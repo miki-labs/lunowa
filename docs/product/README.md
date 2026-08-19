@@ -56,6 +56,47 @@ Logical contracts between modules:
 - background jobs;
 - error semantics.
 
+### `SECURITY-ARCHITECTURE.md`
+
+Lunowa-specific security architecture and trust boundaries:
+
+- browser/server/provider/AI/job trust boundaries;
+- object-level authorization and scope isolation;
+- secret/credential boundaries;
+- HTML email, attachment, remote-content, and prompt-injection handling;
+- idempotency/concurrency/resource containment;
+- cache/search/logging/error isolation;
+- feature-phase activation gates.
+
+### `FAILURE-MODES.md`
+
+Living Lunowa production-failure catalogue:
+
+- cross-user/cross-account data leakage;
+- secret and CI/supply-chain failures;
+- duplicate external effects and concurrency races;
+- Gmail/provider sync and Temporal Contract drift;
+- HTML/attachment/browser threats;
+- AI prompt injection/cross-account context/cost failures;
+- database/query/cache/resource failures;
+- billing/webhook/privacy/recovery/UX-trust failures;
+- severity and implementation/release activation gates.
+
+### `VERIFICATION-CONTRACTS.md`
+
+Observable security/reliability acceptance contracts for implementation and CI:
+
+- secret-canary/client-bundle checks;
+- cross-user authorization negative tests;
+- scope-before-retrieval verification;
+- send idempotency and ambiguous-provider-acceptance tests;
+- stale-worker/concurrency tests;
+- resource/attachment abuse bounds;
+- malicious HTML/prompt-injection isolation;
+- provider reconciliation and billing-webhook contracts;
+- N+1/index/query-plan evidence;
+- guardrail-integrity review requirements.
+
 ### `TECH-STACK.md`
 
 Accepted initial implementation stack and activation policy:
@@ -157,6 +198,9 @@ Do not use one total precedence list for every issue.
 | What product-specific technical boundary/invariant applies? | `docs/product/ARCHITECTURE.md` + accepted relevant ADR |
 | What data concept/ownership applies? | `docs/product/DATA-MODEL.md` |
 | What module/API/job semantics apply? | `docs/product/CONTRACTS.md` |
+| What Lunowa-specific security/trust-boundary invariant applies? | `docs/product/SECURITY-ARCHITECTURE.md` |
+| What known material failure mode/gate applies? | `docs/product/FAILURE-MODES.md` |
+| What observable security/reliability evidence is required? | `docs/product/VERIFICATION-CONTRACTS.md` |
 | What technology/runtime choice is currently accepted? | `docs/product/TECH-STACK.md` + relevant ADR |
 | How should the current implementation effort be sequenced? | `docs/product/IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
 | What is actually implemented now? | current code/schema/migrations/tests/runtime evidence |

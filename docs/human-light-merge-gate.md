@@ -4,16 +4,13 @@
 
 **Accepted initial merge policy for AI-heavy development.**
 
-Lunowa does not assume that a human expert will read every line of every AI-generated diff. Merge confidence must therefore come from an evidence chain that is stronger than “the builder says it works” or “a fresh agent approved it.”
-
-The objective is not zero human involvement. The objective is to spend human attention where judgment is valuable while ordinary implementation correctness is demonstrated mechanically.
+This file defines the Lunowa-specific risk tiers and merge evidence contract. General test/review philosophy remains in `verification-review.md`; general agent workflow remains in `coding-agent-harness.md`.
 
 Related sources:
 
 - `agent-permission-model.md`
-- `coding-agent-harness.md`
 - `verification-review.md`
-- `security-privacy.md`
+- `coding-agent-harness.md`
 - `product/ARCHITECTURE.md`
 - `product/CONTRACTS.md`
 
@@ -25,248 +22,15 @@ Related sources:
 
 > **Human-light does not mean evidence-light.**
 
-A human should not need to reconstruct correctness by manually reading thousands of generated lines. Before merge, the repository should make the important claims observable through:
-
-- accepted intent / acceptance criteria;
-- deterministic type/schema/static constraints;
-- behavior tests at the appropriate layer;
-- runtime/browser/integration evidence when relevant;
-- independent review for non-trivial work;
-- protected-surface detection and human judgment for high-risk changes;
-- rollback/recovery understanding for risky changes.
+A human should not need to prove generated-code correctness by reading every line. Merge confidence should come from accepted behavior, executable constraints/tests, runtime evidence where relevant, fresh review when useful, and focused human judgment where the change can violate an important trust or production boundary.
 
 Passing CI is necessary, not universally sufficient.
 
 ---
 
-## 2. Evidence bundle
+## 2. Common evidence bundle
 
-Every non-trivial PR should make the following answerable without reading the whole diff:
-
-1. **What was intended?**
-   - task/issue/active plan and observable acceptance criteria.
-2. **What changed?**
-   - concise behavioral summary and material changed surfaces.
-3. **What can break?**
-   - actual failure modes relevant to the change.
-4. **What evidence was executed?**
-   - exact checks/tests/runtime actions and results.
-5. **What was not verified?**
-   - explicit limitations, mocks, unavailable provider/runtime evidence.
-6. **Did another context challenge it?**
-   - independent agent review when required by risk/complexity.
-7. **Can it be recovered?**
-   - revert/rollback/forward-fix posture where failure is costly.
-8. **Does a human judgment gate apply?**
-   - risk tier and protected-surface status.
-
-A PR description/completion report should summarize this evidence rather than reproduce implementation reasoning.
-
----
-
-## 3. Risk tiers
-
-Risk is determined by **behavior and authority**, not merely by file extension or diff size.
-
-If uncertain between two tiers, use the higher tier until the uncertainty is resolved.
-
-### R0 — trivial / editorial
-
-Examples:
-
-- typo/copy correction;
-- formatting-only documentation change;
-- non-semantic comment cleanup;
-- narrowly obvious test-data correction with no behavior change.
-
-Required evidence:
-
-- relevant lightweight check;
-- no protected surface;
-- no runtime/security/data behavior change.
-
-Fresh reviewer is optional when the change is genuinely obvious.
-
-Human may merge from the summary/checks without reading the entire diff.
-
-### R1 — ordinary reversible product/engineering change
-
-Examples:
-
-- isolated UI behavior;
-- ordinary component/refactor work;
-- fake-data product slice;
-- non-sensitive helper/domain code with clear tests;
-- accessible/responsive interaction improvement;
-- additive low-risk internal behavior with no privileged external side effect.
-
-Required evidence as applicable:
-
-- explicit acceptance criteria;
-- `Verify` green;
-- `E2E Smoke` and/or targeted Playwright for user-visible flows;
-- focused unit/component/integration tests for the changed failure modes;
-- browser/runtime evidence for frontend/runtime behavior;
-- no unresolved protected surface;
-- fresh independent reviewer for normal non-trivial R1 work;
-- no unexplained warnings/flakes.
-
-For R1, the human normally reviews the **evidence summary/outcome**, not every line of code.
-
-### R2 — high-impact / protected / trust-sensitive
-
-A change is R2 if a mistake can violate a significant trust, security, data-integrity, provider, money, or lifecycle promise even when rollback is technically possible.
-
-Examples include:
-
-- GitHub Actions / verification / build-script policy;
-- dependency or lockfile changes that alter executable supply-chain capability;
-- authentication / authorization / OAuth;
-- provider credential handling;
-- Gmail/Microsoft sync/reconciliation;
-- send/retry/idempotency behavior;
-- Lifecycle authoritative transitions;
-- Temporal Contract persistence/firing/reconciliation;
-- database schema/migrations with durable data impact;
-- data retention/deletion paths;
-- encryption/key-management code;
-- billing/payment logic;
-- production deployment configuration;
-- major architecture/data-authority changes.
-
-Required evidence:
-
-- reviewed design/Task Contract before expensive implementation where appropriate;
-- all relevant R1 evidence;
-- fresh independent reviewer with an explicitly adversarial brief;
-- negative/adversarial tests, not only happy-path tests;
-- integration/provider/migration/idempotency/failure-injection evidence as applicable;
-- rollback/forward-recovery plan;
-- `Guardrail Integrity` exact-head human approval when the protected-surface mechanism applies;
-- human judgment on the **risk-bearing surface**.
-
-Human judgment does **not** require reading unrelated generated code. Keep R2 PRs small enough that the human can inspect the material boundary/change/evidence directly.
-
-### R3 — irreversible / production-dangerous
-
-A change/action is R3 when the main risk is an irreversible or externally consequential operation rather than merely merging code.
-
-Examples:
-
-- destructive production migration with non-trivial rollback risk;
-- production data deletion/retention execution;
-- encryption-key rotation/destruction;
-- broad production OAuth scope/credential changes;
-- changing production secret/IAM boundaries;
-- direct production database repair/mutation;
-- payment settlement/refund automation with material consequence;
-- DNS/domain ownership or destructive cloud administration;
-- bypassing repository/Guardrail protection.
-
-Required posture:
-
-- explicit human design/judgment before execution;
-- staged/canary/dry-run where possible;
-- backups/recovery evidence where relevant;
-- separate production authorization;
-- no coding-agent direct execution by default;
-- no auto-merge/auto-deploy merely because CI is green.
-
-R3 is a human-controlled operation assisted by agents, not an autonomous coding task.
-
----
-
-## 4. Production Merge Gate
-
-### Current mandatory baseline
-
-A normal merge candidate must have:
-
-- PR-based change to `main`;
-- branch based on/up-to-date with current protected `main` once the Ruleset is active;
-- `Verify = success`;
-- `E2E Smoke = success`;
-- `Guardrail Integrity = success` after that mechanism becomes enforced;
-- no merge conflict;
-- acceptance evidence appropriate to its risk tier;
-- no known unresolved blocking review finding.
-
-The GitHub Ruleset is the mechanical floor. Risk-tier requirements may be stricter than the Ruleset.
-
-### Fresh reviewer
-
-For R1 non-trivial and all R2 changes, use a reviewer that:
-
-- starts from fresh context;
-- reads accepted goal/constraints and current repository/diff;
-- does not rely on the builder's hidden reasoning;
-- reviews both conformance and adversarial correctness;
-- may reject the requested design itself.
-
-Fresh review is **one evidence source**, not a replacement for executable verification.
-
----
-
-## 5. Testing Oracle problem
-
-Builder-written tests can encode the same misunderstanding as builder-written code.
-
-Mitigations for important changes:
-
-- acceptance criteria come from durable product/provider contracts before implementation;
-- test externally observable behavior rather than only private implementation details;
-- use independent fixtures/contracts when available;
-- include negative/authorization/failure scenarios;
-- compare provider behavior with official API contracts for integration work;
-- use browser/runtime evidence for UX rather than trusting component snapshots alone;
-- use database constraints/transactions for data invariants that should not depend on application tests;
-- for AI behavior, use held-out representative eval cases and deterministic authority outside model output.
-
-For R2 work, a builder adding both implementation and tests is not enough evidence by itself.
-
----
-
-## 6. What the human actually reviews
-
-### R0
-
-Usually just change intent + green checks.
-
-### R1
-
-Human reviews:
-
-- intended user/system outcome;
-- evidence summary;
-- screenshots/runtime result when visually meaningful;
-- any unresolved limitation/trade-off.
-
-Line-by-line diff reading is normally optional.
-
-### R2
-
-Human reviews:
-
-- why the change is needed;
-- architecture/security/data/side-effect boundary being modified;
-- credible failure modes;
-- relevant focused diff or schema/config boundary where judgment matters;
-- independent reviewer findings;
-- verification evidence;
-- rollback/recovery;
-- exact-head Guardrail approval.
-
-The human is reviewing **the dangerous decision surface**, not proving syntax correctness manually.
-
-### R3
-
-Human owns the decision and production execution authorization.
-
----
-
-## 7. Builder completion report
-
-For non-trivial changes, the builder should report:
+Every non-trivial PR should make these facts easy to inspect:
 
 ```text
 Behavior changed:
@@ -277,102 +41,95 @@ Runtime/integration evidence:
 Independent review:
 Protected surfaces changed:
 Anything not verified:
-Rollback/recovery:
+Rollback/recovery when relevant:
 Durable docs changed:
 ```
 
-Do not report a check as passed if it was mocked, skipped, inferred, or only run on a materially different environment.
+Do not report mocked, skipped, inferred, or differently-scoped verification as if it were executed evidence.
 
 ---
 
-## 8. Merge authority / automation policy
+## 3. Risk tiers
 
-### Current stage
+Risk is based on **behavior, authority, side effects, and reversibility**, not merely file type or line count. If uncertain, use the higher tier until the uncertainty is resolved.
+
+| Tier | Typical changes | Mandatory evidence | Human role |
+| --- | --- | --- | --- |
+| **R0 — trivial/editorial** | typo/copy; formatting-only docs; non-semantic cleanup | relevant lightweight check; no protected/runtime/security/data change | intent + checks; full diff optional |
+| **R1 — ordinary reversible** | isolated UI/component behavior; fake-data slice; low-risk refactor/helper code; accessible/responsive improvement | acceptance criteria; `Verify`; relevant targeted tests; `E2E Smoke`/Playwright/runtime evidence when user-visible; fresh reviewer for non-trivial work; no unresolved Guardrail failure | review outcome/evidence; line-by-line diff normally optional |
+| **R2 — high-impact/trust-sensitive** | auth/OAuth; provider credentials/sync; send/idempotency; Lifecycle; Temporal Contract; migrations; deletion/retention; encryption; billing; CI/tooling/dependency execution policy; deployment/major architecture | reviewed design/Task Contract when needed; R1 evidence; adversarial fresh review; negative/failure/integration/migration/idempotency evidence as applicable; rollback/forward recovery; Guardrail exact-head approval when covered | inspect the **risk-bearing boundary + evidence**, not unrelated generated code |
+| **R3 — irreversible/production-dangerous** | destructive production migration/data deletion; key destruction/rotation; broad prod IAM/secret change; direct prod DB repair; material payment execution; DNS/cloud-admin destruction; protection bypass | explicit human design/authorization; dry-run/staging/canary where possible; backup/recovery evidence; separate production authorization | human owns decision/execution authorization; no direct coding-agent execution by default |
+
+The GitHub Ruleset is the mechanical floor. R2/R3 may require more evidence than the Ruleset can express.
+
+---
+
+## 4. Current mechanical merge floor
+
+Once the repository-safety setup is complete, a normal merge candidate must have:
+
+- PR-based change to `main`;
+- branch up to date with protected `main` while strict status checks are enabled;
+- `Verify = success`;
+- `E2E Smoke = success`;
+- `Guardrail Integrity = success` after that mechanism is enforced;
+- no merge conflict;
+- no unresolved blocking review finding;
+- tier-appropriate evidence from the table above.
+
+For R1 non-trivial and all R2 work, the independent reviewer should start from fresh context, inspect the accepted goal/current repository/diff, and challenge both conformance and the requested design itself. Fresh review is evidence, not a substitute for executable verification.
+
+---
+
+## 5. Testing Oracle risk
+
+Builder-written tests can encode the same misunderstanding as builder-written code. For important/R2 changes, reduce this by using the strongest applicable external authority:
+
+- acceptance criteria from durable product/provider contracts before implementation;
+- observable behavior rather than private implementation details;
+- negative/authorization/failure scenarios;
+- official provider contracts for integration behavior;
+- browser/runtime evidence for UX;
+- database constraints/transactions for durable invariants;
+- migration/idempotency/reconciliation tests for persistence/workflow behavior;
+- held-out representative eval cases for AI behavior while deterministic application logic retains authority.
+
+Builder implementation + builder tests alone are not sufficient R2 evidence.
+
+---
+
+## 6. Current merge authority
 
 **No auto-merge. No agent-controlled merge.**
 
-The human owner performs the final merge after the evidence bundle is complete.
+The human owner performs the final merge after the evidence bundle is complete. One human merge action is currently cheap, and Guardrail/permission/rollback evidence is not mature enough to remove that stop point.
 
-Reason:
+Consider agent/auto-merge for R0/R1 only after all are demonstrably true:
 
-- one human merge click is currently cheap;
-- Guardrail Integrity and permission separation are still being established;
-- the product has not accumulated enough real failure/rollback evidence to justify removing this final stop point.
-
-This is intentionally more conservative than mature high-throughput agent-first case studies whose repositories already have deeper test/observability/rollback infrastructure.
-
-### Revisit criteria
-
-Consider agent/auto-merge for R0/R1 only when all are true:
-
-- `main` Ruleset is active and reliable;
-- Guardrail expected-source spoof tests have passed;
+- `main` Ruleset is active/reliable;
+- Guardrail expected-source spoof tests pass;
 - builder identity cannot issue human Guardrail approval;
-- CI is deterministic enough that bypass/rerun rituals are rare;
-- runtime/browser evidence is routinely generated for affected flows;
+- required CI is deterministic enough that bypass/rerun rituals are rare;
+- relevant runtime/browser evidence is routinely generated;
 - revert/rollback path has been exercised;
-- independent review is available when the tier requires it;
-- actual merged-change history shows that current gates catch the failure modes that matter.
+- independent review is available where required;
+- real merged-change history shows the gates catch the failure modes that matter.
 
-Do not set an arbitrary PR-count target and call that safety evidence.
-
-R2/R3 remain human-gated even if R0/R1 automation later increases.
+Do not use an arbitrary PR-count threshold as safety evidence. R2/R3 remain human-gated even if R0/R1 automation later increases.
 
 ---
 
-## 9. Flakes and failed checks
+## 7. Failure / flake rule
 
-Do not normalize rerunning a failed check until it happens to pass.
+Do not rerun a failed required check until it happens to pass without understanding why it failed.
 
-When a required check fails:
-
-1. inspect the failure;
-2. identify product failure vs infrastructure flake;
-3. fix systemic flakes when recurring;
-4. rerun only when there is a reason the rerun is meaningful;
-5. never weaken/skip a gate merely to unblock the PR.
-
-A flaky required gate is itself a reliability defect because it trains humans/agents to ignore evidence.
+A recurring flaky gate is itself a reliability defect. Inspect the failure, distinguish product failure from infrastructure flake, fix systemic flakes, and never weaken/skip a gate merely to unblock a PR.
 
 ---
 
-## 10. Reversibility and small slices
+## 8. Lunowa-specific R2 promises
 
-AI generation speed is a reason to make **smaller coherent PRs**, not larger ones.
-
-Prefer a PR that:
-
-- has one observable goal;
-- changes one primary risk surface;
-- can be independently verified;
-- can be reverted without unrelated damage;
-- does not bundle opportunistic cleanup.
-
-Do not use an arbitrary line-count limit. Diff size is a signal; semantic coupling and risk are the real constraints.
-
----
-
-## 11. Escalation rules
-
-Escalate the risk tier when:
-
-- the change introduces a new external side effect;
-- durable state/data authority changes;
-- authorization/sensitive data scope expands;
-- a retry/idempotency/concurrency invariant changes;
-- rollback is unclear;
-- verification depends primarily on mocks for a production-relevant property;
-- provider/API behavior is uncertain;
-- a protected surface is changed;
-- the reviewer cannot explain why the evidence is sufficient.
-
-Unknown is not evidence of safety.
-
----
-
-## 12. Current Lunowa-specific high-risk promises
-
-Even before exact implementation paths exist, treat changes to these promises as at least R2:
+Treat changes to these promises as at least R2 even before their final file paths exist:
 
 - `AI understands; rules decide state` authority boundary;
 - ActionItem lifecycle authority and reopen/completion semantics;
@@ -385,4 +142,4 @@ Even before exact implementation paths exist, treat changes to these promises as
 - user-data retention/deletion;
 - any mechanism that can silently hide a real user obligation.
 
-When the concrete modules/paths for these concerns are established, update Guardrail Integrity so the mechanical protected-surface detector covers the stable high-risk boundaries without forcing human approval for ordinary UI/test work.
+When these concerns get stable concrete module paths, add those paths to Guardrail Integrity without forcing human approval for unrelated UI/test work.

@@ -7,13 +7,17 @@ on:
     types: [created, edited]
 
 # This workflow intentionally runs in the trusted base-repository context.
-# It never checks out or executes pull-request code. Its only write authority is
-# posting a commit status on the PR head SHA.
+# It never checks out, installs, or executes pull-request code.
+#
+# The Guardrail status is NOT posted with GITHUB_TOKEN. It is signed by a
+# dedicated GitHub App whose private key is stored in the `guardrail-trust`
+# environment. That environment must allow only the `main` branch. A normal
+# `pull_request` workflow has GITHUB_REF=refs/pull/<n>/merge and therefore
+# cannot access the signing secret.
 permissions:
   contents: read
   issues: read
   pull-requests: read
-  statuses: write
 
 jobs:
   evaluate:
@@ -23,8 +27,19 @@ jobs:
       (github.event_name == 'issue_comment' && github.event.issue.pull_request)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    environment:
+      name: guardrail-trust
+      deployment: false
 
     steps:
+      - name: Create Guardrail signer token
+        id: guardrail-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.GUARDRAIL_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GUARDRAIL_APP_PRIVATE_KEY }}
+          permission-statuses: write
+
       - name: Use Node 24
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
@@ -33,8 +48,8 @@ jobs:
 
       - name: Evaluate protected surfaces
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
+          READ_TOKEN: ${{ github.token }}
+          STATUS_TOKEN: ${{ steps.guardrail-token.outputs.token }}
           EVENT_PATH: ${{ github.event_path }}
           API_URL: ${{ github.api_url }}
           REPOSITORY: ${{ github.repository }}
@@ -45,23 +60,24 @@ jobs:
           node <<'NODE'
           import fs from 'node:fs';
 
-          const token = process.env.GITHUB_TOKEN;
+          const readToken = process.env.READ_TOKEN;
+          const statusToken = process.env.STATUS_TOKEN;
           const apiUrl = process.env.API_URL;
           const repository = process.env.REPOSITORY;
           const runUrl = process.env.RUN_URL;
           const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, 'utf8'));
 
-          if (!token || !apiUrl || !repository) {
-            throw new Error('Required GitHub runtime context is missing.');
+          if (!readToken || !statusToken || !apiUrl || !repository) {
+            throw new Error('Required Guardrail runtime context is missing.');
           }
 
-          async function api(path, options = {}) {
+          async function api(path, token, options = {}) {
             const response = await fetch(`${apiUrl}${path}`, {
               ...options,
               headers: {
                 Accept: 'application/vnd.github+json',
                 Authorization: `Bearer ${token}`,
-                'X-GitHub-Api-Version': '2022-11-28',
+                'X-GitHub-Api-Version': '2026-03-10',
                 ...(options.headers ?? {})
               }
             });
@@ -78,11 +94,15 @@ jobs:
             return response.json();
           }
 
+          async function readApi(path, options = {}) {
+            return api(path, readToken, options);
+          }
+
           async function paginated(path) {
             const items = [];
             for (let page = 1; ; page += 1) {
               const separator = path.includes('?') ? '&' : '?';
-              const batch = await api(`${path}${separator}per_page=100&page=${page}`);
+              const batch = await readApi(`${path}${separator}per_page=100&page=${page}`);
               items.push(...batch);
               if (batch.length < 100) {
                 return items;
@@ -96,12 +116,12 @@ jobs:
             process.exit(0);
           }
 
-          const pullRequest = event.pull_request ?? await api(`/repos/${repository}/pulls/${prNumber}`);
+          const pullRequest = event.pull_request ?? await readApi(`/repos/${repository}/pulls/${prNumber}`);
           const headSha = pullRequest.head.sha;
           const repositoryOwner = event.repository.owner.login;
 
           async function postStatus(state, description) {
-            await api(`/repos/${repository}/statuses/${headSha}`, {
+            await api(`/repos/${repository}/statuses/${headSha}`, statusToken, {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({

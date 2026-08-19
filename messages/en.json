@@ -1,0 +1,8 @@
+{
+  "Bootstrap": {
+    "eyebrow": "Phase 0",
+    "title": "Lunowa foundation is running",
+    "description": "The next implementation step will be a small, verifiable product slice.",
+    "status": "Next.js, Tailwind, localization, and test foundations are connected"
+  }
+}

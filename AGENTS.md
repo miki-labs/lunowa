@@ -8,15 +8,15 @@ This file is a **map**, not the handbook. Read only the source-of-truth document
 
 ## Current repository stage
 
-Lunowa is in **pre-implementation / Phase 0 bootstrap**.
+Lunowa has a **mechanically verified Phase 0 application/runtime foundation**.
 
-Product/UX references, product architecture/contracts, and the initial technology stack are accepted and committed. The real application runtime/scaffold and canonical commands have **not yet been established**, so code/runtime evidence is not yet the source of truth for implementation details.
+Product/UX references, product architecture/contracts, and the initial technology stack are accepted and committed. The real Next.js application scaffold, locked dependencies, canonical commands, unit/component verification, browser smoke verification, and GitHub Actions checks now exist. Phase 1 product UI has **not** been implemented yet.
 
-Do not invent or silently replace framework/database/auth/provider/job/AI choices. Read `docs/product/TECH-STACK.md`, the relevant decision records, and the active bootstrap plan before implementation.
+Executable tooling is now governed by the checked-in runtime/configuration (`package.json`, `pnpm-lock.yaml`, test configuration, and `.github/workflows/ci.yml`). Durable product behavior and architecture remain governed by the relevant docs/decisions.
 
-Current active execution artifact:
+Do not invent or silently replace framework/database/auth/provider/job/AI choices. Read `docs/product/TECH-STACK.md`, the relevant decision records, and the task-specific active plan before implementation.
 
-- `docs/plans/active/phase-0-bootstrap.md`
+Before normal Phase 1 product implementation proceeds, configure the `main` Ruleset so the established `Verify` and `E2E Smoke` checks are required.
 
 ## Source of truth by question
 
@@ -99,15 +99,18 @@ Do not change these casually. If stronger evidence requires a change, reconcile 
 
 ## Canonical commands
 
-**Not established yet.** `docs/plans/active/phase-0-bootstrap.md` must establish and actually verify the real project commands before substantial product implementation proceeds.
+Use these actual repository commands unless a task intentionally changes the toolchain and updates this map in the same change:
 
-Once established, keep this section concise and update it to the actual commands used by humans, Codex, and CI where practical:
+- Install: `pnpm install --frozen-lockfile`
+- Run: `pnpm dev`
+- Typecheck: `pnpm typecheck`
+- Lint: `pnpm lint`
+- Unit/component tests: `pnpm test`
+- Browser smoke: `pnpm test:e2e`
+- Build: `pnpm build`
+- Canonical fast verification: `pnpm verify`
 
-- Install: `<TBD during Phase 0 bootstrap>`
-- Run: `<TBD during Phase 0 bootstrap>`
-- Verify: `<TBD during Phase 0 bootstrap>`
-
-Do not fabricate commands just to satisfy this template.
+GitHub Actions independently runs stable `Verify` and `E2E Smoke` checks. Local success does not substitute for required CI evidence once branch protection is active.
 
 ## Working rules
 
@@ -128,11 +131,9 @@ Do not fabricate commands just to satisfy this template.
 
 Follow `docs/product/IMPLEMENTATION-PLAN.md` and the current active plan.
 
-The immediate task is **Phase 0 bootstrap** in:
+Phase 0 established the application/runtime and verification foundation. The immediate repository-safety follow-up is to require `Verify` and `E2E Smoke` on `main` through a GitHub Ruleset before normal product implementation proceeds.
 
-- `docs/plans/active/phase-0-bootstrap.md`
-
-After bootstrap is mechanically verified, the first product slice is the **high-fidelity fake-data canonical desktop shell**, beginning with:
+After that protection is active, the first product slice is the **high-fidelity fake-data canonical desktop shell**, beginning with:
 
 - `00-brand-system.png`
 - `01-component-system.png`

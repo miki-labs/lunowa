@@ -19,9 +19,9 @@ Internal principle:
 
 ## Current status
 
-**Pre-implementation / bootstrap.**
+**Phase 0 runtime bootstrap is mechanically verified; `main` protection is the immediate next step.**
 
-The current repository already contains:
+The repository now contains:
 
 - the accepted Lunowa product/interaction/responsive design specification;
 - 20 visual UI references;
@@ -31,9 +31,17 @@ The current repository already contains:
 - staged implementation plan;
 - durable architecture decisions;
 - the accepted initial technology stack;
+- a real Next.js/TypeScript application scaffold;
+- locked pnpm dependencies with explicit dependency-build policy;
+- next-intl Japanese/English locale plumbing;
+- Vitest + React Testing Library verification;
+- Playwright browser smoke verification;
+- GitHub Actions with stable `Verify` and `E2E Smoke` checks;
 - a reusable software-engineering baseline inherited from the bootstrap blueprint.
 
-The initial framework/runtime/database/hosting direction is accepted in `docs/product/TECH-STACK.md`. Phase 0 exists to turn the Phase-0 portion of that accepted stack into a real reproducible application scaffold, canonical verification commands, browser smoke evidence, and CI without prematurely activating later provider/auth/database/job/AI services.
+The initial framework/runtime/database/hosting direction remains governed by `docs/product/TECH-STACK.md`. Only the Phase 0 runtime/testing portion is active now; Gmail, production persistence/auth/jobs/AI and other later-phase services remain intentionally unactivated.
+
+Before normal Phase 1 product implementation, the `main` Ruleset should require the established `Verify` and `E2E Smoke` checks.
 
 ---
 
@@ -227,7 +235,7 @@ See `docs/product/IMPLEMENTATION-PLAN.md` and `docs/plans/active/` for acceptanc
 High-level order:
 
 ```text
-0. Bootstrap / runtime + verification + CI establishment
+0. Bootstrap / runtime + verification + CI establishment   [done]
 1. High-fidelity fake-data UI
 2. Domain + persistence foundation
 3. Gmail read-only slice
@@ -239,7 +247,7 @@ High-level order:
 9. Beta hardening
 ```
 
-The first product slice after bootstrap is deliberately **not** Gmail OAuth or AI.
+The first product slice after repository protection is deliberately **not** Gmail OAuth or AI.
 
 It is:
 
@@ -266,15 +274,22 @@ Then implement Moment states `03`–`08` before expensive integrations dictate t
 
 ## Development commands
 
-Not established yet. Phase 0 bootstrap must replace this section with the real commands and update `AGENTS.md` after the commands have actually been executed successfully.
+Requirements:
+
+- Node.js 24 LTS
+- pnpm 11.20.0 (declared by `packageManager`)
 
 ```text
-Install: TBD
-Run:     TBD
-Verify:  TBD
+Install: pnpm install --frozen-lockfile
+Run:     pnpm dev
+Verify:  pnpm verify
+E2E:     pnpm test:e2e
+Build:   pnpm build
 ```
 
-Do not invent command names before the runtime scaffold exists.
+`pnpm verify` runs strict typechecking, ESLint, deterministic Vitest tests, and a production Next.js build. Browser smoke remains an explicit separate layer through Playwright and the GitHub `E2E Smoke` check.
+
+Phase 0 requires no external application/provider secret.
 
 ---
 

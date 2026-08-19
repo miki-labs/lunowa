@@ -1,0 +1,8 @@
+{
+  "Bootstrap": {
+    "eyebrow": "Phase 0",
+    "title": "Lunowaの基盤が動作しています",
+    "description": "次の実装は、検証可能な小さなProduct sliceとして進めます。",
+    "status": "日本語UI・Tailwind・Next.js・テスト基盤を確認中"
+  }
+}

@@ -58,44 +58,42 @@ Logical contracts between modules:
 
 ### `SECURITY-ARCHITECTURE.md`
 
-Lunowa-specific security architecture and trust boundaries:
+Lunowa-specific trust/security contract:
 
-- browser/server/provider/AI/job trust boundaries;
-- object-level authorization and scope isolation;
-- secret/credential boundaries;
-- HTML email, attachment, remote-content, and prompt-injection handling;
-- idempotency/concurrency/resource containment;
+- browser/server/provider/AI/background-job trust boundaries;
+- object-level authorization and Scope isolation;
+- server-only secret/credential boundaries;
+- untrusted HTML/attachment/prompt-injection handling;
+- idempotency, concurrency, resource/cost containment;
 - cache/search/logging/error isolation;
-- feature-phase activation gates.
+- feature-triggered activation rather than premature hardening.
 
 ### `FAILURE-MODES.md`
 
-Living Lunowa production-failure catalogue:
+Living, deliberately focused Lunowa failure catalogue. It currently contains:
 
-- cross-user/cross-account data leakage;
-- secret and CI/supply-chain failures;
-- duplicate external effects and concurrency races;
-- Gmail/provider sync and Temporal Contract drift;
-- HTML/attachment/browser threats;
-- AI prompt injection/cross-account context/cost failures;
-- database/query/cache/resource failures;
-- billing/webhook/privacy/recovery/UX-trust failures;
-- severity and implementation/release activation gates.
+- the ten concrete risks already analyzed (BOLA/ID access, client secret leakage, runaway API calls, N+1, indexes, double-submit, billing webhooks, oversized files, concurrency, error leakage);
+- product-specific risks already implied by accepted Lunowa architecture (Scope leakage, duplicate provider ingestion, ambiguous send acceptance, stale Temporal Contract work, AI authority/prompt injection/uncertainty, hostile HTML, telemetry leakage).
+
+This is **not yet an exhaustive security audit**. Broader research should add only risks that materially apply to Lunowa.
 
 ### `VERIFICATION-CONTRACTS.md`
 
-Observable security/reliability acceptance contracts for implementation and CI:
+Observable security/reliability acceptance contracts for implementation and CI, including:
 
-- secret-canary/client-bundle checks;
+- secret-canary/client-output checks;
 - cross-user authorization negative tests;
-- scope-before-retrieval verification;
-- send idempotency and ambiguous-provider-acceptance tests;
-- stale-worker/concurrency tests;
-- resource/attachment abuse bounds;
-- malicious HTML/prompt-injection isolation;
-- provider reconciliation and billing-webhook contracts;
-- N+1/index/query-plan evidence;
-- guardrail-integrity review requirements.
+- Scope-before-retrieval verification;
+- bounded expensive endpoints;
+- N+1/index evidence;
+- send idempotency/provider ambiguity;
+- concurrency/stale-worker behavior;
+- provider duplicate ingestion;
+- oversized files;
+- billing webhooks;
+- hostile HTML/AI prompt boundaries;
+- telemetry leakage checks;
+- guardrail-integrity review.
 
 ### `TECH-STACK.md`
 

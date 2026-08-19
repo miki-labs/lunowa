@@ -8,9 +8,15 @@ This file is a **map**, not the handbook. Read only the source-of-truth document
 
 ## Current repository stage
 
-Lunowa is in **pre-implementation / bootstrap**. Product/UX references and core architecture contracts are committed; the application stack and runtime code are not yet the source of truth because they have not been established.
+Lunowa is in **pre-implementation / Phase 0 bootstrap**.
 
-Do not invent framework/database/provider implementation decisions silently. Follow `docs/product/IMPLEMENTATION-PLAN.md` and record material choices when bootstrap establishes them.
+Product/UX references, product architecture/contracts, and the initial technology stack are accepted and committed. The real application runtime/scaffold and canonical commands have **not yet been established**, so code/runtime evidence is not yet the source of truth for implementation details.
+
+Do not invent or silently replace framework/database/auth/provider/job/AI choices. Read `docs/product/TECH-STACK.md`, the relevant decision records, and the active bootstrap plan before implementation.
+
+Current active execution artifact:
+
+- `docs/plans/active/phase-0-bootstrap.md`
 
 ## Source of truth by question
 
@@ -28,7 +34,9 @@ Do not invent framework/database/provider implementation decisions silently. Fol
 - `docs/product/ARCHITECTURE.md` — modules, ownership, provider/AI/scheduler boundaries, failures, architectural invariants.
 - `docs/product/DATA-MODEL.md` — conceptual entities, state ownership, persistence/concurrency invariants.
 - `docs/product/CONTRACTS.md` — provider, sync, AI extraction, lifecycle, scheduler, search, draft/send, job/error contracts.
-- `docs/product/IMPLEMENTATION-PLAN.md` — current staged execution plan.
+- `docs/product/TECH-STACK.md` — accepted initial runtime/framework/auth/persistence/jobs/provider/AI/search/testing choices and activation policy.
+- `docs/product/IMPLEMENTATION-PLAN.md` — staged implementation sequence.
+- `docs/plans/active/` — current execution artifacts; read the plan relevant to the task.
 - `docs/decisions/` — durable rationale for costly/high-value architecture choices.
 
 ### Reusable engineering baseline
@@ -52,6 +60,24 @@ Read these only when relevant rather than loading the whole blueprint:
 - `docs/repository-knowledge.md`
 - `docs/references.md`
 
+## Accepted initial stack — concise map
+
+Do not treat this list as a substitute for `docs/product/TECH-STACK.md`.
+
+- Node.js 24 LTS + pnpm + TypeScript strict.
+- Next.js 16.x App Router + supported React 19.x.
+- Tailwind CSS 4 + shadcn/ui; next-intl from the beginning.
+- PostgreSQL 18 hosted initially on Neon; Drizzle ORM/Kit when persistence activates.
+- Better Auth for Lunowa application sessions, **separate from connected-mailbox authorization/credentials**.
+- Vercel for the initial web/API deployment path.
+- Trigger.dev for durable background execution only when real sync/scheduling activates.
+- Gmail API first; Microsoft Graph second.
+- OpenAI Responses API + Structured Outputs for the initial AI interpretation runtime when Phase 6 activates.
+- PostgreSQL full-text search first; no vector/search cluster by default.
+- Vitest + React Testing Library + Playwright for verification.
+
+Do not install/activate later-phase services merely because they are accepted in the architecture. Follow activation phases in `TECH-STACK.md` and the active plan.
+
 ## High-value Lunowa invariants
 
 Do not change these casually. If stronger evidence requires a change, reconcile the durable docs/decision records in the same change.
@@ -67,17 +93,19 @@ Do not change these casually. If stronger evidence requires a change, reconcile 
 9. **Send retries/double-submit must not create duplicate messages.**
 10. **Pin is an explicit user override orthogonal to lifecycle state.**
 11. **Do not silently hide a real user obligation because AI output is missing/uncertain.**
-12. **Prefer reuse/platform/official SDK capabilities before custom infrastructure for non-differentiating concerns.**
+12. **Lunowa application authentication and mailbox authorization are distinct boundaries.**
+13. **Durable job execution is not lifecycle/Temporal Contract authority; persisted domain state is authoritative.**
+14. **Prefer reuse/platform/official SDK capabilities before custom infrastructure for non-differentiating concerns.**
 
 ## Canonical commands
 
-**Not established yet.** Phase 0 bootstrap must define and document the real project commands before substantial implementation proceeds.
+**Not established yet.** `docs/plans/active/phase-0-bootstrap.md` must establish and actually verify the real project commands before substantial product implementation proceeds.
 
 Once established, keep this section concise and update it to the actual commands used by humans, Codex, and CI where practical:
 
-- Install: `<TBD during bootstrap>`
-- Run: `<TBD during bootstrap>`
-- Verify: `<TBD during bootstrap>`
+- Install: `<TBD during Phase 0 bootstrap>`
+- Run: `<TBD during Phase 0 bootstrap>`
+- Verify: `<TBD during Phase 0 bootstrap>`
 
 Do not fabricate commands just to satisfy this template.
 
@@ -98,9 +126,13 @@ Do not fabricate commands just to satisfy this template.
 
 ## Initial implementation sequence
 
-Follow `docs/product/IMPLEMENTATION-PLAN.md`.
+Follow `docs/product/IMPLEMENTATION-PLAN.md` and the current active plan.
 
-The first product slice after bootstrap is the **high-fidelity fake-data canonical desktop shell**, beginning with:
+The immediate task is **Phase 0 bootstrap** in:
+
+- `docs/plans/active/phase-0-bootstrap.md`
+
+After bootstrap is mechanically verified, the first product slice is the **high-fidelity fake-data canonical desktop shell**, beginning with:
 
 - `00-brand-system.png`
 - `01-component-system.png`

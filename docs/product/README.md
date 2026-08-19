@@ -56,6 +56,23 @@ Logical contracts between modules:
 - background jobs;
 - error semantics.
 
+### `TECH-STACK.md`
+
+Accepted initial implementation stack and activation policy:
+
+- Node.js 24 LTS / pnpm / TypeScript strict;
+- Next.js 16.x App Router / React 19.x;
+- Tailwind CSS 4 / shadcn/ui / next-intl;
+- PostgreSQL 18 / Neon / Drizzle;
+- Better Auth for Lunowa application sessions, separated from mailbox authorization;
+- Trigger.dev for durable background execution once real sync/scheduling begins;
+- Gmail API first, Microsoft Graph second;
+- OpenAI Responses API + Structured Outputs for the initial AI interpretation runtime;
+- PostgreSQL full-text search first;
+- Vitest / React Testing Library / Playwright verification stack.
+
+`TECH-STACK.md` also records activation phases, current externally verified constraints, deliberate deferrals, and launch-sensitive provider constraints. Re-check external provider/runtime facts when they materially affect implementation or release.
+
 ### `IMPLEMENTATION-PLAN.md`
 
 Active staged execution plan:
@@ -72,6 +89,28 @@ Active staged execution plan:
 - beta hardening.
 
 This is a living plan, not permanent product semantics.
+
+### Active execution plan
+
+- `../plans/active/phase-0-bootstrap.md` — current Codex-ready bootstrap task contract. It establishes the real application scaffold and canonical verification commands without prematurely activating database/provider/AI/background infrastructure.
+
+---
+
+## Durable architecture decisions
+
+Material choices that should not be silently re-litigated during ordinary implementation live under `docs/decisions/`.
+
+Current high-value decisions include:
+
+- `0001-modular-monolith-default.md`
+- `0002-ai-understands-rules-decide-state.md`
+- `0003-temporal-contracts-use-durable-scheduling.md`
+- `0004-web-runtime-and-ui-stack.md`
+- `0005-auth-and-persistence-stack.md`
+- `0006-provider-sync-and-background-runtime.md`
+- `0007-initial-ai-runtime.md`
+
+A decision can be superseded by stronger evidence, but the reason and consequences should be recorded rather than silently changing architecture through an implementation task.
 
 ---
 
@@ -115,10 +154,11 @@ Do not use one total precedence list for every issue.
 | Question | Primary authority |
 | --- | --- |
 | What should the user experience/interaction be? | `docs/design/*.md` + relevant visual reference |
-| What product-specific technical boundary/invariant applies? | `docs/product/ARCHITECTURE.md` |
+| What product-specific technical boundary/invariant applies? | `docs/product/ARCHITECTURE.md` + accepted relevant ADR |
 | What data concept/ownership applies? | `docs/product/DATA-MODEL.md` |
 | What module/API/job semantics apply? | `docs/product/CONTRACTS.md` |
-| How should the current implementation effort be sequenced? | `docs/product/IMPLEMENTATION-PLAN.md` |
+| What technology/runtime choice is currently accepted? | `docs/product/TECH-STACK.md` + relevant ADR |
+| How should the current implementation effort be sequenced? | `docs/product/IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
 | What is actually implemented now? | current code/schema/migrations/tests/runtime evidence |
 | What generic engineering rule applies? | relevant reusable `docs/*.md` baseline |
 | What is currently true about Gmail/Microsoft/AI/platform APIs? | current official provider documentation, checked at implementation time |
@@ -140,7 +180,9 @@ Keep these visible when planning/implementing:
 7. Core reading/composing remains usable when AI is unavailable.
 8. Scope boundaries apply before search/retrieval/AI context exposure.
 9. Pin is a user override orthogonal to lifecycle state.
-10. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
+10. Lunowa application authentication and connected-mailbox authorization are separate security/domain boundaries.
+11. Durable background execution is not the authority for lifecycle/Temporal Contract state; PostgreSQL/domain state remains authoritative.
+12. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
 
 ---
 
@@ -148,4 +190,4 @@ Keep these visible when planning/implementing:
 
 Update these documents only when durable accepted knowledge changes.
 
-Do not duplicate transient debugging notes or every implementation detail here. Prefer code/tests for local mechanics and decision records for costly-to-reverse rationale.
+Do not duplicate transient debugging notes or every implementation detail here. Prefer code/tests for local mechanics, active plans for current execution, and decision records for costly-to-reverse rationale.

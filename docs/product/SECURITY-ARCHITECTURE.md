@@ -4,446 +4,332 @@
 
 **Accepted product-specific security architecture contract.**
 
-This document specializes the reusable baseline in `../security-privacy.md` for Lunowa's actual trust boundaries, data, and failure modes. It does not replace `ARCHITECTURE.md`, `DATA-MODEL.md`, or `CONTRACTS.md`; it defines the security invariants those artifacts and the implementation must preserve.
+This document specializes the reusable baseline in `../security-privacy.md` for Lunowa's actual trust boundaries. It defines durable security invariants, not an exhaustive checklist or an instruction to implement every later-stage control now.
 
 Related sources:
 
-- `ARCHITECTURE.md` — module ownership and system boundaries.
-- `DATA-MODEL.md` — ownership, persistence, and concurrency concepts.
-- `CONTRACTS.md` — provider, sync, AI, lifecycle, scheduler, send, search, and error contracts.
-- `TECH-STACK.md` — currently accepted implementation stack and activation policy.
-- `FAILURE-MODES.md` — Lunowa-specific risk catalogue and phase ownership.
-- `VERIFICATION-CONTRACTS.md` — observable security/reliability acceptance contracts.
+- `ARCHITECTURE.md` — module/system ownership.
+- `DATA-MODEL.md` — ownership and concurrency concepts.
+- `CONTRACTS.md` — provider, sync, AI, lifecycle, scheduler, send, search, and error semantics.
+- `FAILURE-MODES.md` — currently catalogued Lunowa risks and activation gates.
+- `VERIFICATION-CONTRACTS.md` — observable acceptance contracts.
 - `../security-privacy.md` — reusable security/privacy baseline.
-- `../reliability-operability.md` — reusable reliability/operability baseline.
 
 ---
 
 ## 1. Security objective
 
-Lunowa handles communication that may contain sensitive personal, academic, financial, work, authentication, and account-recovery information. The product also makes a trust-sensitive promise: it may remove communication from immediate attention and resurface it later.
+Lunowa handles communication that may contain sensitive personal/work/academic/account data and makes a trust-sensitive promise: communication may disappear from immediate attention and return later when action is needed.
 
-The security objective is therefore broader than preventing account takeover:
+The architecture must therefore preserve:
 
-1. one user must never receive another user's mailbox or workflow data;
-2. provider credentials and application secrets must remain outside untrusted client/runtime surfaces;
-3. untrusted email/provider/AI content must not gain authority over privileged product actions;
-4. duplicate, delayed, retried, or concurrent execution must not create harmful side effects or silently corrupt lifecycle state;
-5. expensive provider/AI/background paths must be bounded so bugs or abuse cannot create uncontrolled cost or resource exhaustion;
-6. failure must degrade toward visible, repairable states rather than silently hiding obligations;
-7. logs, analytics, support tooling, errors, and caches must not become secondary data-leak channels.
+1. **data isolation** — one user/account/scope never receives another's protected content;
+2. **credential isolation** — provider/application secrets remain outside untrusted client surfaces;
+3. **authority isolation** — untrusted email/provider/AI content cannot grant authorization or own privileged actions;
+4. **side-effect safety** — retries/double-submit/concurrency do not create duplicate or contradictory effects;
+5. **lifecycle safety** — stale/uncertain work cannot silently hide or overwrite a real obligation;
+6. **bounded execution** — bugs/abuse cannot create uncontrolled provider/AI/resource cost;
+7. **safe observability** — errors/logs/analytics do not become a secondary sensitive-data channel.
 
-Security controls should be activated when the corresponding product surface becomes real. Do not build enterprise controls for surfaces that do not yet exist, but do not postpone architectural invariants until launch.
+Implement controls when the corresponding feature becomes real. Preserve the architectural boundary from the beginning.
 
 ---
 
 ## 2. Trust boundaries
 
-### 2.1 Browser / client
+### Browser / client
 
-The browser is **not trusted** for authorization, lifecycle authority, provider credentials, send idempotency, or Temporal Contract execution.
+The browser is not trusted for:
 
-Client-visible values are assumed observable and modifiable by the user or an attacker controlling the browser environment.
+- authorization;
+- provider credentials/secrets;
+- lifecycle authority;
+- Temporal Contract execution;
+- send idempotency;
+- privileged provider mutations.
 
-The client may own rendering, ephemeral UI state, draft editing before persistence acknowledgement, and safe optimistic feedback. It must not be the only enforcement point for any privileged operation.
+Client-visible values are assumed observable and modifiable. Browser-only validation, hidden routes, disabled buttons, or unpredictable IDs are UX aids, not correctness/security controls.
 
-### 2.2 Lunowa application boundary
+### Lunowa application/API
 
-The server-side application/API is the trusted boundary for:
+The server-side application boundary owns:
 
 - authenticated Lunowa identity;
 - object/action authorization;
-- scope/account ownership resolution;
-- validation of client writes;
+- account/scope ownership resolution;
 - privileged provider operations;
-- send idempotency coordination;
-- lifecycle and Temporal Contract mutation;
-- server-side access to credentials and secrets.
+- authoritative lifecycle/Temporal Contract mutations;
+- server-only secrets and credentials;
+- side-effect/idempotency coordination.
 
-Authentication answers who the actor is. Every privileged read/write must separately answer whether that actor may perform the requested operation on the specific authoritative resource.
+Authentication answers **who** the actor is. Authorization separately answers whether that actor may perform this operation on this resource.
 
-### 2.3 Mailbox provider boundary
+### Mailbox provider
 
-Gmail and future mailbox providers are external authorities for provider mailbox facts, not Lunowa workflow authority.
+Gmail and future providers are authorities for mailbox facts, not Lunowa workflow state.
 
-Provider payloads, identifiers, webhook/push notifications, message bodies, HTML, attachments, sender names, subjects, and headers are untrusted application input even when delivered by an authenticated provider API.
+Provider payloads, message bodies, HTML, attachments, sender names, headers, push notifications, and IDs are external input and must be validated/handled as untrusted data at the application boundary.
 
-Provider OAuth credentials are separate from Lunowa application authentication/session state.
+Mailbox OAuth credentials are distinct from Lunowa login/session credentials.
 
-### 2.4 AI boundary
+### AI
 
 AI output is untrusted structured input.
 
-AI may extract or propose facts, summaries, deadlines, owners, intent, and confidence/provenance. AI output must not directly:
+AI may propose facts such as action, owner, deadline, completion/waiting signal, summary, provenance, and confidence. It must not directly:
 
-- authorize data access;
-- select cross-account data outside already-authorized scope;
-- send a message;
-- delete provider data;
-- change billing/entitlement;
-- execute arbitrary tool instructions embedded in email content;
-- become authoritative lifecycle state without deterministic application rules.
-
-Core rule:
+- authorize access;
+- widen account/scope retrieval;
+- send/delete provider content;
+- own billing/entitlement;
+- execute instructions embedded in email content;
+- become authoritative lifecycle state without deterministic rules.
 
 > **AI understands. Deterministic application logic decides authoritative state and privileged effects.**
 
-### 2.5 Background-job boundary
+### Durable/background execution
 
-Workers, schedulers, retries, webhook handlers, sync processors, and Temporal Contract jobs are not implicitly trusted merely because they run server-side.
+A worker is not trusted merely because it runs server-side.
 
-Every durable job that acts on user state must re-read authoritative current state and re-check the relevant ownership/version/precondition before applying a privileged mutation or external side effect.
-
-A stale job must become a safe no-op, reconciliation request, or explicit conflict/error state rather than overwriting newer truth.
-
-### 2.6 Third-party operational systems
-
-Hosting, database, background-job provider, analytics, logging, email-delivery, payment, error-monitoring, CI/CD, and support systems are additional data/trust boundaries.
-
-Only the minimum data required for their purpose should cross those boundaries. Raw mailbox content, credentials, and provider tokens must not be copied into observability/support systems by default.
+Before applying a privileged mutation or external side effect, durable jobs must re-read current authoritative state and re-check relevant ownership/version/preconditions. Stale work must become a no-op, conflict, or re-evaluation path rather than overwriting newer truth.
 
 ---
 
 ## 3. Authorization architecture
 
-### 3.1 Object-level authorization is mandatory
+### Object-level authorization
 
-Unpredictable IDs, UUIDs, hidden routes, or client-side filtering are not authorization controls.
+UUIDs/unpredictable IDs do not solve authorization.
 
-Every server operation using a user-controlled resource identifier must derive access from trusted ownership relationships such as:
+Every privileged operation using a client-controlled resource ID must scope access through trusted ownership relationships, conceptually such as:
 
-`User -> Scope -> ConnectedAccount -> Conversation -> Message/Attachment/ActionItem/TemporalContract/Draft/SendOperation`
+`User -> Scope -> ConnectedAccount -> Conversation -> Message / Attachment / ActionItem / TemporalContract / Draft / SendOperation`
 
-The exact schema may evolve, but privileged reads/writes must be scoped through authoritative ownership rather than trusting an ID supplied by the client.
+The exact schema may evolve; the invariant does not.
 
-### 3.2 Scope boundary before retrieval
+### Scope before retrieval
 
-Scope/account authorization must be applied **before**:
+Account/scope authorization must apply **before** protected content enters:
 
-- search results are returned;
-- AI context is assembled;
-- previews/summaries are generated or retrieved;
-- attachments/messages are fetched;
-- background jobs load content for processing.
+- search results;
+- previews/summaries;
+- AI context;
+- attachment/message fetches;
+- background processing.
 
-Filtering after cross-account retrieval is not an acceptable isolation strategy for sensitive data.
+Filtering after broad cross-account retrieval is not an acceptable isolation boundary.
 
-### 3.3 Negative authorization behavior
+### Negative behavior
 
-Cross-user/cross-account access must fail without leaking protected object content or mutating protected state.
+Cross-user/cross-account access must return no protected content and produce no protected state change. Where product semantics do not require disclosure that another user's object exists, avoid turning errors into an object-enumeration oracle.
 
-Where product semantics do not require the caller to know that another user's object exists, prefer a response that does not become an enumeration oracle.
+### Database defense in depth
 
-### 3.4 Optional database defense in depth
-
-Application authorization remains mandatory. Database-level controls such as Row Level Security may be added selectively when they materially reduce blast radius and remain understandable/testable with the chosen data-access architecture.
-
-RLS must not be treated as a substitute for application authorization semantics or as a checkbox requirement before the persistence model exists.
+Application authorization remains mandatory. Database-level mechanisms such as RLS may be added selectively if they materially reduce blast radius and remain understandable/testable with the chosen persistence architecture. They are not a substitute for application authorization semantics.
 
 ---
 
 ## 4. Secret and credential architecture
 
-### 4.1 Server-only credentials
+Server-side secrets include, unless a provider explicitly defines a public/publishable counterpart:
 
-The following classes are server-side secrets unless a provider explicitly defines a public/publishable counterpart:
-
-- database credentials/connection strings containing credentials;
+- database credentials;
 - OAuth client secrets;
-- mailbox refresh/access tokens;
-- OpenAI or other model-provider secret keys;
-- Stripe secret keys and webhook signing secrets;
-- application/session encryption or signing secrets;
-- background-job/provider credentials;
-- operational service tokens.
+- mailbox access/refresh tokens;
+- model-provider secret keys;
+- payment secret/webhook keys;
+- application signing/encryption/session secrets;
+- background-job/operational credentials.
 
-They must not be placed in client-exposed environment namespaces, client bundles, source maps, public runtime configuration, logs, analytics payloads, browser storage, or committed fixtures.
+They must not appear in:
 
-### 4.2 Public identifiers are not secrets
+- client-exposed environment namespaces;
+- browser bundles/static assets/source maps;
+- public runtime config;
+- source control;
+- normal logs/analytics;
+- browser storage;
+- ordinary test fixtures.
 
-OAuth client IDs, analytics project IDs, and payment publishable keys may be intentionally public depending on the provider contract. Their presence must not be confused with exposure of a credential capable of privileged server-side action.
+Public identifiers such as OAuth client IDs, analytics project IDs, or payment publishable keys may intentionally be public depending on provider semantics; do not confuse them with privileged credentials.
 
-### 4.3 Agent and CI access
-
-Ordinary coding-agent environments should not receive production credentials. CI permissions should be the minimum required for verification/build/deployment responsibilities.
-
-Changes to workflows, secret handling, deployment, auth/authz, and other guardrail surfaces require stronger review than ordinary product UI changes.
+Ordinary coding-agent environments should not receive production credentials.
 
 ---
 
 ## 5. Untrusted communication content
 
-### 5.1 HTML email
+### HTML email
 
-Email HTML is hostile input.
+Real email HTML is hostile input. It must not gain script execution, application-origin DOM authority, access to Lunowa session/credential data, or privileged navigation/action capability.
 
-Rendering must prevent message content from gaining script execution, application-origin DOM authority, access to Lunowa credentials/session data, or unsafe navigation behavior.
+The final implementation must use an isolation/sanitization strategy appropriate to the chosen renderer and browser/runtime. Do not treat successful display as proof of safe rendering.
 
-Prefer a rendering boundary that makes the email document less trusted than the application shell. Sanitization, restrictive sandboxing/isolation, controlled link handling, appropriate security headers/CSP, and remote-resource policy should be selected based on the final implementation.
+### Attachments
 
-### 5.2 Remote images and tracking resources
+Attachments remain untrusted even when fetched from an authenticated mailbox provider.
 
-Remote email resources can reveal user activity and can become a security/privacy boundary. They should not be fetched blindly as ordinary application resources.
+When attachment/upload handling becomes real, define and enforce server/provider-boundary limits for the relevant subset of:
 
-The product should define an explicit remote-content policy before real mailbox rendering is considered production-ready.
+- bytes per file/request;
+- file count;
+- handled content types;
+- processing time/memory;
+- archive/decompression behavior if supported;
+- storage/retention/deletion.
 
-### 5.3 Attachments
+Do not read arbitrarily large payloads fully into memory before rejection.
 
-Attachments are untrusted even when fetched from a legitimate mailbox provider.
+### AI prompt injection
 
-Before attachment processing/downloading/uploading features become real, define:
+Email bodies, quoted text, attachments, and retrieved web content may contain instructions targeting the model. They are data, not trusted system instructions.
 
-- maximum file and aggregate request sizes;
-- file-count bounds;
-- accepted/handled content types;
-- filename normalization/display behavior;
-- decompression/archive limits if archives are processed;
-- malware/content handling strategy proportional to the feature;
-- processing time/memory bounds;
-- storage/retention/deletion behavior.
-
-Do not load arbitrarily large bodies into application memory before rejecting them.
-
-### 5.4 Prompt injection from communication
-
-Message bodies, attachments, quoted text, signatures, and retrieved web content may contain instructions targeted at an AI model.
-
-They are data, not trusted instructions. AI context construction must preserve the distinction between application/system policy and user/provider content. Privileged actions must remain gated by deterministic product controls and authorization outside model text.
+Privileged action/authorization/lifecycle gates must live outside model text so prompt injection cannot expand authority.
 
 ---
 
 ## 6. Side-effect safety and idempotency
 
-Any external or non-trivially reversible side effect must define retry semantics.
+Any non-trivially reversible external effect must define:
 
-High-risk examples include:
+- logical operation identity;
+- retry semantics;
+- uniqueness/idempotency boundary;
+- ambiguous-acceptance behavior;
+- reconciliation authority.
 
-- sending email;
-- provider mailbox mutation;
-- payment/entitlement mutation;
-- account linking/unlinking;
-- durable scheduling/resurfacing;
-- deletion/export workflows.
+High-risk examples include send, provider mailbox mutation, billing/entitlement mutation, account linking/unlinking, deletion/export, and durable resurfacing transitions.
 
-UI button disabling is only a convenience control. Server-side idempotency/concurrency protection owns correctness.
+UI button disabling is only a convenience control.
 
-For sending, preserve the existing `SendOperation`/operation-id contract: concurrent double-submit, transport retries, provider ambiguity, and worker retries must not blindly create duplicate messages. Ambiguous provider acceptance must enter an explicit reconciliation state rather than being treated as a simple failure safe to resend.
+For email send, preserve the existing `SendOperation` contract: concurrent double-submit, transport retry, provider ambiguity, and worker retry must not blindly create duplicate messages. Provider acceptance with lost acknowledgement is an explicit ambiguous state that requires reconciliation before resend.
 
 ---
 
 ## 7. Concurrency and stale work
 
-Lunowa must assume the same logical state can be changed by:
+Assume the same logical state can be changed by:
 
-- multiple browser tabs/devices;
+- two browser tabs/devices;
 - user action plus mailbox sync;
 - incoming provider events;
 - AI interpretation completion;
-- Temporal Contract workers;
+- Temporal Contract/background workers;
 - retry/reconciliation jobs.
 
-Critical state transitions should use an explicit concurrency strategy appropriate to the invariant: transaction boundaries, conditional updates/version checks, unique constraints, row locks, idempotency records, or deterministic reduction from authoritative events/state.
+Critical state transitions need an explicit concurrency strategy appropriate to the invariant: version/precondition checks, transaction semantics, unique constraints, row locks, idempotency records, or deterministic reduction from authoritative state/events.
 
 A database transaction alone does not define product conflict semantics.
 
 Particularly important:
 
-- a stale Temporal Contract worker must not overwrite a newer user/provider-derived state;
-- duplicate ingestion must not duplicate messages/actions;
-- concurrent send requests must converge on one logical SendOperation;
-- completion/reopen/follow-up transitions must be explainable from current authoritative state.
+- stale Temporal Contract work cannot overwrite newer state;
+- duplicate provider ingestion cannot duplicate normalized messages/actions;
+- concurrent sends converge on one logical SendOperation;
+- meaningful lifecycle transitions cannot be silently lost by accidental last-write-wins behavior.
 
 ---
 
 ## 8. Resource and cost containment
 
-Public or semi-public endpoints that can trigger disproportionate CPU, memory, provider requests, model usage, background work, or storage must have explicit bounds before exposure.
+Before public exposure, materially expensive paths need explicit bounds appropriate to their cost and side effects.
 
-Likely Lunowa hotspots include:
+Likely hotspots:
 
 - AI interpretation/summarization;
-- mailbox sync/fetch/reconciliation;
-- sending;
+- mailbox sync/reconciliation;
+- send;
 - search;
 - attachment transfer/processing;
-- OAuth/reconnect flows;
+- OAuth/reconnect;
 - Temporal Contract scheduling/re-evaluation;
 - future billing/webhook processing.
 
-Use the smallest useful combination of:
+Possible controls include per-user/account/operation rate limits, request/body limits, bounded concurrency, dedupe/coalescing, provider-aware backoff, hard execution limits, and quotas where economically necessary.
 
-- request/body limits;
-- per-user/account/operation rate limits;
-- bounded concurrency;
-- deduplication/coalescing;
-- provider-aware backoff;
-- daily/period quotas where necessary;
-- circuit breakers/hard limits for economically dangerous paths.
-
-Do not rely solely on cost alerts when a loop can spend materially faster than a human can react.
+Do not rely only on after-the-fact cost alerts when a loop can spend materially faster than the operator can react.
 
 ---
 
-## 9. Cache, search, and derived-state isolation
+## 9. Cache/search/derived-state isolation
 
-Any cache, search index, summary store, preview store, or AI-derived projection containing user communication must preserve the same authorization/scope boundary as the authoritative source.
+Any cache, search index, preview/summary store, or AI-derived projection containing user communication must preserve the same authorization boundary as the authoritative source.
 
-Derived data must never become a shortcut around authorization.
+Derived state must not become an authorization shortcut.
 
-Cache keys must include the dimensions required to prevent cross-user/cross-account reuse. Shared/private caching behavior must be explicit for authenticated personalized content.
-
-Search and AI projections should reference authoritative records so access can be re-resolved before content is exposed.
+Personalized cache keys must include the identity/account/scope dimensions required to prevent cross-user/cross-account reuse. Search/AI projections should resolve back to authoritative authorized records before protected content is exposed.
 
 ---
 
-## 10. Error, logging, analytics, and support data
+## 10. Errors, logs, analytics, and support
 
-### 10.1 Public errors
+### Public errors
 
-User-facing production errors should expose stable product-safe semantics and an error/request identifier when useful, not stack traces, raw SQL/provider responses, credentials, internal filesystem paths, or sensitive mailbox content.
+Production-facing errors should expose stable user-safe semantics and an error/request identifier when useful, not stack traces, credentials, raw SQL/provider responses, sensitive paths, or raw mailbox content.
 
-### 10.2 Server logs
+### Logs/analytics/support
 
-Detailed server-side diagnostics may exist, but sensitive data must be minimized/redacted. Do not log by default:
+Do not emit by default:
 
 - access/refresh tokens;
-- OAuth client secrets;
-- session secrets;
-- full authorization headers;
-- raw email bodies/attachments;
-- model prompts containing unnecessary mailbox content;
-- payment secrets;
-- database credentials.
+- secrets/authorization headers;
+- database credentials;
+- raw attachment bytes;
+- unnecessary raw email bodies;
+- model prompts containing unnecessary mailbox content.
 
-### 10.3 Analytics and support
-
-Analytics/support tooling should receive identifiers and event metadata sufficient for product/incident diagnosis without copying raw communication content unless a reviewed feature explicitly requires it.
+Prefer metadata/event-oriented observability sufficient to diagnose failures without duplicating the user's mailbox into operational systems.
 
 ---
 
 ## 11. Failure posture
 
-Security-sensitive failure should move toward visible, bounded, recoverable states.
+Security/reliability-sensitive failure should move toward visible, bounded, recoverable states.
 
 Examples:
 
-- uncertain AI interpretation -> preserve/raise uncertainty; do not silently hide an obligation;
-- AI unavailable -> normal mail reading/composing continues;
-- send acknowledgement ambiguous -> reconcile before blind resend;
-- stale worker -> no-op/re-evaluate from current state;
-- provider sync cursor invalid -> controlled reconciliation/full sync path;
+- uncertain/failed AI -> preserve uncertainty; do not silently hide an obligation;
+- AI unavailable -> normal mail reading/composing remains usable;
+- ambiguous send -> reconcile before blind resend;
+- stale worker -> no-op/re-evaluate from current authoritative state;
 - authz uncertainty -> fail closed;
-- secret/configuration missing -> fail startup/operation safely rather than substitute a client-visible fallback;
-- remote/attachment content unsafe or oversized -> reject or offer a constrained fallback.
+- missing secret/config -> fail safely rather than substitute a client-visible fallback;
+- oversized/unhandled content -> reject or use a constrained fallback.
 
 ---
 
-## 12. Activation by implementation phase
+## 12. Activation by feature
 
-This document records durable invariants. Implementation should activate controls with the corresponding real surface.
+| Feature/stage | Security/reliability controls that become mandatory |
+| --- | --- |
+| Current runtime foundation | server/client secret boundary; safe public errors; CI guardrails; no production credentials in ordinary agent context |
+| Auth + persistence | object authorization; cross-user negative tests; ownership-aware queries; concurrency strategy |
+| Gmail read/sync | credential protection; provider input validation; idempotent ingestion/reconciliation; account/scope isolation |
+| Real HTML/attachments | untrusted-content isolation plus file/resource limits before public use |
+| Real send | SendOperation idempotency; double-submit/concurrency tests; ambiguous provider acceptance/reconciliation; draft preservation |
+| Temporal Contracts/jobs | persisted promises; stale-worker/version protection; retry/reconciliation; bounded execution |
+| AI interpretation | structured validation; authorized context construction; prompt-injection boundary; uncertainty fallback; cost bounds |
+| Billing | provider authenticity verification; webhook idempotency/reconciliation; explicit commercial authority |
 
-### Runtime / Phase 0 foundation
-
-Required now:
-
-- no committed/runtime-client secret leakage;
-- secure environment separation assumptions;
-- production-safe error defaults;
-- CI/verification protection for guardrail files once repository Ruleset is configured;
-- no privileged feature implemented only in the browser.
-
-### Fake-data UI
-
-Required:
-
-- no real sensitive mailbox fixtures;
-- rendered sample HTML must not create a false security assumption for real email rendering;
-- preserve server-authority boundaries in component/API design even if data is fake.
-
-### Persistence / auth
-
-Required:
-
-- object-level authorization model;
-- cross-user negative tests;
-- ownership-aware query patterns;
-- concurrency/version strategy for mutable authoritative state;
-- session/account lifecycle behavior appropriate to enabled auth features.
-
-### Gmail read/sync
-
-Required:
-
-- mailbox credential protection;
-- provider payload validation;
-- idempotent ingestion/reconciliation;
-- HTML/remote-content policy before real rendering;
-- cross-account isolation in search/context/preview paths.
-
-### Real send
-
-Required:
-
-- SendOperation idempotency;
-- concurrent/double-submit tests;
-- provider ambiguity/reconciliation behavior;
-- safe retries and draft preservation.
-
-### Temporal Contracts / background work
-
-Required:
-
-- durable persisted trigger state;
-- stale-worker/version checks;
-- retry/reconciliation behavior;
-- bounded scheduling/re-evaluation work.
-
-### AI interpretation
-
-Required:
-
-- structured-output validation;
-- prompt-injection boundary;
-- provenance/confidence/abstention handling;
-- no model-owned authorization/lifecycle/side effects;
-- bounded model cost/usage.
-
-### Attachments / uploads
-
-Required before public use:
-
-- size/count/type/processing/storage limits;
-- safe download/render behavior;
-- abuse/memory exhaustion verification.
-
-### Billing
-
-Required when activated:
-
-- verified webhook authenticity;
-- duplicate-event handling/idempotency;
-- asynchronous/retriable processing;
-- reconciliation of Lunowa entitlement state with provider authority;
-- no raw card-data handling unless intentionally reviewed.
+Do not activate later-feature infrastructure merely because it appears in this table.
 
 ---
 
-## 13. Security architecture review triggers
+## 13. Review triggers
 
-Update this document, the relevant threat/failure entry, and verification contract when a change materially introduces or alters:
+Revisit this document when a change materially alters:
 
-- identity/auth/account recovery;
-- authorization/multi-account boundaries;
-- Gmail/Microsoft scopes or token storage;
+- auth/account recovery or ownership;
+- Gmail/Microsoft scopes/token handling;
 - public APIs/webhooks;
-- raw HTML/attachment processing;
+- HTML/attachment/remote-content processing;
 - AI tool/action capability;
-- search/derived caches containing mailbox content;
-- durable jobs/Temporal Contract execution;
+- search/caches containing mailbox content;
+- durable jobs/Temporal Contracts;
 - payment/entitlement;
 - deletion/export/retention;
 - deployment/runtime trust boundary;
-- secret/CI permissions;
-- new sensitive third-party data processor.
+- CI/secret permissions;
+- a new sensitive third-party data processor.
 
-Do not add controls solely because a checklist mentions them. Tie each control to a real Lunowa asset, boundary, failure mode, or release surface.
+Do not add a permanent control solely because a generic checklist contains it. Tie the control to a real Lunowa asset, boundary, failure mode, or release surface.

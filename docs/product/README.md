@@ -129,9 +129,7 @@ Active staged execution plan:
 
 This is a living plan, not permanent product semantics.
 
-### Active execution plan
-
-- `../plans/active/phase-0-bootstrap.md` — current Codex-ready bootstrap task contract. It establishes the real application scaffold and canonical verification commands without prematurely activating database/provider/AI/background infrastructure.
+When a task-specific execution artifact exists under `../plans/active/`, use it for that task. There is currently no requirement that such a file always exist.
 
 ---
 
@@ -200,7 +198,7 @@ Do not use one total precedence list for every issue.
 | What known material failure mode/gate applies? | `docs/product/FAILURE-MODES.md` |
 | What observable security/reliability evidence is required? | `docs/product/VERIFICATION-CONTRACTS.md` |
 | What technology/runtime choice is currently accepted? | `docs/product/TECH-STACK.md` + relevant ADR |
-| How should the current implementation effort be sequenced? | `docs/product/IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
+| How should the current implementation effort be sequenced? | `docs/product/IMPLEMENTATION-PLAN.md` + current task-specific `docs/plans/active/` artifact when present |
 | What is actually implemented now? | current code/schema/migrations/tests/runtime evidence |
 | What generic engineering rule applies? | relevant reusable `docs/*.md` baseline |
 | What is currently true about Gmail/Microsoft/AI/platform APIs? | current official provider documentation, checked at implementation time |

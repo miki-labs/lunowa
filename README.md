@@ -30,9 +30,10 @@ The current repository already contains:
 - integration/domain contracts;
 - staged implementation plan;
 - durable architecture decisions;
+- the accepted initial technology stack;
 - a reusable software-engineering baseline inherited from the bootstrap blueprint.
 
-The application framework/runtime/database/hosting stack has **not** yet been fixed. Phase 0 of the implementation plan exists specifically to make those choices deliberately rather than silently embedding them in the first generated code.
+The initial framework/runtime/database/hosting direction is accepted in `docs/product/TECH-STACK.md`. Phase 0 exists to turn the Phase-0 portion of that accepted stack into a real reproducible application scaffold, canonical verification commands, browser smoke evidence, and CI without prematurely activating later provider/auth/database/job/AI services.
 
 ---
 
@@ -134,6 +135,7 @@ docs/product/
 ├── ARCHITECTURE.md
 ├── DATA-MODEL.md
 ├── CONTRACTS.md
+├── TECH-STACK.md
 └── IMPLEMENTATION-PLAN.md
 ```
 
@@ -142,7 +144,8 @@ Key responsibilities:
 - `ARCHITECTURE.md` — system shape, modules, authorities, provider/AI/scheduler boundaries, failure behavior, invariants.
 - `DATA-MODEL.md` — conceptual entities and ownership.
 - `CONTRACTS.md` — normalized provider/sync/AI/lifecycle/scheduler/search/send/job contracts.
-- `IMPLEMENTATION-PLAN.md` — active staged execution plan.
+- `TECH-STACK.md` — accepted initial implementation stack and activation phases.
+- `IMPLEMENTATION-PLAN.md` — staged implementation sequence.
 
 ### Durable decisions
 
@@ -150,7 +153,8 @@ Key responsibilities:
 docs/decisions/
 ├── 0001-modular-monolith-default.md
 ├── 0002-ai-understands-rules-decide-state.md
-└── 0003-temporal-contracts-use-durable-scheduling.md
+├── 0003-temporal-contracts-use-durable-scheduling.md
+└── ...
 ```
 
 ### Reusable engineering baseline
@@ -202,28 +206,28 @@ When screenshots conflict with accepted Markdown behavior, follow the relevant t
 
 ## Architecture direction
 
-Initial default:
+Accepted initial direction is recorded in `docs/product/TECH-STACK.md`. At a high level it is:
 
 - **responsive web-first**;
-- **modular monolith**;
-- **relational primary application store**;
-- **durable background job/scheduling mechanism**;
-- **Gmail and Microsoft adapters behind provider contracts**;
-- **one initial evaluated AI provider/model rather than premature multi-provider infrastructure**;
-- **rebuildable search/AI projections where practical**.
+- **Next.js/TypeScript modular monolith** initially;
+- **PostgreSQL** as the durable relational store when persistence activates;
+- **durable background execution** when provider sync/Temporal Contracts activate;
+- **Gmail first, Microsoft Graph later** behind provider contracts;
+- **one initial evaluated AI provider/runtime** rather than premature multi-provider infrastructure;
+- **PostgreSQL search first** with rebuildable derived projections where practical.
 
-Exact framework/database/hosting choices are intentionally deferred to bootstrap and should be selected based on current official ecosystem support, product fit, maintenance cost, and solo-developer operability.
+The accepted stack is not permission to activate every later-phase dependency during bootstrap. Phase-specific plans control when services and dependencies become real implementation requirements.
 
 ---
 
 ## Implementation sequence
 
-See `docs/product/IMPLEMENTATION-PLAN.md` for acceptance criteria and stop conditions.
+See `docs/product/IMPLEMENTATION-PLAN.md` and `docs/plans/active/` for acceptance criteria, stop conditions, and the current execution artifact.
 
 High-level order:
 
 ```text
-0. Bootstrap / stack decision
+0. Bootstrap / runtime + verification + CI establishment
 1. High-fidelity fake-data UI
 2. Domain + persistence foundation
 3. Gmail read-only slice
@@ -262,7 +266,7 @@ Then implement Moment states `03`–`08` before expensive integrations dictate t
 
 ## Development commands
 
-Not established yet. Phase 0 bootstrap must replace this section with the real commands and update `AGENTS.md`.
+Not established yet. Phase 0 bootstrap must replace this section with the real commands and update `AGENTS.md` after the commands have actually been executed successfully.
 
 ```text
 Install: TBD
@@ -270,7 +274,7 @@ Run:     TBD
 Verify:  TBD
 ```
 
-Do not invent command names before the stack exists.
+Do not invent command names before the runtime scaffold exists.
 
 ---
 
@@ -281,7 +285,7 @@ For non-trivial work:
 1. read `AGENTS.md`;
 2. inspect only the relevant design/product sources;
 3. inspect current code/tests once they exist;
-4. use `docs/product/IMPLEMENTATION-PLAN.md` for current sequencing;
+4. follow the relevant active plan under `docs/plans/active/`;
 5. scope the task with Goal / Why / Scope / Non-goals / invariants / visual references / acceptance criteria / verification / stop conditions;
 6. implement a small coherent slice;
 7. run real verification (browser/runtime/provider/integration as required);

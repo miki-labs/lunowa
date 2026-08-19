@@ -8,6 +8,8 @@ This is the current execution artifact for bootstrapping Lunowa's real applicati
 
 The goal is to establish a reproducible, verified application foundation that Codex can extend into the high-fidelity fake-data product shell in Phase 1.
 
+Phase 0 also establishes the first repository-level verification gate: local canonical commands and GitHub Actions must exercise the same accepted baseline before later Human-light development depends on them.
+
 This plan does **not** authorize implementation of Gmail, Microsoft Graph, Neon production data, Trigger.dev production jobs, or OpenAI runtime behavior yet.
 
 ---
@@ -20,6 +22,8 @@ Create the smallest real Lunowa application scaffold that:
 - runs locally with one documented command;
 - builds reproducibly;
 - has strict type/lint/test verification;
+- exposes one canonical `verify` command shared by humans, Codex, and CI where practical;
+- has GitHub Actions that independently verify proposed changes with stable `Verify` and `E2E Smoke` checks;
 - is ready to implement the committed visual references;
 - supports Japanese-first UI without hard-coding the app into a Japanese-only architecture;
 - keeps future provider/auth/database/job/AI boundaries available without activating unnecessary infrastructure now.
@@ -30,7 +34,7 @@ The output of this phase is a **working engineering foundation**, not a finished
 
 ## 2. Why this phase exists
 
-The repository currently has accepted product/design/architecture sources but no established runtime code or canonical commands.
+The repository currently has accepted product/design/architecture sources but no established runtime code, canonical commands, or executable CI gate.
 
 Skipping this phase would force later Codex tasks to invent:
 
@@ -40,9 +44,12 @@ Skipping this phase would force later Codex tasks to invent:
 - test setup;
 - localization boundaries;
 - environment handling;
-- browser verification path.
+- browser verification path;
+- CI behavior and status-check names.
 
 Those decisions should be established once and then reused.
+
+Local success is not enough for an AI-heavy workflow. The same baseline must run independently in GitHub Actions so a later coding agent cannot rely on an unverified local environment or completion claim.
 
 ---
 
@@ -100,7 +107,7 @@ Install/use only what Phase 0 actually needs.
 - Node.js 24 LTS
 - pnpm
 - TypeScript strict
-- Next.js 16.x App Router
+- current stable, security-patched Next.js 16.x App Router release
 - React version supported by the selected Next.js 16 release
 - Tailwind CSS 4
 - next-intl
@@ -110,6 +117,8 @@ Install/use only what Phase 0 actually needs.
 - Vitest
 - React Testing Library
 - Playwright
+
+Record the exact resolved dependency graph in `pnpm-lock.yaml`. Durable docs describe accepted support lines; the lockfile records the concrete installed versions.
 
 ### Do not activate yet merely because it is accepted later
 
@@ -158,6 +167,8 @@ lunowa/
 ├── e2e/
 │   └── ...
 ├── public/
+├── .github/
+│   └── workflows/
 ├── docs/
 ├── package.json
 ├── pnpm-lock.yaml
@@ -198,12 +209,12 @@ If the initializer conflicts with existing repository files, initialize in a tem
 
 ### 6.2 Runtime declaration
 
-Make the Node/pnpm expectations explicit using ordinary ecosystem mechanisms, for example:
+Make the Node/pnpm expectations explicit using ordinary ecosystem mechanisms:
 
-- `packageManager` in `package.json`;
-- an appropriate Node version declaration/tool file if useful to the developer environment.
+- declare the actual pnpm version with `packageManager` in `package.json`;
+- declare the accepted Node 24 runtime line using the smallest conventional mechanism useful to local/CI tooling.
 
-Do not pin to an obsolete patch when the repository only needs the accepted Node 24 LTS line.
+Do not pin durable documentation to an obsolete patch when the repository only needs the accepted Node 24 LTS line. Concrete dependency/tool resolutions belong in the lockfile and runtime configuration.
 
 ### 6.3 TypeScript
 
@@ -267,6 +278,8 @@ Configure:
 
 For pure/domain/helper/component tests where appropriate.
 
+The canonical CI-facing test command must run deterministically and exit; do not make watch mode the `pnpm test` contract.
+
 #### React Testing Library
 
 Include one minimal behavior/rendering test proving the environment works.
@@ -279,11 +292,15 @@ Include one minimal browser smoke test proving:
 - the main bootstrap route loads;
 - a stable Lunowa-owned element is visible.
 
+Initial CI may use Chromium only. Broader browser/device coverage belongs to later support validation.
+
 Do not create large screenshot-golden suites yet. Phase 1 establishes visual golden screenshots after the rendered UI is approved.
 
 ### 6.8 Linting and formatting posture
 
-Use the framework/current ecosystem lint setup with minimal customization.
+Use the current ecosystem lint setup with minimal customization.
+
+Next.js 16 does not own the lint command; run ESLint directly through the repository's `lint` script.
 
 The goal is mechanically useful feedback, not a large style-policy project.
 
@@ -329,6 +346,48 @@ src-or-lib/
 
 is acceptable, but create it only when the first Phase 1 screen actually needs it.
 
+### 6.12 GitHub Actions CI
+
+Create the smallest CI workflow that makes the Phase 0 baseline independently reproducible on GitHub.
+
+Run on:
+
+- pull requests targeting `main`;
+- pushes to `main`.
+
+Expose stable job/check names suitable for the immediately following `main` Ruleset task:
+
+#### `Verify`
+
+- checkout the repository;
+- use Node 24;
+- activate/install the repository-declared pnpm version;
+- install dependencies with a frozen lockfile;
+- run `pnpm verify`.
+
+#### `E2E Smoke`
+
+- checkout the repository;
+- use Node 24;
+- install dependencies with a frozen lockfile;
+- install the minimum required Playwright browser/system dependencies;
+- start the real application deterministically (for example via Playwright `webServer`);
+- run the Phase 0 smoke test.
+
+Use one Playwright worker initially unless measured CI behavior supports safe parallelism.
+
+#### CI security baseline
+
+- workflow permissions default to `contents: read` unless a narrower/stronger reason is documented;
+- do not expose application/provider/production secrets;
+- do not use `pull_request_target` for ordinary PR verification;
+- prefer first-party/official actions where available;
+- pin third-party/prebuilt Actions to immutable full commit SHAs where practical, retaining a readable version comment when useful;
+- do not add deployment behavior or production credentials;
+- do not make CI green by weakening type/lint/test/security settings.
+
+GitHub Ruleset/main protection is deliberately the next task, after these real check names have run successfully at least once.
+
 ---
 
 ## 7. Canonical commands to establish
@@ -340,8 +399,10 @@ pnpm dev
 pnpm typecheck
 pnpm lint
 pnpm test
+pnpm test:watch       # optional convenience command, not the CI contract
 pnpm test:e2e
 pnpm build
+pnpm start
 pnpm verify
 ```
 
@@ -352,11 +413,11 @@ Initial required baseline:
 ```text
 typecheck
 + lint
-+ unit/component tests
++ deterministic unit/component tests
 + production build
 ```
 
-Playwright can remain a separate command if including it in every local `verify` would make the feedback loop materially worse. The decision must be documented from actual runtime cost, not guessed.
+Keep Playwright as a separate explicit layer initially so the local fast feedback path and browser evidence remain independently diagnosable.
 
 Humans, Codex, and CI should converge on the same canonical verification commands where practical.
 
@@ -368,7 +429,7 @@ Implementation is not complete merely because files were generated.
 
 Before closing Phase 0, actually run and record the result of:
 
-1. dependency install;
+1. dependency install using the locked dependency graph;
 2. `pnpm typecheck`;
 3. `pnpm lint`;
 4. `pnpm test`;
@@ -391,6 +452,18 @@ Open the running application in a real browser and verify:
 
 Do not claim visual conformance to Lunowa's reference screens in Phase 0; that begins in Phase 1.
 
+### GitHub CI evidence
+
+After the implementation branch/PR is pushed:
+
+- confirm the `Verify` check runs and passes;
+- confirm the `E2E Smoke` check runs and passes;
+- inspect failure logs rather than rerunning blindly if a check fails;
+- confirm no application secrets are required by either job;
+- confirm the workflow token has no unjustified write permission.
+
+Local success does not substitute for CI evidence.
+
 ---
 
 ## 9. Documentation updates required in the same change
@@ -406,6 +479,8 @@ Update repository stage from `pre-implementation / bootstrap` to reflect that th
 ### `README.md`
 
 Add the shortest useful local-development start instructions if they are not already clear.
+
+Ensure README reflects `docs/product/TECH-STACK.md` as the accepted initial stack source of truth rather than claiming the stack remains undecided.
 
 ### `docs/product/TECH-STACK.md`
 
@@ -435,7 +510,10 @@ Do **not** extend this task into:
 - semantic search;
 - rich text editor selection beyond a narrowly scoped spike;
 - native/mobile applications;
-- deployment-production hardening.
+- production deployment configuration;
+- GitHub Ruleset/main branch protection;
+- protected-surface/Guardrail Integrity policy;
+- auto-merge or agent-controlled production deployment.
 
 If a setup tool insists on one of these boundaries, prefer the simplest local/mock/config-only path rather than silently expanding scope.
 
@@ -447,17 +525,25 @@ Phase 0 is complete only when all are true:
 
 - existing Lunowa docs/reference images remain intact;
 - app starts locally using the documented Node/pnpm environment;
+- exact pnpm version is declared and the lockfile is committed;
 - one localized bootstrap route renders;
 - TypeScript strict checking is active;
 - Tailwind CSS is working;
 - next-intl is working;
-- tests are configured and at least one meaningful smoke test exists at each selected test layer;
+- tests are configured and at least one meaningful smoke/behavior test exists at each selected test layer;
 - Playwright can launch the real app and verify the bootstrap route;
 - production build succeeds;
 - canonical `verify` command exists and succeeds;
+- `pnpm test` is deterministic and exits;
 - no external credentials are required for install/run/verify;
 - no provider/AI/database/job architecture was prematurely implemented;
+- GitHub Actions exists for PRs/pushes to `main`;
+- GitHub Actions uses frozen-lockfile installation;
+- GitHub Actions uses least privilege and no application secrets;
+- no ordinary verification workflow uses `pull_request_target`;
+- stable `Verify` and `E2E Smoke` checks both pass on the implementation PR;
 - `AGENTS.md` contains real canonical commands after successful verification;
+- README reflects the accepted initial stack/runtime state;
 - Codex can begin Phase 1 from `docs/design/references/00`, `01`, and `02` without first redesigning the repository foundation.
 
 ---
@@ -471,6 +557,8 @@ Stop and report instead of guessing if:
 - an existing repository file conflicts with app initialization and cannot be preserved safely;
 - verification cannot be made reproducible with the selected tooling;
 - a dependency requires secret/provider infrastructure merely to render/test the fake-data UI;
+- GitHub CI requires unexplained write permissions, production secrets, or privileged events;
+- passing verification would require weakening TypeScript, lint, tests, or security configuration;
 - implementation evidence makes an accepted ADR materially incorrect.
 
 If a conflict is small and reversible, choose the simplest compatible implementation and document the assumption. If it changes a durable architecture decision, stop and update/review the relevant ADR first.
@@ -481,7 +569,9 @@ If a conflict is small and reversible, choose the simplest compatible implementa
 
 The next task after this plan is **not** `build the whole app`.
 
-The first Phase 1 slice should implement the canonical shell using:
+Immediately after the Phase 0 implementation PR produces real green `Verify` and `E2E Smoke` checks, configure the `main` Ruleset so these checks become required before normal product implementation proceeds.
+
+The first Phase 1 product slice should then implement the canonical shell using:
 
 ```text
 docs/design/references/00-brand-system.png

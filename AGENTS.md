@@ -115,6 +115,7 @@ GitHub Actions independently runs stable `Verify` and `E2E Smoke` checks. Local 
 ## Working rules
 
 - Inspect the relevant durable specs and nearby code/tests before non-trivial edits.
+- When a handoff names a GitHub Issue, preflight that the configured `origin` repository matches the full Issue URL before creating or changing a task branch. Use the Issue for current task-specific intent and the repository for durable constraints; if the Issue is unavailable, stop rather than infer the task from unrelated state. For complex/high-risk work, follow its link to a repository-local plan, design, or task artifact.
 - For frontend work, inspect the exact visual references relevant to the screen/state; do not treat generated-image artifacts, sample names/dates, or accidental wording as requirements.
 - For complex/risky changes, plan before implementation and keep slices independently verifiable.
 - Prefer repository/framework/platform/official SDK functionality and mature dependencies before substantial custom implementation.

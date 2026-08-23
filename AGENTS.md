@@ -10,13 +10,15 @@ This file is a **map**, not the handbook. Read only the Source of Truth relevant
 
 Lunowa has a mechanically verified Phase-0 application/runtime foundation. Phase-1 product UI has not yet been implemented.
 
-Responsibility v0.1 semantics are an accepted versioned baseline. Architecture, Data Model, Contracts, Design/Interactions, Implementation Plan, and repository routing have been reconciled to that baseline on the current documentation branch.
+Responsibility v0.1 semantics are an accepted versioned baseline. Architecture, Data Model, Contracts, Design/Interactions/Responsive behavior, Implementation Plan, technology guidance, ADRs, and repository routing have been reconciled to that baseline on the current documentation branch.
 
 This does **not** mean the physical Responsibility schema or AI runtime is implemented/passed.
 
 Executable tooling is governed by checked-in runtime/config (`package.json`, lockfile, test config, CI). Durable product behavior/architecture is governed by current docs/decisions.
 
-Do not invent or silently replace framework/database/auth/provider/job/AI choices. Read `docs/product/TECH-STACK.md`, relevant ADRs, and active plan before implementation.
+Task-specific implementation intent is **Issue-driven**: use the referenced GitHub Issue for the current task's Goal/Why/Scope/Acceptance/Verification, and use repository docs for durable constraints. A complex/high-risk Issue may link a repository-local plan/design/task artifact; do not assume a permanent `docs/plans/active/` directory exists.
+
+Do not invent or silently replace framework/database/auth/provider/job/AI choices. Read `docs/product/TECH-STACK.md`, relevant ADRs, `docs/product/IMPLEMENTATION-PLAN.md`, and the current task Issue before implementation.
 
 ---
 
@@ -24,7 +26,7 @@ Do not invent or silently replace framework/database/auth/provider/job/AI choice
 
 ### Responsibility semantics / eval
 
-For any task involving task extraction, responsibility state, owner/actionability, deadlines, waiting, completion, follow-up, uncertainty, historical activation, safety, or projection, start here:
+For any task involving task extraction, Responsibility state, owner/actionability, deadlines, waiting, completion, follow-up, uncertainty, historical activation, safety, or projection, start here:
 
 - `docs/product/responsibility/README.md` — status/scope/current implementation gate;
 - `docs/product/responsibility/DECISIONS.md` — FIXED/OPEN/SUPERSEDED decisions;
@@ -32,7 +34,8 @@ For any task involving task extraction, responsibility state, owner/actionabilit
 - `docs/product/responsibility/ANNOTATION-GUIDELINES.md` — communication/evidence/admission semantics;
 - `docs/product/responsibility/SCENARIO-SCHEMA.md` — focal-event oracle contract;
 - `docs/product/responsibility/TRANSITION-SCHEMA.md` — multi-event trace contract;
-- `docs/product/responsibility/COVERAGE-PLAN.md` + oracle files when implementing/evaluating domain behavior.
+- `docs/product/responsibility/COVERAGE-PLAN.md` + oracle files when implementing/evaluating domain behavior;
+- `docs/decisions/0008-responsibility-state-is-orthogonal.md` — costly-to-reverse state/projection architecture rationale.
 
 Do **not** derive canonical state from legacy screenshot filenames such as `moment-action-required`, `moment-deferred`, or `moment-follow-up`.
 
@@ -40,7 +43,7 @@ Do **not** derive canonical state from legacy screenshot filenames such as `mome
 
 - `docs/design/DESIGN.md` — product intent, information architecture, visual/product principles.
 - `docs/design/INTERACTIONS.md` — click semantics, Responsibility projections/Moment View, Temporal Contract, compose/search/context/error interactions.
-- `docs/design/RESPONSIVE.md` — pane/responsive behavior.
+- `docs/design/RESPONSIVE.md` — pane/responsive behavior under the same Responsibility projection model.
 - `docs/design/references/README.md` — visual-reference authority and legacy filename caveats.
 - `docs/design/references/00-brand-system.png` through `19-mobile-layout.png` — visual references only within those rules.
 
@@ -52,7 +55,8 @@ Do **not** derive canonical state from legacy screenshot filenames such as `mome
 - `docs/product/CONTRACTS.md` — provider/sync/AI interpretation/Responsibility reducer/scheduler/search/send/job contracts.
 - `docs/product/TECH-STACK.md` — accepted initial stack + activation policy.
 - `docs/product/IMPLEMENTATION-PLAN.md` — staged implementation sequence.
-- `docs/plans/active/` — current execution artifacts.
+- current referenced GitHub Issue — task-specific implementation intent.
+- repository-local plan/design/task artifact only when the Issue explicitly links one.
 - `docs/decisions/` — durable architecture rationale.
 
 ### Reusable engineering baseline
@@ -146,7 +150,8 @@ GitHub Actions independently runs `Verify` and `E2E Smoke` checks. Local success
 ## Working rules
 
 - Inspect relevant durable specs and nearby code/tests before non-trivial edits.
-- If a handoff names a GitHub Issue, preflight that configured `origin` matches the Issue repository before task-branch work. If Issue is inaccessible, stop rather than infer intent from unrelated state.
+- If a handoff names a GitHub Issue, preflight that configured `origin` matches the Issue repository before task-branch work. Use that Issue for current task-specific intent and repository docs for durable constraints. If Issue is inaccessible, stop rather than infer intent from unrelated state.
+- For complex/high-risk work, follow a repository-local plan/design/task artifact only when the Issue links it or the task creates one deliberately.
 - For Responsibility-domain work, explicitly map implementation behavior to relevant canonical scenario/transition oracles.
 - For frontend work, inspect exact relevant visual refs **and** translate legacy filenames through `docs/design/references/README.md`.
 - For complex/risky changes, design/plan first and keep slices independently verifiable.
@@ -164,7 +169,7 @@ GitHub Actions independently runs `Verify` and `E2E Smoke` checks. Local success
 
 ## Initial implementation sequence
 
-Follow `docs/product/IMPLEMENTATION-PLAN.md` and current active plan.
+Follow `docs/product/IMPLEMENTATION-PLAN.md` plus the current task-specific GitHub Issue when one is supplied.
 
 Phase 0 established runtime/verification. The first product slice is the high-fidelity fake-data desktop shell beginning with `00`, `01`, `02`, with `row body -> 会話` and `status/projection chip -> 今の要点` browser-verified before provider/AI complexity.
 

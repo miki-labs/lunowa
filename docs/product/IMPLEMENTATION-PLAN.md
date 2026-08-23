@@ -2,7 +2,7 @@
 
 ## Status
 
-**Active initial execution plan, reconciled with Responsibility v0.1.**
+**Active initial execution plan, reconciled with Responsibility v0.1 and the current L2 executable-proof gate.**
 
 This plan sequences implementation to reduce product/technical risk without activating production infrastructure or feature breadth before the core interaction/domain model is proven.
 
@@ -16,6 +16,9 @@ Related sources:
 - `responsibility/README.md`;
 - `responsibility/DECISIONS.md`;
 - `responsibility/CONSISTENCY-AUDIT.md`;
+- `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`;
+- `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md`;
+- `responsibility/L2-EXECUTABLE-PROOF-GATE.md`;
 - `ARCHITECTURE.md`;
 - `DATA-MODEL.md`;
 - `CONTRACTS.md`.
@@ -28,12 +31,12 @@ Build vertical slices that can be behaviorally/visually verified.
 
 Do not implement every provider, AI feature, mailbox action, scheduler feature, and responsive edge case at once.
 
-Current high-level sequence:
+Current high-level product sequence:
 
 ```text
 Bootstrap
   -> High-fidelity fake-data product shell using Responsibility projections
-  -> Responsibility physical-model design + persistence foundation
+  -> Responsibility persistence foundation
   -> One real provider read path
   -> Real compose/send path
   -> Deterministic Responsibility reduction + Temporal Contract
@@ -42,6 +45,8 @@ Bootstrap
   -> Second provider
   -> Beta hardening
 ```
+
+Bounded technical spikes may run ahead of their production phase when they retire a costly-to-reverse uncertainty without activating production infrastructure. The current Responsibility L2 executable proof is such a spike; it does **not** authorize production persistence before the relevant product/phase gates.
 
 Key rule:
 
@@ -171,18 +176,37 @@ If real rendered interaction hierarchy is materially confusing, change design/sp
 
 Implement the **smallest physical model** that satisfies validated Responsibility semantics and core product ownership without building a generic workflow engine.
 
-### Pre-implementation gate
+### Current design/proof state
 
-Before schema code/migrations are accepted:
+```text
+L0 semantic model                         FROZEN v0.1
+L1 logical persistence boundary           FROZEN v0.1
+L2 exact PostgreSQL/Drizzle candidate      v0.4 STATIC REVIEW COMPLETE
+L2 executable proof                        PENDING
+L2 final freeze                            BLOCKED
+L3 production migrations/runtime           NOT AUTHORIZED
+```
 
-1. read `responsibility/DECISIONS.md` + `CONSISTENCY-AUDIT.md`;
-2. inspect canonical Scenario/Transition schemas/oracles;
-3. expand enough remaining Tier-0 oracles to pressure-test the proposed physical shape;
-4. explicitly map each required semantic dimension to the proposed representation;
-5. prove the proposal does not reintroduce the superseded seven-state lifecycle/scalar-owner/single-deadline model;
-6. document trade-offs/open dimensions before Codex implementation.
+All 44 Tier-0 base cases are fully layered and all 20 mandatory transition traces are designed. Three exact-DDL static adversarial audits have already been incorporated into v0.4.
 
-### Minimum broader entities
+The remaining pre-migration uncertainty is executable PostgreSQL/Drizzle/Auth behavior, not more speculative semantic-table design.
+
+### Current pre-implementation proof gate
+
+Before a production Responsibility migration is accepted:
+
+1. complete GitHub Issue #13 against real PostgreSQL 18 for the Drizzle/schema acceptance matrix;
+2. complete GitHub Issue #14 for the Better Auth UUID persistence prerequisite;
+3. run GitHub Issue #15 as an independent combined review;
+4. account for all acceptance IDs `01–60` under `responsibility/L2-EXECUTABLE-PROOF-GATE.md`;
+5. inspect actual Drizzle-generated/reviewed SQL rather than trusting TypeScript types;
+6. leave no unresolved CRITICAL/HIGH schema-integrity finding;
+7. if executable evidence changes v0.4, update the canonical DDL design and rerun all affected tests;
+8. record an explicit L2 PASS/FREEZE decision before any production migration task.
+
+The L2 spike may run before Phase-1 UI completion because it is an isolated falsification experiment. **Production persistence activation remains a separate implementation decision and must not silently reorder the product sequence.**
+
+### Minimum broader entities when production persistence activates
 
 - User;
 - Scope / ScopeAccount;
@@ -214,32 +238,60 @@ temporal facts
 field-level uncertainty/risk
 provenance/evidence revision
 composite effects where one event touches multiple Responsibilities
+AdmissionReview before Responsibility existence is accepted
 ```
 
-Do not assume each bullet requires a table. Minimize representation while preserving invariants/queryability.
+Do not assume each bullet requires a table. L1 already freezes the accepted hybrid boundary; a new table/aggregate now requires executable/production evidence that falsifies it.
 
-### Required rules/tests
+### Required database/runtime proof
+
+The exact schema/protocol must demonstrate at minimum:
 
 - one Conversation -> zero/one/many Responsibilities;
 - zero Responsibility valid;
 - multiple obligation legs where required;
-- historical OPEN != live activation;
+- historical evidence-relative OPEN != live tracking activation;
 - Pin independent;
 - provider IDs unique per account;
-- user corrections field-scoped enough to avoid whole-item freeze;
+- field-scoped correction/authority without whole-item freeze;
 - derived Conversation projection rebuildable;
 - Responsibility mutations through domain/reducer boundary;
-- stale evidence revision cannot apply;
-- cross-account semantic auto-merge prohibited.
+- Conversation semantic-evidence revision guards admission/matching freshness;
+- stale evidence/AI basis cannot create or overwrite accepted state;
+- global semantic application/effect idempotency prevents duplicate CREATE even with different generated target UUIDs;
+- cross-account semantic auto-merge prohibited;
+- same-user/account/Responsibility references are mechanically constrained where PostgreSQL can cheaply enforce them;
+- conflict temporal candidates coexist while duplicate accepted-current facts are rejected;
+- delete/privacy order is proven against the actual FK graph.
 
 ### Exit criteria
 
-- UI fake interfaces can be backed by DB repositories without semantic rewrite;
-- reproducible migrations;
-- ownership/uniqueness constraints enforced;
-- representative reducer/domain tests built from canonical oracles;
-- no old lifecycle model introduced as canonical truth;
-- no provider integration bypasses domain boundary.
+For the L2 design-proof substage:
+
+- Issues #13/#14 provide direct executable evidence;
+- Issue #15 independently records PASS/FREEZE or FAIL/REVISE;
+- generated SQL and actual PostgreSQL behavior are reviewed;
+- exact schema has no unresolved required acceptance failure;
+- L3 remains a separate later task.
+
+For the production Phase-2 implementation itself:
+
+- UI domain interfaces can be backed by DB repositories without semantic rewrite;
+- reproducible reviewed migrations exist;
+- ownership/uniqueness constraints are enforced;
+- representative reducer/domain tests are built from canonical oracles;
+- no old lifecycle model is introduced as canonical truth;
+- no provider integration bypasses the domain boundary.
+
+### Stop conditions
+
+Do not create/accept production migrations if:
+
+- the L2 executable gate has not passed;
+- Better Auth actual ID type conflicts with the DDL assumption;
+- Drizzle emission weakens a required PostgreSQL invariant without an explicitly accepted fallback;
+- a failing executable test reveals an unresolved L1 falsifier;
+- passing requires production credentials or irreversible external state.
 
 ---
 
@@ -552,24 +604,38 @@ relevant SCENARIO/TRANSITION oracles
 
 and must not infer a lifecycle enum from legacy visual filenames.
 
+Complex/high-risk tasks should use the Issue-driven handoff plus a repository-local artifact only when that artifact materially reduces guessing. The current L2 proof uses Issues #13/#14/#15 and `responsibility/L2-EXECUTABLE-PROOF-GATE.md`.
+
 ---
 
 ## 14. Completion definition per phase
 
 A phase is not complete because code exists/build passes/tests are green.
 
-Exercise intended behavior with the required combination of browser/runtime inspection, screenshot comparison, unit/domain tests, integration/provider tests, failure injection, accessibility checks, and persisted-state/log inspection.
+Exercise intended behavior with the required combination of browser/runtime inspection, screenshot comparison, unit/domain tests, integration/provider tests, failure injection, accessibility checks, persisted-state/log inspection, and database/concurrency proof where applicable.
 
-Never claim provider/scheduler/send/security behavior verified when only mocked.
+Never claim provider/scheduler/send/security/database behavior verified when only mocked.
 
 ---
 
-## 15. Current next product implementation slice
+## 15. Current next work
 
-After repository-safety prerequisites, the first UI product task remains:
+### Product implementation
+
+The first product slice remains:
 
 > implement the canonical `00`–`02` desktop shell using fake domain-shaped data with `row body -> 会話` and `status/projection chip -> 今の要点`, then implement the projection-specific Moment visuals before real mailbox/AI integration.
 
 When `03`–`08` images are used, translate their legacy filenames into current projections using `docs/design/references/README.md`.
 
-Before Phase-2 Responsibility schema implementation, return to the canonical oracle set and produce the minimal physical-model design rather than coding from intuition.
+### Parallel bounded technical proof
+
+The currently authorized persistence work is **not production Phase-2 implementation**. It is the bounded L2 falsification sequence:
+
+```text
+Issue #13 PostgreSQL/Drizzle executable proof
+Issue #14 Better Auth UUID proof
+Issue #15 independent combined review/freeze decision
+```
+
+Do not proceed from these spikes directly into migrations without a separate post-PASS task.

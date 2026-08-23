@@ -86,8 +86,8 @@
 
 | Decision | Status | Notes |
 |---|---|---|
-| Physical `ActionItem` entity should eventually be renamed to `Responsibility` or equivalent | STRONG DIRECTION | Semantics fit better, but rename itself has little product value and should wait until schema alignment. |
-| Physical persistence should implement the fixed orthogonal semantic dimensions rather than the existing single lifecycle enum | STRONG DIRECTION | Exact tables/columns/enums remain open even though the semantic separation is now fixed. |
+| Physical `ActionItem` entity should eventually be renamed to `Responsibility` or equivalent | STRONG DIRECTION | Semantics fit better; exact physical naming should be chosen during schema design, not kept by inertia. |
+| Physical persistence should implement the fixed orthogonal semantic dimensions rather than the existing single lifecycle enum | STRONG DIRECTION | Exact tables/columns/enums remain open even though the semantic separation is fixed. |
 | Replace `active + state + completed_at` with a less contradictory resolution/activation/attention model | STRONG DIRECTION | Exact fields/enums not frozen. |
 | Maintain pending proposals and agreed facts separately | STRONG DIRECTION | Necessary for scheduling/negotiation; physical representation remains open. |
 | Use selective extra inference/validation for ambiguous or high-risk cases rather than default multi-run inference | STRONG DIRECTION | Balances cost, latency, and stability. |
@@ -123,7 +123,7 @@
 
 | Prior direction | Current status | Replacement |
 |---|---|---|
-| One canonical lifecycle enum: `OPEN/ACTION_REQUIRED/DEFERRED/WAITING/FOLLOW_UP/COMPLETED/UNCERTAIN` | SUPERSEDED for responsibility semantics | Orthogonal resolution/live-activation/attention/obligation semantics; UI buckets are projections. |
+| One canonical lifecycle enum: `OPEN/ACTION_REQUIRED/DEFERRED/WAITING/FOLLOW_UP/COMPLETED/UNCERTAIN` | SUPERSEDED for Responsibility semantics | Orthogonal resolution/live-activation/attention/obligation semantics; UI buckets are projections. |
 | `tracking_status: OPEN/RESOLVED` as a complete tracking model | SUPERSEDED as complete model | Treat legacy `tracking_status` as resolution-status shorthand only; live activation and attention are separate. |
 | One scalar `next_owner` completely represents Responsibility state | SUPERSEDED | Multiple obligation legs/expected events are conceptually allowed; scalar owner is only convenience/projection. |
 | `BOTH` as a general owner value | REJECTED as core solution | Represent parallel obligations or conservative ambiguity instead. |
@@ -144,7 +144,7 @@
 
 ## Current validation state
 
-The following design artifacts now exist and are mutually constrained by `CONSISTENCY-AUDIT.md`:
+The following Responsibility artifacts are mutually constrained by `CONSISTENCY-AUDIT.md`:
 
 ```text
 ANNOTATION-GUIDELINES.md
@@ -159,6 +159,21 @@ CONSISTENCY-AUDIT.md
 
 Coverage mapping is design-complete for all mandatory rule/contrast/interaction/mutant/metamorphic/high-harm/ambiguity/transition inventories. This is not implementation or pass evidence.
 
-Before Responsibility domain/persistence implementation begins, the responsibility-specific sections of the older `DATA-MODEL.md`, `CONTRACTS.md`, and `design/INTERACTIONS.md` must be reconciled. Until then, those legacy lifecycle/scalar-owner/deadline shapes must not drive implementation.
+The prior source-of-truth conflict has been reconciled across:
+
+```text
+docs/product/ARCHITECTURE.md
+docs/product/DATA-MODEL.md
+docs/product/CONTRACTS.md
+docs/design/INTERACTIONS.md
+```
+
+The documentation-level stop condition is therefore satisfied.
+
+The remaining pre-schema work is to:
+
+- expand the remaining Tier-0 base assignments into full layered oracles;
+- normalize legacy oracle aliases/errata into executable fixtures;
+- design the **minimal physical Responsibility representation** against those oracles without reintroducing the superseded lifecycle model or building a generic workflow engine.
 
 Any scenario or production evidence that breaks a FIXED principle must trigger an explicit versioned decision review rather than an ad-hoc exception.

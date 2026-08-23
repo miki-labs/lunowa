@@ -5,24 +5,24 @@ This is a compact, mutable bootstrap checkpoint. It is not a product, design, ar
 ## Checkpoint metadata
 
 - Last reconciled: `2026-08-24`
-- Repository ref / candidate state: Issue #19 candidate branch `chatgpt/issue-19-product-knowledge-preservation`, based on post-#18 integration commit `c03174a22f22090e878bb48dd8388c8bb47760ce`; this checkpoint is **candidate state until the #19 PR is independently reviewed and integrated**.
+- Repository ref / candidate state: Issue #19 candidate PR #22 from `chatgpt/issue-19-product-knowledge-preservation`, based on post-#18 integration commit `c03174a22f22090e878bb48dd8388c8bb47760ce`; this checkpoint is **candidate state until PR #22 is independently reviewed and integrated**.
 - Continuity schema version: `0.1`
-- Live GitHub state checked: `2026-08-24` for Issues #13/#14/#15/#19/#21 and the preceding #16/#18 integration chain. **Re-query GitHub on every fresh bootstrap when task/review state matters.**
+- Live GitHub state checked: `2026-08-24` for PR #22, Issues #13/#14/#15/#19/#21, and the preceding #16/#18 integration chain. **Re-query GitHub on every fresh bootstrap when task/review state matters.**
 
 ## Current phase
 
 - Phase 0 application/runtime/verification foundation is mechanically established.
 - Phase 1 **high-fidelity fake-data product UI** is still the first product slice and has not yet been implemented.
 - Responsibility semantics/persistence design has advanced farther than the product UI: L0/L1 are frozen baselines and exact L2 v0.4 is static-review complete, but this is a **bounded technical proof stream**, not a product-priority reorder or production-persistence authorization.
-- The immediate priority is preserving and validating the current product/domain understanding for fresh-session continuity before resuming broader reusable-Blueprint reconciliation.
+- The immediate priority is validating/integrating the Issue #19 product/domain preservation candidate before resuming broader reusable-Blueprint reconciliation.
 
 Primary phase/sequence authority: `docs/product/IMPLEMENTATION-PLAN.md`. Product intent/validation authority: `docs/product/PRODUCT.md`.
 
 ## Active workstreams
 
-### Product/current-state preservation — Issue #19
+### Product/current-state preservation — Issue #19 / PR #22
 
-**Current priority.** Promote missing decision-relevant product knowledge into canonical artifacts, reconcile stale routing/status, populate this checkpoint, and produce a candidate that a fresh reviewer can falsify for handoff fidelity.
+**Current priority.** The canonical promotion/routing/checkpoint candidate now exists as PR #22. It must receive current CI/diff evidence and an independent handoff-fidelity review before integration.
 
 Do not confuse this with transcript archiving: the objective is recoverable product understanding, not full conversation retention.
 
@@ -36,11 +36,11 @@ Open but **deliberately deferred until the Issue #19 preservation baseline is sa
 - #14: Better Auth → PostgreSQL UUID persistence proof for acceptance IDs 47–49.
 - #15: independent combined review; only this step may decide L2 PASS/FREEZE vs FAIL/REVISE after #13/#14 evidence exists.
 
-The #13/#14 Issue bodies still contain historical wording saying “blocked by #16”. That prerequisite has since been integrated. **Do not treat the stale sentence as a current blocker or start from the pre-created stale branches:** when those tasks resume, refresh/recreate their execution branches/worktrees from the intended current integration base and run the repository/runtime isolation preflight.
+The #13/#14 Issue bodies still contain historical wording saying “blocked by #16”. That prerequisite has since been integrated, and durable correction comments now record this. **Do not treat the stale sentence as a current blocker or start from the pre-created stale branches:** when those tasks resume, refresh/recreate their execution branches/worktrees from the intended current integration base and run the repository/runtime isolation preflight.
 
 ## Current blockers / dependencies
 
-- Fresh-session migration is not considered complete until Issue #19 is independently reviewed/integrated and a later **Fresh-session Bootstrap Evaluation** demonstrates that a new context can recover the correct product/project state without hidden chat memory.
+- Fresh-session migration is not considered complete until PR #22 is independently reviewed/integrated and a later **Fresh-session Bootstrap Evaluation** demonstrates that a new context can recover the correct product/project state without hidden chat memory.
 - Responsibility L2 final freeze is blocked on direct executable evidence from #13 + #14 and the fresh independent #15 review. Static DDL review is not sufficient.
 - L3 Responsibility migrations/runtime remain unauthorized until a separate post-L2-PASS implementation decision.
 - Blueprint adoption status remains unreconciled until #21 is completed; do not infer “latest Blueprint = current Lunowa policy”.
@@ -78,12 +78,11 @@ Detailed domain rationale lives in the owning canonical sources; this list exist
 
 ## Next recommended decision / action
 
-1. Finish Issue #19 canonical-product/routing/checkpoint reconciliation on its isolated candidate branch.
-2. Inspect the exact candidate diff and resolve stale/broken routes discovered by the preservation audit.
-3. Run canonical verification/CI and mark the resulting PR `agent:review-ready` only after the candidate is complete.
-4. Have a fresh independent reviewer attempt to falsify handoff fidelity before integration.
-5. After #19 is safely integrated, resume Issue #21 Blueprint reconciliation; update only the engineering-baseline portion of this checkpoint if that result changes current routing/state.
-6. Later run a genuinely fresh-session bootstrap evaluation. A broader cross-chat Knowledge Delta Audit may follow separately.
+1. Obtain current exact-head verification for PR #22 (`pnpm verify`, CI `Verify`/`E2E Smoke`, diff/scope integrity).
+2. Mark PR #22 `agent:review-ready` only after the candidate is complete and evidence is current.
+3. Have a fresh independent reviewer attempt to falsify handoff fidelity, authority boundaries, status freshness, and hypothesis-vs-decision classification before integration.
+4. After #19 / PR #22 is safely integrated, resume Issue #21 Blueprint reconciliation; update only the engineering-baseline portion of this checkpoint if that result changes current routing/state.
+5. Later run a genuinely fresh-session bootstrap evaluation. A broader cross-chat Knowledge Delta Audit may follow separately.
 
 ## Deep links to canonical sources
 
@@ -112,7 +111,7 @@ Detailed domain rationale lives in the owning canonical sources; this list exist
 - `docs/continuity/README.md` — continuity operating contract.
 - `docs/continuity/KNOWLEDGE-MAP.md` — question → authority routing.
 - `docs/continuity/BLUEPRINT-ADOPTION.md` — Blueprint adoption relationship; currently awaiting #21 reconciliation.
-- GitHub Issues #19 and #21 — current preservation/reconciliation task intent.
+- GitHub Issue #19 / PR #22 and Issue #21 — current preservation/reconciliation task/candidate state; query live GitHub.
 - GitHub Issues #13/#14/#15 — live Responsibility L2 proof/review chain.
 
 ## Update lifecycle

@@ -2,7 +2,7 @@
 
 ## Status
 
-This directory contains Lunowa-specific durable product-engineering knowledge.
+This directory contains Lunowa-specific durable product and product-engineering knowledge.
 
 It complements the reusable engineering baseline in `docs/*.md` and the visual/interaction design sources in `docs/design/`.
 
@@ -11,6 +11,25 @@ Do not treat raw chat history as product source of truth when a current reposito
 ---
 
 ## Documents
+
+### `PRODUCT.md`
+
+Current product-level intent and validation boundary:
+
+- vision / North Star;
+- Communication Management Burden and product problem;
+- accepted product principles;
+- current user/ICP hypotheses and explicit validation gaps;
+- core jobs to be done;
+- system-led/invisible-AI experience thesis;
+- differentiation vs table stakes;
+- v1 direction / non-goals;
+- MVP/validation logic;
+- candidate success metrics;
+- monetization/distribution status;
+- important supersessions and deferred exploratory directions.
+
+This is the primary authority for **what product Lunowa is trying to become and which market/product claims remain hypotheses**. Detailed interaction behavior remains in `docs/design/`; Responsibility semantics remain in `responsibility/`.
 
 ### `ARCHITECTURE.md`
 
@@ -41,7 +60,7 @@ Conceptual durable model:
 - derived search/audit projections;
 - concurrency/versioning invariants.
 
-Responsibility L1 persistence boundaries are now accepted by ADR 0009 / `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`; exact PostgreSQL/Drizzle DDL remains open.
+Responsibility L1 persistence boundaries are accepted by ADR 0009 / `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`. The exact PostgreSQL/Drizzle design is now a **v0.4 statically reviewed candidate**, but final L2 freeze remains blocked on executable PostgreSQL/Drizzle/Auth proof.
 
 ### `CONTRACTS.md`
 
@@ -61,7 +80,7 @@ Logical contracts between modules:
 
 ### `responsibility/`
 
-Primary authority for canonical Responsibility semantics, annotation/evaluation behavior, and the accepted L1 persistence boundary.
+Primary authority for canonical Responsibility semantics, annotation/evaluation behavior, the accepted L1 persistence boundary, the current exact L2 candidate, and the executable proof gate.
 
 Recommended reading order:
 
@@ -76,15 +95,19 @@ Recommended reading order:
 9. detailed Tier-0 oracle files — 44/44 full layered base semantic contracts;
 10. `responsibility/TRANSITION-ORACLES.md` — all 20 mandatory transition traces;
 11. physical-model audit files — adversarial persistence-boundary pressure;
-12. `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — accepted L1 boundary and L2 requirements.
+12. `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — accepted L1 boundary and L2 requirements;
+13. `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact v0.4 L2 candidate;
+14. `responsibility/L2-EXECUTABLE-PROOF-GATE.md` — required evidence before final L2 freeze.
 
 ### Responsibility freeze levels
 
 ```text
 L0 semantic model                         FROZEN v0.1 baseline
 L1 logical persistence boundary           FROZEN v0.1 baseline
-L2 exact PostgreSQL/Drizzle DDL            OPEN
-L3 migrations/runtime                     NOT STARTED
+L2 exact PostgreSQL/Drizzle DDL            v0.4 STATIC REVIEW COMPLETE
+L2 executable proof                        PENDING
+L2 final freeze                            BLOCKED
+L3 migrations/runtime                     NOT AUTHORIZED
 ```
 
 The current L1 boundary is conceptually:
@@ -112,7 +135,7 @@ TemporalContract / TemporalTrigger
 Draft / SendOperation
 ```
 
-Exact table names, columns, enums, indexes, JSON field names, and Drizzle definitions are still L2 decisions.
+The exact candidate currently exists, but **candidate != frozen production schema**. PostgreSQL/Drizzle-generated SQL, concurrency, delete/privacy, tenancy/FK, and Better Auth UUID behavior must still pass the executable gate before production migrations are proposed.
 
 ### Responsibility source-of-truth reconciliation
 
@@ -182,7 +205,7 @@ Active staged execution plan:
 
 - bootstrap;
 - fake-data high-fidelity UI using current Responsibility projections;
-- exact L2 Responsibility DDL design/review, then persistence implementation;
+- bounded L2 executable proof, then persistence implementation only after freeze authorization;
 - Gmail read slice;
 - real send;
 - deterministic Responsibility/Temporal Contract behavior;
@@ -217,7 +240,7 @@ Current high-value ADRs include:
 - `0006-provider-sync-and-background-runtime.md`;
 - `0007-initial-ai-runtime.md` — initial bounded Structured Outputs runtime/eval boundary;
 - `0008-responsibility-state-is-orthogonal.md` — orthogonal canonical state + deterministic UI projections;
-- `0009-responsibility-persistence-boundary.md` — accepted hybrid L1 persistence boundary; exact DDL remains L2.
+- `0009-responsibility-persistence-boundary.md` — accepted hybrid L1 persistence boundary; exact L2 final freeze remains pending executable evidence.
 
 A decision may be superseded by stronger evidence, but rationale/consequences should be recorded.
 
@@ -225,9 +248,10 @@ A decision may be superseded by stronger evidence, but rationale/consequences sh
 
 ## Related product/UX sources
 
-- `../design/DESIGN.md`;
-- `../design/INTERACTIONS.md`;
-- `../design/RESPONSIVE.md`;
+- `PRODUCT.md` — product intent, users/hypotheses, differentiation, MVP/validation/commercial status;
+- `../design/DESIGN.md` — accepted design model/information architecture/visual principles;
+- `../design/INTERACTIONS.md` — detailed interaction semantics;
+- `../design/RESPONSIVE.md` — responsive behavior;
 - visual references under `../design/references/`.
 
 `DESIGN.md` / `INTERACTIONS.md` are reconciled with Responsibility v0.1: `My Turn / Waiting / Later / Done / Review` are interaction projections, not the old canonical lifecycle enum. Legacy visual filenames are interpreted through `references/README.md`.
@@ -261,9 +285,11 @@ Read when relevant:
 
 | Question | Primary authority |
 | --- | --- |
+| Product vision/problem/user hypothesis/differentiation/validation status? | `docs/product/PRODUCT.md` |
 | Canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*` + ADR 0008 |
 | Responsibility logical persistence boundary? | ADR 0009 + `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` |
-| Exact Responsibility PostgreSQL/Drizzle schema? | future accepted L2 DDL artifact; until then **OPEN** |
+| Current exact Responsibility PostgreSQL/Drizzle candidate? | `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` (v0.4 candidate) |
+| Has exact L2 been executable-proof frozen? | `responsibility/L2-EXECUTABLE-PROOF-GATE.md` + live Issue #13/#14/#15 evidence; currently no |
 | Product-level Responsibility architecture/module boundary? | `ARCHITECTURE.md` + ADRs 0002/0008/0009 |
 | Conceptual Responsibility persistence/ownership? | `DATA-MODEL.md` + ADRs 0008/0009 |
 | Module/API/job Responsibility semantics? | `CONTRACTS.md` + Responsibility semantic baseline |

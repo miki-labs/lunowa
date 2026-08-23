@@ -111,6 +111,32 @@ class ParallelTaskPreflightTests(unittest.TestCase):
         errors = preflight.check(self.arguments())
         self.assertTrue(any("named dedicated branch" in error for error in errors))
 
+    def test_linked_worktree_root_is_accepted(self):
+        linked = self.directory.parent / f"{self.directory.name}-linked"
+        self.run_git("worktree", "add", "-b", "linked-task", str(linked), "main")
+        original_root = preflight.ROOT
+        preflight.ROOT = linked
+        args = self.arguments()
+        args.expected_repository = str(linked)
+        args.expected_worktree = str(linked)
+        args.expected_branch = "linked-task"
+        try:
+            self.assertEqual(preflight.check(args), [])
+        finally:
+            preflight.ROOT = original_root
+
+    def test_wrong_repository_is_rejected(self):
+        args = self.arguments()
+        args.expected_repository = str(self.directory / "other-repository")
+        errors = preflight.check(args)
+        self.assertTrue(any("repository mismatch" in error for error in errors))
+
+    def test_named_wrong_branch_is_rejected(self):
+        args = self.arguments()
+        args.expected_branch = "other-task"
+        errors = preflight.check(args)
+        self.assertTrue(any("branch mismatch" in error for error in errors))
+
     def test_unrelated_history_is_rejected(self):
         self.run_git("switch", "--orphan", "unrelated")
         if (self.directory / "tracked.txt").exists():
@@ -138,5 +164,4 @@ class ParallelTaskPreflightTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
 

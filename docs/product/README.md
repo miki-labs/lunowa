@@ -34,7 +34,7 @@ Conceptual durable model:
 
 - User / Scope / ConnectedAccount;
 - Conversation / Message / Attachment;
-- Responsibility and the semantic concepts required by current scenarios;
+- Responsibility and scenario-required semantic concepts;
 - provenance / user field corrections;
 - TemporalContract / TemporalTrigger;
 - Draft / SendOperation;
@@ -78,13 +78,22 @@ Recommended reading order:
 
 ### Responsibility source-of-truth reconciliation
 
-The prior conflict between Responsibility v0.1 and older lifecycle-specific text is now reconciled across:
+The prior conflict between Responsibility v0.1 and older lifecycle-specific text has been reconciled across the durable routing/design/engineering sources that could otherwise steer implementation:
 
 ```text
+AGENTS.md
+README.md
+docs/design/DESIGN.md
+docs/design/INTERACTIONS.md
+docs/design/references/README.md
 docs/product/ARCHITECTURE.md
 docs/product/DATA-MODEL.md
 docs/product/CONTRACTS.md
-docs/design/INTERACTIONS.md
+docs/product/IMPLEMENTATION-PLAN.md
+docs/decisions/0002-ai-understands-rules-decide-state.md
+docs/decisions/0003-temporal-contracts-use-durable-scheduling.md
+docs/decisions/0007-initial-ai-runtime.md
+docs/decisions/0008-responsibility-state-is-orthogonal.md
 ```
 
 Current semantic direction is orthogonal across:
@@ -127,12 +136,12 @@ Re-check current official provider/runtime facts whenever they materially affect
 Active staged execution plan:
 
 - bootstrap;
-- fake-data high-fidelity UI;
-- domain/persistence;
+- fake-data high-fidelity UI using current Responsibility projections;
+- minimal Responsibility physical model + persistence;
 - Gmail read slice;
 - real send;
 - deterministic Responsibility/Temporal Contract behavior;
-- AI interpretation;
+- AI interpretation behind canonical evals;
 - search/context;
 - Microsoft adapter;
 - beta hardening.
@@ -152,12 +161,13 @@ Material choices that should not silently change during ordinary implementation 
 Current high-value ADRs include:
 
 - `0001-modular-monolith-default.md`;
-- `0002-ai-understands-rules-decide-state.md`;
-- `0003-temporal-contracts-use-durable-scheduling.md`;
+- `0002-ai-understands-rules-decide-state.md` — AI interpretation vs trusted Responsibility authority;
+- `0003-temporal-contracts-use-durable-scheduling.md` — durable/reconcilable attention promises;
 - `0004-web-runtime-and-ui-stack.md`;
 - `0005-auth-and-persistence-stack.md`;
 - `0006-provider-sync-and-background-runtime.md`;
-- `0007-initial-ai-runtime.md`.
+- `0007-initial-ai-runtime.md` — initial bounded Structured Outputs runtime/eval boundary;
+- `0008-responsibility-state-is-orthogonal.md` — orthogonal canonical state + deterministic UI projections.
 
 A decision may be superseded by stronger evidence, but rationale/consequences should be recorded.
 
@@ -170,7 +180,7 @@ A decision may be superseded by stronger evidence, but rationale/consequences sh
 - `../design/RESPONSIVE.md`;
 - visual references under `../design/references/`.
 
-`INTERACTIONS.md` is reconciled with Responsibility v0.1: `My Turn / Waiting / Later / Done / Review` are interaction projections, not the old canonical lifecycle enum.
+`DESIGN.md` / `INTERACTIONS.md` are reconciled with Responsibility v0.1: `My Turn / Waiting / Later / Done / Review` are interaction projections, not the old canonical lifecycle enum. Legacy visual filenames are interpreted through `references/README.md`.
 
 ---
 
@@ -201,11 +211,13 @@ Read when relevant:
 
 | Question | Primary authority |
 | --- | --- |
-| Canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*` |
-| Product-level Responsibility architecture/module boundary? | `ARCHITECTURE.md` + relevant responsibility decisions |
-| Conceptual Responsibility persistence/ownership? | `DATA-MODEL.md` + responsibility semantic baseline |
+| Canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*` + ADR 0008 for the costly-to-reverse state architecture decision |
+| Product-level Responsibility architecture/module boundary? | `ARCHITECTURE.md` + ADRs 0002/0008 |
+| Conceptual Responsibility persistence/ownership? | `DATA-MODEL.md` + responsibility semantic baseline + ADR 0008 |
 | Module/API/job Responsibility semantics? | `CONTRACTS.md` + responsibility semantic baseline |
 | User-facing Responsibility interaction/projection behavior? | `docs/design/INTERACTIONS.md` + `docs/design/DESIGN.md` |
+| AI interpretation authority/runtime? | ADRs 0002/0007 + `CONTRACTS.md` + canonical responsibility eval artifacts |
+| Temporal Contract durability/attention semantics? | ADR 0003 + `ARCHITECTURE.md` + `CONTRACTS.md` |
 | Other product-specific technical boundary/invariant? | `ARCHITECTURE.md` + accepted relevant ADR |
 | Technology/runtime choice? | `TECH-STACK.md` + relevant ADR |
 | Current implementation sequence? | `IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
@@ -228,15 +240,17 @@ If sources materially conflict again, do not silently guess. Treat the contradic
 7. Parallel/contingent work may require multiple obligation legs; scalar `BOTH` is not canonical truth.
 8. Temporal facts remain distinct: source due, expected-event time, user target, resurface, follow-up.
 9. Temporal Contracts are durable/reconcilable promises.
-10. Provider observations and Lunowa domain facts have field-scoped authorities.
-11. Send attempt is not provider-reconciled acceptance; reconciliation closes only the appropriate operational outcome.
-12. Core reading/composing remains usable when AI is unavailable.
-13. Scope/account boundaries apply before search/retrieval/AI context exposure.
-14. Cross-account semantic similarity does not authorize Responsibility merge.
-15. Pin is independent of Responsibility semantics.
-16. App auth and connected-mailbox authorization are separate boundaries.
-17. Prompt-injection/tool-like text inside email has no application authority.
-18. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
+10. Communication hold is not automatically Later/snooze.
+11. Provider observations and Lunowa domain facts have field-scoped authorities.
+12. Send attempt is not provider-reconciled acceptance; reconciliation closes only the appropriate operational outcome.
+13. Core reading/composing remains usable when AI is unavailable.
+14. Scope/account boundaries apply before search/retrieval/AI context exposure.
+15. Cross-account semantic similarity does not authorize Responsibility merge.
+16. Pin is independent of Responsibility semantics.
+17. App auth and connected-mailbox authorization are separate boundaries.
+18. Prompt-injection/tool-like text inside email has no application authority.
+19. Requested action and safe next action are distinct for high-risk requests.
+20. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
 
 ---
 

@@ -35,6 +35,7 @@ This directory does **not** freeze:
 - `DECISIONS.md` — fixed principles, strong directions, open questions, and superseded decisions.
 - `SCENARIO-SCHEMA.md` — contract for describing one canonical scenario/evaluation oracle.
 - `COVERAGE-PLAN.md` — corpus-level mandatory coverage inventory, contrast/interactions, semantic mutants, transition traces, metamorphic relations, and completion gates.
+- `TIER-0-SCENARIO-MATRIX.md` — first 44 base semantic-oracle assignments, controlled variants, contrast mapping, mutant-kill mapping, and explicit transition-coverage remainder.
 
 ## Core architecture
 

@@ -20,6 +20,8 @@
 | Communication-act detection does not automatically create a Responsibility | FIXED | Courtesy, FYI, reported requests, and irrelevant third-party acts would otherwise create false tasks. |
 | Admission has `TRACK / DO_NOT_TRACK / NEEDS_REVIEW` semantics | FIXED | Allows abstention and product relevance to be explicit. |
 | `No Responsibility` is a first-class correct outcome | FIXED | Essential to prevent task spam. |
+| Admission `NEEDS_REVIEW` may exist before a canonical Responsibility exists | FIXED | T0-041/T0-043/T0-044 show that Responsibility existence/materiality itself can be unresolved; do not create a fake Responsibility merely to render Review. |
+| Product `REVIEW` may surface either an admitted Responsibility with field-level uncertainty or a pre-admission review candidate | FIXED | T0-028 and Batch-3 admission cases need distinct internal subjects even if one UX surface is shared. |
 | Public communicative force is annotated; hidden private intent is not | FIXED | Avoids mind-reading, especially under politeness, sarcasm, and social nuance. |
 | Speaker and obligation bearer are separate | FIXED | Third-party assignments and commitments require this distinction. |
 | Politeness and obligation strength are separate | FIXED | Polite business language may still be mandatory. |
@@ -31,9 +33,11 @@
 | Semantic similarity is candidate retrieval, not identity authority | FIXED | Avoids accidental merges. |
 | False merge is considered more harmful than modest false split | FIXED | Merge can hide real obligations. |
 | Reopen means the same operational outcome was never actually satisfied | FIXED | Keeps history/analytics coherent. |
+| REOPEN preserves prior evidence/history and need not rewind previously satisfied action legs | FIXED | T0-029 shows a remedial current leg can be added while prior send/action history remains true. |
 | New work after a genuinely closed episode normally creates a new Responsibility | FIXED | Avoids reopening historical episodes incorrectly. |
 | Canonical state may contain multiple obligation legs and expected events | FIXED | Parallel signers, contingent work, and multi-party loops cannot be represented faithfully by one scalar owner. |
 | `obligation_legs[]` is the canonical semantic concept; active user obligations are a derived subset | FIXED | T16/T18 show that a known leg may be parallel, contingent, safety-blocked, satisfied, or currently actionable. |
+| Obligation-leg granularity follows independent bearer/actionability/closure needs, not linguistic verb count | FIXED | T0-031 prevents a bounded sequential instruction from becoming an accidental workflow graph. |
 | A scalar `next_owner` is not complete canonical truth | FIXED | It may remain a convenience/projection field only. |
 | `BOTH` must not be used to hide parallel/ambiguous structure | FIXED | Loses assignment semantics. |
 | Completion criteria may exist inside one Responsibility | FIXED | Partial completion such as front/back document submission must not force artificial Responsibility splitting. |
@@ -42,6 +46,7 @@
 | Communication hold/pause and product defer/snooze are distinct | FIXED | A hold normally means waiting on a resume event; `LATER` requires a separate attention decision. |
 | Delegation intent and effective delegation are distinct | FIXED | Ownership transfer needs evidence that the request was actually communicated/effected. |
 | Source due, expected-event time, user target, resurface time, and follow-up time are distinct | FIXED | Prevents false deadlines and incorrect projections. |
+| USER_TARGET is an orthogonal user-owned fact, not an automatic correction/override of SOURCE_DUE | FIXED | T0-026 shows Friday external due and Thursday user target can coexist. |
 | `SOURCE_DUE` semantics are not changed by source legitimacy/safety status | FIXED | Safety/authority is orthogonal to what due time was actually communicated. |
 | Never silently increase temporal precision | FIXED | "Friday" does not imply 17:00; ASAP does not imply an exact deadline. |
 | External anchors are derived, not rewritten source facts | FIXED | Calendar changes may re-resolve event-relative time without changing the email source. |
@@ -66,12 +71,12 @@
 | A reconciled send resolves only when sending is sufficient for that Responsibility's closure condition | FIXED | Provider acceptance must not be generalized into proof of document usability, approval, or other external outcomes. |
 | Historical `no observed closure` does not imply live active responsibility | FIXED | Initial sync cannot treat years-old mail like live event processing. |
 | Ingestion order and semantic chronology are distinct | FIXED | Late arrival of older data must not supersede later correction. |
-| One focal event may produce multiple Responsibility effects | FIXED | Supersession can terminate one Responsibility and create another in the same communication. |
+| One focal event may produce multiple Responsibility effects | FIXED | Supersession or one message with independent outcomes can affect/create multiple aggregates. |
 | `SUPERSEDE` is a terminal effect on the old Responsibility, with replacement creation represented separately | FIXED | Avoids ambiguous `RESOLVE + SUPERSEDE` double operations and identity mutation. |
 | Contingent obligations preserve an activation relation to their condition/event | FIXED | Future user work must not disappear while waiting or become actionable before the condition is met. |
-| `My Turn / Waiting / Later / Done / Review` are deterministic projections, not canonical source state | FIXED | UI mental model remains simple without corrupting domain semantics. |
+| `My Turn / Waiting / Later / Done` are deterministic projections over admitted Responsibility semantics; `Review` is a product projection family whose subject type must remain explicit | FIXED | UI remains simple without confusing pre-admission review with canonical Responsibility state. |
 | Uncertainty should be reasoned about by cause and field | FIXED | Missing context, source ambiguity, contradiction, noise, model instability, stale analysis require different treatment. |
-| Admission `NEEDS_REVIEW` and product projection `REVIEW` are distinct | FIXED | A Responsibility may definitely exist while only one decision-critical field remains conflicted. |
+| Admission `NEEDS_REVIEW` and admitted-Responsibility field review are distinct | FIXED | A Responsibility may definitely exist while one field conflicts, or Responsibility existence itself may be unresolved. |
 | Uncertainty does not automatically imply asking the user | FIXED | Preserve decision-reduction; prompt only for material decision-critical uncertainty with no cheaper resolution. |
 | Golden cases may be `DETERMINATE / AMBIGUOUS / USER_DEPENDENT` | FIXED | Do not train/evaluate the system to overstate certainty. |
 | Preserve raw human disagreement where practical | FIXED | Some communication ambiguity is genuine rather than annotation error. |
@@ -89,6 +94,8 @@
 | Physical `ActionItem` entity should eventually be renamed to `Responsibility` or equivalent | STRONG DIRECTION | Semantics fit better; exact physical naming should be chosen during schema design, not kept by inertia. |
 | Physical persistence should implement the fixed orthogonal semantic dimensions rather than the existing single lifecycle enum | STRONG DIRECTION | Exact tables/columns/enums remain open even though the semantic separation is fixed. |
 | Replace `active + state + completed_at` with a less contradictory resolution/activation/attention model | STRONG DIRECTION | Exact fields/enums not frozen. |
+| Persist surfaced admission-level Review as a narrow accepted pre-Responsibility artifact rather than a fake Responsibility | STRONG DIRECTION | Batch 3 demonstrates a real product/domain boundary; exact table name/shape still belongs to schema-freeze review. |
+| Current explicit field-authority decisions should be directly queryable | STRONG DIRECTION | Prevents stale AI or unrelated evidence from silently overriding user-resolved fields; exact physical representation remains under audit. |
 | Maintain pending proposals and agreed facts separately | STRONG DIRECTION | Necessary for scheduling/negotiation; physical representation remains open. |
 | Use selective extra inference/validation for ambiguous or high-risk cases rather than default multi-run inference | STRONG DIRECTION | Balances cost, latency, and stability. |
 | Japanese-specific typo/IME/noise variants belong in eval coverage | STRONG DIRECTION | Product must not rely on clean-input benchmarks. |
@@ -100,7 +107,7 @@
 
 | Question | Status | Why open |
 |---|---|---|
-| Exact physical schema for Responsibility / obligation legs / expected events / completion criteria | OPEN | Scenario/transition semantics are clearer than the minimal physical representation. |
+| Exact physical schema for Responsibility / obligation legs / expected events / completion criteria / admission review | OPEN | Scenario/transition semantics are clearer than the minimal physical representation. |
 | Exact enum names for resolution status, live-tracking activation, attention, obligation status/actionability | OPEN | Semantics are fixed; naming/cardinality are not. |
 | Exact communication-act subtypes/modality enum | OPEN | Avoid taxonomy explosion before evidence. |
 | Exact obligation-strength enum | OPEN | Dimension is required; labels need scenario validation. |
@@ -133,6 +140,9 @@
 | Identity follows broad terminal/project outcome | SUPERSEDED | Smallest communication-bounded operational outcome with coherent closure. |
 | Latest processed message/result wins | REJECTED | Use semantic chronology, explicit correction/supersession relations, and current evidence-set revision. |
 | Any detected Request should create a task | REJECTED | Responsibility Admission Gate. |
+| Admission `NEEDS_REVIEW` should be represented by a fake UNKNOWN Responsibility | REJECTED | Preserve a distinct pre-admission review subject until TRACK is accepted. |
+| One obligation row per linguistic verb | REJECTED | Normalize only independently meaningful bearer/actionability/closure units. |
+| Every USER-originated semantic fact belongs in a field-override mechanism | REJECTED | Orthogonal facts such as USER_TARGET keep their own semantic type/provenance. |
 | AI confidence alone determines automation/review | REJECTED | Combine evidence quality, contradiction, risk, source ambiguity, deterministic validation, and model instability. |
 | Repeated AI consensus is sufficient proof | REJECTED | Consensus is only one uncertainty signal. |
 | User-close means objective completion | REJECTED | Tracking close and external resolution are distinct. |
@@ -144,7 +154,7 @@
 
 ## Current validation state
 
-The following Responsibility artifacts are mutually constrained by `CONSISTENCY-AUDIT.md`:
+The following Responsibility artifacts are mutually constrained by the current semantic/audit baseline:
 
 ```text
 ANNOTATION-GUIDELINES.md
@@ -153,11 +163,16 @@ TRANSITION-SCHEMA.md
 COVERAGE-PLAN.md
 TIER-0-SCENARIO-MATRIX.md
 TIER-0-CRITICAL-ORACLES.md
+TIER-0-DETAILED-ORACLES-BATCH-2.md
+TIER-0-DETAILED-ORACLES-BATCH-3.md
 TRANSITION-ORACLES.md
 CONSISTENCY-AUDIT.md
+PHYSICAL-MODEL-DESIGN.md
+PHYSICAL-MODEL-AUDIT.md
+PHYSICAL-MODEL-AUDIT-BATCH-3.md
 ```
 
-Coverage mapping is design-complete for all mandatory rule/contrast/interaction/mutant/metamorphic/high-harm/ambiguity/transition inventories. This is not implementation or pass evidence.
+Coverage mapping is design-complete for all mandatory rule/contrast/interaction/mutant/metamorphic/high-harm/ambiguity/transition inventories. Detailed Tier-0 expansion is currently 28/44. This is not implementation or pass evidence.
 
 The prior source-of-truth conflict has been reconciled across:
 
@@ -168,12 +183,12 @@ docs/product/CONTRACTS.md
 docs/design/INTERACTIONS.md
 ```
 
-The documentation-level stop condition is therefore satisfied.
-
 The remaining pre-schema work is to:
 
-- expand the remaining Tier-0 base assignments into full layered oracles;
+- expand the remaining schema-falsifier Tier-0 cases into full layered oracles;
 - normalize legacy oracle aliases/errata into executable fixtures;
-- design the **minimal physical Responsibility representation** against those oracles without reintroducing the superseded lifecycle model or building a generic workflow engine.
+- pressure-test the current hybrid Responsibility aggregate plus narrow pre-admission Review boundary;
+- perform a schema-freeze review that maps every proposed persisted structure to concrete oracle/query/invariant pressure;
+- only then write Drizzle/PostgreSQL migrations.
 
 Any scenario or production evidence that breaks a FIXED principle must trigger an explicit versioned decision review rather than an ad-hoc exception.

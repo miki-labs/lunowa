@@ -63,4 +63,3 @@ jobs:
 
       - name: Run browser smoke
         run: pnpm test:e2e
-

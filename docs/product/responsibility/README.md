@@ -33,7 +33,8 @@ This directory does **not** freeze:
 
 - `ANNOTATION-GUIDELINES.md` — normative definitions, invariants, and annotation decision procedure.
 - `DECISIONS.md` — fixed principles, strong directions, open questions, and superseded decisions.
-- `SCENARIO-SCHEMA.md` — contract for describing one canonical scenario/evaluation oracle, refined from demonstrated Tier 0 needs.
+- `SCENARIO-SCHEMA.md` — contract for describing one canonical focal-event scenario/evaluation oracle, refined from demonstrated Tier 0 needs.
+- `TRANSITION-SCHEMA.md` — multi-event trace extension with semantic/observed chronology, evidence revisions, composite `effects[]`, branch semantics, and step-level forbidden outcomes.
 - `COVERAGE-PLAN.md` — corpus-level mandatory coverage inventory, contrast/interactions, semantic mutants, transition traces, metamorphic relations, and completion gates.
 - `TIER-0-SCENARIO-MATRIX.md` — first 44 base semantic-oracle assignments, controlled variants, contrast mapping, and mutant-kill mapping. Its earlier transition-coverage remainder is superseded by the dedicated transition oracle document below.
 - `TIER-0-CRITICAL-ORACLES.md` — full layered oracles for the first eight highest-risk/highest-connectivity Tier 0 cases; this is the first detailed expansion used to pressure-test the scenario schema itself.

@@ -33,7 +33,8 @@ This directory does **not** freeze:
 
 - `ANNOTATION-GUIDELINES.md` — normative definitions, invariants, and annotation decision procedure.
 - `DECISIONS.md` — fixed principles, strong directions, open questions, and superseded decisions.
-- `SCENARIO-SCHEMA.md` — contract for the canonical scenario/evaluation matrix that follows this specification.
+- `SCENARIO-SCHEMA.md` — contract for describing one canonical scenario/evaluation oracle.
+- `COVERAGE-PLAN.md` — corpus-level mandatory coverage inventory, contrast/interactions, semantic mutants, transition traces, metamorphic relations, and completion gates.
 
 ## Core architecture
 

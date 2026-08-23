@@ -1,28 +1,27 @@
-# Responsibility PostgreSQL / Drizzle DDL Design v0.3
+# Responsibility PostgreSQL / Drizzle DDL Design v0.4
 
 ## Status
 
-**Corrected L2 candidate after two static adversarial audits. Migration authority is still BLOCKED until the concrete Drizzle-generated schema is instantiated against PostgreSQL 18 and the executable L2 acceptance suite passes.**
+**Corrected L2 candidate after three static adversarial audits. Static structural review is complete; migration authority remains BLOCKED until the concrete Drizzle-generated schema is instantiated against PostgreSQL 18 and the executable L2 acceptance suite passes.**
 
 Freeze levels:
 
 ```text
 L0 semantic truth                           FROZEN v0.1
 L1 logical persistence boundary             FROZEN v0.1
-L2 exact PostgreSQL/Drizzle representation  CANDIDATE v0.3
+L2 exact PostgreSQL/Drizzle representation  CANDIDATE v0.4 — STATIC REVIEW COMPLETE
 L3 migrations/runtime                       NOT AUTHORIZED
 ```
 
-v0.3 incorporates all required findings from:
+v0.4 incorporates all required findings from:
 
 ```text
 POSTGRESQL-DRIZZLE-DDL-AUDIT.md
 POSTGRESQL-DRIZZLE-DDL-AUDIT-PASS-2.md
+POSTGRESQL-DRIZZLE-DDL-AUDIT-PASS-3.md
 ```
 
-The second pass found that idempotency alone cannot reject a stale direct `TRACK -> CREATE` before a Responsibility exists. v0.3 therefore makes the existing Conversation row a **semantic-evidence revision and admission/matching serialization boundary** without making Conversation the workflow-state owner.
-
-No new L1 Responsibility aggregate/table is introduced.
+No static audit required a new L1 Responsibility aggregate/table or a new lifecycle state.
 
 ---
 
@@ -59,13 +58,14 @@ connected_accounts UNIQUE (id, user_id);
 conversations      UNIQUE (id, connected_account_id);
 participant_identities UNIQUE (id, user_id);
 messages           UNIQUE (id, connected_account_id);
+ai_interpretation_runs UNIQUE (id, user_id);
 ```
 
 These are deliberate ownership/reference indexes even though `id` is already individually unique.
 
 ## 1.3 Conversation semantic evidence revision
 
-The existing Conversation entity MUST also expose a monotonic semantic-evidence revision:
+The existing Conversation entity MUST expose a monotonic semantic-evidence revision:
 
 ```sql
 semantic_evidence_revision bigint NOT NULL DEFAULT 0
@@ -89,6 +89,26 @@ accepted authorized external context used by the reducer
 Do not advance it for UI/read/rendering-only changes.
 
 In v0.1, admission/matching reducer commands lock the Conversation row before accepting semantic effects. This is a concurrency/evidence coordinator only; canonical Responsibility state still belongs to Responsibility aggregates.
+
+## 1.4 AI context snapshot invariant
+
+An `AIInterpretationRun.basis_evidence_revision` is valid only if it labels the exact authorized context captured for that run.
+
+Context building MUST either:
+
+```text
+A. briefly lock Conversation while reading the revision + authorized context/input manifest,
+   persist the run basis/manifest, release the DB lock, then call the remote model;
+
+or
+
+B. use a consistent DB snapshot and re-check the Conversation revision before
+   persisting/dispatching the run as based on that revision.
+```
+
+Do not hold a database lock across the remote AI call.
+
+This is a runtime contract rather than a new table requirement.
 
 ---
 
@@ -618,7 +638,7 @@ CREATE INDEX responsibility_temporal_conflict_idx
   WHERE currentness_status = 'CONFLICT_CANDIDATE';
 ```
 
-`HISTORICAL` and `SUPERSEDED` are distinct: historical retained evidence need not have been the once-accepted value that a later fact superseded.
+`HISTORICAL` and `SUPERSEDED` remain distinct: historical retained evidence need not have been the once-accepted value that a later fact superseded.
 
 ---
 
@@ -704,6 +724,9 @@ CREATE TABLE responsibility_admission_reviews (
   CONSTRAINT responsibility_admission_reviews_id_account_uq
     UNIQUE (id, connected_account_id),
 
+  CONSTRAINT responsibility_admission_reviews_id_user_uq
+    UNIQUE (id, user_id),
+
   CONSTRAINT responsibility_admission_reviews_same_revision_uq
     UNIQUE (
       connected_account_id,
@@ -781,12 +804,14 @@ CREATE TABLE responsibility_admission_reviews (
     REFERENCES responsibilities (id, connected_account_id)
     ON DELETE RESTRICT,
 
-  CONSTRAINT responsibility_admission_reviews_interpretation_run_fk
-    FOREIGN KEY (interpretation_run_id)
-    REFERENCES ai_interpretation_runs(id)
-    ON DELETE SET NULL
+  CONSTRAINT responsibility_admission_reviews_interpretation_run_user_fk
+    FOREIGN KEY (interpretation_run_id, user_id)
+    REFERENCES ai_interpretation_runs (id, user_id)
+    ON DELETE SET NULL (interpretation_run_id)
 );
 ```
+
+**Implementation note:** PostgreSQL supports column-list `SET NULL` actions, but Drizzle support/current generated SQL must be verified. If Drizzle cannot express the column-list action cleanly, use explicit migration SQL or use `NO ACTION` and explicit retention cleanup. Never set `user_id` null as a side effect of pruning an interpretation run.
 
 ```sql
 CREATE UNIQUE INDEX responsibility_admission_reviews_open_source_candidate_uq
@@ -811,8 +836,8 @@ CREATE INDEX responsibility_admission_reviews_conversation_idx
 ```sql
 CREATE TABLE responsibility_domain_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  responsibility_id uuid NOT NULL
-    REFERENCES responsibilities(id) ON DELETE CASCADE,
+  responsibility_id uuid NOT NULL,
+  user_id uuid NOT NULL,
 
   operation text NOT NULL,
   actor_kind text NOT NULL,
@@ -836,6 +861,16 @@ CREATE TABLE responsibility_domain_events (
 
   CONSTRAINT responsibility_domain_events_id_parent_uq
     UNIQUE (id, responsibility_id),
+
+  CONSTRAINT responsibility_domain_events_parent_user_fk
+    FOREIGN KEY (responsibility_id, user_id)
+    REFERENCES responsibilities (id, user_id)
+    ON DELETE CASCADE,
+
+  CONSTRAINT responsibility_domain_events_interpretation_run_user_fk
+    FOREIGN KEY (interpretation_run_id, user_id)
+    REFERENCES ai_interpretation_runs (id, user_id)
+    ON DELETE SET NULL (interpretation_run_id),
 
   CONSTRAINT responsibility_domain_events_operation_check
     CHECK (
@@ -885,14 +920,11 @@ CREATE TABLE responsibility_domain_events (
     CHECK (char_length(btrim(reducer_version)) BETWEEN 1 AND 128),
 
   CONSTRAINT responsibility_domain_events_change_summary_object_check
-    CHECK (jsonb_typeof(change_summary) = 'object'),
-
-  CONSTRAINT responsibility_domain_events_interpretation_run_fk
-    FOREIGN KEY (interpretation_run_id)
-    REFERENCES ai_interpretation_runs(id)
-    ON DELETE SET NULL
+    CHECK (jsonb_typeof(change_summary) = 'object')
 );
 ```
+
+As above, if column-list `ON DELETE SET NULL` is not emitted cleanly by Drizzle, prefer `NO ACTION` + explicit retention cleanup over nulling tenant ownership.
 
 Global semantic application/effect idempotency:
 
@@ -920,10 +952,13 @@ CREATE INDEX responsibility_domain_events_source_idx
 
 # 11. `responsibility_provenance_refs`
 
+v0.1 canonical Message provenance is same-account and all AI-run references are same-user.
+
 ```sql
 CREATE TABLE responsibility_provenance_refs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
+  user_id uuid NOT NULL,
   connected_account_id uuid NOT NULL,
 
   responsibility_id uuid,
@@ -955,9 +990,19 @@ CREATE TABLE responsibility_provenance_refs (
   CONSTRAINT responsibility_provenance_refs_domain_event_owner_check
     CHECK (domain_event_id IS NULL OR responsibility_id IS NOT NULL),
 
+  CONSTRAINT responsibility_provenance_refs_responsibility_user_fk
+    FOREIGN KEY (responsibility_id, user_id)
+    REFERENCES responsibilities (id, user_id)
+    ON DELETE CASCADE,
+
   CONSTRAINT responsibility_provenance_refs_responsibility_account_fk
     FOREIGN KEY (responsibility_id, connected_account_id)
     REFERENCES responsibilities (id, connected_account_id)
+    ON DELETE CASCADE,
+
+  CONSTRAINT responsibility_provenance_refs_review_user_fk
+    FOREIGN KEY (admission_review_id, user_id)
+    REFERENCES responsibility_admission_reviews (id, user_id)
     ON DELETE CASCADE,
 
   CONSTRAINT responsibility_provenance_refs_review_account_fk
@@ -970,15 +1015,15 @@ CREATE TABLE responsibility_provenance_refs (
     REFERENCES messages (id, connected_account_id)
     ON DELETE RESTRICT,
 
+  CONSTRAINT responsibility_provenance_refs_interpretation_run_user_fk
+    FOREIGN KEY (interpretation_run_id, user_id)
+    REFERENCES ai_interpretation_runs (id, user_id)
+    ON DELETE SET NULL (interpretation_run_id),
+
   CONSTRAINT responsibility_provenance_refs_domain_event_parent_fk
     FOREIGN KEY (domain_event_id, responsibility_id)
     REFERENCES responsibility_domain_events (id, responsibility_id)
     ON DELETE NO ACTION,
-
-  CONSTRAINT responsibility_provenance_refs_interpretation_run_fk
-    FOREIGN KEY (interpretation_run_id)
-    REFERENCES ai_interpretation_runs(id)
-    ON DELETE SET NULL,
 
   CONSTRAINT responsibility_provenance_refs_target_kind_nonempty
     CHECK (char_length(btrim(target_kind)) BETWEEN 1 AND 128),
@@ -1001,6 +1046,8 @@ CREATE TABLE responsibility_provenance_refs (
     CHECK (source_excerpt_short IS NULL OR char_length(source_excerpt_short) <= 512)
 );
 ```
+
+If Drizzle cannot express column-list `SET NULL`, use explicit SQL or `NO ACTION`/retention cleanup. Under no circumstance may pruning an AI run null the `user_id` ownership column.
 
 ```sql
 CREATE INDEX responsibility_provenance_refs_responsibility_idx
@@ -1102,7 +1149,7 @@ raw provider/model payloads and credentials rejected
 
 # 13. Machine-key contract
 
-Trusted canonical machine keys:
+Trusted canonical keys:
 
 ```text
 source_event_key <= 256 ASCII chars
@@ -1113,14 +1160,14 @@ effect_key       <= 128 ASCII chars
 
 They are not raw URLs, message bodies, user text, or model prose.
 
-Required key tests:
+Tests:
 
 ```text
 same account/source/revision/application -> same key
 different account -> different namespace
-different evidence revision -> different application key only when re-application is authorized
+different evidence revision -> new application key only when re-application is authorized
 model rerun alone -> no new semantic application identity
-one application with multiple effects -> distinct stable effect keys
+one application/multiple effects -> distinct stable effect keys
 duplicate CREATE with different generated target UUID -> same application/effect key
 ```
 
@@ -1128,121 +1175,131 @@ duplicate CREATE with different generated target UUID -> same application/effect
 
 # 14. Transaction/concurrency protocol
 
-## 14.1 Universal Conversation coordination for semantic admission/matching
+## 14.1 AI/context capture
 
-Before accepting any semantic admission/matching effect from Conversation evidence:
+Do not label an inconsistent context snapshot with a revision.
+
+Use a short Conversation lock/consistent snapshot to capture:
+
+```text
+current semantic_evidence_revision
+exact authorized Message/context membership / input-manifest identity
+```
+
+Persist the run basis, release DB locks, then call the remote model.
+
+## 14.2 Universal Conversation coordination for admission/matching
+
+Before accepting semantic admission/matching effects from Conversation evidence:
 
 ```text
 BEGIN
 1. SELECT Conversation FOR UPDATE
 2. read current semantic_evidence_revision
-3. compare candidate / AI basis_evidence_revision
+3. compare candidate/AI basis_evidence_revision
 4. reject stale basis before Review/Responsibility creation or mutation
 5. perform admission + identity matching against current state in this Conversation
-6. then lock affected existing Responsibility rows in deterministic UUID order
+6. lock affected existing Responsibility rows in deterministic UUID order
 7. apply idempotent effects
 COMMIT
 ```
 
-Conversation locking does not make Conversation workflow authority; it serializes evidence-sensitive admission/matching for v0.1's one-Conversation Responsibility scope.
+Conversation locking is concurrency/evidence coordination, not workflow-state authority.
 
-## 14.2 Existing Responsibility mutation
+## 14.3 Existing Responsibility mutation
 
 After the Conversation freshness gate:
 
 ```text
 1. SELECT affected Responsibility FOR UPDATE
 2. verify expected aggregate_version
-3. query global (application_key,effect_key)
-   - if already accepted: return existing result idempotently
-4. validate active FieldDecision authority/current evidence
-5. mutate parent/children/semantic details
-6. set accepted_evidence_revision := current Conversation semantic_evidence_revision
-7. increment aggregate_version exactly once
-8. append mutating DomainEvent with before/after versions
+3. query global (application_key,effect_key); return existing result if already accepted
+4. validate FieldDecision/current evidence
+5. mutate parent/children/details
+6. accepted_evidence_revision := current Conversation semantic_evidence_revision
+7. aggregate_version := aggregate_version + 1 exactly once
+8. append mutating DomainEvent before/after
 9. set updated_at := now() on changed current-state rows
 ```
 
-## 14.3 CREATE
+## 14.4 CREATE
 
 ```text
 BEGIN
 1. lock Conversation and validate current semantic revision
 2. perform admission/identity matching under that lock
-3. compute application_key + effect_key before target identity acceptance
-4. if existing global DomainEvent has key pair -> return winning Responsibility
+3. compute application_key/effect_key before target identity acceptance
+4. existing global DomainEvent key pair -> return winning Responsibility
 5. generate candidate Responsibility UUID
 6. insert Responsibility with accepted_evidence_revision=current Conversation revision
-7. insert children
+7. insert current children
 8. insert CREATE DomainEvent before=0, after=1
-9. global unique(application_key,effect_key) is the duplicate commit arbiter
+9. global unique(application_key,effect_key) arbitrates duplicate CREATE
 COMMIT
 ```
 
-Concurrent duplicate CREATE transactions cannot both commit; semantically related distinct source events in one Conversation cannot race admission/matching outside the Conversation lock.
+## 14.5 Composite effects
 
-## 14.4 Composite effects
+Lock Conversation first, then existing Responsibility rows in deterministic UUID order. Atomic effects such as `SUPERSEDE R1 + CREATE R2` share application/correlation context and have distinct deterministic effect keys.
 
-Lock Conversation first, then existing Responsibility rows in deterministic UUID order. Semantically atomic effects such as `SUPERSEDE R1 + CREATE R2` commit together. Effects share application/correlation context and have distinct stable `effect_key`s.
-
-## 14.5 AdmissionReview
+## 14.6 AdmissionReview
 
 ```text
 BEGIN
 1. lock Conversation; verify current semantic revision
-2. SELECT AdmissionReview FOR UPDATE if it exists
+2. SELECT AdmissionReview FOR UPDATE if present
 3. verify expected Review aggregate_version
-4. RESOLVED -> return stored terminal decision idempotently
+4. RESOLVED -> return terminal result idempotently
 5. OPEN re-evaluation may only move basis_evidence_revision forward/current
-6. TRACK -> create/load Responsibility through global CREATE idempotency, then link same-account Responsibility
-7. DO_NOT_TRACK -> terminal review resolution
-8. increment Review aggregate_version; set updated_at=now()
+6. TRACK -> create/load Responsibility through global CREATE idempotency; link same-account R
+7. DO_NOT_TRACK -> terminal resolution
+8. set resolver/resolved_at; increment Review version; updated_at=now()
 COMMIT
 ```
 
-The all-status same-basis unique key blocks stale same-revision resurrection; Conversation freshness blocks an old revision from being newly accepted after the source context changed.
+## 14.7 Isolation
 
-## 14.6 Isolation escalation
-
-Default remains PostgreSQL `READ COMMITTED` + row locks + deterministic lock order + unique/FK constraints + version checks. Use `SERIALIZABLE` with explicit retry only for a later demonstrated invariant that cannot be protected cleanly by this protocol.
+Default remains PostgreSQL `READ COMMITTED` + explicit locks + deterministic lock order + unique/FK constraints + version checks. Use `SERIALIZABLE` with retry only for a later demonstrated invariant that cannot be protected cleanly by this protocol.
 
 ---
 
-# 15. DB-enforced vs reducer-enforced
+# 15. DB-enforced vs runtime-enforced
 
 ## PostgreSQL-enforced
 
 ```text
-account/conversation ownership
-same-user participant ownership
+Responsibility/Review account + user ownership
+same-user Participant references
+same-user AIInterpretationRun references
 same-Responsibility activation/temporal child references
-finite structural state values
+finite structural states
 resolution/reason/timestamp consistency
-defer/live structural consistency
+defer/live consistency
 DATE/INSTANT/UNRESOLVED shape
-one accepted-current temporal fact per semantic target/kind
+one accepted-current temporal fact per target/kind
 conflict candidates coexist
 one active FieldDecision per field
 one open AdmissionReview per source/candidate
-same source/candidate/basis revision Review cannot reappear
+same source/candidate/basis Review cannot reappear
 same-account TRACK Review link
-global semantic application/effect idempotency
+global application/effect idempotency
 one mutating event per resulting aggregate version
 same-account Message provenance
-same-Responsibility DomainEvent provenance
+same-user AI-run provenance
+a same-Responsibility DomainEvent provenance link
 JSON object shape / bounded machine keys
 ```
 
-## Trusted reducer/runtime-enforced
+## Trusted runtime/reducer
 
 ```text
 when Conversation.semantic_evidence_revision advances
-AI/candidate basis equality to current Conversation revision
-Conversation-first reducer lock protocol
-DEFERRED has valid TemporalContract/return condition
-parent closure criteria/domain policy
+AI ContextEnvelope authorization + snapshot/revision consistency
+Conversation-first admission/matching lock protocol
+DEFERRED -> valid TemporalContract/return condition
+parent closure policy/criteria
 ExpectedEvent satisfaction authority
-field/value/authority registries
+field/action/event/authority registries
 semantic_details_v1 deep validation
 semantic chronology/correction/supersession authority
 high-risk safe-action policy
@@ -1252,11 +1309,11 @@ updated_at maintenance
 
 ---
 
-# 16. Delete/retention rules
+# 16. Delete/retention
 
 Normal domain transitions close/supersede rows rather than hard-delete them.
 
-Hard delete is reserved for explicit privacy/account teardown.
+Hard delete is explicit privacy/account teardown.
 
 ```text
 Responsibility -> aggregate-local rows/provenance/history: CASCADE
@@ -1264,17 +1321,20 @@ AdmissionReview -> Review provenance: CASCADE
 TRACK Review -> admitted Responsibility: RESTRICT/NO ACTION
 cross-child event/leg references: NO ACTION
 Provenance -> Message: RESTRICT
+AIInterpretationRun links: prune through column-list SET NULL when supported,
+                           otherwise explicit cleanup/NO ACTION
 ```
 
 Privacy deletion order:
 
 ```text
-1. delete Responsibility/AdmissionReview state + provenance
-2. delete Message/provider evidence per retention policy
-3. delete account/auth secret material per account/provider policy
+1. delete Responsibility/AdmissionReview state + provenance/history as policy requires
+2. delete Message/provider evidence
+3. prune AI runs according to retention policy with ownership-safe references
+4. delete account/auth secret material
 ```
 
-The PostgreSQL acceptance suite MUST prove parent deletion with the cross-child FK graph. If `NO ACTION` timing blocks aggregate teardown, use explicit child teardown order rather than weakening normal referential integrity.
+Executable tests must prove the actual FK graph and teardown sequence.
 
 ---
 
@@ -1291,7 +1351,11 @@ index()/uniqueIndex() + .where(sql``) for partial indexes
 transaction(..., { isolationLevel: "read committed" })
 ```
 
-Use raw reviewable SQL where correctness is clearer, e.g. `SELECT ... FOR UPDATE`. Generated SQL must be compared with this DDL contract. TypeScript enum hints / `$type` are not DB/runtime validation.
+PostgreSQL supports column-list `SET NULL` on multi-column FKs, but current Drizzle emission for that exact clause MUST be checked. If unclear, use explicit migration SQL or `NO ACTION` + explicit cleanup. Never null a tenant owner column to prune an optional AI-run link.
+
+Raw SQL is acceptable where it makes correctness clearer, especially `SELECT ... FOR UPDATE` or exact PostgreSQL constraint clauses.
+
+Generated SQL must be reviewed against this contract. Type hints / `$type` are not runtime validation.
 
 ---
 
@@ -1403,11 +1467,20 @@ Before L2 freeze/migration authorization, instantiate the Drizzle-generated sche
 ```text
 50 stale rev N direct TRACK/CREATE rejected after Conversation advances to rev N+1
 51 stale rev N AdmissionReview create/update rejected after rev N+1
-52 two semantically related Conversation events processed concurrently serialize admission/matching
+52 semantically related Conversation events processed concurrently serialize admission/matching
 53 duplicate same-revision CREATE still rejected by global application/effect idempotency
 54 UI/read-only changes do not advance semantic_evidence_revision
-55 relevant new semantic message/attachment/provider evidence advances semantic_evidence_revision
+55 relevant semantic Message/Attachment/provider evidence advances semantic_evidence_revision
 56 Responsibility accepted_evidence_revision records last applied basis without masquerading as current Conversation revision
+57 concurrent evidence arrival cannot produce an AI run whose basis revision labels a mixed/incorrect context snapshot
+```
+
+## AI-run tenant integrity
+
+```text
+58 another user's AIInterpretationRun cannot be linked to AdmissionReview
+59 another user's AIInterpretationRun cannot be linked to Responsibility DomainEvent
+60 another user's AIInterpretationRun cannot be linked to Responsibility/Review provenance
 ```
 
 No migration is authorized until this suite or an explicitly equivalent set passes.
@@ -1428,7 +1501,7 @@ No migration is authorized until this suite or an explicitly equivalent set pass
 | AdmissionReview | T0-041..044/T0-042 |
 | provenance | T0-022/025/027/028/034/037, M39/R27 |
 | global DomainEvent idempotency | V16, T10..T15, duplicate CREATE pressure |
-| account integrity | T0-039, H06/H13 |
+| account/user integrity | T0-039, H06/H13, authorization invariants |
 
 ---
 
@@ -1445,22 +1518,23 @@ FieldDecision field/value/authority registry
 support_role / evidence_kind
 semantic-details validator implementation
 machine-key hashing/encoding
-repository/query helper names
+query/repository helper names
 ```
 
-They are bounded and tested in trusted code; freezing their complete vocabulary before real data would be false precision.
+They are bounded/tested in trusted code. Freezing their complete vocabulary before real data would be false precision.
 
 ---
 
-# 21. Current verdict
+# 21. Static-review verdict
 
 ```text
 L0 semantics                         FROZEN v0.1
 L1 logical persistence boundary      FROZEN v0.1
-L2 exact DDL candidate               STATIC AUDIT CORRECTED v0.3
-L2 PostgreSQL executable proof       PENDING
+L2 exact DDL candidate               v0.4 STATIC REVIEW COMPLETE
+Known static CRITICAL blockers       NONE
+PostgreSQL/Drizzle executable proof  PENDING
 L2 final freeze                      NOT YET
 L3 migrations/runtime                NOT AUTHORIZED
 ```
 
-The next step is not more speculative DDL. It is an executable Phase-2 schema spike: express this contract in Drizzle, inspect generated SQL, run the 56-item PostgreSQL acceptance matrix, and only then decide whether L2 earns a freeze.
+No further table invention is justified by the current corpus/static audit. The next work is executable proof: generate the temporary Drizzle/PostgreSQL schema, inspect generated SQL, run the 60-item acceptance matrix, and only then decide whether exact L2 earns an ADR/freeze.

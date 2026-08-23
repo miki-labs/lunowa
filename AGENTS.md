@@ -51,17 +51,20 @@ For any task involving task extraction, Responsibility state, owner/actionabilit
 - `docs/product/responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — current exact L2 candidate; not migration authority until the executable gate passes;
 - `docs/product/responsibility/L2-EXECUTABLE-PROOF-GATE.md` — proof/evidence requirements before L2 freeze;
 - `docs/decisions/0008-responsibility-state-is-orthogonal.md` — state/projection architecture rationale;
-- `docs/decisions/0009-responsibility-persistence-hybrid-boundary.md` — logical persistence-boundary rationale.
+- `docs/decisions/0009-responsibility-persistence-boundary.md` — logical persistence-boundary rationale.
 
 Do **not** derive canonical state from legacy screenshot filenames such as `moment-action-required`, `moment-deferred`, or `moment-follow-up`.
 
 ### Product / UX behavior
 
-- `docs/design/DESIGN.md` — product intent, information architecture, visual/product principles.
+- `docs/product/PRODUCT.md` — product vision/problem, audience hypotheses, differentiation, MVP/validation/commercial status, and important product supersessions.
+- `docs/design/DESIGN.md` — accepted information architecture, visual/product principles, and product-design guardrails.
 - `docs/design/INTERACTIONS.md` — click semantics, Responsibility projections/Moment View, Temporal Contract, compose/search/context/error interactions.
 - `docs/design/RESPONSIVE.md` — pane/responsive behavior under the same Responsibility projection model.
 - `docs/design/references/README.md` — visual-reference authority and legacy filename caveats.
 - `docs/design/references/00-brand-system.png` through `19-mobile-layout.png` — visual references only within those rules.
+
+Treat `PRODUCT.md` classifications such as HYPOTHESIS / NEEDS VALIDATION as hypotheses, not accepted market facts. Detailed Responsibility semantics still belong to `docs/product/responsibility/`.
 
 ### Product-specific engineering
 

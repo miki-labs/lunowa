@@ -51,6 +51,7 @@ This directory does **not** freeze:
 - `TIER-0-CRITICAL-ORACLES.md` — full layered oracles for the first eight high-risk/high-connectivity Tier-0 cases. Legacy aliases/errata are normalized using `CONSISTENCY-AUDIT.md` before executable serialization.
 - `TIER-0-DETAILED-ORACLES-BATCH-2.md` — ten additional full layered base oracles using the reconciled state-vector vocabulary, plus the explicit observation-confirmed C23 counterpart.
 - `TRANSITION-ORACLES.md` — semantic traces for all 20 mandatory transition/event sequences.
+- `PHYSICAL-MODEL-DESIGN.md` — **non-frozen** hybrid relational/typed-details persistence candidate derived from the current oracle pressure. It is a falsifiable design input for Phase 2, not migration authority.
 
 ## Current coverage-design status
 
@@ -156,6 +157,21 @@ claim + matching observation can close a narrow fact without creating a global e
 
 Any minimal physical model that cannot express these without overloaded state fields should be rejected before migrations are written.
 
+## Physical-model candidate status
+
+`PHYSICAL-MODEL-DESIGN.md` currently prefers a hybrid boundary:
+
+```text
+normalized parent orthogonal state
++ normalized obligation legs
++ normalized expected events
++ normalized material temporal facts
++ normalized provenance/history
++ strictly typed/versioned low-query semantic details
+```
+
+That design is deliberately **candidate-only**. Remaining oracles are now used partly as adversarial schema tests. If they expose a cheaper/necessary representation, the physical design changes before code/migrations.
+
 ## Conceptual terminology
 
 `Responsibility` is the canonical semantic concept name. It means a communication-bounded, trackable operational obligation / expected-outcome loop with a coherent closure condition.
@@ -168,15 +184,17 @@ The prior documentation stop condition caused by conflicting legacy lifecycle se
 
 The remaining gate before domain/persistence implementation is different:
 
-> choose the **minimal physical representation** that satisfies the validated scenarios/transitions without reintroducing the superseded single lifecycle model or building a generic workflow engine.
+> accept the **minimal physical representation** that satisfies the validated scenarios/transitions without reintroducing the superseded single lifecycle model or building a generic workflow engine.
 
 Before schema freeze:
 
-1. continue detailed Tier-0 expansion, prioritizing cases capable of falsifying a proposed schema;
-2. normalize the first eight legacy detailed-oracle aliases/errata during executable serialization;
-3. keep the C23 claim-only and observation-confirmed cases as two explicit executable inputs;
-4. require HIGH/CRITICAL forbidden outcomes at the owning verification layer;
-5. mechanically guard mandatory coverage IDs from disappearance.
+1. continue detailed Tier-0 expansion, prioritizing cases capable of falsifying `PHYSICAL-MODEL-DESIGN.md`;
+2. adversarially audit the candidate's JSON-vs-normalized boundaries, field authority, risk representation, provenance, idempotency, and query path;
+3. normalize the first eight legacy detailed-oracle aliases/errata during executable serialization;
+4. keep the C23 claim-only and observation-confirmed cases as two explicit executable inputs;
+5. require HIGH/CRITICAL forbidden outcomes at the owning verification layer;
+6. mechanically guard mandatory coverage IDs from disappearance;
+7. only after those gates, convert an accepted minimal model into Drizzle/PostgreSQL migrations.
 
 ## Change policy
 

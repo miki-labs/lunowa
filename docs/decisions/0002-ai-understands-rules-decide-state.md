@@ -1,84 +1,146 @@
-# Decision 0002 — AI Understands; Rules Decide Lifecycle State
+# Decision 0002 — AI Understands; Trusted Rules Decide Accepted Responsibility State
 
 ## Status
 
-Accepted — 2026-08-19
+Accepted — 2026-08-19  
+Amended / reconciled with Responsibility v0.1 — 2026-08-23
 
 ## Context
 
-Lunowa's product value depends on interpreting ordinary email into actions, deadlines, waiting states, follow-up needs, and completion signals. AI/LLMs are useful for this interpretation, but they are probabilistic and can be affected by ambiguous language, quoted history, prompt-like content inside email, provider formatting, and model/config changes.
+Lunowa's product value depends on understanding ordinary communication well enough to identify possible Responsibility loops, obligation bearers, requested actions/events, temporal expressions, proposals, completion/correction signals, and uncertainty.
 
-A false negative is particularly dangerous: a real user obligation could be classified as safe to hide, completed, or waiting.
+AI/LLMs are useful for language interpretation, but they remain probabilistic and can be affected by:
+
+- ambiguous/indirect language;
+- quoted/forwarded history;
+- typo/IME noise;
+- conflicting evidence;
+- prompt/tool-like text inside email;
+- missing context;
+- model/config changes;
+- asynchronous stale results.
+
+A dangerous failure is not merely a wrong label. A real material user obligation could be hidden as Done/Waiting/Later/NONE, a false completion could be accepted, or a high-risk sender request could be treated as authorized action.
+
+Responsibility v0.1 also established that the domain cannot be represented faithfully by one canonical lifecycle enum. Resolution, live tracking, attention/defer, obligation/actionability, expected events, temporal facts, uncertainty/risk, and provenance are orthogonal semantic dimensions.
 
 ## Decision
 
-AI is an **interpretation component**, not the authoritative lifecycle state machine.
+AI is an **interpretation component**, not the authority for accepted Responsibility state, authorization, or privileged effects.
 
 The accepted flow is:
 
 ```text
-Normalized communication
- -> AI extraction / deterministic parsing
- -> schema validation
- -> candidate facts + confidence + provenance
- -> deterministic lifecycle/domain rules
- -> authoritative ActionItem state
- -> attention / Temporal Contract policy
+Authorized communication / trusted observations
+ -> normalization + message zoning
+ -> AI interpretation + deterministic parsing/observations
+ -> structured candidate acts/claims/temporal expressions + provenance
+ -> schema/source/context validation
+ -> stale-basis / evidence-revision validation
+ -> Responsibility admission
+ -> identity matching + deterministic/trusted reduction
+ -> safety/actionability policy
+ -> accepted evidence-relative Responsibility state
+ -> deterministic My Turn / Waiting / Later / Done / Review projection
+ -> Temporal Contract / attention policy where applicable
 ```
 
-The AI may propose:
+The model may propose/interpret, when relevant:
 
-- requested action;
-- owner;
-- deadline;
-- waiting/completion/follow-up signals;
-- topic/preview;
-- provenance references;
-- uncertainty.
+- communication acts;
+- speaker vs obligation-bearer candidates;
+- requested action/event/object;
+- modality / obligation strength;
+- proposed terms;
+- temporal expressions;
+- completion/correction/cancellation signals;
+- communicated claims;
+- uncertainty;
+- source message IDs / locators / provenance.
 
-It may not directly own:
+It may **not** directly own:
 
-- authorization;
+- authentication/authorization;
+- ConnectedAccount ownership or sending identity;
 - provider mutation permission;
-- authoritative lifecycle state;
-- automatic hiding without policy validation;
-- irreversible send/delete/archive actions;
-- Temporal Contract execution guarantees.
+- accepted Responsibility admission/identity/effects;
+- live tracking/defer/hiding without validated product policy;
+- irreversible send/delete/archive/payment/approval actions;
+- provider-observed facts that should come from trusted provider state;
+- Temporal Contract execution guarantees;
+- cost/entitlement/security policy.
+
+### Orthogonal-state consequence
+
+“Rules decide state” does **not** mean a deterministic reducer chooses one value from the superseded enum:
+
+```text
+OPEN / ACTION_REQUIRED / DEFERRED / WAITING / FOLLOW_UP / COMPLETED / UNCERTAIN
+```
+
+Instead, trusted domain logic reduces evidence into the accepted Responsibility semantic vector and derives the user-facing projection.
+
+`FOLLOW_UP` is normally a current user action/reason after re-evaluation, not a canonical lifecycle species. `LATER` is an attention projection, not the same thing as communication hold. `REVIEW` may arise from a field-level decision-critical conflict even when Responsibility admission is definitely `TRACK`.
 
 ## Alternatives considered
 
-### Let the model directly output lifecycle state
+### Let the model directly output the canonical product state
 
-Rejected as the sole authority because it makes state changes difficult to reason about, test, audit, and bound across model updates.
+Rejected as authority because probabilistic output is difficult to reason about, audit, safely migrate across model updates, and bound under stale/ambiguous/high-risk evidence.
 
-The model may still emit a state *candidate* for debugging/evaluation, but deterministic domain logic remains authoritative.
+A model may emit diagnostic candidates, but accepted domain state still passes through trusted validation/reduction.
+
+### Keep the old deterministic seven-state lifecycle reducer and only improve extraction
+
+Superseded by Responsibility v0.1. Scenario/transition stress testing showed that one enum conflates independent concepts such as resolution, attention defer, follow-up action, uncertainty, parallel obligations, and historical activation.
 
 ### No AI; only deterministic parsing
 
-Not accepted as the long-term product approach because ordinary human communication is too varied for purely deterministic extraction to deliver the intended interpretation benefit.
+Not accepted as the long-term product approach because real communication is too varied for purely deterministic extraction to deliver the intended interpretation benefit.
 
-However deterministic/manual fixtures should be used before AI integration to validate domain/lifecycle behavior.
+Deterministic/manual fixtures remain valuable for validating the domain before AI integration.
+
+### Repeated model voting as authority
+
+Rejected. Consensus is an uncertainty signal, not evidence authority; correlated models can agree on the same wrong interpretation.
 
 ## Consequences
 
 Positive:
 
-- lifecycle behavior can be unit/integration tested;
-- user corrections can be preserved;
-- model/provider changes are less likely to silently alter state authority;
-- provenance and uncertainty can be explicit;
-- core email remains usable when AI is unavailable.
+- Responsibility behavior is testable independently of model/provider changes;
+- user corrections and source provenance can be preserved;
+- stale model results can be rejected by evidence revision;
+- high-risk requests can be understood without being authorized;
+- AI degradation does not disable ordinary email;
+- model/prompt upgrades need not silently rewrite accepted history;
+- scenario/transition oracles can distinguish extraction failures from reducer/safety/projection failures.
 
 Trade-offs:
 
-- requires a structured extraction schema and lifecycle reducer;
-- deterministic rules need ongoing refinement;
-- borderline cases may remain `UNCERTAIN` rather than appearing magically resolved.
+- requires structured interpretation contracts and a real domain reducer;
+- deterministic/trusted domain logic needs ongoing scenario-driven refinement;
+- ambiguous cases may remain Review/ordinary mail rather than appearing magically certain;
+- more semantic dimensions must be represented than in a simplistic lifecycle enum.
 
 ## Safety bias
 
-During early product stages, uncertainty should bias against hiding a likely user obligation. A visible uncertain item is generally less harmful than a missed required action.
+During early product stages:
+
+```text
+fake completion >> visible uncertainty
+missed material user obligation > unnecessary review
+false merge > modest false split
+```
+
+But routing everything to Review is also product failure. Review should be used for decision-critical ambiguity/risk, not harmless uncertainty.
 
 ## Revisit when
 
-This boundary can be refined as evaluation evidence improves, but any proposal to give a model direct privileged lifecycle/action authority requires explicit risk analysis, eval evidence, and an updated decision record.
+The interpretation/reducer boundary may be refined as evaluation evidence improves, but any proposal to give a model direct privileged authority over accepted Responsibility state or high-impact side effects requires:
+
+- explicit threat/risk analysis;
+- canonical/holdout eval evidence;
+- high-harm forbidden-outcome testing;
+- authorization/idempotency/confirmation design;
+- an updated durable decision record.

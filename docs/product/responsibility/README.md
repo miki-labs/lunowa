@@ -49,9 +49,12 @@ This directory does **not** freeze:
 - `COVERAGE-PLAN.md` — corpus-level mandatory coverage inventory, contrasts/interactions, semantic mutants, transition traces, metamorphic relations, and completion gates.
 - `TIER-0-SCENARIO-MATRIX.md` — first 44 base semantic-oracle assignments and controlled variants. Its earlier transition `8/20` section is historical; current transition design coverage is defined by the dedicated transition artifacts.
 - `TIER-0-CRITICAL-ORACLES.md` — full layered oracles for the first eight high-risk/high-connectivity Tier-0 cases. Legacy aliases/errata are normalized using `CONSISTENCY-AUDIT.md` before executable serialization.
+- `TIER-0-DETAILED-ORACLES-BATCH-2.md` — ten additional full layered base oracles using the reconciled state-vector vocabulary, plus the explicit observation-confirmed C23 counterpart.
 - `TRANSITION-ORACLES.md` — semantic traces for all 20 mandatory transition/event sequences.
 
 ## Current coverage-design status
+
+Corpus assignment / transition design coverage:
 
 ```text
 FIXED-rule sentinels: 50 / 50
@@ -65,10 +68,21 @@ ambiguity/oracle families: 10 / 10
 transition/event traces: 20 / 20
 ```
 
-`mapped` is not the same as:
+Detailed one-event Tier-0 oracle expansion:
+
+```text
+base cases fully layered: 18 / 44
+explicit C23 claim-vs-observation pair: complete at specification level
+remaining base cases requiring full layered expansion: 26 / 44
+```
+
+The first eight detailed cases remain under documented compatibility aliases until executable serialization. Batch 2 uses the reconciled vocabulary directly.
+
+`mapped` or `fully layered` is not the same as:
 
 ```text
 implemented
+serialized as executable fixtures
 executed
 passed
 production-validated
@@ -124,6 +138,24 @@ Exact physical representation remains open.
 
 Existing detailed-oracle shorthand such as `tracking_status` or `active_obligations[]` is governed by compatibility rules in `CONSISTENCY-AUDIT.md`; new executable fixtures use the reconciled schema.
 
+## New schema pressure from Batch 2
+
+The second detailed expansion strengthens several physical-model requirements without fixing storage shape:
+
+```text
+pending proposal != agreed fact
+blocked known obligation != forgotten obligation
+hold constraint != attention defer
+cancellation resolution != satisfaction
+intent to delegate != effective delegation
+partial criterion completion != Responsibility completion
+historical evidence-relative OPEN != live activated work
+ANY_OF assignment ambiguity != BOTH/every-recipient ownership
+claim + matching observation can close a narrow fact without creating a global evidence hierarchy
+```
+
+Any minimal physical model that cannot express these without overloaded state fields should be rejected before migrations are written.
+
 ## Conceptual terminology
 
 `Responsibility` is the canonical semantic concept name. It means a communication-bounded, trackable operational obligation / expected-outcome loop with a coherent closure condition.
@@ -132,13 +164,19 @@ The physical entity/table name is an implementation choice; `ActionItem` should 
 
 ## Current implementation gate
 
-The prior documentation stop condition caused by conflicting legacy lifecycle semantics is now satisfied: Architecture, Data Model, Contracts, and Interactions have been reconciled.
+The prior documentation stop condition caused by conflicting legacy lifecycle semantics is now satisfied: Architecture, Data Model, Contracts, Interactions, responsive/design routing, technology guidance, and relevant ADRs have been reconciled.
 
 The remaining gate before domain/persistence implementation is different:
 
 > choose the **minimal physical representation** that satisfies the validated scenarios/transitions without reintroducing the superseded single lifecycle model or building a generic workflow engine.
 
-Before schema freeze, remaining Tier-0 oracle expansion and executable fixture normalization should continue to pressure-test that representation.
+Before schema freeze:
+
+1. continue detailed Tier-0 expansion, prioritizing cases capable of falsifying a proposed schema;
+2. normalize the first eight legacy detailed-oracle aliases/errata during executable serialization;
+3. keep the C23 claim-only and observation-confirmed cases as two explicit executable inputs;
+4. require HIGH/CRITICAL forbidden outcomes at the owning verification layer;
+5. mechanically guard mandatory coverage IDs from disappearance.
 
 ## Change policy
 

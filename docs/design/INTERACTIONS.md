@@ -2,208 +2,234 @@
 
 ## Status
 
-**Current interaction source of truth.**
+**Current interaction source of truth, reconciled with Responsibility v0.1 semantics.**
 
-This document defines behavior that screenshots cannot reliably specify: click semantics, lifecycle transitions, Moment View behavior, Temporal Contract behavior, context preservation, compose/reply flows, search, pinning, menus, account/scope switching, trust fallbacks, and uncertainty handling.
+This document defines behavior screenshots cannot reliably specify: click semantics, Responsibility projection/Moment behavior, Temporal Contract behavior, context preservation, compose/reply flows, search, pinning, menus, account/scope switching, trust fallbacks, and uncertainty handling.
 
-Related sources:
+Responsibility/domain semantics come from:
 
-- `docs/design/DESIGN.md` — product/visual design and information architecture.
-- `docs/design/RESPONSIVE.md` — layout adaptation across widths.
-- `docs/design/references/` — visual references.
+- `docs/product/responsibility/README.md`;
+- `docs/product/responsibility/DECISIONS.md`;
+- `docs/product/responsibility/CONSISTENCY-AUDIT.md`.
+
+Related UX sources:
+
+- `docs/design/DESIGN.md`;
+- `docs/design/RESPONSIVE.md`;
+- visual references under `docs/design/references/`.
+
+This document may use simple user-facing buckets such as `My Turn / Waiting / Later / Done / Review`. Those are **projections**, not one canonical lifecycle enum.
 
 ---
 
 ## 1. Core interaction invariants
 
-These are high-value invariants and should not be changed casually.
-
 ### 1.1 Ordinary conversation open
 
-**Clicking the normal body of a conversation row opens that conversation in `会話`.**
+Clicking the normal body of a conversation row opens that Conversation in `会話`.
 
-Do not force the user through `今の要点` before they can read the thread.
+Do not force the user through `今の要点` before they can read the source thread.
 
-### 1.2 Status-chip open
+### 1.2 Responsibility/status-chip open
 
-**Clicking a lifecycle/status chip opens the same conversation in `今の要点`.**
+Clicking an interactive responsibility/status chip opens the same Conversation in `今の要点`.
 
 Examples:
 
-- click row body → `会話`
-- click `対応が必要` chip → `今の要点`
-- click `あとで` chip → `今の要点`
-- click `待ち` chip → `今の要点`
-- click `完了` chip → `今の要点`
+- row body → `会話`;
+- `対応が必要` / My Turn chip → `今の要点`;
+- `あとで` / Later chip → `今の要点`;
+- `待ち` / Waiting chip → `今の要点`;
+- `完了` / Done chip → `今の要点`;
+- `確認` / Review chip → `今の要点`.
 
-A chip is therefore interactive, not decorative. It must be keyboard focusable and expose an accessible name such as `今の要点を見る`.
+Chip is interactive, keyboard-focusable, and exposes an accessible name such as `今の要点を見る`.
 
 ### 1.3 One Moment, one main question
 
-`今の要点` should optimize for one current decision. It should generally have one visually primary action, even when the conversation contains multiple Action Items.
+`今の要点` optimizes for one current decision. It generally has one visually primary action even when the Conversation contains multiple Responsibilities or one Responsibility contains multiple obligation legs.
 
 ### 1.4 Preserve context
 
-Navigation should preserve as much current context as practical:
+Navigation should preserve, where practical:
 
-- selected scope;
+- selected Scope;
 - selected list/filter;
-- search query and filters;
-- selected conversation;
+- search query/filters;
+- selected Conversation;
 - list scroll position;
 - draft contents;
 - pane widths;
-- whether a secondary panel/preview was open when appropriate.
+- open secondary panel/preview.
 
 ### 1.5 Do not make AI a gate
 
-Failure or absence of AI interpretation must never block ordinary mail reading, composing, replying, sending, or basic search/navigation.
+AI failure/absence never blocks ordinary reading, composing, replying, sending, basic search, or navigation.
 
 ---
 
-## 2. Conceptual data/interaction model
+## 2. Conceptual interaction model
 
 ### 2.1 Conversation
 
-A Conversation groups related communication events/messages.
+A Conversation groups related communication evidence/messages.
 
-### 2.2 Action Item
+It may contain zero, one, or many Responsibilities.
 
-A Conversation can contain zero, one, or many Action Items.
+### 2.2 Responsibility
 
-Recommended conceptual shape:
+A Responsibility is a communication-bounded operational obligation/expected-outcome loop.
+
+The UI does not need to expose the internal term `Responsibility` everywhere; user copy may say `対応`, `要点`, `待ち`, etc.
+
+Conceptually relevant dimensions include:
 
 ```text
-ActionItem {
-  id
-  goal
-  state
-  next_owner
-  next_action
-  deadline
-  attention_level
-  temporal_contract
-  confidence
-  risk
-  provenance
-  related_messages
-  related_files
-}
+operational outcome
+resolution status/reason
+live tracking activation
+attention/defer
+obligation legs/actionability
+expected events
+completion criteria
+constraints
+pending proposals/agreed facts
+temporal facts
+uncertainty/risk
+provenance
 ```
 
-This is a behavioral contract, not necessarily the exact persistence schema.
+Do not rebuild a single internal lifecycle state from the user-facing buckets.
 
-### 2.3 Event history
+### 2.3 Event/evidence history
 
-Important lifecycle decisions should be explainable from durable events, for example:
+Important decisions remain explainable from durable evidence/events, for example:
 
-- message received;
-- message sent;
-- attachment sent;
-- user marked complete;
-- reply arrived;
-- deadline changed;
-- scheduled resurfacing fired;
-- follow-up sent.
+- message received/sent;
+- provider send reconciled/ambiguous;
+- attachment/provider fact observed;
+- user field correction;
+- user tracking close/reopen;
+- counterpart reply/closure;
+- source due corrected;
+- Temporal Contract trigger fired;
+- follow-up sent;
+- Responsibility reopened/superseded.
 
-The UI should be able to answer `なぜ今これが出ているのか` from this history when needed.
+The UI should be able to answer `なぜ今これが出ているのか` when needed.
 
 ---
 
-## 3. Lifecycle state semantics
+## 3. User-facing Responsibility projections
 
-Internal Action Item states:
+The main interaction buckets are deterministic projections over canonical Responsibility state:
 
 ```text
-OPEN
-ACTION_REQUIRED
-DEFERRED
+MY_TURN
 WAITING
-FOLLOW_UP
-COMPLETED
-UNCERTAIN
+LATER
+DONE
+REVIEW
+NONE
 ```
 
-### 3.1 OPEN
+These are not persisted lifecycle truth.
 
-A newly interpreted or insufficiently resolved Action Item before a stronger state is established.
+### 3.1 MY_TURN / 対応が必要
 
-### 3.2 ACTION_REQUIRED
+Use when at least one currently actionable material USER obligation leg exists and no higher-priority review/safety condition should take over.
 
-The user currently owes an action.
+Examples:
 
-Typical evidence:
+- explicit document submission request;
+- confirmation/decision needed;
+- follow-up action becomes due;
+- conditional user action becomes actionable after trusted condition evidence.
 
-- explicit request directed at the user;
-- deadline plus required user action;
-- request for confirmation/approval;
-- required response not yet performed.
+### 3.2 WAITING / 待ち
 
-### 3.3 DEFERRED
+Use when the Responsibility remains open but no current user action is required and the next meaningful work/event belongs to another party/external event.
 
-A known Action Item is intentionally outside current attention because an explicit Temporal Contract defines when/why it returns.
+Examples:
 
-DEFERRED without a reliable return condition is invalid for a meaningful obligation.
+- user sent required draft; counterpart confirmation is expected;
+- legal approval/resume event is pending;
+- user completed one parallel leg and another required signer remains.
 
-### 3.4 WAITING
+A communication hold blocked on another party/event ordinarily projects `WAITING`.
 
-The user's relevant action has been completed and the next meaningful event is owned by another party or external system.
+### 3.3 LATER / あとで
 
-### 3.5 FOLLOW_UP
+Use only when the item is intentionally deferred from current attention under an explicit/validated return condition.
 
-The expected reply/event did not arrive by the relevant trigger or threshold and renewed user action is appropriate.
+```text
+communication hold != product defer
+```
 
-### 3.6 COMPLETED
+Do not use `LATER` merely because current action is blocked on someone else.
 
-The current obligation/loop has strong evidence of completion and no active follow-up is required.
+### 3.4 DONE / 完了
 
-Completion must be reversible when new relevant communication reopens the work.
+Use when the tracked Responsibility is resolved.
 
-### 3.7 UNCERTAIN
+`Done` does not mean every resolution was successful satisfaction. Reasons may include satisfied, declined, cancelled, superseded, user-closed, invalidated, or duplicate.
 
-Lunowa cannot safely decide the lifecycle state with enough confidence.
+The UI may show different explanatory copy when the reason matters.
 
-Behavior should fall back toward ordinary mail presentation rather than aggressively hiding or completing the item.
+### 3.5 REVIEW / 確認
+
+Use when a decision-critical field/identity/safety question cannot be resolved safely enough for a normal deterministic projection.
+
+Examples:
+
+- conflicting material due dates with unknown override authority;
+- ambiguous assignment;
+- completion claim conflicts with provider evidence;
+- high-risk request whose legitimacy/authority is unverified;
+- decision-critical sarcasm/pragmatic ambiguity.
+
+`REVIEW` does not necessarily mean Responsibility admission itself was uncertain. A definitely tracked Responsibility may project Review because one critical field is conflicted.
+
+### 3.6 NONE
+
+Use when there is no admitted live Responsibility to surface.
+
+Historical apparent open loops may remain semantically unresolved but inactive, producing `NONE` or conservative review rather than automatic `MY_TURN`.
 
 ---
 
-## 4. State transitions
+## 4. Projection changes and transition interaction semantics
 
-These transitions describe intended semantics; implementation may have intermediate technical states.
+Projection may change as evidence/state dimensions change; do not treat the bucket itself as the domain transition record.
+
+Examples:
 
 ```text
-OPEN
-├─> ACTION_REQUIRED
-├─> WAITING
-├─> COMPLETED
-└─> UNCERTAIN
+USER leg actionable
+-> MY_TURN
 
-ACTION_REQUIRED
-├─> DEFERRED
-├─> WAITING
-├─> COMPLETED
-└─> UNCERTAIN
+USER send reconciled; OTHER confirmation remains
+-> WAITING
 
-DEFERRED
-├─ trigger fires -> ACTION_REQUIRED
-├─ user completes action -> WAITING or COMPLETED
-└─ interpretation becomes unsafe -> UNCERTAIN
+follow-up trigger; no reply
+-> MY_TURN (reason = follow up)
 
-WAITING
-├─ expected positive reply/event -> COMPLETED or ACTION_REQUIRED
-├─ timeout/deadline/no-response -> FOLLOW_UP
-└─ new request -> ACTION_REQUIRED
+reminder send reconciled; OTHER reply expected
+-> WAITING
 
-FOLLOW_UP
-├─ follow-up sent -> WAITING
-├─ resolved without send -> COMPLETED
-└─ new required action -> ACTION_REQUIRED
+user intentionally snoozes actionable work
+-> LATER
 
-COMPLETED
-└─ new relevant event -> OPEN / ACTION_REQUIRED / WAITING
+return trigger fires; work still actionable
+-> MY_TURN
+
+Responsibility resolves
+-> DONE
 ```
 
-Do not make state transition merely because a message was opened/read.
+Do not transition merely because a message/attachment was opened/read.
+
+One evidence event may affect multiple Responsibilities. UI should render the resulting projections; it must not assume “one message changes one item.”
 
 ---
 
@@ -211,33 +237,31 @@ Do not make state transition merely because a message was opened/read.
 
 Preferred principle:
 
-> **AI understands; product rules decide state.**
+> **AI understands; trusted product rules decide accepted Responsibility state.**
 
-The model should primarily extract structured facts such as:
+AI may propose/extract:
 
 ```text
-requested_action
-action_owner
-deadline
-latest_message_intent
-completion_signal
-reply_expectation
-related_event
-confidence
+communication acts
+speaker / obligation bearer candidates
+requested action/event/object
+modality / obligation strength
+proposed terms
+source temporal expressions
+completion/correction/cancellation signals
+uncertainty
 provenance
 ```
 
-Then deterministic/product logic should decide lifecycle state whenever practical.
+Trusted product/domain logic decides admission, identity/effects, actionability, safety policy, and projection.
 
-Hard invariants such as authorization, sending identity, guaranteed scheduler execution, retry semantics, and irreversible/destructive behavior must not depend solely on free-form model output.
+Hard invariants such as authorization, sending identity, scheduler guarantees, retries, provider facts, and high-impact side effects never depend solely on free-form/model output.
 
-### 5.1 Safety bias
+### 5.1 Safety bias without review spam
 
-The dangerous false negative is:
+The dangerous failure is a real material user obligation being hidden as Done/Waiting/Later/NONE without adequate evidence.
 
-> real ACTION_REQUIRED → incorrectly hidden as DEFERRED / WAITING / COMPLETED.
-
-Initial behavior should therefore prefer conservative visibility when confidence or completion evidence is weak.
+However, sending everything to Review is also product failure. Ask the user only when uncertainty is decision-critical/material and cannot be resolved more cheaply/safely.
 
 ---
 
@@ -245,57 +269,37 @@ Initial behavior should therefore prefer conservative visibility when confidence
 
 ### 6.1 Row body
 
-Click/tap normal row body:
-
-1. select conversation;
+1. select Conversation;
 2. render Detail;
-3. select `会話` tab;
-4. preserve the list scroll position.
+3. select `会話`;
+4. preserve list scroll position.
 
-If the user previously selected `今の要点` manually for that same conversation and then navigates away, do **not** assume the next ordinary row click should inherit `今の要点`. The row-body semantic remains `会話`.
+Ordinary row semantics remain `会話` even if the user previously viewed `今の要点` for another row.
 
-### 6.2 Status chip
+### 6.2 Status/projection chip
 
-Click/tap status chip:
-
-1. select conversation;
+1. select Conversation;
 2. render Detail;
 3. select `今の要点`;
-4. focus/scroll to the primary Moment content if needed.
-
-Hover/focus affordance should make interactivity discoverable without making the chip look like a large button.
+4. focus/scroll primary Moment content if needed.
 
 ### 6.3 Pin quick action
 
-Pin is available from:
+Available from Detail header, desktop hover action, and Conversation menu where appropriate.
 
-- Detail header;
-- row hover quick action where pointer input exists;
-- conversation menu.
-
-Pin toggling must not mutate lifecycle state.
+Pin never mutates Responsibility state.
 
 ### 6.4 Hover actions
 
-Desktop row hover may expose a small set of high-frequency actions such as:
+Desktop may expose a restrained set such as Pin, Archive, Delete, More.
 
-- Pin;
-- Archive;
-- Delete;
-- More.
-
-Do not show a permanent wall of icons on every row.
+Do not render a permanent wall of icons.
 
 ### 6.5 Multi-select
 
-If implemented in the initial client, selecting multiple rows enables bulk operations appropriate to mail management, for example:
+Bulk operations may include read/unread, archive, delete, pin/unpin where clear.
 
-- mark read/unread;
-- archive;
-- delete;
-- pin/unpin where semantics are clear.
-
-Avoid bulk lifecycle inference changes that could hide required actions without explicit confirmation.
+Avoid bulk Responsibility inference/state changes that could hide material work without explicit trustworthy semantics.
 
 ---
 
@@ -303,28 +307,17 @@ Avoid bulk lifecycle inference changes that could hide required actions without 
 
 ### 7.1 Thread presentation
 
-Display the chronological communication thread with:
+Show chronological communication with sender, recipient context, timestamp, body, attachments, and per-message menu.
 
-- sender;
-- recipient context where relevant;
-- date/time;
-- message body;
-- attachments;
-- per-message action menu.
-
-Short conversational messages may feel chat-like, but long/HTML mail should render as readable document content rather than tiny speech bubbles.
+Short mail may feel chat-like; long/HTML content should remain readable document-like mail.
 
 ### 7.2 Quoted history
 
-Because the timeline already shows previous messages, quoted history/signatures should be collapsed or visually de-emphasized when possible.
-
-Users must still be able to expand the original message content.
+Collapse/de-emphasize repeated quoted history/signatures where practical while preserving access to original content.
 
 ### 7.3 Reply composer
 
-Keep a reply composer at the bottom of the thread when the user has permission to reply.
-
-Core elements:
+Keep reply composer near thread bottom when user can reply.
 
 ```text
 From: account ▾
@@ -334,14 +327,14 @@ From: account ▾
 attachment / formatting / optional AI assist        Send ▾
 ```
 
-`From` identity must be explicit in multi-account contexts.
+`From` is explicit in multi-account contexts.
 
 ### 7.4 Reply / Reply All / Forward
 
-- normal single-recipient reply should default to Reply;
-- Reply All must remain available when multiple relevant recipients exist;
-- Forward can be exposed in the message or conversation menu;
-- do not silently choose a different sender identity than the account/context indicates.
+- default ordinary single-recipient reply to Reply;
+- keep Reply All available when relevant;
+- Forward available from message/conversation menu;
+- never silently switch sender identity.
 
 ---
 
@@ -349,150 +342,179 @@ attachment / formatting / optional AI assist        Send ▾
 
 ### 8.1 General structure
 
-A Moment should generally use this order:
+Typical order:
 
-1. current state / immediate question;
-2. primary Action Item;
-3. deadline/return/waiting condition if relevant;
+1. current question/projection;
+2. primary Responsibility/obligation;
+3. due/return/waiting condition when relevant;
 4. one primary action when user action exists;
-5. secondary relevant context;
-6. additional Action Items;
-7. source/provenance disclosure.
+5. safety/review explanation when material;
+6. supporting context;
+7. additional Responsibilities;
+8. source/provenance disclosure.
 
-Do not blindly reproduce every block in every state. Different states need different density.
+Do not reproduce every block in every state.
 
-### 8.2 ACTION_REQUIRED
+### 8.2 MY_TURN
 
 Primary question: `今、何をすればいい？`
 
-Example presentation:
+Example:
 
 ```text
-今日 17:00まで
+今日まで
 
-銀行口座確認書類を提出
+本人確認書類の裏面を提出
 
-📄 bank-account.pdf
+📄 license.pdf
 
 [提出する]
 
-他に2件の対応 >
+他に2件 >
 ```
 
-Required behavior:
+Behavior:
 
-- deadline visually prominent when known;
-- primary action tied to the actual task;
-- source available without making provenance the main card;
-- if action cannot be performed inside Lunowa, clearly state what opening/hand-off will occur.
+- show source due prominently when known;
+- primary action is tied to the **safe product action**, not blindly the sender's requested external action;
+- source/provenance remains accessible;
+- external hand-off is explained when action cannot occur inside Lunowa.
 
-### 8.3 DEFERRED
+For high-risk requests, the primary action may be `確認する` / `依頼を検証` rather than `支払う` or `承認する`.
+
+### 8.3 LATER
 
 Primary question: `いつ戻る？`
 
-Preferred content:
+Example:
 
 ```text
-8月21日 9:00に戻します
+8月27日 9:00に戻します
 
-田中さんから返信が来れば、
-それより先に戻します。
+返信が先に来れば、その時点で再確認します。
 
 [条件を変更]
 ```
 
-Do not add a second headline such as `今は忘れて大丈夫` if it competes with the actual return promise.
+UI communicates the actual return condition.
+
+Source due remains separate from user target/resurface time.
 
 ### 8.4 WAITING
 
-Primary question: `今は誰の番？`
+Primary question: `今は誰/何を待っている？`
 
 Example:
 
 ```text
 田中さんの確認待ち
 
-8月21日 10:14に
-銀行口座確認書類を送信しました。
+8月24日 10:14に資料を送信済み
 
-返信がなければ
-8月24日 9:00に確認します。
+返信がなければ 8月27日に再確認
 ```
 
-Usually there is no visually dominant primary CTA.
+Usually no visually dominant work CTA. Secondary `予定を変更` is acceptable but must not imply the user currently owes the underlying work.
 
-Secondary action such as `予定を変更` may be available but should not imply the user currently owes work.
+### 8.5 Follow-up inside MY_TURN
 
-### 8.5 FOLLOW_UP
+`FOLLOW_UP` is not a canonical lifecycle bucket.
 
-Primary question: `今、何をすればいい？`
-
-Example:
+When a waiting trigger makes renewed user action appropriate, `MY_TURN` may render:
 
 ```text
 3日返信がありません
 
-最後の送信
-8月21日 10:14
-
 確認メールを準備しました
-
-「先日お送りした...」
 
 [送信]
 [編集]
 ```
 
-Sending must still require normal user confirmation unless a separately validated automation mode is explicitly introduced later.
+Sending still requires normal human confirmation unless a separately validated automation mode exists.
 
-After the follow-up is successfully sent, transition the relevant Action Item to WAITING and update the Temporal Contract/history.
+After reconciled follow-up send, if the original outcome remains with the counterpart, projection returns to `WAITING`.
 
-### 8.6 COMPLETED
+### 8.6 DONE
 
 Primary question: `もう何もしなくていい？`
 
-Example:
+Example satisfied case:
 
 ```text
 ✓ 完了
-
-銀行口座書類の提出
-
-8/21 提出
-8/22 田中さん確認
-
-対応はありません。
+契約書提出
+8/24 送信
+8/25 受領確認
 ```
 
-Completed presentation should be quiet, reassuring, and low-action.
+If resolution reason is cancellation/decline/user-close/superseded, use truthful explanatory copy rather than pretending successful completion.
 
-### 8.7 UNCERTAIN
+### 8.7 REVIEW
 
 Do not invent certainty.
 
 Preferred behavior:
 
-- retain access to ordinary `会話`;
-- explain minimally that Lunowa could not determine the next action safely;
-- offer `原文を見る` / `状態を設定` or similar user correction;
-- do not auto-hide.
+- keep `会話` accessible;
+- state the minimal decision-critical uncertainty;
+- show relevant conflicting/source evidence;
+- offer one minimal correction/decision when needed;
+- avoid auto-hiding.
+
+Examples:
+
+```text
+期限が2つ記載されています
+金曜 — Aさん
+月曜 — Bさん
+
+[原文を見る]
+```
+
+or high-risk:
+
+```text
+100万円の支払い依頼
+送信者の権限を確認できません
+
+[依頼を確認]
+```
+
+Do not ask about harmless non-critical uncertainty merely to make the model internally neat.
 
 ---
 
-## 9. Multiple Action Items
+## 9. Multiple Responsibilities / obligation legs
 
-### 9.1 Primary selection
+### 9.1 Primary Moment selection
 
-When multiple unresolved Action Items exist, choose one primary Moment based on product rules such as:
+When multiple unresolved Responsibilities exist, prefer:
 
-1. critical/overdue user-owned obligation;
-2. nearest user-owned deadline;
-3. blocking obligation;
-4. otherwise highest-attention unresolved user obligation.
+1. critical/overdue actionable USER obligation;
+2. nearest material USER source due;
+3. blocking USER obligation;
+4. highest-attention unresolved USER work;
+5. material Review condition when it blocks safe action;
+6. otherwise appropriate Waiting/Later state.
 
-Do not simply choose the newest message.
+Do not simply choose newest message.
 
-### 9.2 Additional-item presentation
+### 9.2 Multiple obligation legs inside one Responsibility
+
+If both USER and another party must sign:
+
+```text
+USER leg open + Tanaka leg open
+-> MY_TURN
+
+USER leg satisfied + Tanaka leg open
+-> WAITING
+```
+
+Do not show `BOTH` as if it fully explains the state.
+
+### 9.3 Additional-item presentation
 
 Example:
 
@@ -500,17 +522,15 @@ Example:
 今日まで
 本人確認書類を提出
 
-📄 license.pdf
-
 [提出する]
 
 ────────
 他に2件
-✓ 銀行口座書類    田中さん待ち
-◷ 勤務希望日      8/25に戻る
+◷ 契約署名    田中さん待ち
+◷ 勤務希望日  8/27に戻る
 ```
 
-Selecting a secondary item may expand its details or make it the active Moment, but the default screen should remain simple.
+Selecting a secondary item may expand it/make it active Moment while keeping default screen simple.
 
 ---
 
@@ -518,48 +538,42 @@ Selecting a secondary item may expand its details or make it the active Moment, 
 
 ### 10.1 Create/modify
 
-A user may explicitly defer an Action Item/conversation or Lunowa may propose a defer/waiting contract.
+User may explicitly defer a Responsibility or Lunowa may propose an attention/waiting contract according to validated policy.
 
-The UI must communicate the actual return condition before relying on it.
+UI states the real return condition before relying on it.
 
 ### 10.2 Initial trigger types
 
-Supported product semantics should begin with:
+Start with:
 
 - exact/scheduled time;
-- reply received;
+- relevant reply received;
 - deadline approaching/threshold.
 
-Do not expose a complex rule builder in v1.
+Do not expose a generic rule builder in v1.
 
 ### 10.3 Trigger semantics
 
-When any active return trigger fires:
+When a trigger fires:
 
-1. re-evaluate the relevant Action Item;
-2. update lifecycle state;
-3. determine the appropriate attention level;
-4. surface it in the relevant list/state;
-5. optionally notify only if notification policy requires it.
-
-A trigger does not automatically mean `send a notification`.
+1. reload/re-evaluate current Responsibility/evidence;
+2. ignore stale/cancelled contract state;
+3. update actionability/attention/projection if warranted;
+4. surface in relevant list;
+5. notify only if separate notification policy warrants it.
 
 ### 10.4 Resurfacing strength
 
-Use a conceptual attention ladder:
-
 ```text
 Level 0 — state update only
-Level 1 — quiet visibility in relevant list
-Level 2 — move into attention-required list
-Level 3 — user notification
+Level 1 — quiet visibility
+Level 2 — attention list
+Level 3 — notification
 ```
-
-Notification policy is a separate concern from lifecycle state. Do not make every return event a disruptive alert.
 
 ### 10.5 Missed execution
 
-If Lunowa detects that a promised return time was missed because of downtime/sync/provider issues, surface recovery clearly rather than pretending the promise was met.
+If a promised return was missed due to downtime/sync/provider problems, show recovery honestly rather than pretending the promise was met.
 
 ---
 
@@ -567,93 +581,80 @@ If Lunowa detects that a promised return time was missed because of downtime/syn
 
 ### 11.1 Entry
 
-`＋ 新規メール` must be a prominent sidebar action.
+`＋ 新規メール` is a prominent sidebar action.
 
-Desktop behavior:
-
-- keep Sidebar and Conversation List visible;
-- switch Detail into new-compose mode;
-- do not navigate to a disconnected full-page form.
+Desktop keeps Sidebar/Conversation List visible and switches Detail into compose mode rather than navigating to a disconnected page.
 
 ### 11.2 Fields
 
-New compose includes:
-
-- From;
-- To;
-- Cc/Bcc progressive disclosure;
-- Subject;
-- body;
-- attachments;
-- formatting;
-- signature;
-- Send;
-- Send Later;
-- draft state;
-- minimize/restore;
-- safe close.
+Include From, To, progressive Cc/Bcc, Subject, body, attachments, formatting, signature, Send, Send Later, draft state, minimize/restore, safe close.
 
 ### 11.3 Draft autosave
 
-Draft persistence should begin quickly and continue while composing.
+Begin quickly and continue while composing.
 
-Closing/minimizing must never silently discard meaningful input.
-
-If autosave fails, inform the user before destructive navigation when possible.
+Closing/minimizing never silently discards meaningful input. Surface autosave failure before destructive navigation when practical.
 
 ### 11.4 Minimize
 
-A compose draft can be minimized so the user can inspect mail without losing the draft. The minimized draft should remain recoverable until sent/discarded.
+Draft remains recoverable while user inspects mail.
 
 ### 11.5 Send Later
 
-The send dropdown may expose:
+Clearly distinguish:
 
-- common suggested times;
-- choose date/time.
-
-The UI must clearly distinguish **Send Later** from `あとで` lifecycle deferral; one schedules outgoing mail, the other manages attention on a communication/action.
+```text
+Send Later = schedule outgoing mail
+Later = defer Responsibility attention
+```
 
 ### 11.6 Undo Send
 
-If supported, after send show a transient undo affordance for the configured window.
-
-Undo behavior must be backed by actual send-delay semantics, not a fake UI after the provider has irreversibly accepted the mail.
+Undo affordance must be backed by real pre-provider delay/cancellation semantics, not fictional recall after irreversible provider acceptance.
 
 ---
 
-## 12. Inline completion / AI assist
+## 12. Send-result interaction
 
-### 12.1 Ghost text
+A click on Send is not authoritative evidence that provider accepted the message.
 
-Inline completion may show a lightweight continuation at the cursor.
+During ambiguous provider result:
 
-Rules:
+- preserve draft/send context;
+- avoid blind duplicate retry;
+- show guarded pending/reconciliation state when necessary;
+- do not move a Responsibility to Done solely from the send click.
 
-- never trigger during active Japanese IME composition;
-- only appear after composition commit and sufficient pause/context;
-- user can accept with a clear action/keyboard gesture;
-- typing continues normally when ignored;
-- repeated rejection reduces suggestion frequency;
-- suggestions must not obscure existing text.
-
-### 12.2 Full AI assist
-
-AI assist may provide drafting/rewrite actions, but ordinary typing remains primary.
-
-Do not make the composer a chatbot.
+After provider reconciliation, Responsibility projection changes only if that send satisfies the relevant obligation leg/closure condition.
 
 ---
 
-## 13. Search interactions
+## 13. Inline completion / AI assist
 
-### 13.1 Enter search mode
+### 13.1 Ghost text
 
-Focusing/typing into search updates the center pane into search results while Detail remains available.
+- never interrupt active Japanese IME composition;
+- appear only after composition commit and sufficient pause/context;
+- acceptance gesture is clear;
+- ignored suggestions do not block typing;
+- repeated rejection reduces frequency;
+- suggestions do not obscure text.
 
-Search should not destroy the pre-search list/filter state.
+### 13.2 Full AI assist
 
-### 13.2 Result categories
+AI may draft/rewrite, but ordinary writing remains primary. Do not turn composer into a mandatory chatbot.
+
+Material dates/amounts/recipients/commitments must not be silently rewritten from ambiguous source intent.
+
+---
+
+## 14. Search interactions
+
+### 14.1 Enter search
+
+Search updates center pane while preserving Detail/pre-search state where practical.
+
+### 14.2 Categories
 
 Potential categories:
 
@@ -661,93 +662,55 @@ Potential categories:
 すべて | 会話 | 人 | ファイル
 ```
 
-### 13.3 Result click
+Responsibility/action search result may exist only when intentionally designed and must resolve to authorized source records.
 
-- Conversation result → open `会話` by default.
-- Message hit → open conversation and scroll/highlight the matched message.
-- Person result → open person context panel/sheet.
-- File result → open attachment preview in context.
+### 14.3 Result click
 
-### 13.4 Exit search
+- Conversation → open `会話`;
+- Message hit → open/jump/highlight in Conversation;
+- Person → context panel;
+- File → attachment preview in context;
+- explicit Responsibility/action result → may open `今の要点`.
 
-Closing/clearing search restores the previous:
+### 14.4 Exit
 
-- scope;
-- filter;
-- list scroll position where practical;
-- selected conversation when still valid.
+Restore previous Scope/filter/scroll/selection where practical.
 
-### 13.5 Scope
+### 14.5 Scope
 
-Search defaults to current scope. Broadening to `全体` must be visible and user-directed.
+Search defaults to current Scope. Broadening to `全体` is visible/user-directed.
 
 ---
 
-## 14. Person/company context panel
+## 15. Person/company context panel
 
-### 14.1 Entry
+Entry from avatar/name/company/person search result.
 
-Possible entry points:
+Desktop may use right-side sheet when width permits; do not replace selected Conversation by default.
 
-- avatar;
-- sender/person name;
-- company link;
-- person search result.
+Useful sections: current relevant issues, recent topics, evidence-backed remembered facts, organization/role, recent files, related Conversations.
 
-### 14.2 Behavior
+AI-inferred material facts expose provenance on demand.
 
-Desktop: open as a right-side side sheet/secondary panel when width allows.
-
-It must not replace the selected conversation by default.
-
-### 14.3 Sections
-
-Useful sections can include:
-
-- current status/issues;
-- recent topics;
-- remembered facts;
-- organization/role;
-- recent files;
-- related conversations.
-
-Facts inferred by AI should expose provenance on demand.
-
-### 14.4 Non-goal
-
-Do not introduce CRM pipeline/stage/deal management unless explicitly designed later.
+No CRM pipeline/stage/deal semantics without separate product decision.
 
 ---
 
-## 15. Attachment preview
+## 16. Attachment preview
 
-### 15.1 Entry
+Click supported attachment to open in-app preview while preserving thread context.
 
-Clicking a supported attachment opens an in-app preview while preserving thread context.
+Controls may include close, page nav, zoom, download, open externally.
 
-### 15.2 Controls
+If preview fails, keep Conversation and offer safe alternatives.
 
-For PDF/image-like previews, provide relevant controls such as:
-
-- close;
-- page navigation;
-- zoom;
-- download;
-- open externally/new tab.
-
-### 15.3 Unsupported/failed preview
-
-If preview fails:
-
-- keep the conversation available;
-- offer download/open externally;
-- do not blank the entire Detail pane.
+Opening/previewing an attachment is not automatically Responsibility completion evidence.
 
 ---
 
-## 16. Navigation and menus
+## 17. Navigation and menus
 
-### 16.1 Sidebar `その他`
+### 17.1 Sidebar `その他`
 
 Recommended secondary destinations:
 
@@ -759,49 +722,29 @@ Recommended secondary destinations:
 - ゴミ箱;
 - 完了 if not top-level.
 
-### 16.2 Conversation-level `…`
+### 17.2 Conversation `…`
 
-Recommended commands:
+Potential commands: unread/read, pin/unpin, forward, print, archive, delete, spam, block sender.
 
-- 未読にする / 既読にする;
-- ピン留め / ピンを外す;
-- 転送;
-- 印刷;
-- アーカイブ;
-- 削除;
-- 迷惑メールとして報告;
-- 送信者をブロック.
+### 17.3 Message `…`
 
-### 16.3 Individual-message `…`
+Potential commands: show original, forward message, print, headers/details.
 
-Recommended commands:
+Do not conflate thread-level and single-message operations where provider semantics differ.
 
-- 原文を表示;
-- このメッセージを転送;
-- 印刷;
-- ヘッダー詳細.
+### 17.4 Destructive actions
 
-Do not conflate thread-level deletion/archive with single-message actions where provider semantics differ.
-
-### 16.4 Destructive actions
-
-Use confirmation only where the cost of accidental action justifies it. Prefer undo for reversible operations such as archive/delete when reliable.
+Confirm only when accidental-cost justifies it. Prefer reliable undo for reversible operations.
 
 ---
 
-## 17. Scope/account interactions
+## 18. Scope/account interactions
 
-### 17.1 Scope means WHERE
+### 18.1 Scope means WHERE
 
-Scope answers **where to look**.
+Scope answers **where**. Responsibility/search filters answer **what**.
 
-Lifecycle/search filters answer **what to look at**.
-
-Do not mix these concepts in the same control.
-
-### 17.2 Scope switcher
-
-User-facing examples:
+### 18.2 Scope switcher
 
 ```text
 💼 仕事 ✓
@@ -812,167 +755,132 @@ User-facing examples:
 ＋ 新しく分ける
 ```
 
-A one-account user should not be forced to understand scope/grouping concepts.
+One-account user should not be forced to understand grouping.
 
-### 17.3 Second account
+### 18.3 Second account
 
-After connecting a second account, offer a lightweight choice such as:
+Offer lightweight `一緒に見る / 分けて使う / 後で` rather than requiring organization decisions during OAuth.
 
-- `一緒に見る`
-- `分けて使う`
-- decide later.
+### 18.4 Account problem
 
-Do not require organization decisions during each OAuth flow.
+Reconnect/error isolates to affected account where possible.
 
-### 17.4 Account problems
+### 18.5 Sending identity
 
-Reconnect/error state should be isolated to the affected account. Other connected accounts should remain usable.
+Compose/reply shows effective sending account. Changing it updates recipients/signature/provider behavior before send and prevents ambiguity.
 
-### 17.5 Sending identity
-
-Compose/reply must show the effective sending account. If changing sender identity changes recipients/signature/provider behavior, the UI should update before send and prevent ambiguous state.
+Cross-account semantic lookalikes do not auto-merge Responsibilities.
 
 ---
 
-## 18. Onboarding interactions
+## 19. Onboarding interactions
 
-### 18.1 Minimal first run
-
-Preferred path:
+Preferred first-run:
 
 ```text
 Googleで始める / Microsoftで始める
 → provider authorization/account picker
-→ initial sync begins
-→ Inbox becomes usable as soon as practical
+→ initial sync
+→ Inbox usable as soon as practical
 ```
 
-### 18.2 Progressive permission
+Use progressive permissions; do not ask for unrelated access/preferences up front.
 
-Do not ask for unrelated permissions or preferences up front merely because they may be useful later.
+### Historical initial sync
 
-Ask contextually when a feature actually needs them.
+Years-old apparent unresolved requests must not automatically flood live `My Turn`.
 
-### 18.3 Background sync
-
-After an account connects, synchronization can proceed in background while the shell becomes usable. Use visible but non-blocking sync status.
+Historical candidates may be ignored, quietly surfaced, or explicitly activated according to validated product policy; user tracking-close does not imply objective satisfaction.
 
 ---
 
-## 19. System/error/offline interactions
-
-### 19.1 General rule
+## 20. System/error/offline interactions
 
 Communicate:
 
 1. what happened;
 2. what is affected;
-3. what the user can do now.
+3. what user can do now.
 
-Technical error codes belong in details/logging, not the primary message.
+### Loading/sync
 
-### 19.2 Loading
+Prefer existing cached content plus sync status over replacing everything with a spinner.
 
-Before cached data exists, show a restrained loading state.
+### New mail
 
-After cached data exists, prefer showing existing content with a syncing indicator over replacing it with a giant spinner.
+Do not unexpectedly jump list position; use `新しいメールN件` or equivalent.
 
-### 19.3 New incoming mail
+### Offline
 
-Do not unexpectedly jump the list and cause the user to lose position.
+When supported, allow cached reading/browsing and draft preparation. Network-required actions queue/fail according to actual runtime capability.
 
-Prefer a small affordance such as `新しいメール3件` that lets the user refresh/scroll intentionally.
+### Send failure/ambiguity
 
-### 19.4 Offline
+Preserve draft/recipient/attachment context. Distinguish known failure from ambiguous acceptance; avoid blind duplicate retry.
 
-When possible, offline mode should allow:
+### AI failure
 
-- reading cached mail;
-- browsing cached conversations;
-- editing drafts;
-- preparing replies.
+Fall back to raw Conversation/basic mail. Existing accepted Responsibility state should not randomly rewrite on view-open.
 
-Actions requiring network should clearly queue or fail safely according to runtime support.
+### App update
 
-### 19.5 Send failure
-
-A failed send must preserve the draft and recipient/attachment context.
-
-Offer retry and safe draft save. Never clear the composer merely because a request failed.
-
-### 19.6 AI failure
-
-Fall back to raw conversation/basic mail UI. Do not block the user's work.
-
-### 19.7 App update
-
-Do not force a reload that destroys an active draft. Defer reload/update prompts until user work is safe.
+Never destroy active draft through forced reload.
 
 ---
 
-## 20. Pane resizing
+## 21. Pane resizing
 
-Desktop pane boundaries should support horizontal dragging.
-
-Expected behavior:
-
-- minimum widths prevent unusable layouts;
-- maximums prevent one pane from swallowing the application;
-- preferred widths persist locally/user-preference storage where appropriate;
-- double-clicking a resize handle may reset to defaults;
-- responsive collapse can temporarily override stored widths;
-- when space returns, restore the user's preferred widths where practical.
-
-Resizable panes and responsive collapse are separate mechanisms.
+Desktop boundaries support horizontal drag with sensible min/max widths, persistence of preferred widths, optional double-click reset, and responsive collapse independent of stored preference.
 
 ---
 
-## 21. Keyboard and accessibility behavior
+## 22. Keyboard and accessibility
 
-Primary desktop controls must be reachable by keyboard.
+Primary controls must be keyboard reachable with visible focus, logical Tab order, Enter/Space activation where appropriate, Escape for transient surfaces when safe, accessible icon labels/tooltips, and interactive status chips implemented as real controls.
 
-At minimum:
-
-- visible focus states;
-- Enter/Space activation where semantically appropriate;
-- Escape closes transient popovers/sheets/previews when safe;
-- Tab order follows visual/logical order;
-- status chips are actual interactive controls;
-- icon-only controls expose accessible names/tooltips.
-
-Optional productivity shortcuts can be added later, but should not be required for ordinary use.
+Optional productivity shortcuts can come later.
 
 ---
 
-## 22. Interaction verification checklist
+## 23. Interaction verification checklist
 
-Before considering the high-fidelity interaction slice complete, verify at least:
+Before a high-fidelity slice is considered complete, verify at least:
 
 - row body opens `会話`;
-- status chip opens `今の要点`;
-- user can switch tabs without losing thread state;
-- all lifecycle Moment states render correctly;
-- multiple Action Items retain one primary action;
-- pin remains independent of lifecycle state;
+- status/projection chip opens `今の要点`;
+- tab switching preserves context;
+- My Turn / Waiting / Later / Done / Review Moments render correctly from projection semantics;
+- follow-up renders as a My Turn action, not a separate canonical lifecycle requirement;
+- communication hold renders Waiting unless separately deferred;
+- multiple Responsibilities still produce one primary Moment;
+- parallel obligation legs move My Turn → Waiting after user leg completion without resolving prematurely;
+- Review can represent field-level conflict while the Responsibility remains tracked;
+- high-risk requested action can surface a safer verify/decide CTA;
+- source due, user target, and resurface time are visually distinguishable where relevant;
+- historical initial-sync candidates do not auto-flood My Turn;
+- pin stays independent of Responsibility state;
 - compose draft survives minimize/restore;
-- send account is explicit;
-- search exits back to previous list context;
-- attachment preview closes back to the same thread;
-- person panel does not destroy selected conversation;
+- sending account is explicit;
+- ambiguous send preserves safe pending/reconciliation behavior;
+- search returns to previous context;
+- attachment preview returns to same thread and does not imply completion;
+- person panel preserves selected Conversation;
 - send failure preserves draft;
 - AI failure leaves core mail usable;
-- pane resizing respects minimums;
-- keyboard focus is visible and logical.
+- pane resizing respects bounds;
+- keyboard focus is visible/logical.
 
 ---
 
-## 23. Default decision rule
+## 24. Default decision rule
 
-When behavior is not explicitly specified, choose the simplest familiar interaction that:
+When behavior is unspecified, choose the simplest familiar interaction that:
 
 1. preserves the user's place;
-2. reduces management burden;
-3. keeps the source mail accessible;
+2. reduces Communication Management Burden;
+3. keeps source mail/evidence accessible;
 4. is reversible where practical;
 5. avoids surprising cross-account/scope behavior;
-6. does not require AI to function.
+6. does not require AI for core mail access;
+7. does not turn uncertainty into unnecessary user questioning;
+8. does not confuse UI projection with canonical Responsibility truth.

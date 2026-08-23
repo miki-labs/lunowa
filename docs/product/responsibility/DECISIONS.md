@@ -3,7 +3,7 @@
 ## Status labels
 
 - **FIXED** — normative for v0.1 unless stronger evidence or a scenario counterexample supersedes it.
-- **STRONG DIRECTION** — preferred direction, but scenario coverage or implementation evidence may still change it before schema freeze.
+- **STRONG DIRECTION** — preferred implementation/modeling direction, but physical representation may still change before schema freeze.
 - **OPEN** — deliberately unresolved.
 - **SUPERSEDED** — prior direction retained for history but no longer current.
 
@@ -32,13 +32,17 @@
 | False merge is considered more harmful than modest false split | FIXED | Merge can hide real obligations. |
 | Reopen means the same operational outcome was never actually satisfied | FIXED | Keeps history/analytics coherent. |
 | New work after a genuinely closed episode normally creates a new Responsibility | FIXED | Avoids reopening historical episodes incorrectly. |
-| Canonical state may contain multiple active obligations/expected events | FIXED | Parallel signers and other multi-party loops cannot be represented faithfully by one scalar owner. |
+| Canonical state may contain multiple obligation legs and expected events | FIXED | Parallel signers, contingent work, and multi-party loops cannot be represented faithfully by one scalar owner. |
+| `obligation_legs[]` is the canonical semantic concept; active user obligations are a derived subset | FIXED | T16/T18 show that a known leg may be parallel, contingent, safety-blocked, satisfied, or currently actionable. |
 | A scalar `next_owner` is not complete canonical truth | FIXED | It may remain a convenience/projection field only. |
 | `BOTH` must not be used to hide parallel/ambiguous structure | FIXED | Loses assignment semantics. |
+| Completion criteria may exist inside one Responsibility | FIXED | Partial completion such as front/back document submission must not force artificial Responsibility splitting. |
 | Action and constraint are distinct | FIXED | "Do not send before approval" is not a normal next action. |
 | Pause/hold and cancellation are distinct | FIXED | A paused obligation can remain open. |
+| Communication hold/pause and product defer/snooze are distinct | FIXED | A hold normally means waiting on a resume event; `LATER` requires a separate attention decision. |
 | Delegation intent and effective delegation are distinct | FIXED | Ownership transfer needs evidence that the request was actually communicated/effected. |
 | Source due, expected-event time, user target, resurface time, and follow-up time are distinct | FIXED | Prevents false deadlines and incorrect projections. |
+| `SOURCE_DUE` semantics are not changed by source legitimacy/safety status | FIXED | Safety/authority is orthogonal to what due time was actually communicated. |
 | Never silently increase temporal precision | FIXED | "Friday" does not imply 17:00; ASAP does not imply an exact deadline. |
 | External anchors are derived, not rewritten source facts | FIXED | Calendar changes may re-resolve event-relative time without changing the email source. |
 | Material values should be source-span grounded and deterministically parsed/resolved where practical | FIXED | Reduces hallucination for dates, amounts, identity, URLs, etc. |
@@ -56,11 +60,18 @@
 | Prompt-injection text in email remains untrusted data | FIXED | Language understanding cannot grant tool/application authority. |
 | Resolution and successful satisfaction are distinct | FIXED | Decline, cancellation, invalidation, and user-close are not success. |
 | User tracking close and external-world closure are distinct | FIXED | Stopping tracking does not change counterpart expectations. |
+| Resolution status, live-tracking activation, and attention/defer are orthogonal semantic dimensions | FIXED | T20 and hold/snooze traces prove that one `OPEN/RESOLVED` or lifecycle field cannot carry all three meanings. |
 | Generic acknowledgement/inactivity/read state are weak completion evidence | FIXED | Prevents false completion. |
+| Send attempt and reconciled provider acceptance are distinct | FIXED | Ambiguous provider timeout cannot safely imply either success or failure. |
+| A reconciled send resolves only when sending is sufficient for that Responsibility's closure condition | FIXED | Provider acceptance must not be generalized into proof of document usability, approval, or other external outcomes. |
 | Historical `no observed closure` does not imply live active responsibility | FIXED | Initial sync cannot treat years-old mail like live event processing. |
 | Ingestion order and semantic chronology are distinct | FIXED | Late arrival of older data must not supersede later correction. |
+| One focal event may produce multiple Responsibility effects | FIXED | Supersession can terminate one Responsibility and create another in the same communication. |
+| `SUPERSEDE` is a terminal effect on the old Responsibility, with replacement creation represented separately | FIXED | Avoids ambiguous `RESOLVE + SUPERSEDE` double operations and identity mutation. |
+| Contingent obligations preserve an activation relation to their condition/event | FIXED | Future user work must not disappear while waiting or become actionable before the condition is met. |
 | `My Turn / Waiting / Later / Done / Review` are deterministic projections, not canonical source state | FIXED | UI mental model remains simple without corrupting domain semantics. |
 | Uncertainty should be reasoned about by cause and field | FIXED | Missing context, source ambiguity, contradiction, noise, model instability, stale analysis require different treatment. |
+| Admission `NEEDS_REVIEW` and product projection `REVIEW` are distinct | FIXED | A Responsibility may definitely exist while only one decision-critical field remains conflicted. |
 | Uncertainty does not automatically imply asking the user | FIXED | Preserve decision-reduction; prompt only for material decision-critical uncertainty with no cheaper resolution. |
 | Golden cases may be `DETERMINATE / AMBIGUOUS / USER_DEPENDENT` | FIXED | Do not train/evaluate the system to overstate certainty. |
 | Preserve raw human disagreement where practical | FIXED | Some communication ambiguity is genuine rather than annotation error. |
@@ -76,10 +87,9 @@
 | Decision | Status | Notes |
 |---|---|---|
 | Physical `ActionItem` entity should eventually be renamed to `Responsibility` or equivalent | STRONG DIRECTION | Semantics fit better, but rename itself has little product value and should wait until schema alignment. |
-| Model responsibility state as a vector rather than the existing single lifecycle enum | STRONG DIRECTION | `DEFERRED`, `UNCERTAIN`, and `FOLLOW_UP` mix orthogonal dimensions in the current model. |
-| Replace `active + state + completed_at` with a less contradictory tracking/resolution model | STRONG DIRECTION | Exact fields/enums not frozen. |
+| Physical persistence should implement the fixed orthogonal semantic dimensions rather than the existing single lifecycle enum | STRONG DIRECTION | Exact tables/columns/enums remain open even though the semantic separation is now fixed. |
+| Replace `active + state + completed_at` with a less contradictory resolution/activation/attention model | STRONG DIRECTION | Exact fields/enums not frozen. |
 | Maintain pending proposals and agreed facts separately | STRONG DIRECTION | Necessary for scheduling/negotiation; physical representation remains open. |
-| Support completion criteria within one Responsibility | STRONG DIRECTION | Handles partial completion without artificial splitting. |
 | Use selective extra inference/validation for ambiguous or high-risk cases rather than default multi-run inference | STRONG DIRECTION | Balances cost, latency, and stability. |
 | Japanese-specific typo/IME/noise variants belong in eval coverage | STRONG DIRECTION | Product must not rely on clean-input benchmarks. |
 | Organic/historical failure cases must supplement synthetic canonical cases | STRONG DIRECTION | Prevents overfitting to artificially clean examples. |
@@ -90,8 +100,8 @@
 
 | Question | Status | Why open |
 |---|---|---|
-| Exact physical schema for Responsibility / obligations / expected events | OPEN | Scenario matrix should drive minimal implementable shape. |
-| Exact lifecycle/tracking/resolution enum values | OPEN | Semantics are fixed; names/cardinality are not. |
+| Exact physical schema for Responsibility / obligation legs / expected events / completion criteria | OPEN | Scenario/transition semantics are clearer than the minimal physical representation. |
+| Exact enum names for resolution status, live-tracking activation, attention, obligation status/actionability | OPEN | Semantics are fixed; naming/cardinality are not. |
 | Exact communication-act subtypes/modality enum | OPEN | Avoid taxonomy explosion before evidence. |
 | Exact obligation-strength enum | OPEN | Dimension is required; labels need scenario validation. |
 | Cross-thread Responsibility identity/continuation | OPEN | False merge and complexity may outweigh benefit in MVP. |
@@ -105,6 +115,7 @@
 | Number of AI reruns / ensemble strategy | OPEN | Should depend on observed instability/cost. |
 | Historical lookback window / initial-sync activation policy | OPEN | Requires product testing and real inbox distributions. |
 | Whether standing communication instructions become a separate memory/preference model | OPEN | Do not overload Responsibility with generic policy. |
+| Exact high-risk authority/verification policy by action type | OPEN | Semantics require separation, but product/security policy needs implementation-specific evidence. |
 
 ---
 
@@ -112,9 +123,11 @@
 
 | Prior direction | Current status | Replacement |
 |---|---|---|
-| One canonical lifecycle enum: `OPEN/ACTION_REQUIRED/DEFERRED/WAITING/FOLLOW_UP/COMPLETED/UNCERTAIN` | SUPERSEDED for responsibility semantics | Orthogonal/state-vector semantics; UI buckets become projections. |
-| One scalar `next_owner` completely represents Responsibility state | SUPERSEDED | Multiple active obligations/expected events are conceptually allowed; scalar owner is only convenience/projection. |
+| One canonical lifecycle enum: `OPEN/ACTION_REQUIRED/DEFERRED/WAITING/FOLLOW_UP/COMPLETED/UNCERTAIN` | SUPERSEDED for responsibility semantics | Orthogonal resolution/live-activation/attention/obligation semantics; UI buckets are projections. |
+| `tracking_status: OPEN/RESOLVED` as a complete tracking model | SUPERSEDED as complete model | Treat legacy `tracking_status` as resolution-status shorthand only; live activation and attention are separate. |
+| One scalar `next_owner` completely represents Responsibility state | SUPERSEDED | Multiple obligation legs/expected events are conceptually allowed; scalar owner is only convenience/projection. |
 | `BOTH` as a general owner value | REJECTED as core solution | Represent parallel obligations or conservative ambiguity instead. |
+| `active_obligations[]` as the only canonical obligation representation | SUPERSEDED as complete model | General `obligation_legs[]` with condition/actionability; active obligations are a derived subset. |
 | One `deadline_at` captures temporal semantics | SUPERSEDED | Source due, expected event, user target, resurface, follow-up are distinct. |
 | Whole-item `user_override_state` | SUPERSEDED | Field-scoped user authority/corrections. |
 | Identity follows broad terminal/project outcome | SUPERSEDED | Smallest communication-bounded operational outcome with coherent closure. |
@@ -123,29 +136,29 @@
 | AI confidence alone determines automation/review | REJECTED | Combine evidence quality, contradiction, risk, source ambiguity, deterministic validation, and model instability. |
 | Repeated AI consensus is sufficient proof | REJECTED | Consensus is only one uncertainty signal. |
 | User-close means objective completion | REJECTED | Tracking close and external resolution are distinct. |
+| Communication hold automatically means `LATER` | REJECTED | Hold normally waits on another event; `LATER` requires separate attention defer. |
+| Safety/legitimacy uncertainty should be encoded by inventing temporal kinds such as `SOURCE_DUE_CANDIDATE` | REJECTED | Preserve `SOURCE_DUE`; represent authority/legitimacy separately. |
+| One scalar matching operation is sufficient for every focal event | REJECTED | Use `effects[]` when one event changes multiple Responsibilities. |
 
 ---
 
-## Required next validation
+## Current validation state
 
-The next artifact is a canonical scenario matrix built from `SCENARIO-SCHEMA.md`.
+The following design artifacts now exist and are mutually constrained by `CONSISTENCY-AUDIT.md`:
 
-The matrix MUST intentionally target counterexamples rather than merely demonstrate happy paths. It should cover at least:
+```text
+ANNOTATION-GUIDELINES.md
+SCENARIO-SCHEMA.md
+TRANSITION-SCHEMA.md
+COVERAGE-PLAN.md
+TIER-0-SCENARIO-MATRIX.md
+TIER-0-CRITICAL-ORACLES.md
+TRANSITION-ORACLES.md
+CONSISTENCY-AUDIT.md
+```
 
-- direct and indirect requests;
-- firm/tentative commitments;
-- proposal/negotiation/partial acceptance;
-- correction/conflict/authority ambiguity;
-- quoted/forwarded/reported content;
-- multi-party and parallel obligations;
-- delegation and hold/cancel;
-- temporal ambiguity/timezones/relative time;
-- partial completion/reopen/new episode;
-- typo/IME/noise and meaning-changing minimal edits;
-- prompt injection/high-risk requests;
-- stale AI and out-of-order ingestion;
-- historical initial sync;
-- genuine human disagreement;
-- cross-account lookalikes without merge.
+Coverage mapping is design-complete for all mandatory rule/contrast/interaction/mutant/metamorphic/high-harm/ambiguity/transition inventories. This is not implementation or pass evidence.
 
-Any scenario that breaks a FIXED principle should trigger an explicit decision review and, if necessary, a versioned amendment rather than an ad-hoc exception.
+Before Responsibility domain/persistence implementation begins, the responsibility-specific sections of the older `DATA-MODEL.md`, `CONTRACTS.md`, and `design/INTERACTIONS.md` must be reconciled. Until then, those legacy lifecycle/scalar-owner/deadline shapes must not drive implementation.
+
+Any scenario or production evidence that breaks a FIXED principle must trigger an explicit versioned decision review rather than an ad-hoc exception.

@@ -1,215 +1,144 @@
-# Responsibility PostgreSQL / Drizzle DDL Design v0.1
+# Responsibility PostgreSQL / Drizzle DDL Design v0.2
 
 ## Status
 
-**L2 candidate — exact column/constraint/index design for independent review. NOT migration authority until `POSTGRESQL-DRIZZLE-DDL-AUDIT.md` passes and the L2 freeze decision is recorded.**
+**Corrected L2 candidate after independent static audit. Migration authority is still BLOCKED until the concrete Drizzle/SQL schema is instantiated against PostgreSQL 18 and the executable L2 acceptance suite passes.**
 
 This document turns the frozen L0/L1 Responsibility model into a concrete PostgreSQL 18 / Drizzle schema proposal.
 
-It deliberately distinguishes:
+Freeze levels remain:
 
 ```text
-L0 semantic truth
-L1 logical persistence boundary
-L2 concrete PostgreSQL/Drizzle representation   <- this document
-L3 migration/runtime implementation
+L0 semantic truth                           FROZEN v0.1
+L1 logical persistence boundary             FROZEN v0.1
+L2 exact PostgreSQL/Drizzle representation  CANDIDATE v0.2
+L3 migrations/runtime                       NOT AUTHORIZED
 ```
 
-The goal is not to maximize database cleverness. The goal is the smallest concrete schema that:
+The v0.2 changes apply all required findings from `POSTGRESQL-DRIZZLE-DDL-AUDIT.md`, especially:
 
-- preserves every validated Responsibility invariant;
-- makes high-harm corruption mechanically difficult where PostgreSQL can help;
-- keeps normal product queries straightforward;
-- remains evolvable for a solo developer;
-- avoids both a giant semantic JSON blob and table-per-nuance over-normalization.
+```text
+global CREATE-safe application idempotency
+same-Responsibility composite child FKs
+same-user participant integrity
+same-account provenance integrity
+stale-safe AdmissionReview identity
+same-account TRACK resolution link
+ExpectedEvent closed_at
+strict TemporalFact supersession consistency
+bounded canonical machine keys
+explicit AdmissionReview transaction protocol
+```
 
-Primary sources:
-
-- `PHYSICAL-SCHEMA-FREEZE-REVIEW.md`;
-- ADR 0008 and ADR 0009;
-- `SCENARIO-SCHEMA.md` / `TRANSITION-SCHEMA.md`;
-- all 44 Tier-0 detailed oracles;
-- all 20 transition oracles;
-- `DATA-MODEL.md` / `CONTRACTS.md`.
-
----
-
-# 1. Current platform facts checked for L2
-
-L2 relies only on ordinary PostgreSQL/Drizzle capabilities:
-
-- PostgreSQL 18 is the accepted datastore and Neon supports PostgreSQL 18;
-- PostgreSQL provides native UUID storage and `gen_random_uuid()`;
-- PostgreSQL supports `CHECK`, foreign keys, partial indexes, partial unique indexes, and `NULLS NOT DISTINCT` uniqueness;
-- Drizzle supports PostgreSQL UUID/JSONB/timestamps, checks, indexes, partial-index predicates, and transactions;
-- Drizzle's TypeScript `text({ enum: [...] })` typing alone is not a database runtime constraint, so all safety-relevant finite states below also get explicit PostgreSQL `CHECK` constraints;
-- Drizzle transactions support PostgreSQL isolation configuration, and raw `sql` can be used where row-locking or exact SQL is clearer.
-
-This design intentionally does **not** depend on Neon-only database semantics or a PostgreSQL extension.
+No new L1 persistence aggregate was required.
 
 ---
 
-# 2. ID strategy
+# 1. Platform assumptions and implementation prerequisites
 
-## 2.1 Decision
+The design uses ordinary PostgreSQL/Drizzle capabilities only:
 
-Use PostgreSQL `uuid` for application/domain entity identifiers involved in Phase 2.
+```text
+PostgreSQL 18
+uuid / gen_random_uuid()
+CHECK / UNIQUE / FOREIGN KEY
+multi-column foreign keys
+partial / partial-unique indexes
+jsonb
+row locks + transactions
+```
 
-For Lunowa-owned rows, the default is:
+Drizzle is required to generate reviewable PostgreSQL schema/migrations, but PostgreSQL—not TypeScript inference—is the authority for database constraints.
+
+## 1.1 Better Auth UUID gate
+
+All application/domain ownership IDs in this L2 candidate use PostgreSQL `uuid`.
+
+Before any Phase-2 migration is accepted, the auth spike MUST verify the current Better Auth + PostgreSQL/Drizzle integration with its supported UUID ID strategy so that the actual `users.id` column is PostgreSQL `uuid`.
+
+If that spike fails, stop L2 promotion and revise the cross-system ID type consistently before migration. Do not mix UUID domain FKs with an unreviewed text auth ID.
+
+## 1.2 Upstream composite-key prerequisites
+
+The broader Phase-2 schema MUST expose these keys before the Responsibility DDL is installed:
+
+```sql
+-- IDs are already primary keys; these redundant unique keys exist for
+-- multi-column ownership foreign keys.
+
+connected_accounts UNIQUE (id, user_id);
+conversations      UNIQUE (id, connected_account_id);
+participant_identities UNIQUE (id, user_id);
+messages           UNIQUE (id, connected_account_id);
+```
+
+These are deliberate tenant/account-integrity indexes, not alternate identities.
+
+---
+
+# 2. General type conventions
+
+## 2.1 IDs
+
+Lunowa-owned rows:
 
 ```sql
 uuid NOT NULL DEFAULT gen_random_uuid()
 ```
 
-Do not make timestamp extraction from IDs part of domain behavior; `created_at` remains authoritative for time.
+IDs are opaque. `created_at` is the authoritative creation time.
 
-## 2.2 Better Auth integration prerequisite
-
-The exact DDL assumes the Better Auth application user ID is also stored as PostgreSQL `uuid`.
-
-Before the first migration, configure/verify the current Better Auth PostgreSQL/Drizzle integration to use its supported UUID ID strategy rather than relying on an opaque default string-ID format.
-
-Reason:
-
-- keeps ownership FKs type-consistent;
-- avoids a permanent text-ID dependency created accidentally by auth defaults;
-- Better Auth currently exposes explicit UUID ID generation support for PostgreSQL.
-
-If the auth spike falsifies this assumption, stop the L2 freeze and revise `user_id` consistently before migrations. Do **not** mix a migrated Responsibility schema with an unreviewed auth-ID conversion.
-
----
-
-# 3. Type strategy: text + CHECK, not PostgreSQL native ENUM
-
-For small control-state sets whose values are part of v0.1 invariants, use:
-
-```text
-text column
-+ explicit CHECK (... IN (...))
-+ TypeScript literal-union typing in Drizzle/application code
-```
-
-Do **not** use PostgreSQL native ENUM for Responsibility control state in v0.1.
-
-Rationale:
-
-- these labels are versioned product semantics and may still be renamed/split as real inbox evidence arrives;
-- PostgreSQL enum values are convenient for static sets but removal/reordering requires type recreation;
-- text + CHECK still gives database enforcement while keeping migrations straightforward;
-- linguistic/action/reason taxonomies that are expected to evolve should remain trusted-code registries rather than giant CHECK lists.
-
-Database CHECK sets are therefore reserved for **structural control state**, not every semantic code.
-
----
-
-# 4. Timestamp and JSON conventions
-
-## 4.1 Instants
+## 2.2 Structural control states
 
 Use:
 
-```sql
-timestamp(3) with time zone
+```text
+text
++ PostgreSQL CHECK
++ TypeScript literal union
 ```
 
-for persisted instants.
+for small safety-relevant control states.
 
-Millisecond precision matches the ordinary JavaScript `Date` boundary and avoids pretending that application-generated timestamps have meaningful microsecond precision.
+Do not use PostgreSQL native ENUM for Responsibility v0.1 control states. Linguistic/action/reason registries that are expected to evolve stay as trusted-code registries rather than large DB enums.
 
-## 4.2 Date-only semantics
+## 2.3 Instants and date-only values
 
-A source date such as `金曜まで` must not become midnight in a timezone.
-
-Use PostgreSQL `date` when the accepted value is date-only.
-
-## 4.3 JSONB
-
-Use JSONB only for the frozen aggregate-local semantic-details boundary and bounded audit/candidate summaries.
-
-Every trusted JSONB write must be runtime-schema validated.
-
-At the database boundary, enforce at minimum:
+Use:
 
 ```text
-JSON top-level object where an object is required
-explicit adjacent schema/version column
+timestamp(3) with time zone   for instants
+date                          for date-only accepted semantics
 ```
 
-Do not store provider raw payloads, credentials, or raw model prose in canonical semantic JSON.
+A date-only source value MUST NOT be silently converted to midnight.
+
+## 2.4 JSONB
+
+Canonical JSONB is restricted to the frozen typed aggregate-local details boundary and bounded audit/candidate summaries.
+
+Every trusted write requires runtime schema validation and an explicit adjacent schema/version column where the JSON object evolves independently.
 
 ---
 
-# 5. External FK prerequisites
-
-The Responsibility schema assumes these existing Phase-2 entities use UUID primary keys:
-
-```text
-connected_accounts.id
-conversations.id
-participant_identities.id
-messages.id
-ai_interpretation_runs.id
-```
-
-To mechanically prevent account/conversation ownership mismatch, Phase 2 should expose these additional unique keys:
-
-```sql
-connected_accounts UNIQUE (id, user_id)
-conversations      UNIQUE (id, connected_account_id)
-```
-
-Then `responsibilities` and `responsibility_admission_reviews` can use composite FKs:
-
-```text
-(connected_account_id, user_id)
-    -> connected_accounts(id, user_id)
-
-(conversation_id, connected_account_id)
-    -> conversations(id, connected_account_id)
-```
-
-This costs small redundant unique indexes but makes a high-harm cross-account mismatch structurally harder to persist.
-
-If the broader Phase-2 schema chooses another equivalent ownership-enforcement mechanism, it must be reviewed before changing these FKs.
-
----
-
-# 6. Concrete table set
-
-L2 proposes exactly these Responsibility-owned tables:
+# 3. Exact Responsibility-owned table set
 
 ```text
 responsibilities
-responsibility_obligation_legs
 responsibility_expected_events
+responsibility_obligation_legs
 responsibility_temporal_facts
 responsibility_field_decisions
-responsibility_provenance_refs
-responsibility_domain_events
 responsibility_admission_reviews
+responsibility_domain_events
+responsibility_provenance_refs
 ```
 
-No additional normalized table is introduced for:
-
-```text
-completion criteria
-constraints
-proposals
-agreements
-uncertainties
-ANY_OF assignment
-sarcasm
-commitment force
-projection bucket
-```
-
-Those remain typed local detail / upstream interpretation as established by L1.
+No table is added for completion criteria, constraints, proposals, agreements, uncertainties, ANY_OF assignment, sarcasm, commitment force, or projection buckets.
 
 ---
 
-# 7. `responsibilities`
-
-## 7.1 Exact columns
+# 4. `responsibilities`
 
 ```sql
 CREATE TABLE responsibilities (
@@ -235,6 +164,12 @@ CREATE TABLE responsibilities (
   resolved_at timestamp(3) with time zone,
   created_at timestamp(3) with time zone NOT NULL DEFAULT now(),
   updated_at timestamp(3) with time zone NOT NULL DEFAULT now(),
+
+  CONSTRAINT responsibilities_id_user_uq
+    UNIQUE (id, user_id),
+
+  CONSTRAINT responsibilities_id_account_uq
+    UNIQUE (id, connected_account_id),
 
   CONSTRAINT responsibilities_operational_outcome_nonempty
     CHECK (char_length(btrim(operational_outcome)) BETWEEN 1 AND 2048),
@@ -316,25 +251,7 @@ CREATE TABLE responsibilities (
 );
 ```
 
-## 7.2 Deliberately absent columns
-
-Do not add:
-
-```text
-lifecycle_state
-next_owner
-BOTH
-deadline_at
-follow_up_state
-uncertain_state
-completed boolean
-safe_next_action
-projection_bucket
-```
-
-The first seven violate L0/L1. The last two remain derived/policy output until measured query pressure justifies a rebuildable cache.
-
-## 7.3 Parent indexes
+Indexes:
 
 ```sql
 CREATE INDEX responsibilities_live_open_user_idx
@@ -354,19 +271,29 @@ CREATE INDEX responsibilities_account_updated_idx
   ON responsibilities (connected_account_id, updated_at DESC, id);
 ```
 
-No index on `semantic_details` is created in v0.1.
+Deliberately absent canonical columns:
+
+```text
+lifecycle_state
+next_owner
+BOTH
+deadline_at
+follow_up_state
+uncertain_state
+completed boolean
+safe_next_action
+projection_bucket
+```
 
 ---
 
-# 8. `responsibility_expected_events`
-
-Expected events are created before any obligation leg that uses them as an activation condition. This avoids a cyclic FK design.
+# 5. `responsibility_expected_events`
 
 ```sql
 CREATE TABLE responsibility_expected_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  responsibility_id uuid NOT NULL
-    REFERENCES responsibilities(id) ON DELETE CASCADE,
+  responsibility_id uuid NOT NULL,
+  user_id uuid NOT NULL,
 
   actor_kind text NOT NULL,
   actor_participant_id uuid,
@@ -381,8 +308,17 @@ CREATE TABLE responsibility_expected_events (
   expectation_strength text,
 
   satisfied_at timestamp(3) with time zone,
+  closed_at timestamp(3) with time zone,
   created_at timestamp(3) with time zone NOT NULL DEFAULT now(),
   updated_at timestamp(3) with time zone NOT NULL DEFAULT now(),
+
+  CONSTRAINT responsibility_expected_events_id_parent_uq
+    UNIQUE (id, responsibility_id),
+
+  CONSTRAINT responsibility_expected_events_parent_user_fk
+    FOREIGN KEY (responsibility_id, user_id)
+    REFERENCES responsibilities (id, user_id)
+    ON DELETE CASCADE,
 
   CONSTRAINT responsibility_expected_events_actor_kind_check
     CHECK (actor_kind IN ('PARTICIPANT', 'EXTERNAL')),
@@ -394,30 +330,40 @@ CREATE TABLE responsibility_expected_events (
       (actor_kind = 'EXTERNAL' AND actor_participant_id IS NULL)
     ),
 
+  CONSTRAINT responsibility_expected_events_participant_user_fk
+    FOREIGN KEY (actor_participant_id, user_id)
+    REFERENCES participant_identities (id, user_id)
+    ON DELETE RESTRICT,
+
   CONSTRAINT responsibility_expected_events_status_check
     CHECK (event_status IN ('PENDING', 'CLOSED')),
 
   CONSTRAINT responsibility_expected_events_closure_check
     CHECK (
-      (event_status = 'PENDING' AND closure_reason IS NULL AND satisfied_at IS NULL)
+      (
+        event_status = 'PENDING'
+        AND closure_reason IS NULL
+        AND satisfied_at IS NULL
+        AND closed_at IS NULL
+      )
       OR
-      (event_status = 'CLOSED' AND closure_reason IS NOT NULL)
+      (
+        event_status = 'CLOSED'
+        AND closure_reason IS NOT NULL
+        AND closed_at IS NOT NULL
+        AND (satisfied_at IS NULL OR closure_reason = 'SATISFIED')
+      )
     ),
 
   CONSTRAINT responsibility_expected_events_event_code_nonempty
     CHECK (char_length(btrim(event_code)) BETWEEN 1 AND 128),
 
   CONSTRAINT responsibility_expected_events_summary_length
-    CHECK (event_summary IS NULL OR char_length(event_summary) <= 1024),
-
-  CONSTRAINT responsibility_expected_events_participant_fk
-    FOREIGN KEY (actor_participant_id)
-    REFERENCES participant_identities(id)
-    ON DELETE RESTRICT
+    CHECK (event_summary IS NULL OR char_length(event_summary) <= 1024)
 );
 ```
 
-`closure_reason` is a trusted-code registry rather than a DB enum because event classes are expected to evolve. Example values include `SATISFIED`, `CANCELLED`, `INVALIDATED`, and `SUPERSEDED`.
+`closure_reason`, `basis_kind`, and `expectation_strength` are trusted-code registries. A satisfaction closure may leave `satisfied_at` null when the exact external occurrence time is unknown; `closed_at` records when Lunowa accepted closure.
 
 Indexes:
 
@@ -433,13 +379,13 @@ CREATE INDEX responsibility_expected_events_actor_idx
 
 ---
 
-# 9. `responsibility_obligation_legs`
+# 6. `responsibility_obligation_legs`
 
 ```sql
 CREATE TABLE responsibility_obligation_legs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  responsibility_id uuid NOT NULL
-    REFERENCES responsibilities(id) ON DELETE CASCADE,
+  responsibility_id uuid NOT NULL,
+  user_id uuid NOT NULL,
 
   bearer_kind text NOT NULL,
   bearer_participant_id uuid,
@@ -455,12 +401,19 @@ CREATE TABLE responsibility_obligation_legs (
   basis_kind text NOT NULL,
   authority_status text,
 
-  activation_event_id uuid
-    REFERENCES responsibility_expected_events(id) ON DELETE RESTRICT,
+  activation_event_id uuid,
 
   closed_at timestamp(3) with time zone,
   created_at timestamp(3) with time zone NOT NULL DEFAULT now(),
   updated_at timestamp(3) with time zone NOT NULL DEFAULT now(),
+
+  CONSTRAINT responsibility_obligation_legs_id_parent_uq
+    UNIQUE (id, responsibility_id),
+
+  CONSTRAINT responsibility_obligation_legs_parent_user_fk
+    FOREIGN KEY (responsibility_id, user_id)
+    REFERENCES responsibilities (id, user_id)
+    ON DELETE CASCADE,
 
   CONSTRAINT responsibility_obligation_legs_bearer_kind_check
     CHECK (bearer_kind IN ('USER', 'PARTICIPANT')),
@@ -471,6 +424,16 @@ CREATE TABLE responsibility_obligation_legs (
       OR
       (bearer_kind = 'PARTICIPANT' AND bearer_participant_id IS NOT NULL)
     ),
+
+  CONSTRAINT responsibility_obligation_legs_participant_user_fk
+    FOREIGN KEY (bearer_participant_id, user_id)
+    REFERENCES participant_identities (id, user_id)
+    ON DELETE RESTRICT,
+
+  CONSTRAINT responsibility_obligation_legs_activation_event_parent_fk
+    FOREIGN KEY (activation_event_id, responsibility_id)
+    REFERENCES responsibility_expected_events (id, responsibility_id)
+    ON DELETE NO ACTION,
 
   CONSTRAINT responsibility_obligation_legs_status_check
     CHECK (leg_status IN ('OPEN', 'CLOSED')),
@@ -495,12 +458,7 @@ CREATE TABLE responsibility_obligation_legs (
     CHECK (action_summary IS NULL OR char_length(action_summary) <= 1024),
 
   CONSTRAINT responsibility_obligation_legs_object_length
-    CHECK (object_summary IS NULL OR char_length(object_summary) <= 1024),
-
-  CONSTRAINT responsibility_obligation_legs_participant_fk
-    FOREIGN KEY (bearer_participant_id)
-    REFERENCES participant_identities(id)
-    ON DELETE RESTRICT
+    CHECK (object_summary IS NULL OR char_length(object_summary) <= 1024)
 );
 ```
 
@@ -521,17 +479,11 @@ CREATE INDEX responsibility_obligation_legs_participant_idx
   WHERE bearer_participant_id IS NOT NULL;
 ```
 
-### 9.1 Cross-aggregate activation invariant
-
-If `activation_event_id` is present, trusted code must verify that the referenced event belongs to the **same Responsibility** before commit.
-
-A conventional FK proves the event exists but cannot itself prove same-parent ownership without duplicating `responsibility_id` into a composite FK target. The L2 audit must decide whether the extra composite FK is worth the added index/DDL complexity.
+The composite activation FK mechanically forbids a condition event from another Responsibility.
 
 ---
 
-# 10. `responsibility_temporal_facts`
-
-Temporal values preserve date-only vs exact-instant semantics and permit unresolved/conflicting candidates.
+# 7. `responsibility_temporal_facts`
 
 ```sql
 CREATE TABLE responsibility_temporal_facts (
@@ -541,10 +493,8 @@ CREATE TABLE responsibility_temporal_facts (
 
   temporal_kind text NOT NULL,
 
-  obligation_leg_id uuid
-    REFERENCES responsibility_obligation_legs(id) ON DELETE CASCADE,
-  expected_event_id uuid
-    REFERENCES responsibility_expected_events(id) ON DELETE CASCADE,
+  obligation_leg_id uuid,
+  expected_event_id uuid,
 
   original_expression text,
 
@@ -571,6 +521,16 @@ CREATE TABLE responsibility_temporal_facts (
   CONSTRAINT responsibility_temporal_facts_single_target_check
     CHECK (NOT (obligation_leg_id IS NOT NULL AND expected_event_id IS NOT NULL)),
 
+  CONSTRAINT responsibility_temporal_facts_leg_parent_fk
+    FOREIGN KEY (obligation_leg_id, responsibility_id)
+    REFERENCES responsibility_obligation_legs (id, responsibility_id)
+    ON DELETE NO ACTION,
+
+  CONSTRAINT responsibility_temporal_facts_event_parent_fk
+    FOREIGN KEY (expected_event_id, responsibility_id)
+    REFERENCES responsibility_expected_events (id, responsibility_id)
+    ON DELETE NO ACTION,
+
   CONSTRAINT responsibility_temporal_facts_value_kind_check
     CHECK (value_kind IN ('DATE', 'INSTANT', 'UNRESOLVED')),
 
@@ -582,6 +542,9 @@ CREATE TABLE responsibility_temporal_facts (
       OR
       (value_kind = 'UNRESOLVED' AND resolved_date IS NULL AND resolved_at IS NULL)
     ),
+
+  CONSTRAINT responsibility_temporal_facts_original_expression_length
+    CHECK (original_expression IS NULL OR char_length(original_expression) <= 512),
 
   CONSTRAINT responsibility_temporal_facts_precision_nonempty
     CHECK (char_length(btrim(precision_code)) BETWEEN 1 AND 64),
@@ -598,8 +561,9 @@ CREATE TABLE responsibility_temporal_facts (
 
   CONSTRAINT responsibility_temporal_facts_superseded_time_check
     CHECK (
-      currentness_status <> 'SUPERSEDED'
-      OR superseded_at IS NOT NULL
+      (currentness_status = 'SUPERSEDED' AND superseded_at IS NOT NULL)
+      OR
+      (currentness_status <> 'SUPERSEDED' AND superseded_at IS NULL)
     ),
 
   CONSTRAINT responsibility_temporal_facts_anchor_shape_check
@@ -611,11 +575,7 @@ CREATE TABLE responsibility_temporal_facts (
 );
 ```
 
-### 10.1 Current-value uniqueness
-
-One accepted current value is allowed per Responsibility + semantic target + temporal kind, but conflict candidates may coexist.
-
-Use three partial unique indexes rather than one nullable-key shortcut:
+Current accepted uniqueness while allowing conflict candidates:
 
 ```sql
 CREATE UNIQUE INDEX responsibility_temporal_current_parent_uq
@@ -639,9 +599,7 @@ CREATE UNIQUE INDEX responsibility_temporal_current_event_uq
     AND obligation_leg_id IS NULL;
 ```
 
-This permits multiple `CONFLICT_CANDIDATE` rows for T0-028 while preventing two accepted-current values for the same target/kind.
-
-### 10.2 Sorting/query indexes
+Query indexes:
 
 ```sql
 CREATE INDEX responsibility_temporal_current_date_idx
@@ -662,17 +620,11 @@ CREATE INDEX responsibility_temporal_conflict_idx
   WHERE currentness_status = 'CONFLICT_CANDIDATE';
 ```
 
-### 10.3 Same-parent target invariant
-
-Trusted reduction must verify that `obligation_leg_id` / `expected_event_id`, when present, belongs to the same `responsibility_id`.
-
-The audit must decide whether to add composite same-parent FKs.
+`HISTORICAL` and `SUPERSEDED` remain distinct: the former may represent retained historical/candidate evidence that was not necessarily the once-accepted value replaced by another accepted value.
 
 ---
 
-# 11. `responsibility_field_decisions`
-
-This table is a narrow **current authority-decision materialization**, not generic state storage.
+# 8. `responsibility_field_decisions`
 
 ```sql
 CREATE TABLE responsibility_field_decisions (
@@ -688,7 +640,6 @@ CREATE TABLE responsibility_field_decisions (
   basis_evidence_revision bigint NOT NULL,
 
   decision_status text NOT NULL DEFAULT 'ACTIVE',
-
   superseded_at timestamp(3) with time zone,
   created_at timestamp(3) with time zone NOT NULL DEFAULT now(),
 
@@ -711,25 +662,17 @@ CREATE TABLE responsibility_field_decisions (
       (decision_status = 'SUPERSEDED' AND superseded_at IS NOT NULL)
     )
 );
-```
 
-Enforce at most one active accepted decision per field:
-
-```sql
 CREATE UNIQUE INDEX responsibility_field_decisions_active_uq
   ON responsibility_field_decisions (responsibility_id, field_key)
   WHERE decision_status = 'ACTIVE';
 ```
 
-`field_key` and `authority_kind` must be trusted-code allowlists. They are intentionally not PostgreSQL enums because the supported correction surface should stay small and explicit without turning this table into EAV.
-
-No generic product API may write an arbitrary `field_key`.
+`field_key`, its value schema, and `authority_kind` are trusted-code allowlists. This table is not generic EAV and does not own `USER_TARGET` merely because a user supplied it.
 
 ---
 
-# 12. `responsibility_admission_reviews`
-
-AdmissionReview is product state **before** Responsibility existence has been accepted.
+# 9. `responsibility_admission_reviews`
 
 ```sql
 CREATE TABLE responsibility_admission_reviews (
@@ -742,7 +685,7 @@ CREATE TABLE responsibility_admission_reviews (
   review_status text NOT NULL DEFAULT 'OPEN',
   resolution text,
 
-  reason_codes text[] NOT NULL DEFAULT ARRAY[]::text[],
+  reason_codes text[] NOT NULL,
 
   candidate_schema_version smallint NOT NULL DEFAULT 1,
   candidate_summary jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -754,13 +697,23 @@ CREATE TABLE responsibility_admission_reviews (
   candidate_key text NOT NULL,
   interpretation_run_id uuid,
 
-  admitted_responsibility_id uuid
-    REFERENCES responsibilities(id) ON DELETE SET NULL,
+  admitted_responsibility_id uuid,
 
   resolved_by_actor_kind text,
   resolved_at timestamp(3) with time zone,
   created_at timestamp(3) with time zone NOT NULL DEFAULT now(),
   updated_at timestamp(3) with time zone NOT NULL DEFAULT now(),
+
+  CONSTRAINT responsibility_admission_reviews_id_account_uq
+    UNIQUE (id, connected_account_id),
+
+  CONSTRAINT responsibility_admission_reviews_same_revision_uq
+    UNIQUE (
+      connected_account_id,
+      source_event_key,
+      candidate_key,
+      evidence_revision
+    ),
 
   CONSTRAINT responsibility_admission_reviews_status_check
     CHECK (review_status IN ('OPEN', 'RESOLVED')),
@@ -768,12 +721,16 @@ CREATE TABLE responsibility_admission_reviews (
   CONSTRAINT responsibility_admission_reviews_resolution_check
     CHECK (resolution IS NULL OR resolution IN ('TRACK', 'DO_NOT_TRACK')),
 
+  CONSTRAINT responsibility_admission_reviews_reason_codes_check
+    CHECK (cardinality(reason_codes) >= 1),
+
   CONSTRAINT responsibility_admission_reviews_resolution_shape_check
     CHECK (
       (
         review_status = 'OPEN'
         AND resolution IS NULL
         AND admitted_responsibility_id IS NULL
+        AND resolved_by_actor_kind IS NULL
         AND resolved_at IS NULL
       )
       OR
@@ -781,6 +738,7 @@ CREATE TABLE responsibility_admission_reviews (
         review_status = 'RESOLVED'
         AND resolution = 'DO_NOT_TRACK'
         AND admitted_responsibility_id IS NULL
+        AND resolved_by_actor_kind IS NOT NULL
         AND resolved_at IS NOT NULL
       )
       OR
@@ -788,6 +746,7 @@ CREATE TABLE responsibility_admission_reviews (
         review_status = 'RESOLVED'
         AND resolution = 'TRACK'
         AND admitted_responsibility_id IS NOT NULL
+        AND resolved_by_actor_kind IS NOT NULL
         AND resolved_at IS NOT NULL
       )
     ),
@@ -805,10 +764,10 @@ CREATE TABLE responsibility_admission_reviews (
     CHECK (aggregate_version >= 1),
 
   CONSTRAINT responsibility_admission_reviews_source_event_key_check
-    CHECK (char_length(btrim(source_event_key)) BETWEEN 1 AND 512),
+    CHECK (char_length(btrim(source_event_key)) BETWEEN 1 AND 256),
 
   CONSTRAINT responsibility_admission_reviews_candidate_key_check
-    CHECK (char_length(btrim(candidate_key)) BETWEEN 1 AND 256),
+    CHECK (char_length(btrim(candidate_key)) BETWEEN 1 AND 128),
 
   CONSTRAINT responsibility_admission_reviews_account_owner_fk
     FOREIGN KEY (connected_account_id, user_id)
@@ -820,6 +779,11 @@ CREATE TABLE responsibility_admission_reviews (
     REFERENCES conversations (id, connected_account_id)
     ON DELETE RESTRICT,
 
+  CONSTRAINT responsibility_admission_reviews_admitted_account_fk
+    FOREIGN KEY (admitted_responsibility_id, connected_account_id)
+    REFERENCES responsibilities (id, connected_account_id)
+    ON DELETE RESTRICT,
+
   CONSTRAINT responsibility_admission_reviews_interpretation_run_fk
     FOREIGN KEY (interpretation_run_id)
     REFERENCES ai_interpretation_runs(id)
@@ -827,7 +791,7 @@ CREATE TABLE responsibility_admission_reviews (
 );
 ```
 
-Only one unresolved product Review candidate is allowed for the same trusted source/candidate identity:
+At most one currently OPEN review for the source/candidate identity:
 
 ```sql
 CREATE UNIQUE INDEX responsibility_admission_reviews_open_source_candidate_uq
@@ -847,13 +811,11 @@ CREATE INDEX responsibility_admission_reviews_conversation_idx
   ON responsibility_admission_reviews (conversation_id, created_at DESC, id);
 ```
 
-A resolved prior Review row may coexist with a later new Review for the same source/candidate if genuinely new evidence/policy explicitly warrants a new review episode. Product logic must never reopen a user-resolved decision merely because a stale model reruns.
+`candidate_key` is deterministic trusted semantic-candidate identity and MUST NOT depend on model-run IDs or unstable generated labels.
 
 ---
 
-# 13. `responsibility_domain_events`
-
-This is append-only semantic-effect history and the primary mechanical idempotency boundary for Responsibility reducer applications.
+# 10. `responsibility_domain_events`
 
 ```sql
 CREATE TABLE responsibility_domain_events (
@@ -863,7 +825,7 @@ CREATE TABLE responsibility_domain_events (
 
   operation text NOT NULL,
   actor_kind text NOT NULL,
-  reason_codes text[] NOT NULL DEFAULT ARRAY[]::text[],
+  reason_codes text[] NOT NULL,
 
   basis_evidence_revision bigint NOT NULL,
   aggregate_version_before bigint NOT NULL,
@@ -882,6 +844,9 @@ CREATE TABLE responsibility_domain_events (
 
   occurred_at timestamp(3) with time zone NOT NULL DEFAULT now(),
 
+  CONSTRAINT responsibility_domain_events_id_parent_uq
+    UNIQUE (id, responsibility_id),
+
   CONSTRAINT responsibility_domain_events_operation_check
     CHECK (
       operation IN (
@@ -894,6 +859,16 @@ CREATE TABLE responsibility_domain_events (
         'NO_OP'
       )
     ),
+
+  CONSTRAINT responsibility_domain_events_noop_shape_check
+    CHECK (
+      (mutates_state AND operation <> 'NO_OP')
+      OR
+      (NOT mutates_state AND operation = 'NO_OP')
+    ),
+
+  CONSTRAINT responsibility_domain_events_reason_codes_check
+    CHECK (cardinality(reason_codes) >= 1),
 
   CONSTRAINT responsibility_domain_events_revision_check
     CHECK (basis_evidence_revision >= 0),
@@ -909,14 +884,17 @@ CREATE TABLE responsibility_domain_events (
       )
     ),
 
+  CONSTRAINT responsibility_domain_events_actor_kind_check
+    CHECK (char_length(btrim(actor_kind)) BETWEEN 1 AND 64),
+
   CONSTRAINT responsibility_domain_events_source_key_check
-    CHECK (char_length(btrim(source_event_key)) BETWEEN 1 AND 512),
+    CHECK (char_length(btrim(source_event_key)) BETWEEN 1 AND 256),
 
   CONSTRAINT responsibility_domain_events_application_key_check
-    CHECK (char_length(btrim(application_key)) BETWEEN 1 AND 512),
+    CHECK (char_length(btrim(application_key)) BETWEEN 1 AND 128),
 
   CONSTRAINT responsibility_domain_events_effect_key_check
-    CHECK (char_length(btrim(effect_key)) BETWEEN 1 AND 256),
+    CHECK (char_length(btrim(effect_key)) BETWEEN 1 AND 128),
 
   CONSTRAINT responsibility_domain_events_reducer_version_check
     CHECK (char_length(btrim(reducer_version)) BETWEEN 1 AND 128),
@@ -931,41 +909,39 @@ CREATE TABLE responsibility_domain_events (
 );
 ```
 
-## 13.1 Idempotency
+## 10.1 Global semantic-application idempotency
 
-The trusted reducer creates `application_key` from the **semantic application attempt**, not merely the raw provider event.
+`application_key` is deterministic **before** accepting/generating the target Responsibility identity and is globally namespaced by trusted code. `effect_key` identifies a deterministic semantic effect slot and MUST NOT depend on a newly generated Responsibility UUID.
 
-It must distinguish:
+Examples:
 
 ```text
-same normalized event, same evidence revision, same reducer application
-  -> duplicate delivery / retry -> same application_key
+application_key = compact hash/account-scoped opaque key for
+                  source + authorized evidence revision + application namespace
 
-same source revisited under a genuinely new authorized evidence revision
-  -> new reviewed application -> new application_key
+effect_key      = create:candidate-2
+                  supersede:existing-slot-1
+                  update:deadline-resolution
 ```
 
-Mechanical uniqueness:
+Global uniqueness:
 
 ```sql
 CREATE UNIQUE INDEX responsibility_domain_events_application_effect_uq
-  ON responsibility_domain_events
-    (responsibility_id, application_key, effect_key);
+  ON responsibility_domain_events (application_key, effect_key);
 ```
 
-This is deliberately stronger than `source_event_key` uniqueness and avoids blocking legitimate re-evaluation of old evidence after the authorized evidence set changes.
+This protects duplicate concurrent `CREATE` attempts even if each worker generated a different Responsibility UUID.
 
-## 13.2 Aggregate-version history
+Legitimate explicit re-evaluation/migration under a different semantic application uses a distinct, versioned application namespace. A model/reducer version bump by itself does not silently create a new application identity.
 
-At most one mutating domain event should produce a given aggregate version:
+## 10.2 Aggregate version uniqueness
 
 ```sql
 CREATE UNIQUE INDEX responsibility_domain_events_mutation_version_uq
   ON responsibility_domain_events (responsibility_id, aggregate_version_after)
   WHERE mutates_state;
 ```
-
-A logged `NO_OP` may keep the current aggregate version and therefore is not subject to that unique index.
 
 Other indexes:
 
@@ -982,20 +958,18 @@ CREATE INDEX responsibility_domain_events_source_idx
 
 ---
 
-# 14. `responsibility_provenance_refs`
+# 11. `responsibility_provenance_refs`
 
-Provenance is intentionally flexible as an audit/reference layer while canonical business state remains typed.
-
-The same table can support accepted Responsibilities and pre-admission Review without inventing a second provenance subsystem.
+In v0.1 all canonical Responsibility/AdmissionReview Message evidence is account-local. Provenance therefore duplicates the account ID deliberately and enforces it.
 
 ```sql
 CREATE TABLE responsibility_provenance_refs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  responsibility_id uuid
-    REFERENCES responsibilities(id) ON DELETE CASCADE,
-  admission_review_id uuid
-    REFERENCES responsibility_admission_reviews(id) ON DELETE CASCADE,
+  connected_account_id uuid NOT NULL,
+
+  responsibility_id uuid,
+  admission_review_id uuid,
 
   target_kind text NOT NULL,
   target_id uuid,
@@ -1006,8 +980,7 @@ CREATE TABLE responsibility_provenance_refs (
   message_id uuid,
   provider_observation_key text,
   interpretation_run_id uuid,
-  domain_event_id uuid
-    REFERENCES responsibility_domain_events(id) ON DELETE SET NULL,
+  domain_event_id uuid,
 
   source_locator jsonb NOT NULL DEFAULT '{}'::jsonb,
   source_excerpt_short text,
@@ -1020,6 +993,34 @@ CREATE TABLE responsibility_provenance_refs (
       OR
       (responsibility_id IS NULL AND admission_review_id IS NOT NULL)
     ),
+
+  CONSTRAINT responsibility_provenance_refs_domain_event_owner_check
+    CHECK (domain_event_id IS NULL OR responsibility_id IS NOT NULL),
+
+  CONSTRAINT responsibility_provenance_refs_responsibility_account_fk
+    FOREIGN KEY (responsibility_id, connected_account_id)
+    REFERENCES responsibilities (id, connected_account_id)
+    ON DELETE CASCADE,
+
+  CONSTRAINT responsibility_provenance_refs_review_account_fk
+    FOREIGN KEY (admission_review_id, connected_account_id)
+    REFERENCES responsibility_admission_reviews (id, connected_account_id)
+    ON DELETE CASCADE,
+
+  CONSTRAINT responsibility_provenance_refs_message_account_fk
+    FOREIGN KEY (message_id, connected_account_id)
+    REFERENCES messages (id, connected_account_id)
+    ON DELETE RESTRICT,
+
+  CONSTRAINT responsibility_provenance_refs_domain_event_parent_fk
+    FOREIGN KEY (domain_event_id, responsibility_id)
+    REFERENCES responsibility_domain_events (id, responsibility_id)
+    ON DELETE NO ACTION,
+
+  CONSTRAINT responsibility_provenance_refs_interpretation_run_fk
+    FOREIGN KEY (interpretation_run_id)
+    REFERENCES ai_interpretation_runs(id)
+    ON DELETE SET NULL,
 
   CONSTRAINT responsibility_provenance_refs_target_kind_nonempty
     CHECK (char_length(btrim(target_kind)) BETWEEN 1 AND 128),
@@ -1039,17 +1040,7 @@ CREATE TABLE responsibility_provenance_refs (
     CHECK (jsonb_typeof(source_locator) = 'object'),
 
   CONSTRAINT responsibility_provenance_refs_excerpt_length
-    CHECK (source_excerpt_short IS NULL OR char_length(source_excerpt_short) <= 512),
-
-  CONSTRAINT responsibility_provenance_refs_message_fk
-    FOREIGN KEY (message_id)
-    REFERENCES messages(id)
-    ON DELETE RESTRICT,
-
-  CONSTRAINT responsibility_provenance_refs_interpretation_run_fk
-    FOREIGN KEY (interpretation_run_id)
-    REFERENCES ai_interpretation_runs(id)
-    ON DELETE SET NULL
+    CHECK (source_excerpt_short IS NULL OR char_length(source_excerpt_short) <= 512)
 );
 ```
 
@@ -1069,24 +1060,24 @@ CREATE INDEX responsibility_provenance_refs_message_idx
   WHERE message_id IS NOT NULL;
 ```
 
-`target_kind`, `field_key`, `support_role`, and `evidence_kind` are trusted-code registries, not open client input.
+`source_excerpt_short` is optional and SHOULD be omitted by default when source locator/ID is enough. It is never a substitute for retention/privacy policy.
+
+`target_kind`, `field_key`, `support_role`, `evidence_kind`, and provider-observation key semantics are trusted-code registries.
 
 ---
 
-# 15. `semantic_details_v1`
+# 12. `semantic_details_v1`
 
-## 15.1 Exact aggregate-local shape
-
-The v1 runtime-validated object is conceptually:
+Canonical runtime shape remains aggregate-local:
 
 ```ts
 type ResponsibilitySemanticDetailsV1 = {
   completionCriteria: Array<{
-    id: string;                 // UUID string, stable across rewrites
+    id: string; // UUID string, stable local identity
     code: string;
     summary?: string;
     status: "PENDING" | "SATISFIED" | "WAIVED";
-    satisfiedAt?: string;       // ISO instant only when satisfied
+    satisfiedAt?: string;
   }>;
 
   constraints: Array<{
@@ -1104,14 +1095,14 @@ type ResponsibilitySemanticDetailsV1 = {
   pendingProposals: Array<{
     id: string;
     kind: string;
-    value: unknown;             // further validated by proposal kind
+    value: unknown; // further validator selected by kind
     status: "PENDING" | "REJECTED" | "SUPERSEDED";
   }>;
 
   agreedFacts: Array<{
     id: string;
     kind: string;
-    value: unknown;             // further validated by fact kind
+    value: unknown; // further validator selected by kind
     status: "CURRENT" | "SUPERSEDED";
   }>;
 
@@ -1141,230 +1132,366 @@ type ResponsibilitySemanticDetailsV1 = {
 };
 ```
 
-## 15.2 Required trusted validation rules
+Trusted validator requirements:
 
-At every canonical write:
+```text
+exact known semantic_details_version
+unknown top-level keys rejected
+local IDs are valid UUID strings and unique
+all local references resolve
+SATISFIED criterion requires satisfiedAt
+unresolved shared assignment creates no fabricated normalized required leg
+proposal -> agreed fact only through a reducer effect with evidence
+normalized legs/events/times not duplicated in JSON
+raw provider/model payloads and credentials rejected
+```
 
-- the object must match exactly one known `semantic_details_version`;
-- unknown top-level keys are rejected;
-- local IDs are UUID strings and unique inside the document;
-- references to local IDs must resolve;
-- `SATISFIED` completion criteria require `satisfiedAt`;
-- unresolved shared assignment does not silently create normalized required legs;
-- pending proposals never appear in `agreedFacts` without a reducer effect/evidence;
-- normalized legs/events/temporal facts are not duplicated into this document;
-- raw provider/model payloads and credentials are rejected.
-
-The concrete runtime validation library is not an L2 schema decision; use the project's trusted validation library at implementation time and keep one canonical validator/migration registry.
+No GIN index is created in v0.1.
 
 ---
 
-# 16. Transaction and concurrency protocol
+# 13. Machine-key contract
 
-The schema is only correct if writes follow one reducer protocol.
+Keys used for idempotency/AdmissionReview identity are generated only by trusted code.
 
-## 16.1 Single-Responsibility mutation
+```text
+source_event_key <= 256 ASCII chars
+application_key  <= 128 ASCII chars
+candidate_key    <= 128 ASCII chars
+effect_key       <= 128 ASCII chars
+```
 
-Default transaction isolation may remain PostgreSQL `READ COMMITTED` **when combined with explicit row locking and version checks**.
+They are canonical opaque identifiers, not raw URLs, message bodies, user text, or model prose.
 
-Canonical flow:
+Required key-generation tests include:
+
+```text
+same account/source/revision/application -> stable same key
+different account -> different application/source namespace
+different evidence revision -> different application key when re-application is authorized
+model rerun alone -> no new semantic application identity
+multiple semantic effects in one application -> distinct stable effect keys
+duplicate CREATE with newly generated target UUID -> same application/effect key
+```
+
+---
+
+# 14. Transaction and concurrency protocols
+
+## 14.1 Existing Responsibility mutation
+
+Default v0.1 isolation may remain PostgreSQL `READ COMMITTED` with explicit row locking and version/idempotency checks:
 
 ```text
 BEGIN
-
 1. SELECT Responsibility FOR UPDATE
-2. inspect current aggregate_version / evidence_revision
-3. check existing domain event by (responsibility_id, application_key, effect_key)
-   - if already applied: return the existing result idempotently
-4. reject stale/incompatible basis revision
-5. validate current FieldDecision authority + evidence
-6. apply parent/child/semantic-details mutations
-7. increment aggregate_version exactly once for this aggregate command
+2. verify expected aggregate_version + current evidence_revision
+3. query global (application_key, effect_key)
+   - if already accepted, return the existing result idempotently
+4. reject stale/incompatible semantic basis
+5. validate active FieldDecision authority + current evidence
+6. mutate parent/children/semantic details
+7. aggregate_version := aggregate_version + 1 exactly once
 8. append one mutating DomainEvent with before/after versions
-9. COMMIT
+9. set updated_at := now() on changed current-state rows
+COMMIT
 ```
 
-Do not depend on a read-then-write sequence outside one transaction.
+## 14.2 CREATE
 
-## 16.2 Composite effects across multiple existing Responsibilities
+There is no existing Responsibility row to lock.
 
-Lock existing Responsibility rows in deterministic UUID order before mutating any of them.
+```text
+BEGIN
+1. compute deterministic application_key + effect_key before accepting target identity
+2. if existing DomainEvent already has that key pair, return its Responsibility
+3. generate candidate Responsibility UUID
+4. insert Responsibility/current children
+5. insert CREATE DomainEvent with before=0, after=1
+6. global unique(application_key,effect_key) is the commit arbiter
+COMMIT
+```
 
-Then apply all effects in one transaction when the source command semantically requires atomicity, for example:
+If two workers race, one global unique insert wins; the losing transaction rolls back the duplicate Responsibility. The caller then loads the winning DomainEvent/Responsibility.
+
+## 14.3 Composite effects
+
+For existing Responsibilities, lock rows in deterministic UUID order. Apply all semantically atomic effects in one transaction when required, e.g.:
 
 ```text
 SUPERSEDE R1
 CREATE R2
 ```
 
-Deterministic lock order reduces deadlock risk.
+Each effect gets its own stable `effect_key`; all share one application/correlation context.
 
-## 16.3 Optimistic/version boundary
+## 14.4 AdmissionReview re-evaluation/resolution
 
-Even after row locking, trusted code checks the expected current `aggregate_version`/`evidence_revision` supplied by the reducer command.
+```text
+BEGIN
+1. SELECT AdmissionReview FOR UPDATE
+2. verify expected review aggregate_version and evidence_revision
+3. if already RESOLVED -> return stored terminal decision idempotently
+4. re-evaluation may update an OPEN row only against current authorized evidence
+5. TRACK:
+   - create/load Responsibility through the global CREATE idempotency boundary
+   - set resolution=TRACK + same-account admitted_responsibility_id
+6. DO_NOT_TRACK:
+   - set resolution=DO_NOT_TRACK
+7. set resolver/resolved_at, increment review aggregate_version, updated_at=now()
+COMMIT
+```
 
-`aggregate_version` protects canonical state mutation concurrency.
+A stale model run cannot reopen/replace a resolved row. The all-status same-revision unique key prevents re-creation for the exact same source/candidate/evidence revision.
 
-`evidence_revision` protects semantic basis freshness.
+## 14.5 Isolation escalation
 
-They are intentionally separate.
+Do not globally use `SERIALIZABLE` by default. If a later invariant cannot be protected with row locks, deterministic lock order, unique/FK constraints, and version checks, isolate that command and use serializable execution with explicit retry.
 
-## 16.4 Serialization retries
+---
 
-The default v0.1 path does not require every reducer write to run at `SERIALIZABLE` isolation. PostgreSQL row locks + deterministic lock order + unique constraints + version checks are simpler for the aggregate-shaped workload.
+# 15. DB-enforced vs reducer-enforced invariants
 
-If a future cross-aggregate invariant cannot be protected cleanly by this protocol, escalate that command to `SERIALIZABLE` with explicit retry handling rather than globally increasing isolation by default.
+## PostgreSQL-enforced
+
+```text
+account/conversation ownership of Responsibility/Review
+same-user participant ownership on obligation/event rows
+same-Responsibility activation/temporal child references
+finite structural state values
+resolution/reason/timestamp consistency
+defer/live structural consistency
+DATE/INSTANT/UNRESOLVED shape
+one accepted-current temporal fact per semantic target/kind
+conflict candidates may coexist
+one active FieldDecision per field
+one open Review candidate per source/candidate
+same source/candidate/revision Review cannot reappear
+same-account TRACK Review -> Responsibility link
+global semantic application/effect idempotency
+one mutating DomainEvent per resulting aggregate version
+same-account Message provenance
+same-Responsibility DomainEvent provenance
+JSON top-level object shape
+bounded canonical machine keys
+```
+
+## Trusted reducer/runtime-enforced
+
+```text
+DEFERRED has a valid current TemporalContract/return condition
+parent closure criteria/domain policy
+ExpectedEvent satisfaction authority
+field-key/value/authority registries
+semantic_details_v1 deep validation
+semantic chronology and correction/supersession authority
+stale AI rejection beyond raw revision equality
+high-risk safe-action policy
+cross-account semantic merge prohibition at matching/context construction
+provider_observation_key ownership validation
+updated_at maintenance on trusted writes
+```
+
+---
+
+# 16. Delete and retention rules
+
+Normal domain state evolution never hard-deletes Responsibility children; it closes/supersedes them.
+
+Hard delete is reserved for explicit privacy/account teardown or maintenance policy.
+
+```text
+Responsibility -> aggregate-local children/history/provenance: CASCADE
+Review -> Review provenance: CASCADE
+Review TRACK -> admitted Responsibility: RESTRICT/NO ACTION
+cross-child event/leg references: NO ACTION
+Provenance -> Message: RESTRICT
+```
+
+Privacy deletion order is explicit:
+
+```text
+1. delete Responsibility/AdmissionReview state and provenance
+2. delete Message/provider evidence according to retention policy
+3. delete account/auth secret material according to provider/account policy
+```
+
+The executable PostgreSQL acceptance suite MUST verify that deleting a parent Responsibility succeeds with the composite/cross-child FK graph. If `NO ACTION` timing prevents aggregate teardown, use an explicit child teardown order rather than weakening normal referential safety.
 
 ---
 
 # 17. Drizzle representation rules
 
-## 17.1 UUID
-
-Use Drizzle `uuid(...).defaultRandom()` for ordinary UUID IDs.
-
-## 17.2 State columns
-
-Use `text(..., { enum: [...] })` only for TypeScript inference **plus** a database `check(...)` for finite structural state.
-
-Do not mistake Drizzle's type inference for runtime DB enforcement.
-
-## 17.3 JSONB
-
-Use `jsonb(...).$type<...>()` for TypeScript shape, but runtime-validate before writes. TypeScript generics alone are not validation.
-
-## 17.4 Partial indexes
-
-Use Drizzle `index()` / `uniqueIndex()` with `.where(sql``)` for partial indexes where supported by the current stable Drizzle version.
-
-Committed generated SQL must be reviewed against the SQL contract in this document.
-
-## 17.5 Raw SQL escape hatch
-
-Use `sql`` only where the ORM API would obscure correctness, for example explicit `FOR UPDATE` locking or a PostgreSQL expression/check that is clearer in SQL.
-
-Do not replace reviewable PostgreSQL invariants with application-only logic merely because an ORM helper is missing.
-
----
-
-# 18. What is DB-enforced vs reducer-enforced
-
-## 18.1 DB-enforced
-
-PostgreSQL should mechanically enforce:
+Use current Drizzle PostgreSQL primitives:
 
 ```text
-primary/FK ownership where representable
-finite structural state values
-resolution/reason/timestamp consistency
-live/deferred structural consistency
-exactly-shaped temporal resolved value representation
-at most one accepted current temporal fact per target/kind
-at most one active FieldDecision per field
-one unresolved AdmissionReview per source/candidate identity
-DomainEvent application/effect idempotency
-one mutating event per resulting aggregate version
-nonempty/bounded critical keys
-JSON top-level object shape
+uuid().defaultRandom()
+text() + explicit check(...)
+jsonb().$type<...>() + independent runtime validator
+foreignKey(...) for multi-column FKs
+index()/uniqueIndex() + .where(sql``) for partial indexes
+transaction(..., { isolationLevel: "read committed" })
 ```
 
-## 18.2 Reducer/runtime-enforced
+Use raw reviewable SQL only where it makes correctness clearer, such as explicit `SELECT ... FOR UPDATE` or a PostgreSQL constraint expression not cleanly represented by the ORM API.
 
-Trusted domain code enforces cross-row semantic invariants that PostgreSQL CHECK cannot safely express without triggers/general workflow machinery:
+Generated SQL is reviewed against this DDL contract. TypeScript enum hints and `$type` generics are not runtime validation.
+
+---
+
+# 18. L2 executable acceptance suite
+
+Before L2 freeze/migration authorization, instantiate the concrete Drizzle-generated schema on temporary PostgreSQL 18 and prove all of the following.
+
+## Parent/state
 
 ```text
-obligation/event temporal target belongs to same Responsibility
-activation event belongs to same Responsibility
-DEFERRED has a valid active TemporalContract/return condition
-parent resolution only when closure criteria/domain policy permit it
-ExpectedEvent satisfaction has adequate authority
-field-key/value schema registry
-semantic_details_v1 deep validation
-cross-account semantic merge prohibition
-stale AI result rejection beyond revision equality
-high-risk safe-action policy
-semantic chronology/correction authority
+01 invalid RESOLVED without reason/timestamp rejected
+02 DEFERRED + HISTORICAL_INACTIVE rejected
+03 one Conversation can contain multiple Responsibilities
+04 account/conversation mismatch rejected
 ```
 
-Where a reducer-enforced invariant becomes a repeated production failure, first ask whether a narrow relational constraint can cheaply move it into the database before inventing a generic engine.
-
----
-
-# 19. Explicit non-goals at L2
-
-Do not add before evidence:
+## Temporal
 
 ```text
-RLS/Data API exposure
-partitioning
-GIN index on semantic_details
-projection cache/materialized state
-workflow graph
-native PostgreSQL enum types for semantic taxonomies
-triggers that implement Responsibility reducer semantics
-stored procedures as the primary domain layer
-cross-account many-to-many Responsibility sources
-criterion/proposal/uncertainty tables
-semantic embedding IDs/merge hashes
+05 two ACCEPTED_CURRENT facts for same parent/kind rejected
+06 two ACCEPTED_CURRENT facts for same leg/kind rejected
+07 two ACCEPTED_CURRENT facts for same event/kind rejected
+08 multiple CONFLICT_CANDIDATE values allowed
+09 DATE with resolved_at rejected
+10 INSTANT with resolved_date rejected
+11 UNRESOLVED preserves expression with no fabricated resolved value
+12 ACCEPTED_CURRENT with superseded_at rejected
+13 cross-Responsibility leg temporal target rejected
+14 cross-Responsibility event temporal target rejected
 ```
 
+## Obligation/events
+
+```text
+15 multiple USER/PARTICIPANT legs allowed
+16 cross-Responsibility activation_event rejected
+17 participant belonging to another Lunowa user rejected
+18 ExpectedEvent CLOSED requires closed_at
+19 CANCELLED/INVALIDATED event closure does not require fake satisfied_at
+```
+
+## Field decisions
+
+```text
+20 two ACTIVE decisions for same field rejected
+21 superseded decision requires superseded_at
+```
+
+## AdmissionReview
+
+```text
+22 two OPEN reviews for same account/source/candidate rejected
+23 same source/candidate/evidence revision cannot be recreated after resolution
+24 new evidence revision can form a new review episode when no OPEN episode conflicts
+25 TRACK resolution requires admitted Responsibility
+26 TRACK link to another account rejected
+27 deleting TRACKed admitted Responsibility is rejected while Review history remains
+28 DO_NOT_TRACK requires no Responsibility
+29 resolution retry returns stored terminal result and creates no duplicate Responsibility
+```
+
+## Idempotency/history
+
+```text
+30 duplicate global (application_key,effect_key) rejected
+31 concurrent duplicate CREATE with different generated Responsibility UUIDs -> exactly one commit
+32 two mutating events cannot claim same resulting aggregate version
+33 NO_OP may retain current aggregate version under a different application/effect identity
+34 stale aggregate/evidence command cannot overwrite accepted state
+35 one source event can atomically produce distinct effects on multiple Responsibilities
+```
+
+## Provenance/account
+
+```text
+36 Message from another connected account rejected as provenance
+37 DomainEvent from another Responsibility rejected as provenance
+38 provenance retains support-role/locator without requiring copied full body
+```
+
+## Hard delete/privacy
+
+```text
+39 aggregate parent hard-delete removes aggregate-local state/history/provenance only
+40 parent delete succeeds with same-parent/cross-child FK graph
+41 Message deletion is blocked while provenance exists
+42 explicit privacy deletion order succeeds
+```
+
+## Semantic details
+
+```text
+43 invalid semantic_details version/object rejected by trusted runtime before DB write
+44 duplicate local semantic-detail IDs rejected by validator
+45 unresolved ANY_OF assignment produces no fabricated required legs
+46 proposal does not become agreed fact without reducer effect/evidence
+```
+
+## Auth ID gate
+
+```text
+47 actual Better Auth user PK is PostgreSQL uuid
+48 Better Auth sign-up/session/account-linking roundtrip works against the exact UUID schema
+49 Better Auth schema generation/migration does not silently revert user IDs to text
+```
+
+No migration is authorized until this suite or an explicitly equivalent set passes.
+
 ---
 
-# 20. L2 acceptance tests for the schema itself
+# 19. Oracle-to-DDL map
 
-Before migration implementation, instantiate the DDL in a temporary PostgreSQL 18 database and prove at least:
-
-1. invalid `RESOLVED` row without reason/timestamp is rejected;
-2. `DEFERRED + HISTORICAL_INACTIVE` is rejected;
-3. two current accepted source dues for the same parent/leg/event target are rejected;
-4. two conflict candidates are allowed;
-5. two active FieldDecisions for one field are rejected;
-6. two open AdmissionReviews for the same account/source/candidate are rejected;
-7. a resolved old AdmissionReview does not prevent a genuinely new open review row;
-8. duplicate `(responsibility, application_key, effect_key)` DomainEvent is rejected;
-9. two mutating DomainEvents cannot claim the same resulting aggregate version;
-10. multiple NO_OP events can retain the same aggregate version when application keys differ;
-11. one Conversation can hold multiple Responsibilities;
-12. one Responsibility can hold multiple USER/PARTICIPANT legs;
-13. a DATE TemporalFact cannot contain `resolved_at`;
-14. an INSTANT TemporalFact cannot contain `resolved_date`;
-15. an unresolved TemporalFact can preserve source expression without invented resolved value;
-16. an AdmissionReview TRACK resolution requires an admitted Responsibility link;
-17. DO_NOT_TRACK does not require any Responsibility row;
-18. deleting a Responsibility cascades only aggregate-local children/history/provenance, not Message/provider evidence;
-19. account/conversation mismatch fails through ownership FKs;
-20. application transaction test proves duplicate retry is idempotent and stale aggregate/evidence versions cannot silently overwrite accepted state.
-
----
-
-# 21. Oracle-to-DDL mapping summary
-
-| DDL boundary | Main validating cases |
+| DDL boundary | Primary semantic pressure |
 | --- | --- |
 | parent orthogonal columns | T0-014/015/038, T07/T08/T20 |
 | obligation legs | T0-003/004/012/020/029/031/036, T16/T18 |
 | expected events | T0-002/003/005..008/017/034, T02/T04/T09/T18 |
 | temporal facts | T0-001..008/018/026..028, T19 |
 | semantic details | T0-009..011/014/033/040, T05/T06/T07/T17 |
-| field decisions | correction principle, T0-026 negative boundary, T0-027/028, T15 |
-| admission review | T0-041..044/042 |
+| field decisions | T0-026 negative boundary, T0-027/028, T15 |
+| AdmissionReview | T0-041..044/T0-042 |
 | provenance | T0-022/025/027/028/034/037, M39/R27 |
-| domain events/idempotency | T10..T15, V16 |
-| account ownership FKs | T0-039 / H06/H13 |
+| global domain-event idempotency | V16, T10..T15, duplicate CREATE pressure |
+| account ownership/provenance FKs | T0-039, H06/H13 |
 
 ---
 
-# 22. Candidate verdict before independent audit
+# 20. Remaining open L2 choices that do not block executable validation
 
-This proposal is intentionally concrete enough to be falsified.
+The following are still intentionally implementation-level registries/policies, not missing tables:
 
-It should be rejected if the independent L2 audit finds that it:
+```text
+action_code vocabulary
+event_code vocabulary
+basis_kind / expectation_strength vocabulary
+closure_reason registries for legs/events
+FieldDecision field/value registry
+support_role/evidence_kind registries
+exact semantic_details validator library
+canonical machine-key hashing/encoding implementation
+query helper/repository function names
+```
 
-- cannot express an accepted oracle without application-only hidden state;
-- introduces a DB constraint that rejects a valid conflict/history case;
-- leaves a high-harm uniqueness/ownership invariant cheaply enforceable but unenforced;
-- creates an accidental generic EAV/workflow system;
-- requires unacceptable write/query complexity for the core UX;
-- depends on unstable ORM behavior rather than reviewable PostgreSQL semantics.
+They must be bounded in trusted code and tested, but freezing their complete vocabulary before real data would be false precision.
 
-No migrations are authorized by this document alone.
+---
+
+# 21. Current verdict
+
+```text
+L0 semantics                         FROZEN v0.1
+L1 logical persistence boundary      FROZEN v0.1
+L2 corrected exact DDL candidate     STATIC-AUDIT CORRECTED
+L2 executable PostgreSQL proof       PENDING
+L2 final freeze                      NOT YET
+L3 migrations/runtime                NOT AUTHORIZED
+```
+
+The next task is no longer speculative schema design. It is to express this v0.2 contract as temporary Drizzle/PostgreSQL schema/tests, run the 49-item acceptance matrix, inspect generated SQL, and only then decide whether L2 earns a freeze.

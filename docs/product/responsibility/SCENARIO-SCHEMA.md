@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This document defines how to build the canonical scenario matrix used to validate the responsibility semantics in `ANNOTATION-GUIDELINES.md`.
+This document defines the annotation/evaluation contract for one canonical Responsibility scenario.
 
-The matrix is not merely a prompt/eval dataset. It is the shared oracle connecting:
+It connects:
 
 ```text
 product semantics
@@ -16,32 +16,37 @@ product semantics
 → regression tests
 ```
 
-A scenario should be understandable without knowing model internals.
+This is **not** a database schema, API DTO, prompt schema, or physical enum contract.
 
-The schema is an **annotation/evaluation contract**, not a product database schema. Physical serialization, enum names, table design, and runtime DTOs remain open.
+The current vocabulary is constrained by:
 
----
-
-## 1. Scenario principles
-
-Each scenario SHOULD isolate one or a small number of meaningful semantic boundaries while preserving realistic email context.
-
-The corpus MUST contain both:
-
-- clean canonical examples;
-- adversarial/boundary variants.
-
-Later phases SHOULD add organic/historical failures rather than relying only on synthetic examples.
-
-Do not create scenarios only to prove the current design correct. Prefer examples capable of falsifying it.
-
-A scenario may include prior evidence, but MUST identify which event is currently being interpreted/reduced so chronology and matching are explicit.
+- `ANNOTATION-GUIDELINES.md`;
+- `DECISIONS.md`;
+- `CONSISTENCY-AUDIT.md`;
+- `TRANSITION-SCHEMA.md` for multi-event traces.
 
 ---
 
-## 2. Required scenario shape
+# 1. Scenario principles
 
-Conceptual schema:
+Each base scenario SHOULD isolate one primary semantic boundary and only a small number of deliberate secondary interactions.
+
+The corpus MUST include:
+
+- clean canonical cases;
+- adversarial/boundary cases;
+- controlled metamorphic variants;
+- eventually organic/historical/production failures.
+
+Do not construct scenarios merely to prove the current design correct. Prefer cases capable of falsifying a FIXED principle or killing a known semantic mutant.
+
+A multi-message scenario MUST identify the focal evidence event being interpreted/reduced.
+
+---
+
+# 2. Canonical scenario shape
+
+Conceptual YAML:
 
 ```yaml
 case_id: string
@@ -85,7 +90,6 @@ messages:
     attachments: []
 
 expected_zoning: []
-
 expected_communication_acts: []
 expected_claims: []
 expected_observations: []
@@ -94,21 +98,44 @@ expected_admission:
   decision: TRACK | DO_NOT_TRACK | NEEDS_REVIEW
   reason_codes: []
 
+# Convenience shorthand ONLY when the focal event has exactly one
+# Responsibility effect.
 expected_matching:
   operation: CREATE | UPDATE | RESOLVE | REOPEN | SUPERSEDE | INVALIDATE | NO_OP
   matched_responsibility_id: null
 
+# Canonical form when the focal event affects one or more Responsibilities.
+expected_effects:
+  - responsibility_ref:
+    operation: CREATE | UPDATE | RESOLVE | REOPEN | SUPERSEDE | INVALIDATE | NO_OP
+    resolution_reason: null
+    reason:
+    field_changes: []
+
 expected_responsibility:
   operational_outcome:
-  tracking_status:
+
+  resolution_status: OPEN | RESOLVED
   resolution_reason: null
-  active_obligations: []
+
+  # Conceptual activation of this evidence-relative loop as live work.
+  # Exact production enum names remain open.
+  live_tracking_state:
+
+  # Attention is orthogonal to resolution and ownership.
+  attention_mode:
+
+  obligation_legs: []
   expected_events: []
+  completion_criteria: []
+
   pending_proposals: []
   agreed_facts: []
   constraints: []
   temporal_facts: []
+
   uncertainties: []
+  responsibility_risk: null
   provenance: []
 
 expected_safety:
@@ -133,17 +160,51 @@ variants:
 notes:
 ```
 
-The physical serialization format is not frozen; YAML is illustrative.
+Physical serialization is not frozen.
 
 ---
 
-## 3. Why the schema contains focal and coverage metadata
+# 3. Compatibility aliases for already-written v0.1 oracles
 
-Detailed Tier 0 expansion demonstrated two concrete needs.
+Some detailed Tier-0 oracles predate the consistency audit.
 
-### 3.1 Focal message/event
+Until they are normalized into executable fixtures:
 
-A scenario may need prior messages to establish an existing Responsibility, correction target, conflict, or chronology. `focal_message_id` prevents a multi-message context from becoming an ambiguous “classify this whole thread” task.
+```text
+tracking_status: OPEN | RESOLVED
+```
+
+is a legacy alias for:
+
+```text
+resolution_status
+```
+
+only.
+
+It MUST NOT be interpreted as live-tracking activation or attention state.
+
+Likewise:
+
+```text
+active_obligations[]
+```
+
+is a legacy shorthand for the currently relevant unresolved/actionable subset of:
+
+```text
+obligation_legs[]
+```
+
+New oracles SHOULD use the reconciled canonical vocabulary above.
+
+Errata recorded in `CONSISTENCY-AUDIT.md` apply during executable serialization.
+
+---
+
+# 4. Focal event and coverage metadata
+
+`focal_message_id` prevents a multi-message scenario from becoming an ambiguous “classify the thread” task.
 
 Example:
 
@@ -154,49 +215,56 @@ m2: explicit correction to Monday
 focal_message_id = m2
 ```
 
-The oracle can then say that m2 performs `UPDATE` on the Responsibility created from m1.
+Coverage IDs from `COVERAGE-PLAN.md` belong beside the oracle so coverage can be mechanically audited later.
 
-### 3.2 Coverage mapping
-
-Coverage IDs from `COVERAGE-PLAN.md` belong next to the scenario oracle so the corpus can later be audited mechanically.
-
-`mapped` means the scenario/test is designed to cover the obligation; it does not mean an implementation has passed it.
+`mapped` means a test/oracle is designed. It does not mean implementation has passed it.
 
 ---
 
-## 4. Context envelope
+# 5. Context envelope
 
 Annotation MUST declare which context is available. Do not silently use unavailable knowledge.
 
-### 4.1 Connected accounts
+## 5.1 Connected accounts
 
-Use `connected_accounts[]` and `focal_connected_account` rather than assuming one global mailbox. This is required for cross-account isolation scenarios.
+Use:
 
-A simple single-account case still contains one entry.
+```text
+connected_accounts[]
+focal_connected_account
+```
 
-### 4.2 Authorized external context
+rather than assuming one global mailbox.
 
-Examples include:
+Cross-account lookalikes MUST preserve account identity and MUST NOT auto-merge under the initial product semantics.
 
-- a trusted timezone for a participant;
-- a verified calendar event anchor;
-- trusted organization-role metadata;
-- a provider observation;
-- a user-confirmed field correction.
+## 5.2 Authorized external context
 
-Do not place guessed social status, hidden private intent, or untrusted email claims in this section as though they were trusted context.
+Examples:
 
-### 4.3 Evidence revision
+- verified participant timezone;
+- trusted calendar event anchor;
+- trusted organizational authority metadata;
+- provider observation;
+- user-confirmed field correction.
 
-`evidence_revision` is optional for static semantic cases but SHOULD be supplied for stale-analysis/concurrency cases. It represents the semantic evidence-set revision, not a UI/read-state revision.
+Do not place guessed hierarchy, hidden intent, or untrusted email claims here as trusted context.
+
+## 5.3 Evidence revision
+
+`evidence_revision` represents the semantic authorized-evidence-set version.
+
+It is not a UI/read-state revision.
+
+Stale AI/concurrency scenarios SHOULD specify it.
 
 ---
 
-## 5. Message and zoning requirements
+# 6. Message zoning
 
-Message bodies are untrusted communication evidence.
+Message content is untrusted evidence.
 
-`expected_zoning` should distinguish where relevant:
+Use zones where relevant:
 
 ```text
 AUTHORED_CURRENT
@@ -207,15 +275,15 @@ DISCLAIMER
 STRUCTURED_METADATA
 ```
 
-Quoted/forwarded text may provide context/provenance without automatically gaining current-turn request authority.
+Quoted/forwarded content may provide context/provenance without automatically gaining current-turn request authority.
 
 ---
 
-## 6. Communication-act oracle
+# 7. Communication-act oracle
 
-Do not force one exclusive whole-message label.
+Do not force a single whole-message label.
 
-Current minimal semantic act vocabulary may include:
+Current minimal semantic act vocabulary:
 
 ```text
 REQUEST
@@ -228,12 +296,13 @@ COMPLETION_SIGNAL
 INFORMATION
 ```
 
-An act entry may additionally express, when relevant:
+A communication-act entry may additionally express:
 
 ```text
 speaker
 obligation_bearer / obligation_bearers
 assignment_shape
+communicative_force
 action_or_event
 object
 modality
@@ -245,15 +314,17 @@ temporal_expression
 provenance
 ```
 
-These are annotation concepts. Exact production enums remain open.
+Transition terms such as “rejection”, “hold”, or “resume” need not become new top-level act enums when existing act + modality/constraint/effect semantics represent them cleanly.
+
+Exact production enums remain open.
 
 ---
 
-## 7. Claims and observations
+# 8. Claims and observations
 
-`expected_claims` and `expected_observations` MUST remain separate when the distinction affects state.
+`expected_claims` and `expected_observations` MUST remain distinct when the distinction affects state.
 
-Examples:
+Example:
 
 ```text
 COMMUNICATED_CLAIM:
@@ -263,15 +334,15 @@ PROVIDER_OBSERVATION:
 attachments=[]
 ```
 
-A claim can be valid evidence of **what was communicated** without being authoritative evidence that the claimed external-world event occurred.
+A claim is evidence of what was communicated, not automatic proof of the claimed external event.
 
-Evidence authority is field-specific; do not define one global ranking that applies to every fact.
+Evidence authority is field-specific.
 
 ---
 
-## 8. Admission oracle
+# 9. Admission oracle
 
-Admission is distinct from communication-act extraction.
+Admission is distinct from extraction:
 
 ```text
 TRACK
@@ -279,17 +350,19 @@ DO_NOT_TRACK
 NEEDS_REVIEW
 ```
 
-`TRACK` means a material responsibility loop should be represented. It does not mean the sender's requested action is legitimate, authorized, or safe to execute.
+`TRACK` means a material Responsibility loop should be represented.
 
-`NEEDS_REVIEW` should be used when the **admission decision itself** is not safely determined. A tracked Responsibility may instead contain field-scoped uncertainty and project `REVIEW` when its existence is clear but a decision-critical field is conflicted.
+It does **not** mean the requested action is legitimate, authorized, or safe to execute.
 
-This distinction prevents deadline ambiguity from incorrectly erasing a clear user obligation.
+`NEEDS_REVIEW` is reserved for uncertainty about the admission decision itself.
+
+A definitely tracked Responsibility may instead contain field-scoped uncertainty and project `REVIEW`.
 
 ---
 
-## 9. Matching oracle
+# 10. Matching/effect oracle
 
-Matching uses:
+Canonical operations:
 
 ```text
 CREATE
@@ -301,24 +374,92 @@ INVALIDATE
 NO_OP
 ```
 
-The oracle must distinguish:
+## 10.1 Composite effects
 
-- explicit correction from unrelated/later conflict;
-- REOPEN from genuinely new episode;
-- candidate similarity from merge authority;
-- same-account from prohibited initial cross-account merge.
+When one focal event changes more than one Responsibility, use `expected_effects[]`.
 
-For multi-event transition traces, each focal event SHOULD have its own matching/reduction step rather than one vague final matching label.
+Example:
+
+```text
+R1 -> SUPERSEDE
+R2 -> CREATE
+```
+
+Do not mutate R1's operational outcome into R2's replacement outcome.
+
+## 10.2 SUPERSEDE semantics
+
+`SUPERSEDE` is terminal on the old Responsibility and conceptually yields:
+
+```text
+resolution_status = RESOLVED
+resolution_reason = SUPERSEDED
+```
+
+Replacement creation, if any, is a separate `CREATE` effect.
+
+Narrative shorthand such as `RESOLVE/SUPERSEDE` is not the canonical operation model.
+
+## 10.3 REOPEN vs new episode
+
+```text
+same operational outcome was never actually satisfied -> REOPEN
+prior episode genuinely closed + later new operational work -> CREATE
+```
+
+Similarity alone is not merge authority.
 
 ---
 
-## 10. Responsibility semantic shape
+# 11. Canonical Responsibility semantic vector
 
-The Responsibility oracle is state-vector-like and evidence-relative.
+The Responsibility oracle is evidence-relative and state-vector-like.
 
-### 10.1 Active obligations
+## 11.1 Resolution status
 
-An obligation entry may carry semantic attributes such as:
+Conceptually:
+
+```text
+OPEN
+RESOLVED
+```
+
+Resolution reason is separate, for example:
+
+```text
+SATISFIED
+DECLINED
+CANCELLED
+SUPERSEDED
+USER_CLOSED
+INVALIDATED
+DUPLICATE
+```
+
+Exact enums remain open.
+
+## 11.2 Live-tracking activation
+
+Historical semantic openness is distinct from live work activation.
+
+A historical item may be evidence-relative OPEN while remaining an inactive historical candidate that does not enter `MY_TURN`.
+
+Exact representation remains open.
+
+## 11.3 Attention
+
+Attention/defer is orthogonal:
+
+```text
+present attention
+intentional defer/snooze
+```
+
+A communication hold does not itself imply attention defer.
+
+## 11.4 Obligation legs
+
+Canonical obligation-leg semantics may include:
 
 ```yaml
 - id:
@@ -326,21 +467,51 @@ An obligation entry may carry semantic attributes such as:
   action:
   object:
   status:
+  actionability:
   basis:
+  authority_status:
   condition:
   temporal_fact_ref:
   provenance:
 ```
 
-This allows one Responsibility to represent parallel obligation legs without pretending a scalar `next_owner` is complete truth.
+This supports:
 
-### 10.2 Expected events
+- parallel signers;
+- contingent future work;
+- safety-blocked requested actions;
+- satisfied vs still-open legs.
 
-Expected-event entries should identify who/event the user is waiting on and any temporal linkage.
+`active user obligations` are derived from these dimensions.
 
-### 10.3 Temporal facts
+## 11.5 Expected events
 
-Temporal facts SHOULD distinguish at least:
+Expected events identify who/what the product is waiting for and any condition/temporal linkage.
+
+## 11.6 Completion criteria
+
+`completion_criteria[]` represents multiple conditions that jointly close one operational outcome without forcing artificial Responsibility splitting.
+
+Example:
+
+```text
+one Responsibility: provide identity document
+criteria: FRONT + BACK
+```
+
+## 11.7 Risk
+
+Top-level scenario `risk_class` is test-priority/harm classification.
+
+`responsibility_risk` is the product/domain risk associated with being wrong about this Responsibility/action.
+
+They are not automatically the same field.
+
+---
+
+# 12. Temporal facts
+
+Distinguish at least:
 
 ```text
 SOURCE_DUE
@@ -350,7 +521,9 @@ RESURFACE_TIME
 FOLLOW_UP_TIME
 ```
 
-Other candidate kinds may be used in an ambiguous oracle, but MUST NOT silently become authoritative source due dates.
+`SOURCE_DUE` means an explicitly communicated due/required time for an obligation. It is not limited by message direction and does not become a different temporal kind merely because source legitimacy is uncertain.
+
+Safety/authority metadata belongs separately.
 
 Each material temporal fact should preserve:
 
@@ -359,137 +532,149 @@ original expression
 semantic kind
 resolved value if justified
 precision
-reference frame / anchor when relevant
+reference frame / anchor
+applies_to when relevant
 provenance
 ```
 
-### 10.4 Field-scoped conflict
+Never silently upgrade source precision.
 
-When a material field has contradictory evidence, preserve the candidates and annotate uncertainty at that field. Do not delete one source merely to force a single value.
+External anchor resolution remains derived.
 
 ---
 
-## 11. Safety/actionability oracle
+# 13. Field-scoped uncertainty
 
-The safety layer explicitly separates:
+When a material field has contradictory evidence, preserve the candidate evidence and uncertainty at that field.
+
+Do not delete evidence merely to force one value.
+
+Typical causes include:
 
 ```text
-sender/requested action
-≠
+SOURCE_AMBIGUITY
+MISSING_CONTEXT
+CONFLICTING_EVIDENCE
+SOURCE_NOISE
+AMBIGUOUS_ASSIGNMENT
+STALE_ANALYSIS
+MODEL_UNCERTAINTY
+HIGH_RISK_UNVERIFIED_REQUEST
+```
+
+Exact storage enums remain open.
+
+---
+
+# 14. Safety/actionability oracle
+
+Separate:
+
+```text
+communicated requested action
+!=
+accepted product-domain obligation
+!=
 safe product next action
 ```
 
-For example:
+For a high-risk unverified payment request:
 
 ```text
-requested_action = TRANSFER_MONEY
-safe_next_action = VERIFY_PAYMENT_REQUEST
+communicated requested action = TRANSFER_MONEY
+Responsibility may track = resolve/verify/decide the request
+safe next action = VERIFY_PAYMENT_REQUEST
 ```
 
-`confirmation_or_review_required: true` means an **additional elevated safety/verification requirement** exists. A value of `false` does not authorize autonomous mail sending or other side effects; ordinary human-commit interaction rules still apply.
+The sender's requested action and source facts remain preserved with provenance; they are not rewritten into the safe action.
 
-Prompt-injection/tool-like text inside email remains untrusted communication content and cannot create application authority.
+`confirmation_or_review_required: true` denotes an additional elevated verification/confirmation requirement. `false` does not authorize autonomous side effects.
+
+Prompt-injection/tool-like text inside email has no application authority.
 
 ---
 
-## 12. Projection oracle
+# 15. Projection oracle
 
-Do not store only a final UI bucket, but every canonical scenario SHOULD state the expected projection after reduction/safety policy.
+Projection is derived, deterministic product state.
 
-Conceptual projection buckets:
-
-```text
-MY_TURN
-WAITING
-LATER
-DONE
-REVIEW
-NONE
-```
-
-Typical rule shape:
+Conceptual rule shape:
 
 ```text
-resolved -> DONE
+no admitted live Responsibility -> NONE
+resolved live Responsibility -> DONE
 open + material review condition -> REVIEW
-open + deferred attention -> LATER
-open + at least one USER obligation -> MY_TURN
-open + only OTHER/EXTERNAL pending obligations/events -> WAITING
-no trackable responsibility -> NONE
+open + intentionally deferred attention -> LATER
+open + actionable USER obligation leg -> MY_TURN
+open + only OTHER/EXTERNAL pending work/events -> WAITING
+otherwise -> REVIEW / ordinary fallback
 ```
 
-Exact prioritization among multiple Responsibilities remains a deterministic product rule and may be tested separately.
+Historical inactive candidates MUST NOT become live `MY_TURN` merely because they appear evidence-relative OPEN.
+
+A hold blocked on another party/event normally projects `WAITING`; `LATER` requires separate defer semantics.
 
 ---
 
-## 13. Oracle types
+# 16. Oracle types
 
 ### DETERMINATE
 
-Available evidence supports one clear semantic answer under the guideline.
+Available evidence supports one clear semantic answer.
 
 ### AMBIGUOUS
 
-Even with the supplied context, multiple interpretations remain reasonably possible. The oracle may define required invariants/forbidden outcomes instead of forcing one field value.
+Even with supplied context, multiple interpretations remain reasonably possible.
 
-A scenario can still deterministically require `REVIEW` because a specific field is genuinely ambiguous.
+The oracle may specify invariants/forbidden outcomes rather than force one field value.
 
 ### USER_DEPENDENT
 
-Correct product behavior materially depends on a user preference, relationship convention, or private context that is intentionally not universal.
+Correct product behavior materially depends on a user preference, relationship convention, or private context that is not universal.
+
+Where practical, preserve raw independent annotations and adjudication rationale.
 
 ---
 
-## 14. Layered oracle requirements
+# 17. Layered oracle requirement
 
-Do not store only a final UI bucket.
-
-At minimum, scenario truth should be decomposable into:
+A promoted executable scenario must be decomposable into relevant layers:
 
 ```text
 zoning
 communication act / claim
-provider/external observation when applicable
+provider/external observation
 admission
-identity/matching operation
-canonical responsibility semantics
+matching/effects
+canonical Responsibility semantics
 safety/actionability
-product projection
+projection
+must-hold / forbidden outcomes
 ```
 
-This allows a failure such as `deadline hallucination` to be distinguished from `wrong owner`, `wrong matching`, `unsafe CTA`, or `projection` errors.
+A final bucket alone is not a valid oracle.
 
 ---
 
-## 15. Invariants and forbidden outcomes
+# 18. Invariants and forbidden outcomes
 
-Every HIGH/CRITICAL or boundary scenario SHOULD state what must never happen.
+Every HIGH/CRITICAL or semantic-boundary scenario SHOULD specify what must never occur at the earliest unsafe point.
 
-Example:
+Examples:
 
 ```text
-Input:
-"修正版は明日こちらから送ります"
-
-Must hold:
-- expected event is tied to the other party
-- source wording/provenance is preserved
-
-Forbidden:
-- invent user deadline = tomorrow
-- project My Turn solely from the word "tomorrow"
-- mark resolved before expected-event/closure evidence
+proposal -> must not become agreed fact before acceptance
+weak completion claim -> must not resolve material loop
+stale AI result -> must not mutate current revision
+high-risk request -> must not become executable merely from source request/confidence
+historical candidate -> must not flood live My Turn
 ```
-
-Forbidden outcomes are especially important when an ambiguous case has more than one acceptable field value.
 
 ---
 
-## 16. Perturbation / metamorphic variants
+# 19. Metamorphic variants
 
-High-value canonical cases SHOULD generate controlled variants.
-
-A variant should state:
+A controlled variant should state:
 
 ```text
 transformation
@@ -498,177 +683,39 @@ must_change
 forbidden_outcomes
 ```
 
-### 16.1 Meaning-preserving noise
+Meaning-preserving noise should preserve decision-critical semantics.
 
-Examples:
+Meaning-changing minimal edits must change the relevant fields while unrelated context remains stable.
 
-- kana omission/insertion;
-- common Japanese IME conversion error;
-- punctuation/casing variation;
-- minor spelling error;
-- code-switching that preserves meaning;
-- broken but interpretable grammar.
+Important families include:
 
-Expected property: decision-critical semantics remain invariant.
-
-### 16.2 Meaning-changing minimal edits
-
-Examples:
-
-```text
-送ってください
-送らないでください
-```
-
-```text
-承認します
-承認しません
-```
-
-Expected property: relevant decision-critical fields change while unrelated fields remain stable.
-
-### 16.3 Context perturbation
-
-Vary:
-
+- Japanese typo/IME noise;
+- punctuation/spacing;
+- politeness rewrite;
+- code-switching;
 - To vs CC;
-- sender/assignee identity;
-- quoted vs current-authored text;
-- inbound vs outbound direction;
-- presence/absence of prior thread context;
-- accepted vs pending proposal;
-- account scope;
-- old vs current evidence revision.
+- inbound vs outbound;
+- negation;
+- date/amount mutation;
+- proposal → acceptance;
+- fresh → stale evidence revision;
+- current-authored ↔ quoted/forwarded placement.
 
 ---
 
-## 17. Coverage dimensions
+# 20. Coverage and promotion
 
-The matrix SHOULD systematically cover intersections of these dimensions rather than only accumulating random cases:
+Corpus-level obligations live in `COVERAGE-PLAN.md`.
 
-```text
-direction
-communication act
-modality / obligation strength
-admission
-assignment shape
-identity operation
-temporal semantics
-proposal/agreement state
-constraint/condition
-resolution reason
-message zoning
-attachment evidence
-source noise
-uncertainty cause
-risk class
-account scope
-AI freshness
-ingestion chronology
-historical vs live processing
-```
+A case is promoted when it protects at least one material invariant, contrast, interaction, transition, mutant, high-harm failure, metamorphic relation, or organic regression.
 
-Not every Cartesian-product combination is valuable. Prioritize intersections where an error changes product behavior or causes meaningful harm. Corpus-level obligations live in `COVERAGE-PLAN.md`.
+Before executable promotion:
 
----
+- apply `CONSISTENCY-AUDIT.md` errata/aliases;
+- serialize both sides of mandatory contrasts;
+- provide explicit must-hold/forbidden outcomes for HIGH/CRITICAL cases;
+- do not expose annotators to current model predictions before oracle creation;
+- retain genuine ambiguity rather than forcing false certainty;
+- verify coverage IDs mechanically or with an equivalent linter.
 
-## 18. Initial high-priority scenario families
-
-The first matrix pass SHOULD include at least:
-
-1. direct inbound/outbound Request/Commitment four-quadrant cases;
-2. `DO_NOT_TRACK` courtesy/FYI/receipt/newsletter cases;
-3. indirect Japanese business requests and optionality;
-4. plan/intention/tentative vs firm commitment;
-5. proposal/counterproposal/acceptance/rejection;
-6. deadline correction vs conflicting evidence;
-7. source due vs expected-event time vs user target;
-8. relative time, timezone, EOD, event-relative anchors;
-9. multiple requests in one message;
-10. sequential steps vs independent outcomes;
-11. partial completion criteria;
-12. reopen vs new episode;
-13. parallel signers / group ambiguity;
-14. delegation intent vs effective delegation;
-15. hold/pause vs cancellation;
-16. quoted/forwarded/reported requests;
-17. claim-vs-provider-observation conflicts;
-18. attachment-only and contradictory attachment cases;
-19. typo/IME/noise invariance and sensitivity;
-20. sarcasm/rhetorical/non-literal decision-critical ambiguity;
-21. high-risk payment/contract/login requests;
-22. prompt-injection text in email;
-23. stale AI runs;
-24. out-of-order provider ingestion;
-25. historical initial sync/open-loop ambiguity;
-26. cross-account lookalikes that must not merge;
-27. user field correction/target vs source fact;
-28. strong/weak completion signals;
-29. user decline vs user tracking close;
-30. genuine human disagreement/oracle ambiguity.
-
----
-
-## 19. Evaluation views
-
-The same scenario corpus should support separate scorecards for:
-
-```text
-zoning accuracy
-act/claim extraction
-responsibility admission
-identity operation
-owner/obligation accuracy
-temporal-fact correctness
-resolution safety
-provenance coverage
-safety/actionability behavior
-UX projection
-run stability
-typo invariance
-semantic sensitivity
-```
-
-Raw overall accuracy is insufficient.
-
-Error cost is asymmetric. Maintain at least:
-
-```text
-fake completion >> visible uncertainty
-missed material user obligation > unnecessary review
-false merge > modest false split
-invented material date/amount = critical class
-wrong account/identity/authorization = critical class
-```
-
----
-
-## 20. Human annotation process
-
-For important boundary cases, prefer independent annotation before adjudication.
-
-Where practical preserve:
-
-```text
-raw_annotations
-adjudicated_oracle
-oracle_type
-adjudication_reason
-```
-
-Annotators should not see the model's current prediction before recording the human oracle; otherwise anchoring can contaminate the evaluation set.
-
----
-
-## 21. Promotion rule
-
-A synthetic/boundary scenario becomes part of the long-lived regression suite when at least one is true:
-
-- it protects a FIXED invariant;
-- it previously caused a material failure;
-- it distinguishes two semantics that are easy to collapse;
-- it covers a high-risk or high-frequency real-world pattern;
-- it kills a mandatory semantic mutant;
-- it exposes nondeterminism or typo/noise instability that can change product behavior.
-
-Low-value redundant cases should not accumulate merely to increase dataset size.
+Raw overall accuracy is insufficient; correctness, safety, stability, provenance, and semantic robustness must remain separable evaluation views.

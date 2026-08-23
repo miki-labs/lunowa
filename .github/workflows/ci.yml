@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -65,3 +63,4 @@ jobs:
 
       - name: Run browser smoke
         run: pnpm test:e2e
+

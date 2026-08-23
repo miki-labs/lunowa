@@ -6,7 +6,7 @@ This directory contains Lunowa-specific durable product-engineering knowledge.
 
 It complements the reusable engineering baseline in `docs/*.md` and the visual/interaction design sources in `docs/design/`.
 
-Do not treat raw chat history as the product source of truth when the relevant repository artifact exists.
+Do not treat raw chat history as product source of truth when a current repository artifact exists.
 
 ---
 
@@ -20,25 +20,28 @@ Current product-specific architecture:
 - module ownership;
 - provider boundaries;
 - sync/async architecture;
-- responsibility/domain authority;
+- Responsibility/domain authority;
 - AI boundary;
 - Temporal Contract reliability;
 - send/search/security/failure architecture;
 - architectural invariants.
 
+The Responsibility-related architecture is reconciled to v0.1 semantics.
+
 ### `DATA-MODEL.md`
 
-Conceptual durable data model for broader product entities and ownership:
+Conceptual durable model:
 
 - User / Scope / ConnectedAccount;
 - Conversation / Message / Attachment;
-- provenance;
+- Responsibility and the semantic concepts required by current scenarios;
+- provenance / user field corrections;
 - TemporalContract / TemporalTrigger;
 - Draft / SendOperation;
 - derived search/audit projections;
-- concurrency and persistence invariants.
+- concurrency/versioning invariants.
 
-**Responsibility-specific ActionItem lifecycle/scalar-owner/deadline details in this older document are not current semantic authority.** See `responsibility/` and the stop condition below before implementing them.
+Physical Responsibility tables/enums remain deliberately open.
 
 ### `CONTRACTS.md`
 
@@ -46,55 +49,61 @@ Logical contracts between modules:
 
 - provider adapter;
 - sync/ingestion;
-- AI interpretation;
-- domain reduction;
-- conversation aggregate;
+- AI structured interpretation;
+- Responsibility reduction/effects;
+- conversation aggregate projection;
 - Temporal Contract scheduler;
 - attention/resurfacing;
 - drafts/send;
 - search/context/preview;
 - background jobs;
-- error semantics.
-
-**Older single-lifecycle `ActionItem` reducer/output shapes in this document predate the Responsibility v0.1 semantic model.** They must be reconciled before responsibility-domain implementation.
+- error/versioning/testing semantics.
 
 ### `responsibility/`
 
-Primary authority for canonical Responsibility semantics and their annotation/evaluation contract.
+Primary authority for canonical Responsibility semantics and annotation/evaluation behavior.
 
-Read in this order for responsibility work:
+Recommended reading order:
 
-1. `responsibility/README.md` — scope, precedence, status, and implementation stop condition;
-2. `responsibility/DECISIONS.md` — fixed/open/superseded semantic decisions;
-3. `responsibility/CONSISTENCY-AUDIT.md` — cross-document reconciliation, compatibility aliases, errata, and migration guardrails;
-4. `responsibility/ANNOTATION-GUIDELINES.md` — communication/evidence/admission/identity semantics;
+1. `responsibility/README.md` — scope/status/current implementation gate;
+2. `responsibility/DECISIONS.md` — FIXED/OPEN/SUPERSEDED decisions;
+3. `responsibility/CONSISTENCY-AUDIT.md` — reconciliation findings/errata/remaining gates;
+4. `responsibility/ANNOTATION-GUIDELINES.md` — evidence/communication/admission/identity semantics;
 5. `responsibility/SCENARIO-SCHEMA.md` — canonical focal-event oracle contract;
 6. `responsibility/TRANSITION-SCHEMA.md` — multi-event trace contract;
 7. `responsibility/COVERAGE-PLAN.md` — mandatory corpus coverage inventory;
-8. `responsibility/TIER-0-SCENARIO-MATRIX.md` — first base-oracle assignment matrix;
+8. `responsibility/TIER-0-SCENARIO-MATRIX.md` — base-oracle assignments/variants;
 9. `responsibility/TIER-0-CRITICAL-ORACLES.md` — first detailed critical oracles;
 10. `responsibility/TRANSITION-ORACLES.md` — all 20 mandatory transition traces.
 
-### Responsibility implementation stop condition
+### Responsibility source-of-truth reconciliation
 
-Until `DATA-MODEL.md`, `CONTRACTS.md`, and the relevant `design/INTERACTIONS.md` responsibility sections are explicitly reconciled against the v0.1 Responsibility semantics:
-
-> **Do not implement the legacy single lifecycle enum, scalar `next_owner`, `BOTH`, one `deadline_at`, or whole-item override model merely because they appear in older accepted/current documents.**
-
-Current canonical Responsibility semantics are evidence-relative and orthogonal across at least:
+The prior conflict between Responsibility v0.1 and older lifecycle-specific text is now reconciled across:
 
 ```text
-resolution
+docs/product/ARCHITECTURE.md
+docs/product/DATA-MODEL.md
+docs/product/CONTRACTS.md
+docs/design/INTERACTIONS.md
+```
+
+Current semantic direction is orthogonal across:
+
+```text
+resolution status/reason
 live tracking activation
 attention/defer
-obligation legs/actionability
-expected events/completion criteria
+obligation legs/actionability/conditions
+expected events
+completion criteria
+constraints
+pending proposals/agreed facts
 temporal facts
 uncertainty/risk
 provenance
 ```
 
-Physical schema remains open.
+The former single lifecycle enum, scalar `next_owner/BOTH`, one `deadline_at`, and follow-up-as-lifecycle model are not canonical truth.
 
 ### `TECH-STACK.md`
 
@@ -107,11 +116,11 @@ Accepted initial implementation stack and activation policy:
 - Better Auth for Lunowa application sessions, separated from mailbox authorization;
 - Trigger.dev for durable background execution once real sync/scheduling begins;
 - Gmail API first, Microsoft Graph second;
-- OpenAI Responses API + Structured Outputs for the initial AI interpretation runtime;
+- OpenAI Responses API + Structured Outputs for initial AI runtime;
 - PostgreSQL full-text search first;
 - Vitest / React Testing Library / Playwright verification stack.
 
-`TECH-STACK.md` also records activation phases, current externally verified constraints, deliberate deferrals, and launch-sensitive provider constraints. Re-check external provider/runtime facts when they materially affect implementation or release.
+Re-check current official provider/runtime facts whenever they materially affect implementation/release.
 
 ### `IMPLEMENTATION-PLAN.md`
 
@@ -122,7 +131,7 @@ Active staged execution plan:
 - domain/persistence;
 - Gmail read slice;
 - real send;
-- deterministic responsibility/Temporal Contract behavior;
+- deterministic Responsibility/Temporal Contract behavior;
 - AI interpretation;
 - search/context;
 - Microsoft adapter;
@@ -132,102 +141,114 @@ This is a living plan, not permanent product semantics.
 
 ### Active execution plan
 
-- `../plans/active/phase-0-bootstrap.md` — current Codex-ready bootstrap task contract. It establishes the real application scaffold and canonical verification commands without prematurely activating database/provider/AI/background infrastructure.
+- `../plans/active/phase-0-bootstrap.md` — current Codex-ready bootstrap task contract.
 
 ---
 
 ## Durable architecture decisions
 
-Material choices that should not be silently re-litigated during ordinary implementation live under `docs/decisions/`.
+Material choices that should not silently change during ordinary implementation live under `docs/decisions/`.
 
-Current high-value decisions include:
+Current high-value ADRs include:
 
-- `0001-modular-monolith-default.md`
-- `0002-ai-understands-rules-decide-state.md`
-- `0003-temporal-contracts-use-durable-scheduling.md`
-- `0004-web-runtime-and-ui-stack.md`
-- `0005-auth-and-persistence-stack.md`
-- `0006-provider-sync-and-background-runtime.md`
-- `0007-initial-ai-runtime.md`
+- `0001-modular-monolith-default.md`;
+- `0002-ai-understands-rules-decide-state.md`;
+- `0003-temporal-contracts-use-durable-scheduling.md`;
+- `0004-web-runtime-and-ui-stack.md`;
+- `0005-auth-and-persistence-stack.md`;
+- `0006-provider-sync-and-background-runtime.md`;
+- `0007-initial-ai-runtime.md`.
 
-A decision can be superseded by stronger evidence, but the reason and consequences should be recorded rather than silently changing architecture through an implementation task.
+A decision may be superseded by stronger evidence, but rationale/consequences should be recorded.
 
 ---
 
 ## Related product/UX sources
 
-- `../design/DESIGN.md`
-- `../design/INTERACTIONS.md`
-- `../design/RESPONSIVE.md`
-- `../design/references/README.md`
+- `../design/DESIGN.md`;
+- `../design/INTERACTIONS.md`;
+- `../design/RESPONSIVE.md`;
 - visual references under `../design/references/`.
 
-`INTERACTIONS.md` remains the interaction source for click/compose/search/layout behavior, but its older “internal lifecycle state” section is not current Responsibility-domain semantic authority until reconciled.
+`INTERACTIONS.md` is reconciled with Responsibility v0.1: `My Turn / Waiting / Later / Done / Review` are interaction projections, not the old canonical lifecycle enum.
 
 ---
 
 ## Reusable engineering sources
 
-Read only when relevant:
+Read when relevant:
 
-- `../core-principles.md`
-- `../implementation-workflow.md`
-- `../greenfield-bootstrap.md`
-- `../architecture-design.md`
-- `../reuse-dependencies.md`
-- `../reliability-operability.md`
-- `../security-privacy.md`
-- `../verification-review.md`
-- `../platform-development.md`
-- `../production-readiness.md`
-- `../product-operations.md`
-- `../monetization-engineering.md`
-- `../ai-product-runtime.md`
-- `../coding-agent-harness.md`
-- `../repository-knowledge.md`
-- `../references.md`
+- `../core-principles.md`;
+- `../implementation-workflow.md`;
+- `../greenfield-bootstrap.md`;
+- `../architecture-design.md`;
+- `../reuse-dependencies.md`;
+- `../reliability-operability.md`;
+- `../security-privacy.md`;
+- `../verification-review.md`;
+- `../platform-development.md`;
+- `../production-readiness.md`;
+- `../product-operations.md`;
+- `../monetization-engineering.md`;
+- `../ai-product-runtime.md`;
+- `../coding-agent-harness.md`;
+- `../repository-knowledge.md`;
+- `../references.md`.
 
 ---
 
 ## Authority by question
 
-Do not use one total precedence list for every issue.
-
 | Question | Primary authority |
 | --- | --- |
-| What are the canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/README.md`, `DECISIONS.md`, `CONSISTENCY-AUDIT.md`, and the relevant responsibility artifact |
-| What should the user experience/interaction be outside conflicting legacy Responsibility state semantics? | `docs/design/*.md` + relevant visual reference |
-| What product-specific technical boundary/invariant applies? | `docs/product/ARCHITECTURE.md` + accepted relevant ADR |
-| What data concept/ownership applies outside Responsibility semantics? | `docs/product/DATA-MODEL.md` |
-| What module/API/job semantics apply outside conflicting legacy Responsibility reducer shapes? | `docs/product/CONTRACTS.md` |
-| What technology/runtime choice is currently accepted? | `docs/product/TECH-STACK.md` + relevant ADR |
-| How should the current implementation effort be sequenced? | `docs/product/IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
+| Canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*` |
+| Product-level Responsibility architecture/module boundary? | `ARCHITECTURE.md` + relevant responsibility decisions |
+| Conceptual Responsibility persistence/ownership? | `DATA-MODEL.md` + responsibility semantic baseline |
+| Module/API/job Responsibility semantics? | `CONTRACTS.md` + responsibility semantic baseline |
+| User-facing Responsibility interaction/projection behavior? | `docs/design/INTERACTIONS.md` + `docs/design/DESIGN.md` |
+| Other product-specific technical boundary/invariant? | `ARCHITECTURE.md` + accepted relevant ADR |
+| Technology/runtime choice? | `TECH-STACK.md` + relevant ADR |
+| Current implementation sequence? | `IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
 | What is actually implemented now? | current code/schema/migrations/tests/runtime evidence |
-| What generic engineering rule applies? | relevant reusable `docs/*.md` baseline |
-| What is currently true about Gmail/Microsoft/AI/platform APIs? | current official provider documentation, checked at implementation time |
+| Generic engineering rule? | relevant reusable `docs/*.md` baseline |
+| Current Gmail/Microsoft/AI/platform fact? | current official provider documentation at implementation time |
 
-When sources materially conflict, do not silently guess. Identify the question, use the appropriate authority, and reconcile before implementation when the conflict affects durable domain behavior.
+If sources materially conflict again, do not silently guess. Treat the contradiction as a spec defect and reconcile it before durable implementation.
 
 ---
 
 ## High-value product invariants
 
-Keep these visible when planning/implementing:
+1. Normal row click opens `会話`; Responsibility/status chip opens `今の要点`.
+2. Conversation can contain multiple Responsibilities; Conversation is not one workflow-state owner.
+3. One Moment generally presents one primary current question/action.
+4. Evidence, interpretation, accepted Responsibility state, safe action, and UI projection are distinct.
+5. AI interprets; trusted product/domain logic owns accepted Responsibility state and privileged effects.
+6. Resolution, live tracking activation, and attention/defer are orthogonal.
+7. Parallel/contingent work may require multiple obligation legs; scalar `BOTH` is not canonical truth.
+8. Temporal facts remain distinct: source due, expected-event time, user target, resurface, follow-up.
+9. Temporal Contracts are durable/reconcilable promises.
+10. Provider observations and Lunowa domain facts have field-scoped authorities.
+11. Send attempt is not provider-reconciled acceptance; reconciliation closes only the appropriate operational outcome.
+12. Core reading/composing remains usable when AI is unavailable.
+13. Scope/account boundaries apply before search/retrieval/AI context exposure.
+14. Cross-account semantic similarity does not authorize Responsibility merge.
+15. Pin is independent of Responsibility semantics.
+16. App auth and connected-mailbox authorization are separate boundaries.
+17. Prompt-injection/tool-like text inside email has no application authority.
+18. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
 
-1. Normal conversation-row click opens `会話`; status/action chip opens `今の要点`.
-2. Conversation can contain multiple Responsibilities; Conversation is not the single workflow state owner.
-3. One Moment should generally present one primary current question/action.
-4. AI interprets; deterministic/trusted product logic owns accepted Responsibility/domain state.
-5. Original evidence, interpretation, canonical Responsibility state, safe action, and UI projection are distinct layers.
-6. Resolution, live tracking activation, and attention/defer are orthogonal semantics.
-7. Temporal Contracts are durable promises with persisted triggers/reconciliation.
-8. Provider mailbox facts and Lunowa-specific domain facts have distinct authorities.
-9. Core reading/composing remains usable when AI is unavailable.
-10. Scope/account boundaries apply before search/retrieval/AI context exposure.
-11. Pin is a user override orthogonal to Responsibility semantics.
-12. Lunowa application authentication and connected-mailbox authorization are separate security/domain boundaries.
-13. Durable background execution is not the authority for Responsibility state; trusted persisted domain/evidence state is authoritative.
-14. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
+---
+
+## Current implementation gate
+
+Documentation-level Responsibility reconciliation is complete.
+
+The next implementation question is **not** whether to use the old lifecycle model. It is:
+
+> what is the smallest physical representation that satisfies the validated semantic vector, scenarios, and transition invariants without building a generic workflow engine?
+
+Before schema freeze, continue remaining Tier-0 detailed-oracle expansion and normalize legacy oracle aliases/errata into executable fixtures.
 
 ---
 
@@ -235,6 +256,6 @@ Keep these visible when planning/implementing:
 
 Update durable documents only when accepted knowledge changes.
 
-Do not duplicate transient debugging notes or every implementation detail here. Prefer code/tests for local mechanics, active plans for current execution, and decision records for costly-to-reverse rationale.
+Prefer code/tests for local mechanics, active plans for current execution, and decision records for costly-to-reverse rationale.
 
-If a stronger scenario, transition, production failure, or external fact changes a prior decision, update the durable source and record why rather than preserving stale consistency.
+When stronger scenarios, production failures, or external facts change a prior decision, update the durable source and record why rather than preserving stale consistency.

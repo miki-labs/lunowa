@@ -41,7 +41,7 @@ Conceptual durable model:
 - derived search/audit projections;
 - concurrency/versioning invariants.
 
-Physical Responsibility tables/enums remain deliberately open.
+Responsibility L1 persistence boundaries are now accepted by ADR 0009 / `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`; exact PostgreSQL/Drizzle DDL remains open.
 
 ### `CONTRACTS.md`
 
@@ -61,20 +61,58 @@ Logical contracts between modules:
 
 ### `responsibility/`
 
-Primary authority for canonical Responsibility semantics and annotation/evaluation behavior.
+Primary authority for canonical Responsibility semantics, annotation/evaluation behavior, and the accepted L1 persistence boundary.
 
 Recommended reading order:
 
-1. `responsibility/README.md` — scope/status/current implementation gate;
-2. `responsibility/DECISIONS.md` — FIXED/OPEN/SUPERSEDED decisions;
-3. `responsibility/CONSISTENCY-AUDIT.md` — reconciliation findings/errata/remaining gates;
+1. `responsibility/README.md` — scope/status/freeze levels/current implementation gate;
+2. `responsibility/DECISIONS.md` — FIXED/OPEN/SUPERSEDED semantic decisions;
+3. `responsibility/CONSISTENCY-AUDIT.md` — reconciliation findings/errata;
 4. `responsibility/ANNOTATION-GUIDELINES.md` — evidence/communication/admission/identity semantics;
 5. `responsibility/SCENARIO-SCHEMA.md` — canonical focal-event oracle contract;
 6. `responsibility/TRANSITION-SCHEMA.md` — multi-event trace contract;
 7. `responsibility/COVERAGE-PLAN.md` — mandatory corpus coverage inventory;
 8. `responsibility/TIER-0-SCENARIO-MATRIX.md` — base-oracle assignments/variants;
-9. detailed Tier-0 oracle files — layered semantic contracts for promoted base cases;
-10. `responsibility/TRANSITION-ORACLES.md` — all 20 mandatory transition traces.
+9. detailed Tier-0 oracle files — 44/44 full layered base semantic contracts;
+10. `responsibility/TRANSITION-ORACLES.md` — all 20 mandatory transition traces;
+11. physical-model audit files — adversarial persistence-boundary pressure;
+12. `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — accepted L1 boundary and L2 requirements.
+
+### Responsibility freeze levels
+
+```text
+L0 semantic model                         FROZEN v0.1 baseline
+L1 logical persistence boundary           FROZEN v0.1 baseline
+L2 exact PostgreSQL/Drizzle DDL            OPEN
+L3 migrations/runtime                     NOT STARTED
+```
+
+The current L1 boundary is conceptually:
+
+```text
+# Accepted Responsibility aggregate
+Responsibility
+ObligationLeg[]
+ExpectedEvent[]
+TemporalFact[]
+FieldDecision[]
+ProvenanceReference[]
+DomainEvent[]
+SemanticDetails (typed/versioned local document)
+
+# Accepted unresolved pre-admission product state
+AdmissionReview[]
+
+# Separate evidence/inference systems
+Message / Attachment / provider observations
+AIInterpretationRun
+
+# Separate durable operational authorities
+TemporalContract / TemporalTrigger
+Draft / SendOperation
+```
+
+Exact table names, columns, enums, indexes, JSON field names, and Drizzle definitions are still L2 decisions.
 
 ### Responsibility source-of-truth reconciliation
 
@@ -100,6 +138,7 @@ docs/decisions/0005-auth-and-persistence-stack.md
 docs/decisions/0006-provider-sync-and-background-runtime.md
 docs/decisions/0007-initial-ai-runtime.md
 docs/decisions/0008-responsibility-state-is-orthogonal.md
+docs/decisions/0009-responsibility-persistence-boundary.md
 ```
 
 Current semantic direction is orthogonal across:
@@ -143,7 +182,7 @@ Active staged execution plan:
 
 - bootstrap;
 - fake-data high-fidelity UI using current Responsibility projections;
-- minimal Responsibility physical model + persistence;
+- exact L2 Responsibility DDL design/review, then persistence implementation;
 - Gmail read slice;
 - real send;
 - deterministic Responsibility/Temporal Contract behavior;
@@ -177,7 +216,8 @@ Current high-value ADRs include:
 - `0005-auth-and-persistence-stack.md`;
 - `0006-provider-sync-and-background-runtime.md`;
 - `0007-initial-ai-runtime.md` — initial bounded Structured Outputs runtime/eval boundary;
-- `0008-responsibility-state-is-orthogonal.md` — orthogonal canonical state + deterministic UI projections.
+- `0008-responsibility-state-is-orthogonal.md` — orthogonal canonical state + deterministic UI projections;
+- `0009-responsibility-persistence-boundary.md` — accepted hybrid L1 persistence boundary; exact DDL remains L2.
 
 A decision may be superseded by stronger evidence, but rationale/consequences should be recorded.
 
@@ -221,16 +261,18 @@ Read when relevant:
 
 | Question | Primary authority |
 | --- | --- |
-| Canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*` + ADR 0008 for the costly-to-reverse state architecture decision |
-| Product-level Responsibility architecture/module boundary? | `ARCHITECTURE.md` + ADRs 0002/0008 |
-| Conceptual Responsibility persistence/ownership? | `DATA-MODEL.md` + responsibility semantic baseline + ADR 0008 |
-| Module/API/job Responsibility semantics? | `CONTRACTS.md` + responsibility semantic baseline |
+| Canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*` + ADR 0008 |
+| Responsibility logical persistence boundary? | ADR 0009 + `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` |
+| Exact Responsibility PostgreSQL/Drizzle schema? | future accepted L2 DDL artifact; until then **OPEN** |
+| Product-level Responsibility architecture/module boundary? | `ARCHITECTURE.md` + ADRs 0002/0008/0009 |
+| Conceptual Responsibility persistence/ownership? | `DATA-MODEL.md` + ADRs 0008/0009 |
+| Module/API/job Responsibility semantics? | `CONTRACTS.md` + Responsibility semantic baseline |
 | User-facing Responsibility interaction/projection behavior? | `docs/design/INTERACTIONS.md` + `docs/design/DESIGN.md` |
-| AI interpretation authority/runtime? | ADRs 0002/0007 + `CONTRACTS.md` + canonical responsibility eval artifacts |
+| AI interpretation authority/runtime? | ADRs 0002/0007 + `CONTRACTS.md` + canonical eval artifacts |
 | Temporal Contract durability/attention semantics? | ADR 0003 + `ARCHITECTURE.md` + `CONTRACTS.md` |
 | Other product-specific technical boundary/invariant? | `ARCHITECTURE.md` + accepted relevant ADR |
 | Technology/runtime choice? | `TECH-STACK.md` + relevant ADR |
-| Current implementation sequence? | `IMPLEMENTATION-PLAN.md`; current GitHub Issue supplies task-specific intent; follow any explicit repository-local artifact linked from it |
+| Current implementation sequence? | `IMPLEMENTATION-PLAN.md`; current GitHub Issue supplies task-specific intent |
 | What is actually implemented now? | current code/schema/migrations/tests/runtime evidence |
 | Generic engineering rule? | relevant reusable `docs/*.md` baseline |
 | Current Gmail/Microsoft/AI/platform fact? | current official provider documentation at implementation time |
@@ -244,7 +286,7 @@ If sources materially conflict again, do not silently guess. Treat the contradic
 1. Normal row click opens `会話`; Responsibility/status chip opens `今の要点`.
 2. Conversation can contain multiple Responsibilities; Conversation is not one workflow-state owner.
 3. One Moment generally presents one primary current question/action.
-4. Evidence, interpretation, accepted Responsibility state, safe action, and UI projection are distinct.
+4. Evidence, interpretation, admission, accepted Responsibility state, safe action, and UI projection are distinct.
 5. AI interprets; trusted product/domain logic owns accepted Responsibility state and privileged effects.
 6. Resolution, live tracking activation, and attention/defer are orthogonal.
 7. Parallel/contingent work may require multiple obligation legs; scalar `BOTH` is not canonical truth.
@@ -256,30 +298,8 @@ If sources materially conflict again, do not silently guess. Treat the contradic
 13. Core reading/composing remains usable when AI is unavailable.
 14. Scope/account boundaries apply before search/retrieval/AI context exposure.
 15. Cross-account semantic similarity does not authorize Responsibility merge.
-16. Pin is independent of Responsibility semantics.
-17. App auth and connected-mailbox authorization are separate boundaries.
-18. Prompt-injection/tool-like text inside email has no application authority.
-19. Requested action and safe next action are distinct for high-risk requests.
-20. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
-
----
-
-## Current implementation gate
-
-Documentation-level Responsibility reconciliation is complete.
-
-The next implementation question is **not** whether to use the old lifecycle model. It is:
-
-> what is the smallest physical representation that satisfies the validated semantic vector, scenarios, and transition invariants without building a generic workflow engine?
-
-Before schema freeze, continue remaining Tier-0 detailed-oracle expansion and normalize legacy oracle aliases/errata into executable fixtures.
-
----
-
-## Change discipline
-
-Update durable documents only when accepted knowledge changes.
-
-Prefer code/tests for local mechanics, current Issues for task-specific execution intent, and decision records for costly-to-reverse rationale.
-
-When stronger scenarios, production failures, or external facts change a prior decision, update the durable source and record why rather than preserving stale consistency.
+16. Admission `NEEDS_REVIEW` may exist before a Responsibility; durable surfaced Review must not be modeled as a fake Responsibility.
+17. Determinate `DO_NOT_TRACK` normally produces no Responsibility or durable AdmissionReview product-state row.
+18. Projection equality does not imply semantic equality.
+19. Pin is independent of Responsibility semantics.
+20. App auth and connected-mailbox authorization are separate boundaries.

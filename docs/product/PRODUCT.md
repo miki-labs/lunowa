@@ -18,7 +18,7 @@ It deliberately does **not** replace the more detailed authorities for UX, Respo
 
 The product-intent sections below distinguish **ACCEPTED / CURRENT DIRECTION** from **HYPOTHESIS / NEEDS VALIDATION / DEFERRED**. A hypothesis is not promoted to market fact merely because it appears in this repository.
 
-Reconciled from the current repository plus the long-running product/architecture session on **2026-08-24**, using repository base `c03174a22f22090e878bb48dd8388c8bb47760ce` before this capture change.
+Reconciled from the current repository plus the long-running product/architecture session on **2026-08-24**, using repository base `c03174a22f22090e878bb48dd8388c8bb47760ce` before this capture change. A second semantic-fidelity audit on the Issue #19 candidate tightened differentiation, switching-risk, MVP-scope, and validation wording without promoting additional market claims to accepted fact.
 
 ---
 
@@ -125,12 +125,23 @@ Before treating an ICP as established, collect evidence for:
 - problem frequency and severity;
 - current workaround and switching friction;
 - whether Responsibility/attention behavior is materially better than existing mail + task tools;
+- whether a cross-account/provider Responsibility workspace is materially more useful than a conventional unified inbox or repeated account switching;
 - reachable distribution channel;
 - willingness to pay;
 - retention after novelty disappears;
 - trust threshold for letting Lunowa manage attention.
 
 Prior conversational discovery should not be treated as sufficient validation unless the evidence is promoted into an explicit research/decision artifact.
+
+### 3.5 Primary product risk
+
+**NEEDS VALIDATION:** the highest-level product risk is not whether Lunowa can be engineered. It is whether the differentiated experience is sufficiently better to overcome **switching cost and trust cost**.
+
+The critical question is:
+
+> Can the Responsibility-oriented, cross-account communication-management experience create enough recurring value that a real user changes or materially relies on their existing mail/workflow behavior?
+
+This is intentionally stronger than “do users like the UI?”. Positive aesthetic or feature feedback does not establish switching willingness, repeated reliance, or willingness to pay.
 
 ---
 
@@ -305,7 +316,9 @@ The following may be necessary for a credible email product but are not, by them
 - responsive access;
 - generic AI summarization/drafting.
 
-In particular, **multi-account unification is a baseline capability, not the core differentiator**.
+In particular, **multi-account unification by itself is a baseline capability, not the core differentiator**.
+
+Likewise, labels/workflow primitives such as `My Turn` or `Waiting` are useful parts of the experience but are **not assumed to be defensible differentiation on their own**.
 
 ### 8.2 Current differentiation hypothesis
 
@@ -313,13 +326,27 @@ In particular, **multi-account unification is a baseline capability, not the cor
 
 1. system-led communication understanding rather than prompt-led AI;
 2. trustworthy Responsibility identity/state instead of message-level inbox status;
-3. explicit My Turn / Waiting / Later / Done / Review attention projections;
-4. durable “forget safely” Temporal Contracts;
-5. one-question/one-action Moment interaction that reduces decision work;
-6. source/provenance visibility and conservative safety boundaries;
-7. graceful degradation where ordinary email still works without AI.
+3. an **authorization-preserving cross-account/provider attention workspace** where the user can see what requires attention across connected accounts/scopes without repeatedly switching inboxes, while account/scope provenance and sender identity remain explicit;
+4. deterministic My Turn / Waiting / Later / Done / Review projections over that Responsibility state;
+5. durable “forget safely” Temporal Contracts;
+6. one-question/one-action Moment interaction that reduces decision work;
+7. source/provenance visibility and conservative safety boundaries;
+8. graceful degradation where ordinary email still works without AI.
 
-This is a **market differentiation hypothesis**, not proof that current competitors lack similar capabilities. Competitor functionality/pricing must be re-checked against current primary sources before positioning claims are made.
+The cross-account hypothesis does **not** authorize cross-account semantic auto-merge. Multiple accounts may feed a unified attention experience while Responsibility identity, authorization, scope, and sending boundaries remain explicit; semantic similarity alone never collapses account ownership.
+
+This is a **market differentiation hypothesis**, not proof that current competitors lack similar capabilities. Prior competitor research supports the internal conclusion that a unified inbox or My Turn/Waiting-style labels alone are not enough to assume differentiation, but current competitor functionality/pricing must be re-checked against current primary sources before any external positioning claim is made.
+
+### 8.3 Differentiation must survive switching-cost evidence
+
+A feature or prototype should not be called differentiated merely because it is novel inside Lunowa. The relevant test is comparative behavior/value:
+
+- does it reduce real monitoring/reconstruction/manual task-transfer burden compared with the user's current workflow?;
+- does the cross-account Responsibility view reduce repeated account/inbox switching without obscuring account boundaries?;
+- does the user trust it enough to stop repeatedly re-checking the source inbox?;
+- is the gain strong enough to justify changing or depending less on the existing workflow?
+
+Until evidence exists, these remain product hypotheses rather than validated advantage.
 
 ---
 
@@ -329,7 +356,7 @@ Detailed UI scope is in `docs/design/DESIGN.md`.
 
 ### 9.1 Current v1 direction
 
-A credible initial product includes ordinary daily-email capability plus the differentiated Responsibility/attention layer, including:
+A credible initial product direction includes ordinary daily-email capability plus the differentiated Responsibility/attention layer, including:
 
 - Gmail first; Microsoft/Outlook behind the same product/provider boundaries later;
 - one or multiple accounts/scopes;
@@ -341,6 +368,8 @@ A credible initial product includes ordinary daily-email capability plus the dif
 - Temporal Contract/resurfacing;
 - trust/error/AI-degraded states;
 - responsive layouts.
+
+**Important scope classification:** this is the accepted **design/product direction for a credible client**, not evidence that every listed capability belongs in a market-validated MVP or must ship before learning. The exact release MVP remains adjustable as product evidence arrives. The next accepted product-validation slice is still the high-fidelity fake-data UI in Section 10, not full provider/AI/runtime breadth.
 
 ### 9.2 Platform direction
 
@@ -391,15 +420,35 @@ The slice is valuable only if it helps test questions such as:
 - Can users understand why something is Waiting or Later?
 - Does source/provenance access create enough trust without visual overload?
 - Can several Responsibilities exist without making the UI complex?
+- Can users understand and benefit from a cross-account attention view while still knowing which account/scope/source an item belongs to?
 - Is the ordinary email path still familiar enough?
 
 ### 10.3 Technical proof is not product validation
 
-Responsibility L2 PostgreSQL/Drizzle executable proof is important engineering risk retirement, but it does not prove demand, usability, willingness to pay, retention, or differentiation.
+Responsibility L2 PostgreSQL/Drizzle executable proof is important engineering risk retirement, but it does not prove demand, usability, willingness to pay, retention, switching willingness, or differentiation.
 
-Likewise, a visually polished fake-data UI does not prove the semantic reducer/provider runtime.
+Likewise, a visually polished fake-data UI does not prove the semantic reducer/provider runtime, and a technically correct runtime does not prove that users will switch or keep using the product.
 
 Keep these evidence classes separate.
+
+### 10.4 Product-validation evidence ladder
+
+**NEEDS VALIDATION:** the current product-learning target is a progressively stronger evidence chain, not one binary “MVP complete” event.
+
+A representative path is:
+
+```text
+representative target user understands the workflow
+  -> can use it on realistic communication without extensive instruction
+  -> reaches the next meaningful action/state with less reconstruction/decision work
+  -> reduces repeated inbox/thread re-checking or manual task-transfer behavior
+  -> returns and relies on it across subsequent days/weeks
+  -> expresses credible continued-use / switching / payment intent
+```
+
+Each arrow requires evidence. Do not infer later-stage retention/payment/switching from an earlier-stage prototype-usability result.
+
+Use the cheapest experiment that can falsify the highest-impact open product assumption: interview/workflow observation, high-fidelity prototype, concierge/manual operation, limited real-inbox slice, payment-intent test, or another smaller experiment before broad implementation when appropriate.
 
 ---
 
@@ -414,6 +463,7 @@ No single metric is frozen yet. Use metrics that test the product promise rather
 - time-to-next-meaningful-action/state recognition;
 - number of user decisions/navigation steps before the meaningful action;
 - thread rereads / manual re-check frequency;
+- account/inbox switching frequency where multiple accounts matter;
 - rate of missed/late material obligations;
 - proportion of Waiting work that returns at an appropriate time;
 - correction/review burden caused by wrong interpretation;
@@ -428,7 +478,7 @@ This safety/quality concern must be balanced against the opposite product failur
 
 ### 11.3 Business/product metrics
 
-**NEEDS VALIDATION:** retention, repeated weekly/daily use, conversion/willingness to pay, acquisition efficiency, and support burden matter more than code volume, AI call count, or number of features.
+**NEEDS VALIDATION:** retention, repeated weekly/daily use, switching/dependency behavior, conversion/willingness to pay, acquisition efficiency, and support burden matter more than code volume, AI call count, or number of features.
 
 ---
 
@@ -500,9 +550,9 @@ Earlier mobile-native/React-Native-first exploration is superseded by the curren
 
 The current implementation plan deliberately validates the high-fidelity interaction model before Gmail/AI integration breadth.
 
-### 14.7 Multi-account aggregation as differentiation -> baseline capability
+### 14.7 Multi-account aggregation as differentiation -> cross-account Responsibility hypothesis
 
-Unified accounts are useful, but the differentiation thesis is Responsibility/attention/trust, not aggregation alone.
+Plain account aggregation/unified inbox is treated as baseline capability. The remaining unvalidated differentiation hypothesis is that Lunowa can organize attention **across connected accounts/providers by Responsibility** while preserving explicit account/scope/provenance/sender boundaries.
 
 ---
 
@@ -525,7 +575,9 @@ These are **DEFERRED / NOT VALIDATED**. They are recorded only so they are not m
 Do not let future sessions silently convert these into decisions:
 
 - exact early ICP and segment priority;
-- demand strength and switching willingness;
+- demand strength;
+- whether the Responsibility-oriented cross-account experience is materially better than existing inbox/task workflows;
+- switching willingness and switching/trust cost;
 - willingness to pay and pricing/package;
 - distribution channel;
 - retention after initial novelty;
@@ -567,11 +619,12 @@ When a future product decision is ambiguous, prefer the option that maximizes th
 2. reducing low-value user choices before meaningful action;
 3. preserving source visibility and human control;
 4. keeping ordinary email familiar;
-5. avoiding hidden cross-account/scope behavior;
+5. avoiding hidden cross-account/scope behavior while testing the value of a cross-account Responsibility view;
 6. degrading safely when AI/provider/scheduler components fail;
 7. avoiding feature/infrastructure breadth unsupported by evidence;
 8. keeping the change reversible where possible;
 9. distinguishing accepted evidence from market/product hypotheses;
-10. improving validated user value rather than optimizing code/AI novelty.
+10. improving validated user value rather than optimizing code/AI novelty;
+11. when several next actions are possible, preferring the **smallest/cheapest experiment that can falsify the highest-impact unresolved product assumption** before broad implementation.
 
 If stronger evidence changes a product-level decision, update this document and the owning canonical design/domain/architecture artifact in the same accepted change where applicable.

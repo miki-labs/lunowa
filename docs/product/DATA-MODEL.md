@@ -2,32 +2,44 @@
 
 ## Status
 
-**Accepted conceptual model; physical schema is not yet frozen.**
+**Accepted conceptual model, reconciled with Responsibility v0.1; physical schema is not yet frozen.**
 
-This document defines the data concepts, ownership, invariants, and relationships that should constrain implementation. Table names, SQL types, indexes, and ORM syntax may change during bootstrap as long as the semantics and invariants remain intact.
+This document defines durable data concepts, ownership, relationships, and invariants that should constrain implementation. Table names, child-table choices, SQL types, indexes, ORM syntax, and exact enums may change during schema design as long as the accepted semantics remain intact.
 
-Related sources:
+Responsibility semantics are constrained by:
 
-- `ARCHITECTURE.md`
-- `CONTRACTS.md`
-- `../design/INTERACTIONS.md`
+- `responsibility/README.md`;
+- `responsibility/DECISIONS.md`;
+- `responsibility/CONSISTENCY-AUDIT.md`;
+- `responsibility/SCENARIO-SCHEMA.md`;
+- `responsibility/TRANSITION-SCHEMA.md`.
+
+Related broader sources:
+
+- `ARCHITECTURE.md`;
+- `CONTRACTS.md`;
+- `../design/INTERACTIONS.md`.
 
 ---
 
 ## 1. Modeling principles
 
-1. **Do not make Conversation the workflow unit.** A Conversation can contain multiple Action Items.
-2. **Separate provider facts from Lunowa product state.** Provider mailbox state is externally authoritative; lifecycle/Temporal Contract state is Lunowa-authoritative.
-3. **Keep state dimensions orthogonal.** Lifecycle, attention, ownership, confidence, risk, deadline, and resurfacing are separate concepts.
-4. **Persist promises.** Temporal Contracts and scheduled sends are durable records, not inferred UI state.
-5. **Preserve provenance.** Important extracted facts should resolve to source message/event evidence.
-6. **Support idempotency/reconciliation.** Provider ingestion and sends must tolerate retries and duplicate delivery.
-7. **Derived projections are disposable.** Search indexes, summaries, aggregate status, and embeddings should be rebuildable.
-8. **Prefer explicit lifecycle history for trust.** The system should be able to explain why a state changed and why an item resurfaced.
+1. **Conversation is not the workflow unit.** A Conversation may contain zero, one, or many Responsibilities.
+2. **Preserve evidence layers.** Original communication, provider/external observations, AI interpretation, accepted domain state, safe action, and UI projection are distinct.
+3. **Keep Responsibility dimensions orthogonal.** Resolution, live tracking, attention/defer, obligation/actionability, expected events, temporal facts, uncertainty, and risk are not one lifecycle enum.
+4. **Provider facts and Lunowa product state have distinct authorities.** Authority is field-specific, not one global trust ranking.
+5. **Persist durable promises.** Temporal Contracts/scheduled sends are durable records, not inferred UI state.
+6. **Preserve provenance.** Decision-critical facts/state should resolve to source evidence/trusted observations.
+7. **Support idempotency/reconciliation.** Provider ingestion and sends tolerate retries/duplicates/ambiguous outcomes.
+8. **Derived projections are disposable.** Search indexes, summaries, conversation status, embeddings, and similar projections are rebuildable.
+9. **Keep accepted AI state versioned.** Stale interpretation runs must not mutate current evidence revisions.
+10. **Do not build a generic workflow engine.** Model only the semantic structures required by the validated Responsibility cases.
 
 ---
 
 ## 2. Entity overview
+
+Conceptual ownership/relationships:
 
 ```text
 User
@@ -37,31 +49,32 @@ User
  │                       ├─ Conversation
  │                       │   ├─ Message
  │                       │   │   └─ Attachment
- │                       │   └─ ActionItem
+ │                       │   └─ Responsibility
  │                       │       ├─ ProvenanceReference
- │                       │       ├─ TemporalContract
- │                       │       │   └─ TemporalTrigger
- │                       │       └─ LifecycleTransition
+ │                       │       ├─ FieldDecision / correction history
+ │                       │       ├─ ResponsibilityTransition
+ │                       │       └─ TemporalContract
+ │                       │           └─ TemporalTrigger
  │                       ├─ Draft
  │                       └─ SendOperation
  │
  ├─ Pin
  └─ UserPreference
 
-AIInterpretationRun -> Message/Conversation -> candidate facts -> ActionItem rules
+AIInterpretationRun
+  -> authorized Message/Conversation evidence
+  -> validated candidate interpretation
+  -> deterministic/trusted Responsibility reduction
+
 SearchDocument -> derived projection of authorized domain data
-AuditEvent -> cross-cutting durable evidence
+AuditEvent     -> cross-cutting durable evidence
 ```
 
-The exact foreign-key directions may be tuned, but ownership semantics must remain clear.
+`Responsibility` may physically use child rows, embedded structured columns, or another minimal relational representation for obligation legs/events/criteria. This diagram is semantic, not a mandated table graph.
 
 ---
 
 ## 3. User
-
-Represents one Lunowa product user.
-
-Suggested conceptual fields:
 
 ```text
 User {
@@ -74,25 +87,17 @@ User {
 }
 ```
 
-### Invariants
+Invariants:
 
-- Every ConnectedAccount belongs to exactly one Lunowa User unless a future shared-team model is explicitly designed.
-- Every user-owned entity must be authorization-checkable back to User without relying on AI or client-supplied ownership claims.
-- `timezone` is important for Temporal Contract and Send Later display/interpretation. Persist timestamps internally in an unambiguous absolute representation; retain relevant source timezone/context separately when needed.
+- every ConnectedAccount belongs to exactly one Lunowa User until a future shared-team model is explicitly designed;
+- every user-owned entity is authorization-checkable back to User without AI/client ownership claims;
+- internal timestamps use unambiguous absolute representation while source/reference timezone/context is retained when semantically relevant.
 
 ---
 
 ## 4. Scope
 
-A Scope is a user-understandable grouping such as:
-
-- `仕事`
-- `個人`
-- `大学`
-
-Internal historical term `Space` should not leak into UI unless deliberately reintroduced.
-
-Suggested fields:
+User-understandable grouping such as `仕事`, `個人`, `大学`.
 
 ```text
 Scope {
@@ -106,18 +111,16 @@ Scope {
 }
 ```
 
-### Rules
+Rules:
 
-- Scope defines **where to look**.
-- Lifecycle/state filters define **what to look at**.
-- A user may have one account and no visible scope-switching UI even if a default internal Scope exists.
-- `全体` can be a virtual aggregate scope rather than a persisted row.
+- Scope defines **where to look**;
+- Responsibility projections define **what requires attention**;
+- one-account users need not understand scope UI;
+- `全体` may be a virtual aggregate rather than a row.
 
 ---
 
 ## 5. ScopeAccount
-
-Join between Scope and ConnectedAccount.
 
 ```text
 ScopeAccount {
@@ -127,52 +130,46 @@ ScopeAccount {
 }
 ```
 
-### Initial rule
-
-An account SHOULD normally belong to one primary user-created Scope to keep mental boundaries predictable. If later product evidence supports multi-membership, change deliberately rather than assuming it now.
+Initial rule: an account normally belongs to one primary user-created Scope. Multi-membership requires later product evidence.
 
 ---
 
 ## 6. ConnectedAccount
-
-Represents one connected provider mailbox identity.
 
 ```text
 ConnectedAccount {
   id
   user_id
   provider                 // gmail | microsoft | future
-  provider_account_id      // stable provider/user mailbox identifier
+  provider_account_id
   email_address
   display_name?
-  connection_state         // active | needs_reconnect | revoked | error | removed
-  granted_capabilities     // normalized capability set, not raw provider scopes as domain API
-  credential_reference     // server-side secure reference; never browser-visible
+  connection_state
+  granted_capabilities
+  credential_reference
   last_successful_sync_at?
   created_at
   updated_at
 }
 ```
 
-### Invariants
+Invariants:
 
-- `(user_id, provider, provider_account_id)` is unique.
-- Credentials/tokens are sensitive implementation state and must not be exposed through normal product APIs.
-- Removing a ConnectedAccount from Lunowa does **not** delete the provider mailbox.
-- Provider connection failure affects that account; unrelated accounts remain usable.
+- `(user_id, provider, provider_account_id)` unique;
+- credentials/tokens never appear through normal browser/product APIs;
+- removing a ConnectedAccount does not delete provider mailbox data;
+- one account failure must not unnecessarily disable unrelated accounts.
 
 ---
 
 ## 7. ProviderSyncState
-
-Owns provider-specific incremental synchronization position and reconciliation status.
 
 ```text
 ProviderSyncState {
   connected_account_id
   cursor_or_delta_token_encrypted_or_opaque?
   sync_generation
-  status                    // idle | syncing | degraded | resync_required | error
+  status
   last_attempt_at?
   last_success_at?
   last_full_reconcile_at?
@@ -181,19 +178,17 @@ ProviderSyncState {
 }
 ```
 
-Provider-specific cursor material should remain encapsulated at the integration boundary.
+Invariants:
 
-### Invariants
-
-- One current sync state per ConnectedAccount.
-- Invalid cursor/token must transition to a reconciliation path rather than silently stopping sync forever.
-- Sync cursor advancement must not claim success before the local changes needed for correctness are durably committed.
+- one current sync state per account;
+- invalid cursor/token enters explicit reconciliation rather than silent empty success;
+- cursor advancement does not claim success before required local changes are durably committed.
 
 ---
 
 ## 8. Conversation
 
-Normalized display/thread grouping.
+Normalized provider/display thread grouping.
 
 ```text
 Conversation {
@@ -206,28 +201,24 @@ Conversation {
   last_message_at
   last_inbound_at?
   last_outbound_at?
-  derived_attention_state?    // cache/projection only
-  derived_primary_action_item_id?
+  derived_attention_state?          // cache/projection only
+  derived_primary_responsibility_id?
   created_at
   updated_at
 }
 ```
 
-### Critical invariant
+Critical invariants:
 
-`Conversation` MUST NOT own a single authoritative lifecycle enum that pretends to represent all obligations inside the thread.
-
-Conversation-level state is a derived projection from Action Items.
-
-### Cross-account conversation grouping
-
-Do not merge provider threads across accounts in the initial model merely because participants/subjects look similar. Cross-account semantic grouping is a later feature and creates identity/safety ambiguity.
+- Conversation MUST NOT own one authoritative Responsibility lifecycle/state;
+- aggregate state is derived from Responsibilities;
+- do not initially merge provider threads across accounts merely from participant/subject similarity.
 
 ---
 
 ## 9. Message
 
-Normalized provider message / communication event.
+Normalized communication evidence.
 
 ```text
 Message {
@@ -240,7 +231,7 @@ Message {
   sender_identity
   recipient_identities
   cc_identities?
-  bcc_identities?           // only where available/appropriate
+  bcc_identities?
   subject
   text_body?
   sanitized_html_body?
@@ -248,19 +239,19 @@ Message {
   provider_received_at?
   read_state?
   mailbox_state_snapshot?
-  raw_provider_metadata?    // minimal boundary/debug metadata only
+  raw_provider_metadata?
   created_at
   updated_at
 }
 ```
 
-### Invariants
+Invariants:
 
-- `(connected_account_id, provider_message_id)` is unique.
-- Re-ingesting the same provider message updates/reconciles instead of creating duplicates.
-- Raw HTML must be sanitized before rendering.
-- Message content is untrusted data for both browser rendering and AI context.
-- Provider state snapshot is a cache, not the authority if it can become stale.
+- `(connected_account_id, provider_message_id)` unique;
+- re-ingestion reconciles instead of duplicating;
+- raw HTML/content is untrusted for rendering and AI context;
+- provider mailbox snapshots may become stale and are reconcilable;
+- actually sent/received source content remains immutable evidence even when derived normalization/interpretation changes.
 
 ---
 
@@ -275,24 +266,23 @@ Attachment {
   mime_type
   size_bytes?
   content_disposition?
-  content_reference          // provider reference or Lunowa object-store reference
-  content_hash?              // optional when useful
+  content_reference
+  content_hash?
   preview_state?
   created_at
 }
 ```
 
-### Rules
+Rules:
 
-- Do not persist provider attachment bytes by default if metadata + on-demand fetch satisfies the product.
-- Lunowa-owned object storage may be required for new compose uploads before send.
-- Attachment bytes are untrusted input.
+- provider attachment presence/metadata is authoritative for that observed provider message, not for unrelated semantic claims;
+- do not persist provider bytes by default if metadata/on-demand fetch is sufficient;
+- Lunowa object storage may be needed for compose uploads;
+- bytes are untrusted input.
 
 ---
 
 ## 11. ParticipantIdentity / Person projection
-
-A lightweight normalized identity may be useful for Person Context and recipient autocomplete.
 
 ```text
 ParticipantIdentity {
@@ -306,144 +296,298 @@ ParticipantIdentity {
 }
 ```
 
-This is **not** a CRM contact/deal object.
+This is not a CRM deal/contact pipeline.
 
-### Authority
-
-Email addresses and message headers are communication evidence. Organization/role facts inferred by AI are derived and need provenance/confidence when shown as remembered facts.
+Message headers are communication evidence. AI-inferred organization/role facts are derived and require provenance/appropriate uncertainty when material.
 
 ---
 
-## 12. ActionItem
+## 12. Responsibility
 
-The central workflow unit.
+The central communication-bounded operational workflow concept.
+
+Responsibility identity follows the **smallest communication-bounded operational outcome with a coherent closure condition**.
+
+Conceptual parent shape:
 
 ```text
-ActionItem {
+Responsibility {
   id
   user_id
   conversation_id
-  goal
-  state
-  next_owner
-  next_action?
-  deadline_at?
-  deadline_timezone_or_source_context?
-  attention_level
-  confidence
-  risk
-  source_kind                // ai | deterministic | user | mixed
-  user_override_state?       // if explicit override semantics are needed
-  active
-  completed_at?
+  connected_account_id
+
+  operational_outcome
+
+  resolution_status          // semantic dimension; exact enum not frozen
+  resolution_reason?
+
+  live_tracking_state        // semantic dimension; exact enum not frozen
+  attention_mode             // semantic dimension; exact enum not frozen
+
+  risk?
+
+  created_at
+  resolved_at?
+  updated_at
+}
+```
+
+### 12.1 Resolution is not satisfaction
+
+Conceptual reasons may include:
+
+```text
+SATISFIED
+DECLINED
+CANCELLED
+SUPERSEDED
+USER_CLOSED
+INVALIDATED
+DUPLICATE
+```
+
+Exact enum names remain open.
+
+### 12.2 Live tracking is separate
+
+A historical item may be evidence-relative `OPEN` while inactive as current work.
+
+```text
+resolution_status = OPEN
+live_tracking_state = historical/inactive candidate
+```
+
+must be representable semantically without flooding `My Turn`.
+
+### 12.3 Attention is separate
+
+Intentional snooze/defer is independent of resolution/live activation.
+
+A communication hold waiting on another party/event is not automatically `LATER`.
+
+### Critical invariants
+
+- one Conversation may have zero/one/many Responsibilities;
+- completing one Responsibility does not complete the Conversation;
+- field changes occur through trusted domain reduction/user commands, not arbitrary UI writes;
+- state remains explainable via provenance/history;
+- new evidence may update, reopen, supersede, invalidate, or create an episode according to operational identity;
+- cross-account semantic auto-merge is prohibited initially.
+
+---
+
+## 13. ObligationLeg
+
+Canonical semantic concept for an action obligation that belongs to a Responsibility.
+
+A physical child table is **not mandated**, but implementation must preserve equivalent semantics where cases require them.
+
+```text
+ObligationLeg {
+  id
+  responsibility_id
+  bearer
+  action
+  object?
+  status
+  actionability
+  basis
+  authority_status?
+  condition?
+  temporal_fact_ref?
+  created_at
+  satisfied_at?
+  updated_at
+}
+```
+
+Why this exists:
+
+- parallel required signers;
+- future contingent obligations;
+- safety-blocked/unverified requested actions;
+- user leg satisfied while other-party leg remains open.
+
+`active user obligation` is a derived subset, not the complete canonical model.
+
+Do not use scalar `BOTH` to erase individual legs or ambiguity.
+
+---
+
+## 14. ExpectedEvent
+
+Represents an event/response the Responsibility is waiting for.
+
+```text
+ExpectedEvent {
+  id
+  responsibility_id
+  actor_or_source
+  event_kind
+  status
+  condition?
+  temporal_fact_ref?
+  activates_obligation_leg_id?
+  provenance
+}
+```
+
+The activation relationship is semantic; exact physical representation may instead place a condition on the obligation leg.
+
+---
+
+## 15. CompletionCriterion
+
+Represents multiple conditions that jointly close one operational outcome without creating artificial independent Responsibilities.
+
+```text
+CompletionCriterion {
+  id
+  responsibility_id
+  criterion_kind_or_description
+  status
+  provenance?
+  satisfied_at?
+}
+```
+
+Example: identity-document FRONT + BACK are usually criteria in one Responsibility.
+
+Exact storage representation remains open.
+
+---
+
+## 16. Constraint / proposal / agreed-fact semantics
+
+Some Responsibilities require structured semantics beyond an action leg:
+
+```text
+Constraint {
+  responsibility_id
+  kind_or_expression
+  condition_or_anchor?
+  status
+  provenance
+}
+
+PendingProposal {
+  responsibility_id
+  proposed_term
+  status
+  provenance
+}
+
+AgreedFact {
+  responsibility_id
+  value
+  provenance
+}
+```
+
+These are conceptual shapes, not mandates for separate tables.
+
+Key rules:
+
+- prohibition/hold constraint is not a normal next action;
+- proposal is not agreement;
+- pending terms become agreed facts only with adequate acceptance evidence.
+
+---
+
+## 17. TemporalFact
+
+Do not model all time as one `deadline_at`.
+
+Conceptual semantic kinds include:
+
+```text
+SOURCE_DUE
+EXPECTED_EVENT_TIME
+USER_TARGET
+RESURFACE_TIME
+FOLLOW_UP_TIME
+```
+
+```text
+TemporalFact {
+  id
+  responsibility_id
+  semantic_kind
+  original_expression
+  resolved_value?
+  precision
+  timezone_or_reference_frame?
+  external_anchor_ref?
+  applies_to_ref?
+  provenance
   created_at
   updated_at
 }
 ```
 
-### 12.1 LifecycleState
+Rules:
 
-Canonical initial values:
-
-```text
-OPEN
-ACTION_REQUIRED
-DEFERRED
-WAITING
-FOLLOW_UP
-COMPLETED
-UNCERTAIN
-```
-
-### 12.2 NextOwner
-
-```text
-USER
-OTHER_PARTY
-BOTH
-EXTERNAL_EVENT
-NONE
-UNKNOWN
-```
-
-### 12.3 AttentionLevel
-
-```text
-NONE
-LOW
-NORMAL
-HIGH
-CRITICAL
-```
-
-### 12.4 Confidence
-
-Do not assume one scalar confidence is sufficient forever. Initial implementation may have a coarse overall confidence plus field-level confidence in interpretation records.
-
-Conceptually:
-
-```text
-HIGH
-MEDIUM
-LOW
-UNKNOWN
-```
-
-or a bounded numerical value if evaluation/calibration supports it.
-
-### 12.5 Risk
-
-Risk represents product harm if the state/action is wrong, not model confidence.
-
-Example conceptual levels:
-
-```text
-LOW
-NORMAL
-HIGH
-```
-
-A high-confidence inference can still be high-risk and require conservative behavior.
-
-### Critical invariants
-
-- One Conversation may have zero, one, or many Action Items.
-- ActionItem state transitions occur through lifecycle/domain logic, not arbitrary UI/database writes.
-- `deadline_at` must preserve enough source/provenance context to explain it.
-- Completing one Action Item does not automatically complete the entire Conversation.
-- New communication can reopen/replace/create Action Items after a prior completion.
+- never silently increase source precision;
+- external anchor resolution is derived and may change when the anchor changes;
+- user target/resurface does not overwrite external source due;
+- source legitimacy/safety uncertainty does not invent a new temporal kind;
+- material time values retain source/reference provenance.
 
 ---
 
-## 13. ProvenanceReference
-
-Connects a durable product fact/action to evidence.
+## 18. ProvenanceReference
 
 ```text
 ProvenanceReference {
   id
-  action_item_id?
+  responsibility_id?
   interpretation_run_id?
-  message_id
-  evidence_type             // requested_action | deadline | completion | waiting | topic | other
-  quote_start_or_locator?   // implementation-specific locator, not necessarily raw quote storage
-  quote_excerpt?            // minimal if needed for UI; respect retention/privacy
+  message_id?
+  trusted_event_id?
+  evidence_type
+  locator_or_source_span?
+  excerpt_minimal?
   field_name?
   created_at
 }
 ```
 
-### Requirements
+Requirements:
 
-- A user should be able to jump from important inferred facts to the source message where practical.
-- Provenance is especially important for deadline, completion, waiting, and action-required claims.
-- Do not store unnecessary duplicate full message bodies in provenance records.
+- decision-critical fields/actions are traceable to source/trusted observations where practical;
+- do not duplicate unnecessary full message bodies;
+- model confidence does not waive provenance.
 
 ---
 
-## 14. AIInterpretationRun
+## 19. FieldDecision / user correction
 
-Represents one versioned model interpretation of normalized communication/context.
+User authority is field-scoped rather than one whole-item override state.
+
+Conceptual shape:
+
+```text
+FieldDecision {
+  id
+  responsibility_id
+  field
+  value
+  authority                // user | trusted rule | etc.
+  basis_evidence_revision
+  provenance?
+  created_at
+  superseded_at?
+}
+```
+
+Physical representation may be simpler if the implementation supports only a small fixed set of corrections initially.
+
+A correction to one field must not freeze unrelated fields forever.
+
+---
+
+## 20. AIInterpretationRun
 
 ```text
 AIInterpretationRun {
@@ -454,67 +598,63 @@ AIInterpretationRun {
   schema_version
   model_config_version
   provider_model_identifier
-  status                    // succeeded | invalid_output | failed | timeout | skipped
-  candidate_facts_json      // validated structured output, not arbitrary raw prose
+  basis_evidence_revision
+  status
+  candidate_facts_json
   latency_ms?
   usage_metadata?
   created_at
 }
 ```
 
-Optional/raw model output retention should be minimal and justified.
+Invariants:
 
-### Invariants
-
-- `candidate_facts_json` is not authoritative lifecycle state.
-- Structured output must be schema validated before use.
-- Authorization-filtered input only.
-- Model/config version should be traceable for regressions.
+- candidate output is not authoritative Responsibility state;
+- output is schema-validated before reduction;
+- input is authorization-filtered;
+- model/config/schema/basis revision are traceable;
+- a stale basis revision may be retained for diagnostics but cannot mutate current state.
 
 ---
 
-## 15. LifecycleTransition
+## 21. ResponsibilityTransition
 
-Durable explanation/history for meaningful ActionItem changes.
+Durable explanation/history for meaningful Responsibility effects/field changes.
 
 ```text
-LifecycleTransition {
+ResponsibilityTransition {
   id
-  action_item_id
-  from_state?
-  to_state
+  responsibility_id
+  operation                 // CREATE | UPDATE | RESOLVE | REOPEN | SUPERSEDE | INVALIDATE | NO_OP when recorded
   reason_code
-  actor_kind                // system_rule | user | provider_event | admin_repair
+  actor_kind
   source_event_id?
   interpretation_run_id?
+  evidence_revision?
   occurred_at
 }
 ```
 
-### Purpose
+A focal event may produce multiple effects across multiple Responsibilities; the event/effect model must not assume one scalar operation globally.
 
-Allows support/debug/trust questions such as:
+`SUPERSEDE` is terminal on the old Responsibility and conceptually yields `RESOLVED/SUPERSEDED`. Replacement creation is a separate effect.
 
-- Why did this become `待ち`?
-- Why did it reopen?
-- Was this user-corrected or AI-derived?
-
-Not every incidental field change needs a transition row; lifecycle-affecting changes do.
+Not every incidental field write requires a transition row; meaningful domain changes should remain explainable.
 
 ---
 
-## 16. TemporalContract
+## 22. TemporalContract
 
-A persisted promise governing when an Action Item can leave/return to attention.
+Persisted product promise governing attention/reconsideration, not a replacement for Responsibility resolution semantics.
 
 ```text
 TemporalContract {
   id
   user_id
-  action_item_id
-  status                    // active | fired | cancelled | superseded | completed
-  contract_kind             // active_obligation | passive_waiting | other
-  created_by                // user | rule | user_confirmed_rule
+  responsibility_id
+  status                    // exact enum open
+  contract_kind             // active-obligation defer | passive waiting | other
+  created_by
   version
   activated_at
   resolved_at?
@@ -523,24 +663,21 @@ TemporalContract {
 }
 ```
 
-### Active vs passive
+Active user obligations require more conservative auto-hiding than passive waiting.
 
-- **Active obligation:** the user still owes an action. Automatic hiding should be conservative and initially may require user approval.
-- **Passive waiting:** user has acted and waits on another party/event. More automation is safer.
+Communication hold/pause is not itself a TemporalContract defer decision.
 
 ---
 
-## 17. TemporalTrigger
-
-Executable trigger belonging to a Temporal Contract.
+## 23. TemporalTrigger
 
 ```text
 TemporalTrigger {
   id
   temporal_contract_id
   trigger_type              // TIME | REPLY_RECEIVED | DEADLINE | future
-  trigger_at?               // required for time-based trigger
-  status                    // active | claimed | fired | cancelled | superseded | failed
+  trigger_at?
+  status
   idempotency_key
   fired_at?
   failure_count
@@ -550,55 +687,37 @@ TemporalTrigger {
 }
 ```
 
-### Initial MVP trigger types
+Invariants:
 
-```text
-TIME
-REPLY_RECEIVED
-DEADLINE
-```
-
-### Invariants
-
-- Active time triggers have durable `trigger_at`.
-- Trigger execution is idempotent.
-- A trigger is checked against the current contract version/state before acting.
-- Cancelling/superseding a contract invalidates its old triggers.
-- Overdue active triggers are discoverable for reconciliation after downtime.
+- time triggers are durable;
+- execution idempotent;
+- current contract version/state is checked before effect;
+- cancel/supersede invalidates stale triggers;
+- overdue triggers are discoverable/reconcilable;
+- trigger firing re-evaluates current Responsibility evidence before projection/actionability changes.
 
 ---
 
-## 18. ResurfacingEvent
-
-Records a product-level return to attention.
+## 24. ResurfacingEvent
 
 ```text
 ResurfacingEvent {
   id
-  action_item_id
+  responsibility_id
   temporal_contract_id?
   trigger_id?
   reason_code
   attention_before?
-  attention_after
+  attention_after?
   created_at
 }
 ```
 
-This is distinct from an OS/browser notification. Resurfacing may mean:
-
-- state update only;
-- quiet list visibility;
-- move into attention list;
-- user notification.
-
-Notification strength is an attention-policy decision, not a property of every trigger.
+Resurfacing is distinct from OS/browser notification. Notification strength is a separate attention-policy decision.
 
 ---
 
-## 19. Pin
-
-User-controlled override for easy retrieval.
+## 25. Pin
 
 ```text
 Pin {
@@ -608,17 +727,11 @@ Pin {
 }
 ```
 
-### Invariants
-
-- Pin is orthogonal to lifecycle state.
-- State changes do not remove a Pin.
-- User explicitly removes it.
+Pin is orthogonal to Responsibility state and survives Responsibility changes until user removes it.
 
 ---
 
-## 20. Draft
-
-Lunowa-persisted draft state.
+## 26. Draft
 
 ```text
 Draft {
@@ -626,7 +739,7 @@ Draft {
   user_id
   connected_account_id
   conversation_id?
-  mode                      // new | reply | reply_all | forward
+  mode
   in_reply_to_message_id?
   recipients
   cc
@@ -635,27 +748,18 @@ Draft {
   body_format
   body
   signature_state?
-  status                    // editing | scheduled | sending | sent | discarded | error
-  version                   // optimistic concurrency/autosave
+  status
+  version
   created_at
   updated_at
 }
 ```
 
-### Invariants
-
-- Draft survives ordinary navigation/layout changes.
-- Autosave updates must not silently overwrite a newer edit from another active client without conflict handling.
-- Sending account is explicit.
-- Draft deletion/discard semantics are distinct from provider mailbox deletion.
-
-Provider-native draft synchronization may be added later if product requirements justify complexity; Lunowa local draft authority is sufficient for the first vertical slice unless a provider constraint requires otherwise.
+Draft survives ordinary navigation. Sending account is explicit. Autosave must not silently overwrite a newer concurrent edit.
 
 ---
 
-## 21. DraftAttachment / Upload
-
-For files added in Lunowa before send:
+## 27. DraftAttachment / Upload
 
 ```text
 DraftAttachment {
@@ -670,13 +774,11 @@ DraftAttachment {
 }
 ```
 
-Storage lifecycle must delete abandoned uploads according to retention policy.
+Abandoned uploads follow explicit retention cleanup.
 
 ---
 
-## 22. SendOperation
-
-Durable side-effect workflow for Send Now / Undo Send / Send Later.
+## 28. SendOperation
 
 ```text
 SendOperation {
@@ -686,7 +788,7 @@ SendOperation {
   connected_account_id
   idempotency_key
   kind                      // immediate | undo_delay | scheduled
-  status                    // pending | cancellable | dispatching | provider_accepted | reconciled | cancelled | failed
+  status                    // pending | cancellable | dispatching | ambiguous | provider_accepted | reconciled | cancelled | failed
   scheduled_for?
   cancellable_until?
   provider_result_id?
@@ -698,50 +800,34 @@ SendOperation {
 }
 ```
 
-### Invariants
+Invariants:
 
-- `idempotency_key` unique within appropriate user/account boundary.
-- Repeated request for the same operation must not cause duplicate sends.
-- Once irreversible provider dispatch is confirmed, Lunowa must not falsely advertise generic recall unless separately implemented.
-- Send Later operations are recoverable after scheduler/worker downtime.
-
----
-
-## 23. ProviderMutationOperation
-
-Optional generalized durable record if archive/read/trash/spam mutations require retry/reconciliation beyond direct request/response.
-
-Do not create this abstraction preemptively if direct provider operations are simple/reliable enough for v1.
-
-If introduced:
-
-```text
-ProviderMutationOperation {
-  id
-  connected_account_id
-  target_kind
-  target_provider_id
-  mutation_kind
-  idempotency_key?
-  status
-  attempt_count
-  created_at
-  updated_at
-}
-```
+- idempotency prevents duplicate sends;
+- ambiguous provider acceptance is not blindly retried;
+- provider-reconciled send is distinct from send attempt;
+- reconciliation closes a Responsibility only when successful sending is sufficient evidence for its operational closure condition;
+- sending identity remains explicit.
 
 ---
 
-## 24. SearchDocument
+## 29. ProviderMutationOperation
 
-Derived search projection.
+Optional durable record if archive/read/trash/spam operations eventually require retry/reconciliation beyond direct calls.
+
+Do not introduce it preemptively.
+
+---
+
+## 30. SearchDocument
+
+Derived search projection, whether represented literally as a table or through database full-text facilities.
 
 ```text
 SearchDocument {
   id
   user_id
   scope_keys
-  source_type               // conversation | message | person | attachment
+  source_type
   source_id
   searchable_text
   metadata
@@ -750,34 +836,19 @@ SearchDocument {
 }
 ```
 
-Actual implementation may use relational full-text indexes rather than a literal table.
-
-### Invariants
-
-- Rebuildable from authoritative domain data.
-- Never bypass current authorization when returning results.
-- Scope membership changes must be reflected/re-authorized even if the search projection is stale.
+Must be rebuildable and never bypass current authorization.
 
 ---
 
-## 25. UserPreference
+## 31. UserPreference
 
-Non-critical preferences such as:
+Non-critical preferences such as appearance, density, pane widths, default scope, localization, and exposed AI-assistance preferences.
 
-- appearance;
-- density;
-- preferred pane widths;
-- default scope;
-- reduced AI assistance setting if exposed;
-- localization preferences.
-
-Do not mix safety-critical lifecycle rules into generic preference blobs.
+Do not put safety-critical Responsibility rules into an opaque generic preference blob.
 
 ---
 
-## 26. AuditEvent
-
-Cross-cutting audit/support record for materially important actions that do not fit LifecycleTransition alone.
+## 32. AuditEvent
 
 ```text
 AuditEvent {
@@ -793,160 +864,161 @@ AuditEvent {
 }
 ```
 
-Potential events:
+Useful for account/security/send/scheduler and other cross-cutting actions not captured by ResponsibilityTransition alone.
 
-- account connected/reconnected/removed;
-- Temporal Contract created/changed/cancelled/fired;
-- send scheduled/cancelled/dispatched/failed;
-- user corrected Action Item state;
-- security-sensitive account action.
-
-Avoid turning AuditEvent into indiscriminate full-content logging.
+Avoid indiscriminate full-content logging.
 
 ---
 
-## 27. Conversation aggregate projection
+## 33. Conversation aggregate projection
 
-The UI needs one primary status/chip per Conversation even though workflow authority lives in Action Items.
+The UI may need one primary status/chip although authority lives in multiple Responsibilities.
 
-Define a deterministic projection such as:
+Conceptually:
 
 ```text
 ConversationAttentionProjection {
   conversation_id
-  primary_action_item_id?
-  user_facing_state
-  attention_level
-  nearest_deadline?
+  primary_responsibility_id?
+  user_facing_state          // MY_TURN | WAITING | LATER | DONE | REVIEW | NONE or UI mapping
+  attention_level?
+  nearest_relevant_time?
+  reason_code
   derived_at
 }
 ```
 
-This may be materialized/cached or computed.
+Projection is deterministic/rebuildable.
 
-### Initial ordering concept
+Primary selection should prefer material actionable user work (especially critical/overdue), then nearest relevant deadline/blocker, rather than newest message or a fixed legacy lifecycle ranking.
 
-A starting ordering may be:
-
-```text
-FOLLOW_UP
-> ACTION_REQUIRED
-> DEFERRED
-> WAITING
-> COMPLETED
-```
-
-but this is **not** sufficient by itself: deadline/attention can affect priority. The actual reducer should be tested against representative scenarios before being frozen.
+Uncertainty in one Responsibility must not disappear because another Responsibility is resolved.
 
 ---
 
-## 28. State-transition examples
+## 34. State/effect examples
 
 ### New inbound request
 
 ```text
-Message(inbound)
- -> interpretation: user requested to submit document by 8/22
- -> ActionItem(ACTION_REQUIRED, next_owner=USER, deadline=8/22)
+Message evidence
+ -> REQUEST candidate + source due
+ -> admission TRACK
+ -> CREATE Responsibility
+ -> USER obligation leg actionable
+ -> projection MY_TURN
 ```
 
-### User defers
+### User defers attention
 
 ```text
-ACTION_REQUIRED
- -> user approves deferral / rule allows deferral
- -> DEFERRED
- -> TemporalContract(active)
- -> TIME trigger + optional REPLY trigger
+OPEN Responsibility + actionable USER leg
+ -> explicit/validated attention defer
+ -> TemporalContract + return trigger
+ -> attention_mode deferred
+ -> projection LATER
 ```
 
-### Contract fires
+The external source due remains unchanged.
 
-```text
-DEFERRED
- -> trigger claimed
- -> current state validated
- -> ACTION_REQUIRED
- -> ResurfacingEvent
-```
-
-### User sends requested item
+### User sends requested item but confirmation is part of the outcome
 
 ```text
 send reconciled
- -> completion signal for user's requested action
- -> WAITING, next_owner=OTHER_PARTY
- -> optional passive TemporalContract for reply/follow-up
+ -> USER send leg satisfied
+ -> OTHER expected confirmation remains
+ -> Responsibility remains OPEN
+ -> projection WAITING
 ```
 
-### No reply
+### Follow-up trigger
 
 ```text
 WAITING
- -> passive timeout trigger
- -> FOLLOW_UP
- -> suggested follow-up draft may be prepared
+ -> trigger fires + current evidence re-evaluated
+ -> USER follow-up leg/action becomes actionable
+ -> projection MY_TURN
+ -> reminder reconciled
+ -> OTHER approval/reply remains expected
+ -> projection WAITING
 ```
 
-### Completion
+`FOLLOW_UP` is an action/reason, not a canonical lifecycle enum.
+
+### Hold
 
 ```text
-WAITING or FOLLOW_UP
- -> strong explicit completion evidence / user confirmation
- -> COMPLETED
+counterpart: wait until legal clears
+ -> constraint + expected resume/approval event
+ -> Responsibility remains OPEN
+ -> projection WAITING
 ```
 
-### Reopen
+A separate user/product defer may additionally yield `LATER`.
+
+### Reopen vs new episode
 
 ```text
-COMPLETED
- -> new relevant inbound request
- -> new ActionItem or existing ActionItem re-opened according to goal identity
+same operational outcome was not actually satisfied
+ -> REOPEN same Responsibility
+
+genuinely closed earlier outcome + later new work
+ -> CREATE new Responsibility
 ```
 
-Do not assume every new message mutates the same Action Item.
+### Supersession
+
+```text
+one message withdraws R1 and establishes replacement R2
+ -> SUPERSEDE R1
+ -> CREATE R2
+```
 
 ---
 
-## 29. Deletion and retention semantics
+## 35. Deletion and retention semantics
 
-Physical retention rules are not yet finalized, but the model must distinguish:
+Distinguish:
 
-- provider message deleted at provider;
-- message no longer visible because scope/filter changed;
-- Lunowa cached copy awaiting reconciliation/retention cleanup;
-- user removed account from Lunowa;
-- user deleted Lunowa-specific metadata such as Pin/Temporal Contract;
-- user requested product/account data deletion.
+- provider message deletion/unavailability;
+- scope/filter invisibility;
+- Lunowa cache awaiting reconciliation/retention cleanup;
+- connected-account removal;
+- deletion of Lunowa metadata such as Pin/TemporalContract;
+- user-requested product/account data deletion.
 
-Do not overload one `deleted` boolean across these semantics.
+Do not overload one `deleted` boolean.
 
 ---
 
-## 30. Concurrency/versioning requirements
+## 36. Concurrency/versioning requirements
 
-At minimum, explicitly protect:
+Explicitly protect at least:
 
 - draft autosave/version conflicts;
-- ActionItem lifecycle updates racing with new provider messages;
-- Temporal Contract update/cancel racing with trigger execution;
-- duplicate provider ingestion;
-- SendOperation retries/client double-submit;
-- account reconnect/resync racing with ordinary incremental sync.
+- Responsibility reduction racing with new evidence;
+- AI run basis revision becoming stale;
+- Temporal Contract update/cancel racing trigger execution;
+- duplicate/out-of-order provider ingestion;
+- SendOperation retries/client double-submit/ambiguous provider result;
+- reconnect/resync racing ordinary incremental sync.
 
-Use database uniqueness constraints, transactions, compare-and-set/version fields, or locking only where justified by the specific invariant.
+Use uniqueness constraints, transactions, compare-and-set/versioning, or locking only where justified by the invariant.
 
 ---
 
-## 31. Physical-schema implementation rule
+## 37. Physical-schema implementation rule
 
-When implementing the first real schema:
+Before implementing the first real Responsibility schema:
 
-1. start from these ownership/invariants;
-2. use the chosen relational database's native constraints where appropriate;
-3. avoid polymorphic JSON blobs for core relationships simply to move faster;
-4. JSON is acceptable for provider-specific opaque metadata and versioned AI candidate facts when schema evolution benefits outweigh query constraints;
-5. add indexes from actual query flows: account sync, conversation list, ActionItem attention/deadline, active triggers, drafts, send operations, search;
-6. keep migrations reversible/staged when user data already exists.
+1. start from `responsibility/DECISIONS.md`, `CONSISTENCY-AUDIT.md`, canonical scenarios, and transition oracles;
+2. preserve the fixed semantic dimensions while choosing the smallest relational representation that satisfies required queries/invariants;
+3. do **not** resurrect the superseded seven-state lifecycle, scalar `BOTH` owner, one `deadline_at`, or whole-item override as canonical truth;
+4. use native relational constraints for ownership/idempotency where appropriate;
+5. avoid generic polymorphic workflow/EAV structures merely for flexibility;
+6. JSON is acceptable for provider-specific opaque metadata and versioned AI candidate facts when appropriate, but not as an excuse to erase core constraints;
+7. index actual flows: account sync, conversation list/projection, active Responsibility work, temporal triggers, drafts, sends, search;
+8. keep migrations staged/reversible once user data exists;
+9. add only the child structures proven necessary by scenario/transition evidence.
 
-Any implementation change that removes a high-value invariant above should update this document or be rejected.
+An implementation change that removes a high-value invariant must trigger an explicit spec/decision update rather than silently changing the model.

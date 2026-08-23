@@ -52,6 +52,7 @@ This directory does **not** freeze:
 - `TIER-0-DETAILED-ORACLES-BATCH-2.md` — ten additional full layered base oracles using the reconciled state-vector vocabulary, plus the explicit observation-confirmed C23 counterpart.
 - `TRANSITION-ORACLES.md` — semantic traces for all 20 mandatory transition/event sequences.
 - `PHYSICAL-MODEL-DESIGN.md` — **non-frozen** hybrid relational/typed-details persistence candidate derived from the current oracle pressure. It is a falsifiable design input for Phase 2, not migration authority.
+- `PHYSICAL-MODEL-AUDIT.md` — adversarial review of that candidate; requires directly queryable field authority, target-scoped risk, mechanical evidence idempotency, stable IDs/versioning inside typed semantic details, and additional schema-falsifier gates before freeze.
 
 ## Current coverage-design status
 
@@ -166,11 +167,19 @@ normalized parent orthogonal state
 + normalized obligation legs
 + normalized expected events
 + normalized material temporal facts
-+ normalized provenance/history
++ normalized field decisions/provenance/history
 + strictly typed/versioned low-query semantic details
 ```
 
-That design is deliberately **candidate-only**. Remaining oracles are now used partly as adversarial schema tests. If they expose a cheaper/necessary representation, the physical design changes before code/migrations.
+`PHYSICAL-MODEL-AUDIT.md` strengthens that candidate with three particularly important corrections:
+
+```text
+current field-scoped user authority must be directly queryable
+risk is target-scoped; any parent aggregate risk is only a derived summary
+duplicate evidence application needs a mechanical idempotency/source-event boundary
+```
+
+The physical design remains deliberately **candidate-only**. Remaining oracles are now used partly as adversarial schema tests. If they expose a cheaper/necessary representation, the physical design changes before code/migrations.
 
 ## Conceptual terminology
 
@@ -188,8 +197,8 @@ The remaining gate before domain/persistence implementation is different:
 
 Before schema freeze:
 
-1. continue detailed Tier-0 expansion, prioritizing cases capable of falsifying `PHYSICAL-MODEL-DESIGN.md`;
-2. adversarially audit the candidate's JSON-vs-normalized boundaries, field authority, risk representation, provenance, idempotency, and query path;
+1. continue detailed Tier-0 expansion, prioritizing cases capable of falsifying `PHYSICAL-MODEL-DESIGN.md` / `PHYSICAL-MODEL-AUDIT.md`;
+2. explicitly challenge JSON-vs-normalized boundaries, field authority, risk representation, provenance, idempotency, and common projection query paths;
 3. normalize the first eight legacy detailed-oracle aliases/errata during executable serialization;
 4. keep the C23 claim-only and observation-confirmed cases as two explicit executable inputs;
 5. require HIGH/CRITICAL forbidden outcomes at the owning verification layer;

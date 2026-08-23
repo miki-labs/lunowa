@@ -2,54 +2,56 @@
 
 ## Status
 
-**Accepted Responsibility v0.1 semantic baseline for annotation, scenario design, and later domain reconciliation.**
+**Accepted Responsibility v0.1 semantic baseline for annotation, scenario design, architecture/domain reconciliation, and later implementation.**
 
 This is a versioned semantic baseline, not a frozen physical schema or proof that runtime behavior has been implemented/passed.
 
-This directory records the product semantics used to understand communication, admit trackable responsibilities, evaluate AI interpretation, reduce evidence into Responsibility state, apply safety/actionability policy, and project that state into Lunowa UI.
+This directory records the product semantics used to understand communication, admit trackable Responsibilities, reduce evidence into accepted state, apply safety/actionability policy, and project that state into Lunowa UI.
 
 ## Scope and precedence
 
 This directory is normative for **Responsibility semantics and annotation/evaluation behavior**.
 
-Existing documents such as `../DATA-MODEL.md`, `../CONTRACTS.md`, and `../../design/INTERACTIONS.md` remain useful/authoritative for their broader scopes. However, their older Responsibility-specific single-lifecycle/scalar-owner/single-deadline shapes predate this v0.1 work.
+The broader Responsibility-related sections of:
 
-For Responsibility semantics, use this directory first.
+```text
+docs/product/ARCHITECTURE.md
+docs/product/DATA-MODEL.md
+docs/product/CONTRACTS.md
+docs/design/INTERACTIONS.md
+```
 
-### Implementation stop condition
+have now been reconciled against v0.1. They may define broader architectural/data/API/interaction concerns, but should not contradict the semantic decisions here.
 
-Until the older Responsibility-specific sections are explicitly reconciled, **do not implement the legacy `ActionItem` lifecycle model from `DATA-MODEL.md`, `CONTRACTS.md`, or `INTERACTIONS.md` merely because those files are otherwise accepted/current documents.**
-
-The reconciliation findings and compatibility rules are recorded in `CONSISTENCY-AUDIT.md`.
+If a future contradiction appears, treat it as a specification defect and reconcile it explicitly rather than silently guessing.
 
 This directory does **not** freeze:
 
 - SQL tables or ORM types;
-- exact enum names;
+- exact enum names/cardinality;
+- physical child-table vs JSON choices for obligation legs/events/criteria;
 - model/provider choice;
 - prompts;
 - numeric confidence/risk thresholds;
 - similarity thresholds;
 - number of AI retries/reruns;
-- cross-thread responsibility merging;
-- recurring responsibility machinery;
+- cross-thread Responsibility merging;
+- recurring Responsibility machinery;
 - generic team workflow machinery.
 
 ## Documents
 
-- `ANNOTATION-GUIDELINES.md` — normative definitions, evidence/communication/admission/identity/safety boundaries, and annotation decision procedure.
-- `DECISIONS.md` — FIXED principles, strong implementation directions, open questions, and superseded decisions.
-- `CONSISTENCY-AUDIT.md` — cross-document audit, reconciled semantic vector, compatibility aliases, oracle errata, and implementation stop conditions.
-- `SCENARIO-SCHEMA.md` — canonical focal-event scenario/evaluation contract after consistency reconciliation.
+- `ANNOTATION-GUIDELINES.md` — normative evidence/communication/admission/identity/safety definitions and annotation procedure.
+- `DECISIONS.md` — FIXED principles, strong implementation directions, OPEN questions, and superseded decisions.
+- `CONSISTENCY-AUDIT.md` — cross-document reconciliation, compatibility aliases, oracle errata, and remaining promotion gates.
+- `SCENARIO-SCHEMA.md` — canonical focal-event scenario/evaluation contract.
 - `TRANSITION-SCHEMA.md` — multi-event trace contract with semantic/observed chronology, evidence revisions, composite `effects[]`, conditional activation, and step-level forbidden outcomes.
 - `COVERAGE-PLAN.md` — corpus-level mandatory coverage inventory, contrasts/interactions, semantic mutants, transition traces, metamorphic relations, and completion gates.
-- `TIER-0-SCENARIO-MATRIX.md` — first 44 base semantic-oracle assignments and controlled variants. Earlier transition `8/20` text in that assignment document is historical; current transition design coverage is defined by the dedicated transition artifacts.
-- `TIER-0-CRITICAL-ORACLES.md` — full layered oracles for the first eight highest-risk/highest-connectivity Tier-0 cases. Legacy aliases/errata are normalized through `CONSISTENCY-AUDIT.md` before executable serialization.
+- `TIER-0-SCENARIO-MATRIX.md` — first 44 base semantic-oracle assignments and controlled variants. Its earlier transition `8/20` section is historical; current transition design coverage is defined by the dedicated transition artifacts.
+- `TIER-0-CRITICAL-ORACLES.md` — full layered oracles for the first eight high-risk/high-connectivity Tier-0 cases. Legacy aliases/errata are normalized using `CONSISTENCY-AUDIT.md` before executable serialization.
 - `TRANSITION-ORACLES.md` — semantic traces for all 20 mandatory transition/event sequences.
 
 ## Current coverage-design status
-
-At the specification/design level, the mandatory inventory is mapped for:
 
 ```text
 FIXED-rule sentinels: 50 / 50
@@ -92,38 +94,51 @@ Safety / actionability policy
 Deterministic product projection
 ```
 
-The central separation is deliberate:
+Central separation:
 
 ```text
 Evidence ≠ Interpretation ≠ Domain state ≠ Safe action ≠ UI projection
 ```
 
-The model may help interpret language, but it is not the authority for provider facts, authorization, irreversible side effects, or domain invariants.
+The model may help interpret language, but it is not authority for provider facts, authorization, irreversible side effects, or domain invariants.
 
-## Canonical semantic-vector direction
+## Canonical semantic vector
 
-After scenario + transition stress testing and consistency audit, the stable semantic dimensions are:
+The stable v0.1 dimensions are:
 
 ```text
-resolution status
+resolution status/reason
 × live tracking activation
 × attention/defer
-× obligation legs / actionability
-× expected events / completion criteria
+× obligation legs/actionability/conditions
+× expected events
+× completion criteria
+× constraints
+× pending proposals/agreed facts
 × temporal facts
-× uncertainty / risk
+× uncertainty/risk
 × provenance
 ```
 
-Exact physical tables/fields/enums remain open.
+Exact physical representation remains open.
 
-Existing v0.1 oracle shorthand such as `tracking_status` or `active_obligations[]` is governed by compatibility rules in `CONSISTENCY-AUDIT.md`; new oracles should use the reconciled schema.
+Existing detailed-oracle shorthand such as `tracking_status` or `active_obligations[]` is governed by compatibility rules in `CONSISTENCY-AUDIT.md`; new executable fixtures use the reconciled schema.
 
 ## Conceptual terminology
 
 `Responsibility` is the canonical semantic concept name. It means a communication-bounded, trackable operational obligation / expected-outcome loop with a coherent closure condition.
 
-The current physical entity name `ActionItem` is not renamed merely by these documents.
+The physical entity/table name is an implementation choice; `ActionItem` should not be retained merely because the older model used it.
+
+## Current implementation gate
+
+The prior documentation stop condition caused by conflicting legacy lifecycle semantics is now satisfied: Architecture, Data Model, Contracts, and Interactions have been reconciled.
+
+The remaining gate before domain/persistence implementation is different:
+
+> choose the **minimal physical representation** that satisfies the validated scenarios/transitions without reintroducing the superseded single lifecycle model or building a generic workflow engine.
+
+Before schema freeze, remaining Tier-0 oracle expansion and executable fixture normalization should continue to pressure-test that representation.
 
 ## Change policy
 
@@ -138,4 +153,4 @@ which artifacts/evals are affected
 why the replacement is safer/better
 ```
 
-Do not silently preserve consistency with an older decision when stronger evidence contradicts it.
+Do not preserve stale consistency when stronger evidence contradicts it.

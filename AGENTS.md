@@ -10,9 +10,19 @@ This file is a **map**, not the handbook. Read only the Source of Truth relevant
 
 Lunowa has a mechanically verified Phase-0 application/runtime foundation. Phase-1 product UI has not yet been implemented.
 
-Responsibility v0.1 semantics are an accepted versioned baseline. Architecture, Data Model, Contracts, Design/Interactions/Responsive behavior, Implementation Plan, technology guidance, ADRs, and repository routing have been reconciled to that baseline on the current documentation branch.
+Responsibility v0.1 semantics and its logical persistence boundary are accepted versioned baselines. The exact PostgreSQL/Drizzle schema is currently **v0.4, static-review complete but not executable-proof complete**. Production migrations/runtime remain unauthorized until the L2 proof gate passes.
 
-This does **not** mean the physical Responsibility schema or AI runtime is implemented/passed.
+Current bounded technical proof routing:
+
+```text
+Issue #13 -> PostgreSQL 18 / Drizzle executable schema proof
+Issue #14 -> Better Auth UUID persistence proof
+Issue #15 -> independent combined review + L2 freeze decision
+```
+
+The authoritative execution gate is `docs/product/responsibility/L2-EXECUTABLE-PROOF-GATE.md`.
+
+This does **not** mean the physical Responsibility schema, migrations, reducer, or AI runtime are implemented/passed.
 
 Executable tooling is governed by checked-in runtime/config (`package.json`, lockfile, test config, CI). Durable product behavior/architecture is governed by current docs/decisions.
 
@@ -24,9 +34,9 @@ Do not invent or silently replace framework/database/auth/provider/job/AI choice
 
 ## Source of truth by question
 
-### Responsibility semantics / eval
+### Responsibility semantics / eval / persistence proof
 
-For any task involving task extraction, Responsibility state, owner/actionability, deadlines, waiting, completion, follow-up, uncertainty, historical activation, safety, or projection, start here:
+For any task involving task extraction, Responsibility state, owner/actionability, deadlines, waiting, completion, follow-up, uncertainty, historical activation, safety, projection, or Responsibility persistence, start here:
 
 - `docs/product/responsibility/README.md` — status/scope/current implementation gate;
 - `docs/product/responsibility/DECISIONS.md` — FIXED/OPEN/SUPERSEDED decisions;
@@ -35,7 +45,11 @@ For any task involving task extraction, Responsibility state, owner/actionabilit
 - `docs/product/responsibility/SCENARIO-SCHEMA.md` — focal-event oracle contract;
 - `docs/product/responsibility/TRANSITION-SCHEMA.md` — multi-event trace contract;
 - `docs/product/responsibility/COVERAGE-PLAN.md` + oracle files when implementing/evaluating domain behavior;
-- `docs/decisions/0008-responsibility-state-is-orthogonal.md` — costly-to-reverse state/projection architecture rationale.
+- `docs/product/responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — frozen L1 logical persistence boundary;
+- `docs/product/responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — current exact L2 candidate; not migration authority until the executable gate passes;
+- `docs/product/responsibility/L2-EXECUTABLE-PROOF-GATE.md` — proof/evidence requirements before L2 freeze;
+- `docs/decisions/0008-responsibility-state-is-orthogonal.md` — state/projection architecture rationale;
+- `docs/decisions/0009-responsibility-persistence-hybrid-boundary.md` — logical persistence-boundary rationale.
 
 Do **not** derive canonical state from legacy screenshot filenames such as `moment-action-required`, `moment-deferred`, or `moment-follow-up`.
 
@@ -54,7 +68,7 @@ Do **not** derive canonical state from legacy screenshot filenames such as `mome
 - `docs/product/DATA-MODEL.md` — conceptual entities/ownership/Responsibility semantic persistence requirements.
 - `docs/product/CONTRACTS.md` — provider/sync/AI interpretation/Responsibility reducer/scheduler/search/send/job contracts.
 - `docs/product/TECH-STACK.md` — accepted initial stack + activation policy.
-- `docs/product/IMPLEMENTATION-PLAN.md` — staged implementation sequence.
+- `docs/product/IMPLEMENTATION-PLAN.md` — staged implementation sequence and current proof gate.
 - current referenced GitHub Issue — task-specific implementation intent.
 - repository-local plan/design/task artifact only when the Issue explicitly links one.
 - `docs/decisions/` — durable architecture rationale.
@@ -129,6 +143,9 @@ Do not change these casually. Stronger evidence requires durable reconciliation 
 21. **Pin is explicit user control orthogonal to Responsibility semantics.**
 22. **Core reading/composing remains usable when AI is unavailable.**
 23. **Prefer repository/framework/platform/official SDK reuse before custom infrastructure for non-differentiating concerns.**
+24. **Conversation semantic-evidence revision is a freshness/concurrency coordinator, not workflow-state authority.**
+25. **Semantic CREATE idempotency must not depend on a newly generated Responsibility ID.**
+26. **Static DDL review is not proof of PostgreSQL/Drizzle runtime behavior; use the L2 executable gate before migration.**
 
 ---
 
@@ -145,6 +162,8 @@ Do not change these casually. Stronger evidence requires durable reconciliation 
 
 GitHub Actions independently runs `Verify` and `E2E Smoke` checks. Local success does not replace required CI once branch protection is active.
 
+A task-specific spike may add a targeted verification command, but it does not replace these canonical checks when repository-wide behavior is changed.
+
 ---
 
 ## Working rules
@@ -153,6 +172,7 @@ GitHub Actions independently runs `Verify` and `E2E Smoke` checks. Local success
 - If a handoff names a GitHub Issue, preflight that configured `origin` matches the Issue repository before task-branch work. Use that Issue for current task-specific intent and repository docs for durable constraints. If Issue is inaccessible, stop rather than infer intent from unrelated state.
 - For complex/high-risk work, follow a repository-local plan/design/task artifact only when the Issue links it or the task creates one deliberately.
 - For Responsibility-domain work, explicitly map implementation behavior to relevant canonical scenario/transition oracles.
+- For Responsibility L2 proof work, do not treat generated Drizzle types, mocks, PGlite/SQLite, or builder summaries as PostgreSQL 18 evidence when the gate requires the real DB behavior.
 - For frontend work, inspect exact relevant visual refs **and** translate legacy filenames through `docs/design/references/README.md`.
 - For complex/risky changes, design/plan first and keep slices independently verifiable.
 - Prefer existing repository/framework/platform/official SDK/mature dependencies before custom implementation.
@@ -163,7 +183,7 @@ GitHub Actions independently runs `Verify` and `E2E Smoke` checks. Local success
 - Do not weaken/delete tests merely to make verification pass.
 - Update durable docs when accepted behavior/architecture/ownership/contracts/security semantics materially change.
 - Do not silently resolve spec/code/provider conflicts. Determine authority and reconcile/escalate.
-- State exactly what was verified; do not claim provider/scheduler/browser/security/migration/send behavior from mocks alone.
+- State exactly what was verified; do not claim provider/scheduler/browser/security/migration/send/database behavior from mocks alone.
 
 ---
 
@@ -171,9 +191,9 @@ GitHub Actions independently runs `Verify` and `E2E Smoke` checks. Local success
 
 Follow `docs/product/IMPLEMENTATION-PLAN.md` plus the current task-specific GitHub Issue when one is supplied.
 
-Phase 0 established runtime/verification. The first product slice is the high-fidelity fake-data desktop shell beginning with `00`, `01`, `02`, with `row body -> 会話` and `status/projection chip -> 今の要点` browser-verified before provider/AI complexity.
+Phase 0 established runtime/verification. The first **product** slice is the high-fidelity fake-data desktop shell beginning with `00`, `01`, `02`, with `row body -> 会話` and `status/projection chip -> 今の要点` browser-verified before provider/AI complexity.
 
-Before Phase-2 persistence implementation, design the **minimal physical Responsibility representation** against the canonical v0.1 oracles. Do not code from the superseded lifecycle model or from intuition.
+The current Responsibility persistence work is a bounded technical proof, not authorization to skip the product sequence. L0/L1 are frozen; exact L2 v0.4 must pass Issues #13/#14 and independent Issue #15 before production migrations are even proposed.
 
 ## Done
 

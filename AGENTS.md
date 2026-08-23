@@ -198,3 +198,17 @@ The current Responsibility persistence work is a bounded technical proof, not au
 ## Done
 
 Implementation alone is not completion. A change is done only when intended behavior, required verification evidence, and affected durable documentation are consistent.
+For non-trivial parallel implementation, run the repository-local
+`python scripts/parallel-task-preflight.py` before editing with the expected
+repository/worktree, dedicated branch, base ref, owner, and task relationship.
+The preflight is fail-closed and does not fetch, clean, reset, or otherwise
+mutate the workspace. Runtime resources must also follow the task namespace
+convention in `docs/parallel-task-runtime-namespaces.md`.
+
+## Completion handoff
+
+After the required evidence is present, leave the candidate open and apply the
+GitHub `agent:review-ready` label to its pull request. The label means
+“ready to inspect”, never PASS. Keep it until reviewer disposition is recorded
+durably in the pull request; record that disposition before clearing or
+replacing the label.

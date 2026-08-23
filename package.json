@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
     "next": "16.3.0",

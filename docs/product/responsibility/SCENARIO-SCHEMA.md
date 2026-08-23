@@ -10,6 +10,7 @@ It connects:
 product semantics
 → human annotation
 → AI extraction
+→ admission/review
 → matching/reducer behavior
 → safety policy
 → UX projection
@@ -23,7 +24,8 @@ The current vocabulary is constrained by:
 - `ANNOTATION-GUIDELINES.md`;
 - `DECISIONS.md`;
 - `CONSISTENCY-AUDIT.md`;
-- `TRANSITION-SCHEMA.md` for multi-event traces.
+- `TRANSITION-SCHEMA.md` for multi-event traces;
+- detailed oracle pressure, including Batch 3 admission-review cases.
 
 ---
 
@@ -98,6 +100,16 @@ expected_admission:
   decision: TRACK | DO_NOT_TRACK | NEEDS_REVIEW
   reason_codes: []
 
+# Optional. Use when admission itself is unresolved and therefore no
+# canonical Responsibility has yet been admitted.
+expected_admission_review:
+  reason_codes: []
+  candidate_summary:
+  candidate_fields: {}
+  evidence_revision: null
+  provenance: []
+  acceptable_resolution_paths: []
+
 # Convenience shorthand ONLY when the focal event has exactly one
 # Responsibility effect.
 expected_matching:
@@ -112,17 +124,15 @@ expected_effects:
     reason:
     field_changes: []
 
+# Convenience shorthand when exactly one admitted Responsibility snapshot
+# is material to the oracle.
 expected_responsibility:
   operational_outcome:
 
   resolution_status: OPEN | RESOLVED
   resolution_reason: null
 
-  # Conceptual activation of this evidence-relative loop as live work.
-  # Exact production enum names remain open.
   live_tracking_state:
-
-  # Attention is orthogonal to resolution and ownership.
   attention_mode:
 
   obligation_legs: []
@@ -138,6 +148,26 @@ expected_responsibility:
   responsibility_risk: null
   provenance: []
 
+# Canonical form when one focal event creates/updates multiple admitted
+# Responsibilities and their separate snapshots matter to the oracle.
+expected_responsibilities:
+  - responsibility_ref:
+    operational_outcome:
+    resolution_status:
+    resolution_reason:
+    live_tracking_state:
+    attention_mode:
+    obligation_legs: []
+    expected_events: []
+    completion_criteria: []
+    pending_proposals: []
+    agreed_facts: []
+    constraints: []
+    temporal_facts: []
+    uncertainties: []
+    responsibility_risk: null
+    provenance: []
+
 expected_safety:
   requested_action: null
   safe_next_action: null
@@ -145,6 +175,7 @@ expected_safety:
 
 expected_projection:
   bucket: MY_TURN | WAITING | LATER | DONE | REVIEW | NONE
+  subject_kind: RESPONSIBILITY | ADMISSION_REVIEW | CONVERSATION_AGGREGATE | NONE
   primary_reason:
 
 must_hold_invariants: []
@@ -246,7 +277,8 @@ Examples:
 - trusted calendar event anchor;
 - trusted organizational authority metadata;
 - provider observation;
-- user-confirmed field correction.
+- user-confirmed field correction;
+- explicitly authorized user/relationship convention when relevant to admission policy.
 
 Do not place guessed hierarchy, hidden intent, or untrusted email claims here as trusted context.
 
@@ -256,7 +288,7 @@ Do not place guessed hierarchy, hidden intent, or untrusted email claims here as
 
 It is not a UI/read-state revision.
 
-Stale AI/concurrency scenarios SHOULD specify it.
+Stale AI/concurrency and missing-context/re-evaluation scenarios SHOULD specify it when the distinction matters.
 
 ---
 
@@ -295,6 +327,8 @@ CANCELLATION
 COMPLETION_SIGNAL
 INFORMATION
 ```
+
+When a case is genuinely unresolved, the oracle may use a clearly marked candidate/ambiguous act description rather than invent a false top-level label.
 
 A communication-act entry may additionally express:
 
@@ -340,7 +374,7 @@ Evidence authority is field-specific.
 
 ---
 
-# 9. Admission oracle
+# 9. Admission oracle and pre-admission Review
 
 Admission is distinct from extraction:
 
@@ -357,6 +391,45 @@ It does **not** mean the requested action is legitimate, authorized, or safe to 
 `NEEDS_REVIEW` is reserved for uncertainty about the admission decision itself.
 
 A definitely tracked Responsibility may instead contain field-scoped uncertainty and project `REVIEW`.
+
+## 9.1 Admission Review is not a Responsibility
+
+When:
+
+```text
+expected_admission.decision = NEEDS_REVIEW
+```
+
+because Responsibility existence/materiality/relevance itself is unresolved, the oracle SHOULD use `expected_admission_review` and SHOULD NOT invent a canonical Responsibility snapshot merely to represent UI Review.
+
+Canonical examples:
+
+```text
+T0-041 vague `来週よろしくお願いします`
+T0-043 missing referent `それでお願いします`
+T0-044 user-dependent optionality/materiality
+```
+
+An admission-review oracle may record:
+
+- why admission is unresolved;
+- candidate facts that are actually grounded;
+- evidence/context revision;
+- provenance;
+- acceptable resolution paths such as TRACK / DO_NOT_TRACK / remain review.
+
+A later TRACK decision may CREATE a Responsibility. A DO_NOT_TRACK decision may close/dismiss the review without a fake resolved Responsibility.
+
+## 9.2 Review UI is a union projection
+
+User-facing `REVIEW` may originate from:
+
+```text
+A. an admitted Responsibility with material decision-critical field uncertainty
+B. an admission-level review candidate before Responsibility creation
+```
+
+The UI may unify them visually, but tests/application contracts must preserve `subject_kind` so actions do not confuse “resolve a field conflict” with “admit/dismiss a candidate.”
 
 ---
 
@@ -387,6 +460,8 @@ R2 -> CREATE
 
 Do not mutate R1's operational outcome into R2's replacement outcome.
 
+One source message can also create multiple independent Responsibilities. In that case `expected_responsibilities[]` records separate snapshots when needed.
+
 ## 10.2 SUPERSEDE semantics
 
 `SUPERSEDE` is terminal on the old Responsibility and conceptually yields:
@@ -408,6 +483,8 @@ prior episode genuinely closed + later new operational work -> CREATE
 ```
 
 Similarity alone is not merge authority.
+
+REOPEN does not imply every prior obligation leg/history row must be reset. Prior completed actions may remain historically satisfied while a new remedial leg becomes current.
 
 ---
 
@@ -484,6 +561,12 @@ This supports:
 
 `active user obligations` are derived from these dimensions.
 
+### Granularity rule
+
+Do not create one persistent obligation leg per linguistic verb by default.
+
+Separate legs when independent bearer/actionability/closure/query pressure requires them. A bounded sequential/conditional instruction may remain one cohesive leg plus typed condition/constraint detail when that is the smallest faithful model.
+
 ## 11.5 Expected events
 
 Expected events identify who/what the product is waiting for and any condition/temporal linkage.
@@ -521,9 +604,11 @@ RESURFACE_TIME
 FOLLOW_UP_TIME
 ```
 
-`SOURCE_DUE` means an explicitly communicated due/required time for an obligation. It is not limited by message direction and does not become a different temporal kind merely because source legitimacy is uncertain.
+`SOURCE_DUE` means an explicitly communicated due/required time for an obligation. It is not limited by message direction or bearer and does not become a different temporal kind merely because source legitimacy is uncertain.
 
 Safety/authority metadata belongs separately.
+
+A USER-authored `USER_TARGET` is an orthogonal fact, not automatically an override/correction of `SOURCE_DUE`.
 
 Each material temporal fact should preserve:
 
@@ -560,9 +645,12 @@ AMBIGUOUS_ASSIGNMENT
 STALE_ANALYSIS
 MODEL_UNCERTAINTY
 HIGH_RISK_UNVERIFIED_REQUEST
+USER_DEPENDENT_MATERIALITY
 ```
 
 Exact storage enums remain open.
+
+Field-scoped uncertainty inside a TRACKed Responsibility is distinct from admission-level uncertainty before a Responsibility exists.
 
 ---
 
@@ -596,19 +684,27 @@ Prompt-injection/tool-like text inside email has no application authority.
 
 # 15. Projection oracle
 
-Projection is derived, deterministic product state.
+Projection is derived, deterministic product state/surface behavior.
 
-Conceptual rule shape:
+Responsibility-side conceptual rule shape:
 
 ```text
 no admitted live Responsibility -> NONE
 resolved live Responsibility -> DONE
-open + material review condition -> REVIEW
+open + material field-review condition -> REVIEW
 open + intentionally deferred attention -> LATER
 open + actionable USER obligation leg -> MY_TURN
 open + only OTHER/EXTERNAL pending work/events -> WAITING
 otherwise -> REVIEW / ordinary fallback
 ```
+
+Admission-side rule:
+
+```text
+unresolved accepted AdmissionReview selected for surfacing -> REVIEW
+```
+
+Therefore `REVIEW` is a product projection family, not proof that its subject is an admitted Responsibility.
 
 Historical inactive candidates MUST NOT become live `MY_TURN` merely because they appear evidence-relative OPEN.
 
@@ -624,7 +720,7 @@ Available evidence supports one clear semantic answer.
 
 ### AMBIGUOUS
 
-Even with supplied context, multiple interpretations remain reasonably possible.
+Even with supplied context, multiple interpretations remain reasonably possible, or supplied context is explicitly insufficient and the oracle preserves that limitation.
 
 The oracle may specify invariants/forbidden outcomes rather than force one field value.
 
@@ -638,7 +734,9 @@ Where practical, preserve raw independent annotations and adjudication rationale
 
 # 17. Layered oracle requirement
 
-A promoted executable scenario must be decomposable into relevant layers:
+A promoted executable scenario must be decomposable into the relevant path.
+
+For admitted Responsibility cases:
 
 ```text
 zoning
@@ -649,6 +747,19 @@ matching/effects
 canonical Responsibility semantics
 safety/actionability
 projection
+must-hold / forbidden outcomes
+```
+
+For admission-review cases:
+
+```text
+zoning
+communication act / candidate facts
+provider/external/context evidence
+admission = NEEDS_REVIEW
+admission-review state / provenance / revision
+projection or non-surfacing policy
+resolution paths
 must-hold / forbidden outcomes
 ```
 
@@ -668,6 +779,8 @@ weak completion claim -> must not resolve material loop
 stale AI result -> must not mutate current revision
 high-risk request -> must not become executable merely from source request/confidence
 historical candidate -> must not flood live My Turn
+admission ambiguity -> must not create a fake Responsibility merely to render Review
+missing context -> must not fabricate referent/action
 ```
 
 ---
@@ -699,7 +812,8 @@ Important families include:
 - date/amount mutation;
 - proposal → acceptance;
 - fresh → stale evidence revision;
-- current-authored ↔ quoted/forwarded placement.
+- current-authored ↔ quoted/forwarded placement;
+- context-envelope enrichment for missing-context review.
 
 ---
 
@@ -714,8 +828,9 @@ Before executable promotion:
 - apply `CONSISTENCY-AUDIT.md` errata/aliases;
 - serialize both sides of mandatory contrasts;
 - provide explicit must-hold/forbidden outcomes for HIGH/CRITICAL cases;
+- preserve admission-review vs admitted-Responsibility subject identity;
 - do not expose annotators to current model predictions before oracle creation;
 - retain genuine ambiguity rather than forcing false certainty;
 - verify coverage IDs mechanically or with an equivalent linter.
 
-Raw overall accuracy is insufficient; correctness, safety, stability, provenance, and semantic robustness must remain separable evaluation views.
+Raw overall accuracy is insufficient; correctness, safety, stability, provenance, admission quality, and semantic robustness must remain separable evaluation views.

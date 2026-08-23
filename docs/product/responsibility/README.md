@@ -2,19 +2,25 @@
 
 ## Status
 
-**Responsibility Annotation Guideline v0.1 candidate.**
+**Accepted Responsibility v0.1 semantic baseline for annotation, scenario design, and later domain reconciliation.**
 
-This directory records the product semantics used to understand communication, admit trackable responsibilities, evaluate AI interpretation, and project responsibility state into Lunowa UI.
+This is a versioned semantic baseline, not a frozen physical schema or proof that runtime behavior has been implemented/passed.
 
-The purpose is to preserve a stable external source of truth before implementation details harden around an underspecified model.
+This directory records the product semantics used to understand communication, admit trackable responsibilities, evaluate AI interpretation, reduce evidence into Responsibility state, apply safety/actionability policy, and project that state into Lunowa UI.
 
 ## Scope and precedence
 
-This directory is normative for **responsibility semantics and annotation/evaluation behavior**.
+This directory is normative for **Responsibility semantics and annotation/evaluation behavior**.
 
-Existing documents such as `../DATA-MODEL.md`, `../CONTRACTS.md`, and `../../design/INTERACTIONS.md` remain authoritative for their current broader scopes. However, some older responsibility-specific details in those files predate this guideline, including the single `LifecycleState`, scalar `next_owner`, one `deadline_at`, and whole-item `user_override_state` concepts.
+Existing documents such as `../DATA-MODEL.md`, `../CONTRACTS.md`, and `../../design/INTERACTIONS.md` remain useful/authoritative for their broader scopes. However, their older Responsibility-specific single-lifecycle/scalar-owner/single-deadline shapes predate this v0.1 work.
 
-Until those files are reconciled, do not treat those older responsibility-specific shapes as stronger than the principles recorded here.
+For Responsibility semantics, use this directory first.
+
+### Implementation stop condition
+
+Until the older Responsibility-specific sections are explicitly reconciled, **do not implement the legacy `ActionItem` lifecycle model from `DATA-MODEL.md`, `CONTRACTS.md`, or `INTERACTIONS.md` merely because those files are otherwise accepted/current documents.**
+
+The reconciliation findings and compatibility rules are recorded in `CONSISTENCY-AUDIT.md`.
 
 This directory does **not** freeze:
 
@@ -31,18 +37,19 @@ This directory does **not** freeze:
 
 ## Documents
 
-- `ANNOTATION-GUIDELINES.md` — normative definitions, invariants, and annotation decision procedure.
-- `DECISIONS.md` — fixed principles, strong directions, open questions, and superseded decisions.
-- `SCENARIO-SCHEMA.md` — contract for describing one canonical focal-event scenario/evaluation oracle, refined from demonstrated Tier 0 needs.
-- `TRANSITION-SCHEMA.md` — multi-event trace extension with semantic/observed chronology, evidence revisions, composite `effects[]`, branch semantics, and step-level forbidden outcomes.
-- `COVERAGE-PLAN.md` — corpus-level mandatory coverage inventory, contrast/interactions, semantic mutants, transition traces, metamorphic relations, and completion gates.
-- `TIER-0-SCENARIO-MATRIX.md` — first 44 base semantic-oracle assignments, controlled variants, contrast mapping, and mutant-kill mapping. Its earlier transition-coverage remainder is superseded by the dedicated transition oracle document below.
-- `TIER-0-CRITICAL-ORACLES.md` — full layered oracles for the first eight highest-risk/highest-connectivity Tier 0 cases; this is the first detailed expansion used to pressure-test the scenario schema itself.
-- `TRANSITION-ORACLES.md` — full semantic traces for all 20 mandatory transition/event sequences, including negotiation, send reconciliation, follow-up, hold/resume, supersession, out-of-order ingestion, stale AI runs, parallel obligations, conditional activation, temporal-anchor re-resolution, and historical activation.
+- `ANNOTATION-GUIDELINES.md` — normative definitions, evidence/communication/admission/identity/safety boundaries, and annotation decision procedure.
+- `DECISIONS.md` — FIXED principles, strong implementation directions, open questions, and superseded decisions.
+- `CONSISTENCY-AUDIT.md` — cross-document audit, reconciled semantic vector, compatibility aliases, oracle errata, and implementation stop conditions.
+- `SCENARIO-SCHEMA.md` — canonical focal-event scenario/evaluation contract after consistency reconciliation.
+- `TRANSITION-SCHEMA.md` — multi-event trace contract with semantic/observed chronology, evidence revisions, composite `effects[]`, conditional activation, and step-level forbidden outcomes.
+- `COVERAGE-PLAN.md` — corpus-level mandatory coverage inventory, contrasts/interactions, semantic mutants, transition traces, metamorphic relations, and completion gates.
+- `TIER-0-SCENARIO-MATRIX.md` — first 44 base semantic-oracle assignments and controlled variants. Earlier transition `8/20` text in that assignment document is historical; current transition design coverage is defined by the dedicated transition artifacts.
+- `TIER-0-CRITICAL-ORACLES.md` — full layered oracles for the first eight highest-risk/highest-connectivity Tier-0 cases. Legacy aliases/errata are normalized through `CONSISTENCY-AUDIT.md` before executable serialization.
+- `TRANSITION-ORACLES.md` — semantic traces for all 20 mandatory transition/event sequences.
 
 ## Current coverage-design status
 
-At the specification/design level, the mandatory inventory is now mapped for:
+At the specification/design level, the mandatory inventory is mapped for:
 
 ```text
 FIXED-rule sentinels: 50 / 50
@@ -56,7 +63,14 @@ ambiguity/oracle families: 10 / 10
 transition/event traces: 20 / 20
 ```
 
-`mapped` is not the same as `implemented`, `executed`, or `passed`. Runtime verification remains future work.
+`mapped` is not the same as:
+
+```text
+implemented
+executed
+passed
+production-validated
+```
 
 ## Core architecture
 
@@ -71,7 +85,7 @@ Responsibility admission
       ↓
 Responsibility identity + reduction
       ↓
-Canonical evidence-relative responsibility state
+Evidence-relative canonical Responsibility state
       ↓
 Safety / actionability policy
       ↓
@@ -86,10 +100,42 @@ Evidence ≠ Interpretation ≠ Domain state ≠ Safe action ≠ UI projection
 
 The model may help interpret language, but it is not the authority for provider facts, authorization, irreversible side effects, or domain invariants.
 
+## Canonical semantic-vector direction
+
+After scenario + transition stress testing and consistency audit, the stable semantic dimensions are:
+
+```text
+resolution status
+× live tracking activation
+× attention/defer
+× obligation legs / actionability
+× expected events / completion criteria
+× temporal facts
+× uncertainty / risk
+× provenance
+```
+
+Exact physical tables/fields/enums remain open.
+
+Existing v0.1 oracle shorthand such as `tracking_status` or `active_obligations[]` is governed by compatibility rules in `CONSISTENCY-AUDIT.md`; new oracles should use the reconciled schema.
+
 ## Conceptual terminology
 
-`Responsibility` is the canonical concept name in this specification. It means a communication-bounded, trackable operational obligation / expected outcome loop. The current physical entity name `ActionItem` is not renamed by this document.
+`Responsibility` is the canonical semantic concept name. It means a communication-bounded, trackable operational obligation / expected-outcome loop with a coherent closure condition.
+
+The current physical entity name `ActionItem` is not renamed merely by these documents.
 
 ## Change policy
 
-This is a living specification. Strong counterexamples from the canonical scenario matrix, transition traces, production failures, or better evidence may supersede v0.1 decisions. When a decision changes, record what changed and why rather than silently rewriting history.
+This is a living, versioned specification.
+
+Strong counterexamples from canonical scenarios, transition traces, organic/production failures, or better evidence may supersede v0.1 decisions. When a decision changes, record:
+
+```text
+what changed
+what evidence/counterexample changed it
+which artifacts/evals are affected
+why the replacement is safer/better
+```
+
+Do not silently preserve consistency with an older decision when stronger evidence contradicts it.

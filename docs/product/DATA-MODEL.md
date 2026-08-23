@@ -2,17 +2,20 @@
 
 ## Status
 
-**Accepted conceptual model, reconciled with Responsibility v0.1; physical schema is not yet frozen.**
+**Accepted conceptual model, reconciled with Responsibility v0.1 and the frozen L1 logical persistence boundary; exact L2 PostgreSQL/Drizzle remains a statically reviewed candidate awaiting executable proof/final freeze.**
 
 This document defines durable data concepts, ownership, relationships, and invariants that should constrain implementation. Table names, child-table choices, SQL types, indexes, ORM syntax, and exact enums may change during schema design as long as the accepted semantics remain intact.
 
-Responsibility semantics are constrained by:
+Responsibility semantics and persistence boundaries are constrained by:
 
 - `responsibility/README.md`;
 - `responsibility/DECISIONS.md`;
 - `responsibility/CONSISTENCY-AUDIT.md`;
 - `responsibility/SCENARIO-SCHEMA.md`;
-- `responsibility/TRANSITION-SCHEMA.md`.
+- `responsibility/TRANSITION-SCHEMA.md`;
+- `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — authoritative frozen L1 logical persistence boundary;
+- `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — current exact L2 candidate, not production-migration authority;
+- `responsibility/L2-EXECUTABLE-PROOF-GATE.md` — evidence required before final L2 freeze.
 
 Related broader sources:
 
@@ -52,7 +55,7 @@ User
  │                       │   └─ Responsibility
  │                       │       ├─ ProvenanceReference
  │                       │       ├─ FieldDecision / correction history
- │                       │       ├─ ResponsibilityTransition
+ │                       │       ├─ DomainEvent / effect history
  │                       │       └─ TemporalContract
  │                       │           └─ TemporalTrigger
  │                       ├─ Draft
@@ -70,7 +73,7 @@ SearchDocument -> derived projection of authorized domain data
 AuditEvent     -> cross-cutting durable evidence
 ```
 
-`Responsibility` may physically use child rows, embedded structured columns, or another minimal relational representation for obligation legs/events/criteria. This diagram is semantic, not a mandated table graph.
+`Responsibility` may physically use child rows, embedded structured columns, or another minimal relational representation for obligation legs/events/criteria. This diagram is semantic, not a mandated table graph. For Responsibility-owned persistence boundaries, the frozen L1 source in `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` wins over older conceptual labels in this document.
 
 ---
 
@@ -617,29 +620,44 @@ Invariants:
 
 ---
 
-## 21. ResponsibilityTransition
+## 21. DomainEvent / Responsibility effect history
 
-Durable explanation/history for meaningful Responsibility effects/field changes.
+The frozen L1 persistence-boundary name is **`DomainEvent[]`**. Older `ResponsibilityTransition` terminology is superseded as the persistence-boundary name; it may describe the user-visible/domain concept of a transition, but it must not be treated as a second competing persisted authority.
+
+Conceptually, a DomainEvent records one reducer effect/application against a Responsibility and enough provenance/version/idempotency context to explain and safely deduplicate meaningful state changes:
 
 ```text
-ResponsibilityTransition {
+DomainEvent {
   id
   responsibility_id
-  operation                 // CREATE | UPDATE | RESOLVE | REOPEN | SUPERSEDE | INVALIDATE | NO_OP when recorded
-  reason_code
+  user_id
+  operation                 // CREATE | UPDATE | RESOLVE | REOPEN | SUPERSEDE | INVALIDATE | NO_OP
   actor_kind
-  source_event_id?
+  reason_codes
+  basis_evidence_revision
+  aggregate_version_before
+  aggregate_version_after
+  mutates_state
+  source_event_key
+  application_key
+  effect_key
+  correlation_id
+  reducer_version
   interpretation_run_id?
-  evidence_revision?
+  change_summary?
   occurred_at
 }
 ```
 
-A focal event may produce multiple effects across multiple Responsibilities; the event/effect model must not assume one scalar operation globally.
+This is conceptual. Exact columns/constraints belong to the current L2 candidate and are not frozen by this document.
 
-`SUPERSEDE` is terminal on the old Responsibility and conceptually yields `RESOLVED/SUPERSEDED`. Replacement creation is a separate effect.
+Important rules:
 
-Not every incidental field write requires a transition row; meaningful domain changes should remain explainable.
+- a focal source event may produce multiple DomainEvents/effects across multiple Responsibilities; do not assume one scalar transition per source event;
+- semantic application/effect idempotency is global to the trusted application/effect identity, not merely the generated target Responsibility UUID;
+- `SUPERSEDE` is terminal on the old Responsibility and conceptually yields `RESOLVED/SUPERSEDED`; replacement creation is a separate CREATE effect;
+- `NO_OP` may be recorded where the accepted audit/idempotency contract requires it without pretending state mutated;
+- not every incidental persistence write requires a DomainEvent; meaningful accepted domain effects must remain explainable.
 
 ---
 
@@ -864,7 +882,7 @@ AuditEvent {
 }
 ```
 
-Useful for account/security/send/scheduler and other cross-cutting actions not captured by ResponsibilityTransition alone.
+Useful for account/security/send/scheduler and other cross-cutting actions not captured by Responsibility DomainEvents alone.
 
 Avoid indiscriminate full-content logging.
 
@@ -1011,14 +1029,15 @@ Use uniqueness constraints, transactions, compare-and-set/versioning, or locking
 
 Before implementing the first real Responsibility schema:
 
-1. start from `responsibility/DECISIONS.md`, `CONSISTENCY-AUDIT.md`, canonical scenarios, and transition oracles;
-2. preserve the fixed semantic dimensions while choosing the smallest relational representation that satisfies required queries/invariants;
-3. do **not** resurrect the superseded seven-state lifecycle, scalar `BOTH` owner, one `deadline_at`, or whole-item override as canonical truth;
+1. start from the frozen L1 boundary in `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`, the current exact L2 candidate, `responsibility/DECISIONS.md`, `CONSISTENCY-AUDIT.md`, canonical scenarios, transition oracles, and the executable proof gate;
+2. preserve the fixed semantic dimensions while proving the smallest relational representation that satisfies required queries/invariants;
+3. do **not** resurrect the superseded seven-state lifecycle, scalar `BOTH` owner, one `deadline_at`, `ResponsibilityTransition` as a second persistence-boundary authority, or whole-item override as canonical truth;
 4. use native relational constraints for ownership/idempotency where appropriate;
 5. avoid generic polymorphic workflow/EAV structures merely for flexibility;
 6. JSON is acceptable for provider-specific opaque metadata and versioned AI candidate facts when appropriate, but not as an excuse to erase core constraints;
 7. index actual flows: account sync, conversation list/projection, active Responsibility work, temporal triggers, drafts, sends, search;
 8. keep migrations staged/reversible once user data exists;
-9. add only the child structures proven necessary by scenario/transition evidence.
+9. add only the child structures proven necessary by scenario/transition evidence;
+10. do not accept production migrations until the L2 executable gate produces an explicit PASS/FREEZE through its owning review flow.
 
 An implementation change that removes a high-value invariant must trigger an explicit spec/decision update rather than silently changing the model.

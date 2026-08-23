@@ -2,22 +2,28 @@
 
 ## Status
 
-**Accepted Responsibility v0.1 semantic baseline and accepted v0.1 logical persistence boundary.**
+**Accepted Responsibility v0.1 semantic baseline and accepted v0.1 logical persistence boundary. Exact L2 DDL is a statically reviewed v0.4 candidate awaiting executable proof.**
 
-This directory now has two distinct freeze levels:
+Freeze/proof levels:
 
 ```text
 L0 semantic model                         FROZEN v0.1 baseline
 L1 logical persistence boundary           FROZEN v0.1 baseline
-L2 exact PostgreSQL/Drizzle DDL            OPEN
-L3 migrations/runtime                     NOT STARTED
+L2 exact PostgreSQL/Drizzle DDL            v0.4 STATIC REVIEW COMPLETE
+L2 executable proof                        PENDING
+L2 final freeze                            BLOCKED
+L3 migrations/runtime                     NOT AUTHORIZED
 ```
 
-`FROZEN` here means “versioned baseline that requires an explicit superseding decision if stronger evidence breaks it.” It does not mean immutable forever.
+`FROZEN` means “versioned baseline that requires an explicit superseding decision if stronger evidence breaks it.” It does not mean immutable forever.
+
+The L2 v0.4 label means only that three static adversarial audits have no known CRITICAL blocker. It is **not migration authority**.
+
+---
 
 ## Scope and precedence
 
-This directory is normative for Responsibility semantics, annotation/evaluation behavior, and the L1 persistence-boundary decision.
+This directory is normative for Responsibility semantics, annotation/evaluation behavior, the L1 persistence-boundary decision, and the current L2 proof contract.
 
 Broader documents such as:
 
@@ -30,22 +36,28 @@ docs/design/INTERACTIONS.md
 
 have been reconciled against v0.1. If a future contradiction appears, treat it as a specification defect and reconcile it explicitly.
 
-This directory still does **not** freeze:
+This directory still does **not** authorize:
 
-- exact SQL table/column names;
-- exact enum labels/cardinality;
-- indexes/check/unique constraints;
-- exact JSON schema details;
-- Drizzle implementation;
-- model/provider/prompt choice;
-- numeric confidence/risk thresholds;
-- similarity thresholds;
-- number of AI retries/reruns;
+- production migrations;
+- runtime reducer implementation merely from the DDL candidate;
+- provider/AI activation;
 - cross-thread Responsibility merging;
 - recurring Responsibility machinery;
 - generic team workflow machinery.
 
+The following also remain implementation/runtime decisions rather than frozen global vocabularies:
+
+- action/event/basis code registries;
+- FieldDecision field/value registry;
+- exact semantic-details validation library;
+- machine-key hashing/encoding implementation;
+- query/repository helper names.
+
+---
+
 ## Documents
+
+### Semantic / evaluation authority
 
 - `ANNOTATION-GUIDELINES.md` — normative evidence/communication/admission/identity/safety definitions and annotation procedure.
 - `DECISIONS.md` — FIXED principles, strong implementation directions, OPEN questions, and superseded decisions.
@@ -59,11 +71,21 @@ This directory still does **not** freeze:
 - `TIER-0-DETAILED-ORACLES-BATCH-3.md` — ten schema-falsifier oracles covering outbound direction, user-target/source-due, REOPEN/new episode, multiplicity, and pre-admission Review.
 - `TIER-0-DETAILED-ORACLES-BATCH-4.md` — final sixteen Tier-0 detailed oracles covering commitment force, preference/review/approval, materiality/courtesy, direct-vs-CC assignment, quote/forward zoning, and non-literal ambiguity.
 - `TRANSITION-ORACLES.md` — semantic traces for all 20 mandatory transition/event sequences.
+
+### Persistence design / audit authority
+
 - `PHYSICAL-MODEL-DESIGN.md` — original hybrid persistence candidate used as the falsifiable starting point.
 - `PHYSICAL-MODEL-AUDIT.md` — first adversarial physical-model pass.
 - `PHYSICAL-MODEL-AUDIT-BATCH-3.md` — second pass; adds pre-admission Review and narrows several structures.
-- `PHYSICAL-MODEL-AUDIT-BATCH-4.md` — final Tier-0 falsifier pass; finds no new aggregate/table requirement and adds only expected-event/provenance metadata pressure.
-- `PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — authoritative L1 freeze decision and acceptance matrix; exact L2 DDL remains open.
+- `PHYSICAL-MODEL-AUDIT-BATCH-4.md` — final Tier-0 falsifier pass; finds no new aggregate/table requirement and adds expected-event/provenance metadata pressure.
+- `PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — authoritative L1 freeze decision and acceptance matrix.
+- `POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact L2 PostgreSQL/Drizzle candidate, currently v0.4 after three static adversarial audits.
+- `POSTGRESQL-DRIZZLE-DDL-AUDIT.md` — first exact-DDL adversarial audit; initial candidate failed and was corrected.
+- `POSTGRESQL-DRIZZLE-DDL-AUDIT-PASS-2.md` — second exact-DDL pass, including CREATE freshness / Conversation evidence-revision pressure.
+- `POSTGRESQL-DRIZZLE-DDL-AUDIT-PASS-3.md` — third exact-DDL pass, including tenant/AI-run/reference hardening.
+- `L2-EXECUTABLE-PROOF-GATE.md` — authoritative execution/evidence gate before exact L2 may be frozen.
+
+---
 
 ## Coverage / oracle status
 
@@ -90,18 +112,20 @@ mandatory transition traces:     20 / 20
 C23 claim-vs-observation pair:   explicit at specification level
 ```
 
-This is **not** execution evidence. The corpus is not yet fully serialized/executed/production-validated.
+This is **not** full executable/production evidence.
 
-Remaining executable-eval work includes:
+Remaining semantic-eval work includes:
 
 ```text
-normalize first-eight legacy aliases/errata
+normalize first-eight legacy aliases/errata for executable serialization
 serialize controlled variants/metamorphic relations
 coverage linter/equivalent
 human adjudication independent of model predictions
 bind high-harm forbidden outcomes to reducer/integration/security tests
 execute repeated-run/stability evaluations where relevant
 ```
+
+---
 
 ## Core architecture
 
@@ -132,6 +156,8 @@ Central separation:
 Evidence ≠ Interpretation ≠ Admission ≠ Domain state ≠ Safe action ≠ UI projection
 ```
 
+---
+
 ## Canonical semantic vector
 
 Stable v0.1 Responsibility dimensions:
@@ -150,7 +176,7 @@ resolution status/reason
 × provenance
 ```
 
-Important negative rules now pressure-tested across all 44 cases include:
+Important negative rules pressure-tested across all 44 cases include:
 
 ```text
 projection equality != semantic equality
@@ -166,6 +192,8 @@ DO_NOT_TRACK != fake resolved Responsibility
 admission Review != field Review inside Responsibility
 REOPEN != rewind prior history
 ```
+
+---
 
 ## Frozen L1 logical persistence boundary
 
@@ -209,45 +237,104 @@ target-scoped risk detail when no normalized owner is more natural
 
 Normalization is added later only when real query/FK/concurrency/authorization/scheduling pressure justifies it.
 
-## L2 requirements before exact DDL approval
+---
 
-The logical boundary is frozen, but exact DDL must still prove:
+## Current L2 candidate
+
+The v0.4 exact candidate uses exactly eight Responsibility-owned tables:
 
 ```text
-mechanical source-event idempotency
-stale-safe evidence_revision + aggregate_version writes
-narrow/current FieldDecision authority
-conflict-friendly TemporalFact currentness
-stable IDs + migration/versioning for semantic_details
-role-aware provenance where multiple source zones jointly support a fact
-target-scoped risk semantics
-account/scope/FK integrity
-AdmissionReview stale/idempotent user resolution
+responsibilities
+responsibility_expected_events
+responsibility_obligation_legs
+responsibility_temporal_facts
+responsibility_field_decisions
+responsibility_admission_reviews
+responsibility_domain_events
+responsibility_provenance_refs
 ```
 
-A parent projection bucket, if cached later, must remain rebuildable and non-authoritative.
+Important executable invariants include:
+
+```text
+Conversation semantic_evidence_revision coordinates admission/matching freshness
+Responsibility accepted_evidence_revision records last accepted basis
+CREATE idempotency is global (application_key, effect_key), not target-ID scoped
+same-Responsibility child links use composite FKs where cheap/material
+same-user participant / AI-run links are mechanically constrained
+same-account Responsibility/Review/Message provenance is mechanically constrained
+TemporalFact preserves DATE vs INSTANT vs UNRESOLVED and conflict candidates
+AdmissionReview prevents same-revision stale resurrection
+semantic_details is typed/versioned and runtime validated
+```
+
+The actual Drizzle-generated SQL must prove these statements rather than being assumed from TypeScript definitions.
+
+---
+
+## L2 executable proof routing
+
+Current tasks:
+
+```text
+Issue #13
+  PostgreSQL 18 + Drizzle schema proof
+  acceptance IDs 01–46, 50–60 except auth IDs
+
+Issue #14
+  Better Auth UUID persistence proof
+  acceptance IDs 47–49
+
+Issue #15
+  independent combined review and L2 PASS/FREEZE vs FAIL/REVISE decision
+```
+
+Authoritative execution/evidence rules live in `L2-EXECUTABLE-PROOF-GATE.md`.
+
+No test may be considered PASS from mocks or builder summary alone when the gate requires PostgreSQL/Drizzle/runtime evidence.
+
+---
+
+## Current implementation gate
+
+The next authorized work is **executable proof**, not more speculative schema-table invention and not production migration.
+
+Allowed now:
+
+```text
+isolated Drizzle/PostgreSQL schema spike
+real PostgreSQL 18 acceptance tests
+concurrency/idempotency/delete tests
+Better Auth UUID compatibility spike
+generated SQL inspection
+independent result review
+```
+
+Not authorized yet:
+
+```text
+production Drizzle migrations
+production Responsibility reducer/persistence implementation
+schema freeze based only on static reasoning
+```
+
+L2 may be frozen only after `L2-EXECUTABLE-PROOF-GATE.md` passes through Issue #15.
+
+---
 
 ## Conceptual terminology
 
 `Responsibility` is the canonical semantic concept: a communication-bounded, trackable operational obligation / expected-outcome loop with coherent closure.
 
-The physical table name will be chosen at L2; older `ActionItem` terminology must not be kept by inertia.
+Older `ActionItem` terminology must not be kept by inertia.
 
-## Current implementation gate
-
-The next authorized design step is:
-
-> **L2 exact PostgreSQL/Drizzle DDL design + independent DDL acceptance review.**
-
-Do **not** write migrations yet.
-
-The L2 artifact must map every table/column/constraint/index/typed-details field back to a frozen L1 requirement, canonical oracle, query path, or concurrency/security invariant. Anything without such justification should be removed.
+---
 
 ## Change policy
 
 This is a living, versioned specification.
 
-A stronger canonical scenario, organic/production failure, or better evidence may reopen L0/L1, but only through an explicit versioned decision recording:
+A stronger canonical scenario, executable DB failure, organic/production failure, or better evidence may reopen a prior decision, but only through an explicit versioned decision recording:
 
 ```text
 what changed
@@ -255,5 +342,18 @@ what evidence/counterexample changed it
 which artifacts/evals are affected
 why the replacement is safer/better
 ```
+
+A failing executable L2 test should first be classified as:
+
+```text
+DDL defect
+Drizzle representation defect
+runtime protocol defect
+test-harness defect
+platform/version incompatibility
+L1 semantic/persistence-boundary falsifier
+```
+
+Only the final category automatically reopens L1.
 
 Do not preserve stale consistency when stronger evidence contradicts it.

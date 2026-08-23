@@ -30,6 +30,8 @@ Task-specific implementation intent is **Issue-driven**: use the referenced GitH
 
 Do not invent or silently replace framework/database/auth/provider/job/AI choices. Read `docs/product/TECH-STACK.md`, relevant ADRs, `docs/product/IMPLEMENTATION-PLAN.md`, and the current task Issue before implementation.
 
+For fresh-session/current-state bootstrap, read `docs/continuity/README.md`, then `CURRENT.md` and `KNOWLEDGE-MAP.md`. For reusable Blueprint adoption or drift questions, read `docs/continuity/BLUEPRINT-ADOPTION.md`.
+
 ---
 
 ## Source of truth by question

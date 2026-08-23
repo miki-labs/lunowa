@@ -56,6 +56,17 @@ Logical contracts between modules:
 - background jobs;
 - error semantics.
 
+### `responsibility/`
+
+Normative responsibility semantics and annotation/evaluation guidance:
+
+- `responsibility/README.md` — scope, precedence, and relationship to older product docs;
+- `responsibility/ANNOTATION-GUIDELINES.md` — Responsibility v0.1 definitions, invariants, evidence/AI boundaries, and annotation decision procedure;
+- `responsibility/DECISIONS.md` — fixed, strong-direction, open, and superseded decisions;
+- `responsibility/SCENARIO-SCHEMA.md` — contract for the canonical scenario/evaluation matrix.
+
+Some responsibility-specific shapes in `DATA-MODEL.md` and `CONTRACTS.md` predate this v0.1 work. Until those files are reconciled, use `responsibility/` as the primary authority for **Responsibility semantics** rather than silently preserving an older single lifecycle enum/scalar-owner/deadline shape.
+
 ### `TECH-STACK.md`
 
 Accepted initial implementation stack and activation policy:
@@ -154,8 +165,9 @@ Do not use one total precedence list for every issue.
 | Question | Primary authority |
 | --- | --- |
 | What should the user experience/interaction be? | `docs/design/*.md` + relevant visual reference |
+| What are the canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*.md` |
 | What product-specific technical boundary/invariant applies? | `docs/product/ARCHITECTURE.md` + accepted relevant ADR |
-| What data concept/ownership applies? | `docs/product/DATA-MODEL.md` |
+| What data concept/ownership applies outside responsibility semantics? | `docs/product/DATA-MODEL.md` |
 | What module/API/job semantics apply? | `docs/product/CONTRACTS.md` |
 | What technology/runtime choice is currently accepted? | `docs/product/TECH-STACK.md` + relevant ADR |
 | How should the current implementation effort be sequenced? | `docs/product/IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
@@ -172,17 +184,18 @@ When sources materially conflict, do not silently guess. Identify the question, 
 Keep these visible when planning/implementing:
 
 1. Normal conversation-row click opens `会話`; status chip opens `今の要点`.
-2. Conversation can contain multiple Action Items; Conversation is not the single workflow state owner.
+2. Conversation can contain multiple Responsibilities/Action Items; Conversation is not the single workflow state owner.
 3. One Moment should generally present one primary current question/action.
-4. AI interprets; deterministic rules own authoritative lifecycle state.
+4. AI interprets; deterministic rules own authoritative responsibility/domain state.
 5. Temporal Contracts are durable promises with persisted triggers/reconciliation.
 6. Provider mailbox facts and Lunowa-specific workflow facts have distinct authorities.
-7. Core reading/composing remains usable when AI is unavailable.
-8. Scope boundaries apply before search/retrieval/AI context exposure.
-9. Pin is a user override orthogonal to lifecycle state.
-10. Lunowa application authentication and connected-mailbox authorization are separate security/domain boundaries.
-11. Durable background execution is not the authority for lifecycle/Temporal Contract state; PostgreSQL/domain state remains authoritative.
-12. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
+7. Original communication evidence, derived interpretation, domain state, safe action, and UI projection are distinct layers.
+8. Core reading/composing remains usable when AI is unavailable.
+9. Scope boundaries apply before search/retrieval/AI context exposure.
+10. Pin is a user override orthogonal to responsibility lifecycle/tracking state.
+11. Lunowa application authentication and connected-mailbox authorization are separate security/domain boundaries.
+12. Durable background execution is not the authority for lifecycle/Temporal Contract state; PostgreSQL/domain state remains authoritative.
+13. Do not optimize feature count; reduce Communication Management Burden while preserving control/trust.
 
 ---
 

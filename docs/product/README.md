@@ -73,7 +73,7 @@ Recommended reading order:
 6. `responsibility/TRANSITION-SCHEMA.md` — multi-event trace contract;
 7. `responsibility/COVERAGE-PLAN.md` — mandatory corpus coverage inventory;
 8. `responsibility/TIER-0-SCENARIO-MATRIX.md` — base-oracle assignments/variants;
-9. `responsibility/TIER-0-CRITICAL-ORACLES.md` — first detailed critical oracles;
+9. detailed Tier-0 oracle files — layered semantic contracts for promoted base cases;
 10. `responsibility/TRANSITION-ORACLES.md` — all 20 mandatory transition traces.
 
 ### Responsibility source-of-truth reconciliation
@@ -85,13 +85,19 @@ AGENTS.md
 README.md
 docs/design/DESIGN.md
 docs/design/INTERACTIONS.md
+docs/design/RESPONSIVE.md
 docs/design/references/README.md
 docs/product/ARCHITECTURE.md
 docs/product/DATA-MODEL.md
 docs/product/CONTRACTS.md
 docs/product/IMPLEMENTATION-PLAN.md
+docs/product/TECH-STACK.md
+docs/decisions/0001-modular-monolith-default.md
 docs/decisions/0002-ai-understands-rules-decide-state.md
 docs/decisions/0003-temporal-contracts-use-durable-scheduling.md
+docs/decisions/0004-web-runtime-and-ui-stack.md
+docs/decisions/0005-auth-and-persistence-stack.md
+docs/decisions/0006-provider-sync-and-background-runtime.md
 docs/decisions/0007-initial-ai-runtime.md
 docs/decisions/0008-responsibility-state-is-orthogonal.md
 ```
@@ -148,9 +154,13 @@ Active staged execution plan:
 
 This is a living plan, not permanent product semantics.
 
-### Active execution plan
+### Current task-specific execution
 
-- `../plans/active/phase-0-bootstrap.md` — current Codex-ready bootstrap task contract.
+Implementation handoff is **Issue-driven**.
+
+Use the current GitHub Issue for task-specific Goal / Why / Scope / Acceptance / Verification. Use repository documents for durable constraints. A repository-local plan/design/task artifact is required only when the Issue explicitly links one or the work is too complex/high-risk for the Issue contract alone.
+
+Do not invent a missing `docs/plans/active/*` artifact or infer current task intent from an obsolete path.
 
 ---
 
@@ -220,7 +230,7 @@ Read when relevant:
 | Temporal Contract durability/attention semantics? | ADR 0003 + `ARCHITECTURE.md` + `CONTRACTS.md` |
 | Other product-specific technical boundary/invariant? | `ARCHITECTURE.md` + accepted relevant ADR |
 | Technology/runtime choice? | `TECH-STACK.md` + relevant ADR |
-| Current implementation sequence? | `IMPLEMENTATION-PLAN.md` + current `docs/plans/active/` artifact |
+| Current implementation sequence? | `IMPLEMENTATION-PLAN.md`; current GitHub Issue supplies task-specific intent; follow any explicit repository-local artifact linked from it |
 | What is actually implemented now? | current code/schema/migrations/tests/runtime evidence |
 | Generic engineering rule? | relevant reusable `docs/*.md` baseline |
 | Current Gmail/Microsoft/AI/platform fact? | current official provider documentation at implementation time |
@@ -270,6 +280,6 @@ Before schema freeze, continue remaining Tier-0 detailed-oracle expansion and no
 
 Update durable documents only when accepted knowledge changes.
 
-Prefer code/tests for local mechanics, active plans for current execution, and decision records for costly-to-reverse rationale.
+Prefer code/tests for local mechanics, current Issues for task-specific execution intent, and decision records for costly-to-reverse rationale.
 
 When stronger scenarios, production failures, or external facts change a prior decision, update the durable source and record why rather than preserving stale consistency.

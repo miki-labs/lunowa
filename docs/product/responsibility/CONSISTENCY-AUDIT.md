@@ -2,9 +2,9 @@
 
 ## Status
 
-**Accepted consistency-audit baseline; source-of-truth reconciliation completed for the Responsibility-related sections of `ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md`, and `design/INTERACTIONS.md`.**
+**Accepted consistency-audit baseline. Repository-wide durable Responsibility guidance has been reconciled to v0.1 on this branch.**
 
-This audit records the contradictions discovered while pressure-testing Responsibility v0.1 and the canonical reconciliations that now govern annotation, scenario design, architecture, data modeling, contracts, and interaction behavior.
+This audit records contradictions discovered while pressure-testing Responsibility v0.1 and the reconciliations that now govern annotation, scenario design, architecture, data modeling, contracts, interaction/design behavior, implementation planning, technology/runtime guidance, ADRs, and agent routing.
 
 This document is normative where it records a reconciliation/erratum. It does not replace `ANNOTATION-GUIDELINES.md` or `DECISIONS.md`.
 
@@ -23,8 +23,12 @@ Canonical state-vector vocabulary          RECONCILED
 Architecture alignment                     RECONCILED
 Data-model alignment                       RECONCILED
 System-contract alignment                  RECONCILED
-Interaction-semantics alignment            RECONCILED
-Executable corpus readiness                NOT YET; design/oracle work remains
+Design / interaction alignment             RECONCILED
+Implementation-plan alignment              RECONCILED
+Technology-stack semantic terminology      RECONCILED
+Architecture-decision alignment             RECONCILED + ADR 0008 added
+Repository / agent routing                 RECONCILED
+Executable corpus readiness                NOT YET; oracle/fixture work remains
 ```
 
 No finding requires abandoning the core pipeline:
@@ -39,7 +43,7 @@ Authorized evidence
 → deterministic projection
 ```
 
-The defects found were primarily representation/terminology drift and one safety/temporal-classification erratum.
+The defects found were primarily representation/terminology drift plus one safety/temporal-classification erratum.
 
 ---
 
@@ -47,7 +51,7 @@ The defects found were primarily representation/terminology drift and one safety
 
 A single `tracking_status: OPEN | RESOLVED` cannot simultaneously represent resolution, whether historical work is live, and whether attention is deferred.
 
-Canonical semantic dimensions are:
+Canonical dimensions:
 
 ```text
 resolution_status
@@ -57,8 +61,8 @@ obligation_legs[]
 expected_events[]
 completion_criteria[]
 constraints[]
-temporal_facts[]
 pending_proposals[] / agreed_facts[]
+temporal_facts[]
 uncertainties[]
 risk
 provenance[]
@@ -79,9 +83,9 @@ attention_mode:
 
 Exact production enum names/cardinality remain open.
 
-### Compatibility rule for existing v0.1 oracles
+### Compatibility rule for existing detailed oracles
 
-Existing detailed oracles that still use:
+Existing v0.1 detailed oracles that still use:
 
 ```text
 tracking_status: OPEN | RESOLVED
@@ -89,9 +93,9 @@ tracking_status: OPEN | RESOLVED
 
 must be interpreted as a legacy alias for `resolution_status` only.
 
-Existing `active_obligations[]` is accepted only as a legacy shorthand for the currently relevant unresolved/actionable subset of the general `obligation_legs[]` concept.
+Existing `active_obligations[]` is accepted only as legacy shorthand for the currently relevant unresolved/actionable subset of general `obligation_legs[]`.
 
-New executable fixtures should use the reconciled `SCENARIO-SCHEMA.md` vocabulary.
+New executable fixtures use the reconciled `SCENARIO-SCHEMA.md` vocabulary.
 
 ---
 
@@ -117,7 +121,7 @@ obligation_legs[] {
 }
 ```
 
-An actionable user obligation is a derived subset, not the whole canonical model.
+An actionable user obligation is a derived subset, not the entire canonical model.
 
 ---
 
@@ -126,7 +130,7 @@ An actionable user obligation is a derived subset, not the whole canonical model
 **Severity:** HIGH  
 **Status:** RESOLVED
 
-T0-033/T17 require one Responsibility with multiple jointly required criteria, e.g. identity-document front + back.
+T0-033/T17 require one Responsibility with multiple jointly required criteria such as identity-document front + back.
 
 Canonical concept:
 
@@ -151,13 +155,13 @@ AND
 CREATE R2
 ```
 
-Canonical evaluation/runtime contract therefore supports:
+Canonical evaluation/runtime contracts therefore support:
 
 ```text
 expected_effects[] / effects[]
 ```
 
-A scalar matching operation remains shorthand only when exactly one Responsibility effect exists.
+A scalar matching operation is shorthand only when exactly one Responsibility effect exists.
 
 ### SUPERSEDE normalization
 
@@ -179,17 +183,15 @@ Do not encode `RESOLVE + SUPERSEDE` as two independent operations. Earlier narra
 **Severity:** HIGH  
 **Status:** RESOLVED
 
-Canonical rule:
-
 ```text
 communication hold/pause != product attention defer/snooze
 ```
 
-If work is blocked waiting on another party/event, normal projection is `WAITING`.
+If work is blocked waiting on another party/event, ordinary projection is `WAITING`.
 
 `LATER` requires a separate intentional attention/defer decision and return condition.
 
-Any earlier `WAITING/LATER` hold shorthand should be read as:
+Any earlier `WAITING/LATER` hold shorthand means:
 
 ```text
 base hold -> WAITING
@@ -277,7 +279,7 @@ communicated requested action = TRANSFER_MONEY
 
 remains immutable source meaning.
 
-The admitted Responsibility may instead track the neutral product loop:
+The admitted Responsibility may instead track a neutral product loop:
 
 ```text
 verify / decide / safely resolve the received payment request
@@ -312,7 +314,7 @@ Do not generalize:
 provider accepted message -> attachment usable / counterpart approved / external goal satisfied
 ```
 
-T10 REOPEN should be interpreted as a case where prior evidence was sufficient under the then-current closure rule and later explicit failure evidence disproves satisfaction of the same outcome.
+T10 REOPEN should be read as a case where prior evidence was sufficient under the then-current closure rule and later explicit failure evidence disproves satisfaction of the same operational outcome.
 
 ---
 
@@ -333,10 +335,10 @@ Outbound USER commitment: "明日送ります"
 -> communicated time associated with USER commitment/obligation
 
 Inbound OTHER commitment: "明日送ります"
--> EXPECTED_EVENT_TIME from the waiting perspective
+-> EXPECTED_EVENT_TIME from the user's waiting perspective
 ```
 
-The critical invariant is that a date token is not automatically “user deadline.”
+A date token is not automatically a USER deadline.
 
 ---
 
@@ -347,9 +349,9 @@ The critical invariant is that a date token is not automatically “user deadlin
 
 Top-level oracle `risk_class` means test/harm priority.
 
-Responsibility/action risk is a separate product-domain dimension.
+Responsibility/action risk is a separate domain dimension.
 
-Do not silently reuse one field for both meanings.
+Do not reuse one field silently for both meanings.
 
 ---
 
@@ -360,9 +362,9 @@ Do not silently reuse one field for both meanings.
 
 `NEEDS_REVIEW` at admission means whether a Responsibility should exist is itself unsafe to decide.
 
-A definitely `TRACK`ed Responsibility may still project `REVIEW` because a decision-critical field is conflicted.
+A definitely `TRACK`ed Responsibility may project `REVIEW` because a decision-critical field is conflicted.
 
-Canonical example: T0-028 has definite user responsibility but conflicting due evidence.
+Canonical example: T0-028 has a definite user Responsibility but conflicting due evidence.
 
 ---
 
@@ -371,7 +373,7 @@ Canonical example: T0-028 has definite user responsibility but conflicting due e
 **Severity:** MEDIUM  
 **Status:** HISTORICAL/SUPERSEDED
 
-`TIER-0-SCENARIO-MATRIX.md` predates the dedicated transition expansion. Its `8/20` assignment-state text is historical.
+`TIER-0-SCENARIO-MATRIX.md` predates dedicated transition expansion. Its `8/20` assignment-state text is historical.
 
 Current authoritative transition design coverage:
 
@@ -402,41 +404,49 @@ It does not mean:
 
 ---
 
-# 17. CA-15 — broader product-doc source-of-truth drift
+# 17. CA-15 — product engineering/design source-of-truth drift
 
 **Severity:** CRITICAL for implementation routing  
 **Status:** RECONCILED
 
-The audit initially identified stale Responsibility shapes in:
+The first audit identified stale Responsibility shapes in:
 
 - `DATA-MODEL.md`;
 - `CONTRACTS.md`;
 - `design/INTERACTIONS.md`.
 
-A stricter second pass also found the same stale single-lifecycle vocabulary in `ARCHITECTURE.md`. That omission in the first audit was itself corrected rather than hidden.
+A stricter pass found the same lifecycle assumptions in `ARCHITECTURE.md`, and then expanded the reconciliation to downstream design/planning/routing surfaces so an agent could not reintroduce the old model indirectly.
 
-All four documents are now reconciled to the v0.1 semantic model:
+Reconciled durable sources now include:
 
 ```text
-ARCHITECTURE.md
-DATA-MODEL.md
-CONTRACTS.md
-design/INTERACTIONS.md
+docs/product/ARCHITECTURE.md
+docs/product/DATA-MODEL.md
+docs/product/CONTRACTS.md
+docs/design/DESIGN.md
+docs/design/INTERACTIONS.md
+docs/design/references/README.md
+docs/product/IMPLEMENTATION-PLAN.md
+docs/product/TECH-STACK.md
+docs/product/README.md
+README.md
+AGENTS.md
 ```
 
-Specifically removed/superseded as canonical truth:
+Specifically removed/superseded as canonical guidance:
 
 ```text
-OPEN/ACTION_REQUIRED/DEFERRED/WAITING/FOLLOW_UP/COMPLETED/UNCERTAIN
+OPEN/ACTION_REQUIRED/DEFERRED/WAITING/FOLLOW_UP/COMPLETED/UNCERTAIN as one domain enum
 scalar next_owner as complete state
-BOTH as a core assignment solution
+BOTH as core assignment solution
 single deadline_at as all temporal semantics
 whole-item user_override_state
-follow-up as a lifecycle species
-hold == LATER
+follow-up as lifecycle species
+communication hold == LATER
+legacy screenshot filenames as semantic authority
 ```
 
-Replacement model propagated across those documents:
+Replacement semantic model propagated across those documents:
 
 ```text
 resolution status/reason
@@ -452,19 +462,98 @@ field-level uncertainty/risk
 provenance
 ```
 
-The prior implementation stop condition is therefore **satisfied** at the documentation-semantic level.
+---
 
-This does **not** mean physical schema implementation should begin from intuition: implementation must still derive the minimal representation from the reconciled documents + canonical scenarios/transition oracles.
+# 18. CA-16 — durable ADRs could silently resurrect old semantics
+
+**Severity:** HIGH  
+**Status:** RECONCILED
+
+The ADR audit found old terms in accepted decisions that coding agents could reasonably treat as stronger than later explanatory docs:
+
+- ADR 0001 referred to a generic lifecycle module;
+- ADR 0002 described authoritative `ActionItem/lifecycle state`;
+- ADR 0003 described Waiting → canonical Follow-up;
+- ADR 0004 described lifecycle state as UI differentiation;
+- ADR 0005 named Action Items in persistence context without the new schema guardrail;
+- ADR 0006 re-read Action Item/lifecycle state in durable jobs;
+- ADR 0007 described a `next_owner/deadline/lifecycle`-like interpretation contract.
+
+All were reconciled in place while preserving their original architectural choices.
+
+Additionally, **ADR 0008 — Responsibility State Is Orthogonal; UI States Are Projections** was created because this is now a costly-to-reverse architectural decision deserving durable rationale beyond annotation documents.
+
+ADR 0008 records:
+
+```text
+Responsibility = operational workflow unit
+orthogonal canonical semantic vector
+My Turn / Waiting / Later / Done / Review = projections
+multiple obligation legs allowed
+follow-up = action/reason
+one event may have effects[]
+physical schema still open
+no generic workflow engine
+```
 
 ---
 
-# 18. What remains deliberately open
+# 19. CA-17 — technology stack terminology was semantically stale
+
+**Severity:** MEDIUM/HIGH for agent execution  
+**Status:** RECONCILED
+
+`TECH-STACK.md` is not semantic authority, but it previously referred to:
+
+```text
+action-item relationships
+lifecycle transitions
+lifecycle state in Trigger.dev
+extraction/lifecycle eval set
+lifecycle reducer unit tests
+```
+
+Because implementation agents legitimately read this document, those terms could recreate the superseded domain model indirectly.
+
+The document now routes Responsibility semantics to `responsibility/` + ADR 0008 and uses current terms:
+
+- Responsibility relations/effects/provenance;
+- accepted state/evidence revision;
+- canonical responsibility evaluation corpus;
+- projection/domain reducer tests;
+- job runtime as execution, never Responsibility authority.
+
+Time-sensitive external stack/provider facts remain explicitly dated and require official re-verification when implementation/release depends on them.
+
+---
+
+# 20. Documentation-level reconciliation completion
+
+The prior **source-of-truth conflict stop condition is satisfied** on this branch.
+
+This means an implementer now receives the same Responsibility semantics from:
+
+- agent/repository map;
+- product/design model;
+- architecture;
+- conceptual data model;
+- logical contracts;
+- implementation plan;
+- technology-stack activation guidance;
+- durable architecture decisions;
+- Responsibility-specific semantic/eval artifacts.
+
+It does **not** mean the physical schema is ready to code without further design.
+
+---
+
+# 21. What remains deliberately open
 
 The audit does not freeze:
 
 - table/child-table/JSON representation of obligation legs/events/criteria;
 - exact enum names for resolution/live activation/attention/actionability;
-- exact AI output DTO/JSON schema;
+- exact AI runtime DTO/JSON schema;
 - model/provider/prompt;
 - numeric confidence/risk thresholds;
 - cross-thread Responsibility identity;
@@ -478,7 +567,7 @@ Do not turn semantic clarity into premature schema/framework complexity.
 
 ---
 
-# 19. Remaining promotion gates
+# 22. Remaining promotion gates
 
 Before Responsibility v0.1 becomes an executable domain/runtime contract:
 
@@ -488,12 +577,13 @@ Before Responsibility v0.1 becomes an executable domain/runtime contract:
 4. HIGH/CRITICAL forbidden outcomes must be executable at the owning verification layer;
 5. a coverage linter/equivalent must ensure mandatory IDs do not disappear;
 6. model predictions must not be used to author the human oracle;
-7. physical schema must demonstrate the fixed semantic dimensions without reintroducing the superseded lifecycle model;
-8. provider/scheduler/concurrency/security invariants require integration/runtime tests, not prompt eval alone.
+7. the proposed physical schema must demonstrate the fixed semantic dimensions without reintroducing the superseded lifecycle model;
+8. provider/scheduler/concurrency/security invariants require integration/runtime tests, not prompt eval alone;
+9. time-sensitive provider/runtime facts are rechecked against current official sources at their implementation/release gate.
 
 ---
 
-# 20. Final audit conclusion
+# 23. Final audit conclusion
 
 The stable v0.1 separation is:
 
@@ -503,11 +593,16 @@ resolution
 × attention
 × obligation/actionability
 × expected events / completion criteria
+× constraints / proposal-agreement state
 × temporal facts
 × uncertainty/risk
 × provenance
 ```
 
-The broader product architecture, conceptual data model, logical contracts, and interaction specification now use that same semantic model.
+The repository's durable routing, architecture, conceptual data model, logical contracts, design/interactions, implementation plan, technology guidance, and ADRs now use the same semantic direction.
 
-The next uncertainty is no longer “which document is authoritative?” It is whether the remaining canonical oracles expose a counterexample that forces v0.2, and what **minimal physical representation** can satisfy the validated semantics without turning Lunowa into a generic workflow system.
+The next uncertainty is no longer “which document is authoritative?” or “should the old lifecycle be implemented?”
+
+It is:
+
+> **Can the remaining detailed canonical oracles expose a counterexample that forces v0.2, and what is the smallest physical representation that satisfies the validated semantics without turning Lunowa into a generic workflow system?**

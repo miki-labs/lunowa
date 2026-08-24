@@ -15,17 +15,30 @@ Internal principle:
 
 > **Eliminate work, not control.**
 
+The durable product-level “what/why/for whom” baseline — including audience hypotheses, differentiation, MVP/validation logic, monetization/distribution unknowns, and important supersessions — lives in `docs/product/PRODUCT.md`. Do not infer market validation from this README or from old chat history.
+
 ---
 
 ## Current status
 
 The Phase-0 runtime/bootstrap foundation is mechanically verified. Product/UX sources, architecture/contracts, technology stack, verification commands, and CI exist. Phase-1 product UI has not yet been implemented.
 
-Responsibility v0.1 semantics are now an accepted versioned baseline and have been reconciled across Architecture, Data Model, Contracts, Design, Interactions, Implementation Plan, and repository routing docs on the current documentation branch.
+Responsibility v0.1 semantics are an accepted versioned baseline and have been reconciled across Architecture, Data Model, Contracts, Design, Interactions, Implementation Plan, and repository routing docs.
 
-This does **not** mean the physical Responsibility schema or AI runtime behavior is implemented/passed.
+Current Responsibility proof level:
 
-Later-phase Gmail/persistence/auth/jobs/AI services remain intentionally unactivated until their implementation phase.
+```text
+L0 semantic model                         FROZEN v0.1
+L1 logical persistence boundary           FROZEN v0.1
+L2 exact PostgreSQL/Drizzle DDL            v0.4 STATIC REVIEW COMPLETE
+L2 executable proof                        PENDING
+L2 final freeze                            BLOCKED
+L3 migrations/runtime                     NOT AUTHORIZED
+```
+
+This does **not** mean the physical Responsibility schema or AI runtime behavior is implemented/passed. Static review is not executable PostgreSQL/Drizzle/Auth proof.
+
+Later-phase Gmail/persistence/auth/jobs/AI services remain intentionally unactivated until their implementation phase or bounded proof task requires them.
 
 ---
 
@@ -118,13 +131,21 @@ This requires durable triggers, idempotency, and overdue reconciliation. Communi
 
 AI may interpret communication acts, owners, requested actions, temporal expressions, completion/correction signals, proposals, and uncertainty. Trusted product/domain logic owns admission, identity/effects, accepted state, safety policy, authorization, and privileged side effects.
 
-Core mail remains usable when AI is unavailable.
+Core mail remains usable when AI is unavailable. Model confidence is not authority; material uncertainty should be explained through evidence/provenance rather than default confidence-percentage UI.
 
 ---
 
 ## Repository map
 
 Start with `AGENTS.md`; it is the concise map for humans/coding agents.
+
+### Product thesis / validation state
+
+```text
+docs/product/PRODUCT.md
+```
+
+Use this for product vision/problem, current audience and differentiation hypotheses, MVP/validation logic, commercial unknowns, product-level non-goals, and superseded product directions. It deliberately distinguishes accepted product direction from hypotheses/needs-validation.
 
 ### Product / UX
 
@@ -142,6 +163,7 @@ Generated images are visual references, not semantic specifications. Historical 
 
 ```text
 docs/product/
+├── PRODUCT.md
 ├── README.md
 ├── ARCHITECTURE.md
 ├── DATA-MODEL.md
@@ -161,15 +183,15 @@ docs/product/
     └── TRANSITION-ORACLES.md
 ```
 
-`docs/product/responsibility/` is the primary semantic/evaluation authority for Responsibility work.
+`docs/product/responsibility/` is the primary semantic/evaluation/persistence-proof authority for Responsibility work.
 
 ### Durable decisions
 
-`docs/decisions/` records costly/high-value architecture rationale, including the AI/domain authority boundary, durable Temporal Contracts, runtime stack, persistence/auth, provider/background runtime, and initial AI runtime.
+`docs/decisions/` records costly/high-value architecture rationale, including the AI/domain authority boundary, durable Temporal Contracts, runtime stack, persistence/auth, provider/background runtime, initial AI runtime, Responsibility orthogonal state, and the logical persistence boundary.
 
 ### Reusable engineering baseline
 
-Generic guidance remains under `docs/*.md`. These are defaults, not a second Lunowa product spec.
+Generic guidance remains under `docs/*.md`. These are defaults, not a second Lunowa product spec. Lunowa's explicit adoption relationship is recorded through `docs/continuity/BLUEPRINT-ADOPTION.md` after a dedicated reconciliation.
 
 ---
 
@@ -187,6 +209,8 @@ Current accepted direction at a high level:
 - scenario-driven minimal Responsibility persistence rather than generic workflow infrastructure.
 
 Exact current technology choices live in `docs/product/TECH-STACK.md` and ADRs.
+
+Earlier native-mobile/React-Native-first exploration is not current implementation authority; reopen it only with new product/platform evidence.
 
 ---
 
@@ -209,7 +233,9 @@ High-level order:
 
 The first product slice is deliberately not Gmail OAuth or AI. It is the canonical desktop shell with fake domain-shaped data and browser verification.
 
-Before Phase-2 schema implementation, use the canonical Responsibility oracles to choose the **smallest physical representation** that preserves fixed semantics.
+A bounded Responsibility L2 executable proof may run ahead as a falsification spike, but it does **not** authorize production persistence or reorder the product-validation sequence.
+
+Before Phase-2 schema implementation, use the canonical Responsibility oracles and executable proof gate to choose/prove the **smallest physical representation** that preserves fixed semantics.
 
 ---
 
@@ -259,16 +285,17 @@ For non-trivial work:
 
 1. read `AGENTS.md`;
 2. inspect only relevant durable sources;
-3. for Responsibility work, read `docs/product/responsibility/README.md`, `DECISIONS.md`, `CONSISTENCY-AUDIT.md`, and relevant oracles;
-4. inspect current code/tests;
-5. follow relevant active plan;
-6. scope Goal / Why / Scope / Non-goals / invariants / acceptance / verification / stop conditions;
-7. implement a small coherent slice;
-8. run real verification at the owning layer;
-9. update durable docs when accepted semantics/architecture changes;
-10. report exactly what was and was not verified.
+3. read `docs/product/PRODUCT.md` when a product/ICP/differentiation/validation assumption can change the task;
+4. for Responsibility work, read `docs/product/responsibility/README.md`, `DECISIONS.md`, `CONSISTENCY-AUDIT.md`, and relevant oracles;
+5. inspect current code/tests;
+6. follow the current Issue and any deliberately linked plan/design artifact;
+7. scope Goal / Why / Scope / Non-goals / invariants / acceptance / verification / stop conditions;
+8. implement a small coherent slice;
+9. run real verification at the owning layer;
+10. update durable docs when accepted semantics/architecture/product decisions change;
+11. report exactly what was and was not verified.
 
-Do not use a prompt or legacy screenshot filename as the only place a durable product constraint exists.
+Do not use a prompt, old chat, or legacy screenshot filename as the only place a durable product constraint exists.
 
 ---
 
@@ -277,3 +304,5 @@ Do not use a prompt or legacy screenshot filename as the only place a durable pr
 Lunowa is a product, not a code-generation exercise.
 
 Implementation throughput, AI usage, code volume, feature count, and technical novelty are not the objective. The objective is increasing the probability that real users can trust Lunowa enough to stop manually managing communication they should be able to forget.
+
+Current audience, willingness-to-pay, distribution, retention, and differentiation claims remain hypotheses where `docs/product/PRODUCT.md` marks them as such. Do not let engineering completeness masquerade as product validation.

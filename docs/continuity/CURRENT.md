@@ -4,46 +4,42 @@ This is a compact, mutable bootstrap checkpoint. It is not a product, design, ar
 
 ## Checkpoint metadata
 
-- Last reconciled: `2026-08-24`
-- Repository / candidate state: default `main` has been converged through Issue #23 / PR #24 at merge commit `b50418db0565f6fd4029c3390ebda0b2fe9571db`. Issue #19 / PR #22 is retargeted to `main` and its candidate branch has been refreshed from that converged base.
+- Last reconciled: `2026-08-25`
+- Repository state: default `main` contains the accepted Responsibility/harness/continuity history and the Issue #19 product/current-state baseline through PR #22 merge commit `b97279e91af9d0ba7ab440300afb050190e1aa35`.
 - Continuity schema version: `0.1`
-- Live GitHub state checked during this reconciliation: PR #22; Issues #13/#14/#15/#19/#21; completed Issues #16/#18/#23; PRs #5/#7/#8; default `main`; current review queue. Re-query GitHub on every fresh bootstrap when task/review state matters.
+- Fresh-session Bootstrap Evaluation v0.1: **PASS WITH NON-BLOCKING FINDINGS**; durable evaluation evidence is in Issue #25.
+- Live GitHub state was checked during this reconciliation. Re-query GitHub on every fresh bootstrap when task/review state matters; live execution state may advance beyond this checkpoint.
 
 ## Current phase
 
 - Phase 0 application/runtime/verification foundation is mechanically established.
-- Phase 1 **high-fidelity fake-data product UI** remains the first product implementation/validation slice and has not yet been implemented. The current application route is still bootstrap-level rather than the intended three-pane mail product.
-- Responsibility semantics/persistence design has advanced farther than the product UI: L0/L1 are frozen baselines and exact L2 v0.4 is static-review complete, but this is a **bounded technical proof stream**, not a product-priority reorder or production-persistence authorization.
-- Issue #19 / PR #22 is the immediate continuity/product-knowledge preservation stream. Its first independent handoff-fidelity review returned **FAIL / CHANGES REQUIRED** on an older head. The semantic/current-state remediation has since been applied, the default-entry topology blocker has been resolved, and the candidate now requires exact-head mechanical/CI evidence plus a fresh independent handoff-fidelity review.
-- Issue #21 Blueprint reconciliation is the next planned **engineering-baseline** task after #19 is safely integrated. It is not the next Product-learning decision and must not displace ICP/demand/differentiation/switching/WTP/distribution/retention validation.
+- Phase 1 **high-fidelity fake-data product UI / Product-learning slice** remains materially unimplemented; the current application route is still bootstrap-level rather than the intended three-pane Lunowa product.
+- Responsibility semantics/persistence design is ahead of Product implementation: L0/L1 are frozen baselines; exact L2 v0.4 is static-review complete; L2 executable proof is pending; L2 final freeze is blocked; L3 migrations/runtime remain unauthorized.
+- Knowledge continuity is no longer a critical-path blocker. The first fresh-context reconstruction succeeded even when `CURRENT.md` itself was stale relative to live GitHub, demonstrating that the authority/routing rules worked under a stale-checkpoint case.
 
 Primary phase/sequence authority: `docs/product/IMPLEMENTATION-PLAN.md`. Product intent/validation authority: `docs/product/PRODUCT.md`.
 
 ## Active workstreams
 
-### Product/current-state preservation — Issue #19 / PR #22
+### Product learning — Issue #26 — highest Product priority
 
-Current durable state: **candidate open on `main`; first independent review = FAIL / CHANGES REQUIRED on older head; remediation applied; final exact-head gate pending**.
+The next Product-learning gate is a **comparative high-fidelity fake-data prototype experiment**, not broad integration work.
 
-The current candidate preserves/reconciles:
+Primary unresolved question:
 
-- product vision, problem/JTBD and system-led/invisible-AI direction;
-- audience/ICP, demand, differentiation, switching, WTP, distribution and retention claims with explicit hypothesis/validation status;
-- cross-account/provider Responsibility attention-workspace differentiation as a hypothesis, not a proven market fact;
-- credible product/v1 design direction vs a still-unvalidated market/release MVP;
-- differentiation strength + switching/trust cost as a first-class Product risk;
-- a staged product-validation evidence ladder instead of equating implementation completeness with demand/retention/WTP evidence;
-- current Responsibility L0/L1/L2/L3 proof status;
-- the conceptual Data Model with the frozen L1 `DomainEvent[]` boundary rather than `ResponsibilityTransition` as a competing persistence authority;
-- legacy-open-candidate classifications and current engineering work routing.
+> Does the Responsibility / Moment / attention experience create enough recurring comparative value to reduce communication-management burden and plausibly overcome switching + trust cost?
 
-The intended PR diff remains bounded to seven documentation/routing files. No product runtime, migration, provider, auth, AI runtime, or Blueprint-adoption implementation is part of this candidate.
+Current differentiation remains a **hypothesis**, including the cross-account/provider Responsibility attention direction. Plain multi-account aggregation and `My Turn` / `Waiting` labels alone are not assumed sufficient differentiation.
+
+Do not let Gmail/OAuth/AI/database/provider breadth substitute for evidence on ICP, demand, differentiation, switching, trust, willingness to pay, distribution, or retention.
 
 ### Blueprint ↔ Lunowa reconciliation — Issue #21
 
-Issue #21 is intentionally deferred until Issue #19 / PR #22 is safely integrated. Its older Issue-body ordering says #19 should wait for #21, but a later durable Issue comment supersedes that order. Use the later ordering decision.
+The prior ordering prerequisite is now satisfied: Issue #19 / PR #22 is integrated and the Fresh-session Bootstrap Evaluation has passed with non-blocking findings.
 
-`docs/continuity/BLUEPRINT-ADOPTION.md` remains adoption metadata authority. Do not infer “latest Blueprint = current Lunowa policy” before #21 is actually completed.
+Issue #21 may execute from a fresh current `main` when engineering-baseline capacity is allocated. Its pinned Blueprint comparison target remains fixed unless explicitly superseded. It is **engineering-baseline maintenance**, not a reason to block Product learning.
+
+`docs/continuity/BLUEPRINT-ADOPTION.md` remains the adoption-metadata authority. Do not infer “latest Blueprint = current Lunowa policy” before #21 is completed.
 
 ### Responsibility L2 executable proof — Issues #13 / #14 / #15
 
@@ -51,111 +47,123 @@ Issue #21 is intentionally deferred until Issue #19 / PR #22 is safely integrate
 - #14: Better Auth → PostgreSQL UUID persistence proof for acceptance IDs 47–49.
 - #15: independent combined review; only this step may decide L2 PASS/FREEZE vs FAIL/REVISE after #13/#14 evidence exists.
 
-Issue #16 is now completed on default `main`. The #13/#14 Issue bodies still contain historical “blocked by #16” wording, but durable correction evidence and live #16 state supersede it. Do **not** start from the old pre-created execution branches/worktrees: recreate/refresh from the intended current base and run the repository/runtime isolation preflight before editing.
+Issue #16 is completed on default `main`. The #13/#14 Issue bodies contain historical launch/base wording that later durable comments supersede. When resumed, create/refresh work from the then-current intended `main`, run the repository/runtime-isolation preflight, and isolate mutable PostgreSQL/Docker/runtime resources.
 
-### Legacy open candidates requiring classification
+### Continuity maintenance — Issue #25
 
-These are not current authority merely because GitHub shows them open:
+Issue #25 records the first Fresh-session Bootstrap Evaluation and owns this small post-#22 checkpoint reconciliation. After its bounded update is reviewed/integrated, continuity should leave the critical path unless a concrete bootstrap/drift failure appears.
 
-- PR #5 / Issue #6 — dedicated Guardrail signer hardening: **DEFERRED HARDENING**, not a Phase-1 blocker while human merge authority + baseline Ruleset remain the accepted operating boundary.
-- PR #7 — agent-permission / human-light merge-gate candidate created against old `main`: **NEEDS RECONCILIATION**, not safe-to-merge current authority.
-- PR #8 — security/failure/verification-contract candidate created against old `main`: **NEEDS RECONCILIATION**, not safe-to-merge current authority.
+### Legacy open candidates
+
+Open does not imply current authority:
+
+- PR #5 / Issue #6 — **DEFERRED HARDENING**; dedicated Guardrail signer is not a Phase-1 blocker while human merge authority + baseline Ruleset remain the accepted boundary.
+- PR #7 — **NEEDS RECONCILIATION**; old agent-permission / human-light merge-policy candidate, not safe-to-merge current authority.
+- PR #8 — **NEEDS RECONCILIATION**; old security/failure/verification candidate, not safe-to-merge current authority.
 
 ## Current blockers / dependencies
 
-- **PR #22 exact-head gate:** rerun/record the current candidate’s required mechanical verification (`pnpm verify`, literal `git diff --check`) and exact-head GitHub `Verify` + `E2E Smoke` after the latest refresh/current-state update.
-- **PR #22 independent handoff review:** the earlier FAIL belongs to an older head; no new PASS may be inferred from remediation or CI. A fresh reviewer must inspect the current diff/canonical sources/live state and write the disposition durably before integration.
-- **Fresh-session proof:** continuity is not proven merely because the docs exist. After #22 integration, run a genuinely fresh ChatGPT bootstrap evaluation from default `main` + live GitHub.
-- **Responsibility L2:** final freeze remains blocked on direct executable evidence from #13 + #14 and the independent #15 review. Static DDL review is not sufficient.
-- **L3 Responsibility migrations/runtime:** remain unauthorized until a separate post-L2-PASS implementation decision.
+### Product blockers / unknowns
 
-Resolved blockers that should not be resurrected:
+- exact early ICP / segment priority and problem severity;
+- whether Responsibility / Moment meaningfully reduces reconstruction, rereading, switching, manual task transfer and verification burden vs existing workflows;
+- whether the gain is strong enough to overcome switching + trust cost;
+- willingness to pay / price / package;
+- reachable distribution channel / acquisition efficiency;
+- retention after novelty;
+- calibrated automation vs explicit control, including Review prominence and resurfacing behavior.
 
-- default-entry topology mismatch — resolved by PR #24 / Issue #23; accepted Responsibility/harness/continuity history is now reachable from default `main`;
-- Issue #16 execution-harness dependency — completed and closed after default-main convergence;
-- Issue #18 continuity-structure dependency — completed and closed after default-main convergence.
+### Technical blockers
+
+- Responsibility L2 final freeze requires direct executable evidence from #13 + #14 and independent #15 review.
+- L3 Responsibility production migrations/runtime remain unauthorized until a separate post-L2-PASS implementation decision.
+
+### Resolved blockers that should not be resurrected
+
+- default-entry topology mismatch — resolved by Issue #23 / PR #24;
+- Issue #16 execution-harness dependency — completed and closed;
+- Issue #18 continuity-structure dependency — completed and closed;
+- Issue #19 / PR #22 product/current-state preservation — completed and integrated on default `main`;
+- first Fresh-session Bootstrap Evaluation — **PASS WITH NON-BLOCKING FINDINGS**; see Issue #25.
 
 ## Decisions currently pending
 
 - Product evidence: exact early ICP/segment priority and problem severity.
-- Product differentiation: whether the Responsibility-oriented **cross-account/provider attention workspace** is materially better than conventional unified inbox/account-switching/task-tool workflows.
-- Product switching: whether value/trust improvement is strong enough to change or materially replace users’ existing workflow behavior.
-- Commercial evidence: willingness to pay/pricing/package, distribution channel, acquisition efficiency, and retention after novelty.
-- Product UX: calibrated balance between automatic attention management and explicit user control; final prominence of Review; resurfacing/notification policy; historical-initial-sync activation policy.
+- Product differentiation: whether the Responsibility-oriented attention experience, including the cross-account hypothesis where relevant, is materially better than conventional inbox/account-switching/task-tool workflows.
+- Product switching/trust: whether recurring value is strong enough for users to change or materially rely less on their existing workflow.
+- Commercial evidence: willingness to pay/pricing/package, distribution, acquisition efficiency, retention.
+- Product UX: automation/control balance; final Review prominence; resurfacing/notification policy; historical-initial-sync activation policy.
 - Platform/product: whether and when native mobile becomes necessary beyond the current responsive-web-first direction.
-- Responsibility persistence: executable L2 PASS/FREEZE vs FAIL/REVISE after #13/#14/#15.
-- Engineering baseline: Blueprint classifications/adoptions through Issue #21 after #19 is safely integrated.
+- Responsibility persistence: L2 PASS/FREEZE vs FAIL/REVISE after #13/#14/#15.
+- Engineering baseline: Blueprint classifications/adoptions through #21.
 
 ## Hypotheses / needs validation
 
-See `docs/product/PRODUCT.md` for the owning product-level classification. High-value current hypotheses include:
+See `docs/product/PRODUCT.md` for the owning Product-level classification. High-value current hypotheses include:
 
 - early fit among knowledge workers/prosumers/independent professionals with operational email burden, with solo/small-business operators as another candidate segment;
-- a cross-account/provider Responsibility attention layer can reduce account switching, rereading, manual task transfer, and “what do I need to do now?” reconstruction more than a plain unified inbox;
+- Responsibility/Moment attention management can reduce repeated rereading, reconstruction, task transfer and re-checking;
+- cross-account/provider Responsibility attention can add value while preserving explicit account/scope/provenance/sender boundaries;
 - the gain can become strong enough to overcome switching/trust cost;
-- paid subscription/prosumer monetization may be viable, but price/package/WTP are not decided;
-- representative users should be able to identify the next meaningful action/state very quickly (the current “~10 second” target is an internal usability hypothesis, not an SLA or validated market fact);
-- trustworthy attention management can create recurring retention value after novelty fades.
+- paid subscription/prosumer monetization may be viable, but price/package/WTP are undecided;
+- trustworthy ongoing attention management can create recurring retention value after novelty fades.
+
+Do not describe the cross-account hypothesis as a proven market advantage or irrevocable feature requirement. Negative Product evidence may narrow, defer, or reject it.
 
 ## Important recent supersessions
 
-Detailed rationale lives in the owning canonical sources; this list exists only to prevent bootstrap regressions.
+Detailed rationale lives in the owning canonical sources; this list only prevents bootstrap regressions.
 
 - `ActionItem` / message-level task framing → canonical `Responsibility` model.
 - single monolithic lifecycle enum → orthogonal Responsibility state with deterministic `My Turn / Waiting / Later / Done / Review` projections.
 - scalar `next_owner/BOTH` as complete truth → zero/one/multiple obligation legs where required.
-- follow-up as its own lifecycle species → renewed My Turn action/reason after the appropriate trigger.
+- follow-up as lifecycle species → renewed My Turn action/reason after the appropriate trigger.
 - Ask-AI/chat-first routine workflow → system-led intelligence where AI mostly prepares context behind the interface.
-- native-mobile/React-Native-first exploration → current accepted responsive web-first implementation path.
-- Gmail/provider/AI-first implementation → high-fidelity fake-data UX first; provider/AI integration follows after the interaction model is validated.
-- plain multi-account aggregation as the main differentiation → baseline capability; current unvalidated differentiation thesis is Responsibility/attention/trust across accounts/providers while preserving explicit boundaries.
-- non-default branch as practical current authority → accepted source history is now converged into default `main`; fresh sessions should bootstrap from default `main` plus live GitHub.
-- “all open GitHub work is active current authority” → live PR/Issue state must be interpreted against durable classification, supersession, and candidate freshness.
+- native-mobile/React-Native-first exploration → current responsive web-first path.
+- Gmail/provider/AI-first implementation → high-fidelity fake-data Product validation first; integration breadth follows evidence.
+- plain multi-account aggregation as differentiation → table stakes; current cross-account Responsibility thesis remains a hypothesis.
+- non-default branch as practical current authority → accepted source history is on default `main`.
+- “all open GitHub work is active authority” → live state requires durable classification/supersession/freshness interpretation.
 
 ## Next recommended decision / action
 
-Resolve from live state rather than replaying stale chronology:
+Use the smallest experiment that can falsify the highest-impact unresolved Product assumption.
 
-1. Finalize the exact current PR #22 head against `main` and keep the changed-file scope bounded to the intended seven documentation/routing files.
-2. Run/record `pnpm verify`, literal `git diff --check`, GitHub `Verify` + `E2E Smoke`, final changed-file/scope inspection, and path/authority checks for that exact head.
-3. Apply `agent:review-ready` only when the exact-head evidence is current; obtain a genuinely fresh independent handoff-fidelity review. The label means ready to inspect, never PASS.
-4. If the independent gate passes, integrate only with explicit user authorization; then run the Fresh-session Bootstrap Evaluation from default `main` + live GitHub.
-5. After continuity is stable, resume Issue #21 for reusable engineering-baseline reconciliation. Separately, Product-learning work should attack ICP/demand/differentiation/switching/WTP/distribution/retention uncertainties with the smallest adequate validation experiment rather than waiting for all engineering-baseline work to finish.
+1. **Product lane:** execute Issue #26 as a bounded comparative prototype/validation experiment. Prove or falsify Responsibility/Moment value before provider/AI/persistence breadth.
+2. **Continuity lane:** finish Issue #25's bounded checkpoint repair and move continuity out of the critical path unless a real failure appears.
+3. **Engineering-baseline lane:** Issue #21 may proceed independently from a fresh current `main`; do not let it block Product learning.
+4. **Responsibility technical lane:** execute #13 and #14 from fresh isolated current-main workspaces when capacity permits, then #15. Technical PASS is not Product validation.
+
+For review handoff, `agent:review-ready` means **ready to inspect, never PASS**. Reviewer disposition must be recorded durably before queue clearing; merge remains explicitly human-authorized.
 
 ## Deep links to canonical sources
 
 ### Product / UX
 
 - `docs/product/PRODUCT.md` — product vision/problem/users-as-hypotheses/differentiation/MVP/validation/commercial unknowns/supersessions.
-- `docs/design/DESIGN.md` — accepted product-design model, information architecture, visual/trust principles, first high-fidelity slice.
-- `docs/design/INTERACTIONS.md` — click semantics, Moments, compose/search/context/error flows.
+- `docs/design/DESIGN.md` — accepted product-design model, information architecture, visual/trust principles.
+- `docs/design/INTERACTIONS.md` — interaction semantics, Moments, compose/search/context/error flows.
 - `docs/design/RESPONSIVE.md` — responsive/pane behavior.
+- GitHub Issue #26 — current comparative Product-validation experiment contract; **query live**.
 
 ### Responsibility / data / architecture
 
 - `docs/product/responsibility/README.md` — authoritative Responsibility freeze/proof status and semantic routing.
-- `docs/product/responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — authoritative frozen L1 persistence boundary.
+- `docs/product/responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — frozen L1 persistence boundary.
 - `docs/product/responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact current v0.4 L2 candidate.
 - `docs/product/responsibility/L2-EXECUTABLE-PROOF-GATE.md` — evidence gate before final L2 freeze.
-- `docs/product/ARCHITECTURE.md` — modules/authority/provider/AI/scheduler/failure boundaries.
-- `docs/product/DATA-MODEL.md` — conceptual durable entities/ownership/concurrency; must stay reconciled with the frozen L1 boundary.
-- `docs/product/CONTRACTS.md` — module/provider/domain/scheduler/send/search contracts.
-- `docs/product/TECH-STACK.md` — accepted initial stack + activation policy.
-- `docs/product/IMPLEMENTATION-PLAN.md` — living product/technical sequence.
+- `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md`, `TECH-STACK.md`, `IMPLEMENTATION-PLAN.md`.
+- GitHub Issues #13/#14/#15 — L2 executable proof/final-review chain; **query live**.
 
-### Durable decisions / continuity / live work
+### Continuity / engineering baseline / live work
 
-- `docs/decisions/0008-responsibility-state-is-orthogonal.md`.
-- `docs/decisions/0009-responsibility-persistence-boundary.md`.
 - `docs/continuity/README.md` — continuity operating contract.
 - `docs/continuity/KNOWLEDGE-MAP.md` — question → authority routing.
-- `docs/continuity/BLUEPRINT-ADOPTION.md` — Blueprint adoption relationship; consult with live Issue #21.
-- GitHub Issue #19 / PR #22 — current product/current-state preservation candidate; **query live**.
-- GitHub Issue #21 — Blueprint reconciliation; later ordering comment supersedes the older body ordering; **query live**.
-- GitHub Issues #13/#14/#15 — Responsibility L2 proof/review chain; **query live**.
-- GitHub Issues #16/#18/#23 — completed prerequisites/history; not active blockers.
-- GitHub PRs #5/#7/#8 — legacy candidates requiring the classifications above, not automatic merge targets.
+- `docs/continuity/BLUEPRINT-ADOPTION.md` — Blueprint adoption metadata; consult live Issue #21.
+- GitHub Issue #25 — Fresh-session Bootstrap Evaluation v0.1 evidence + post-#22 checkpoint reconciliation; **query live**.
+- GitHub Issue #21 — Blueprint reconciliation; ordering gate is now satisfied; **query live**.
+- GitHub PRs #5/#7/#8 — legacy candidates with the classifications above, not automatic merge targets.
 
 ## Update lifecycle
 
-Revise this checkpoint only after canonical knowledge and live evidence have been reconciled. If it conflicts with a canonical source, code/test/runtime evidence for actual behavior, or live GitHub state, the authoritative/current source wins and this checkpoint must be repaired when appropriate. Keep it small; move substantive knowledge to its proper canonical artifact.
+Revise this checkpoint only after canonical knowledge and live evidence have been reconciled. If it conflicts with a canonical source, actual code/test/runtime evidence, or live GitHub state, the authoritative/current source wins and this checkpoint must be repaired when appropriate. Keep detailed evaluation/task history in its owning Issue/PR rather than turning this file into a changelog or knowledge dump.

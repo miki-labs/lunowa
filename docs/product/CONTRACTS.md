@@ -2,41 +2,47 @@
 
 ## Status
 
-**Accepted logical contracts; concrete API/SDK syntax is not yet frozen.**
+**Accepted logical contracts, reconciled with Responsibility v0.1; concrete API/SDK syntax is not yet frozen.**
 
-This document defines the contracts between Lunowa's major modules. The purpose is to let implementation evolve without allowing provider details, model output, background workers, or UI code to silently redefine domain behavior.
+This document defines contracts between Lunowa modules so provider details, model output, workers, or UI code cannot silently redefine domain behavior.
 
-Related sources:
+Responsibility-specific semantics are constrained by:
 
-- `ARCHITECTURE.md`
-- `DATA-MODEL.md`
-- `../design/INTERACTIONS.md`
-- `../ai-product-runtime.md`
+- `responsibility/README.md`;
+- `responsibility/DECISIONS.md`;
+- `responsibility/CONSISTENCY-AUDIT.md`;
+- `responsibility/SCENARIO-SCHEMA.md`;
+- `responsibility/TRANSITION-SCHEMA.md`.
+
+Related broader sources:
+
+- `ARCHITECTURE.md`;
+- `DATA-MODEL.md`;
+- `../design/INTERACTIONS.md`;
+- `../ai-product-runtime.md`.
 
 ---
 
 ## 1. Contract principles
 
 1. External systems enter through validated adapters.
-2. Core domain contracts use Lunowa concepts, not Gmail/Microsoft SDK types.
-3. AI returns structured candidate facts, not authoritative workflow decisions.
-4. Durable jobs execute persisted intent and re-check current state before side effects.
-5. Every privileged read/write is re-authorized using trusted application state.
-6. Commands with external side effects define retry/idempotency semantics explicitly.
-7. Search/AI projections resolve back to authoritative authorized records.
-8. Contracts should be small and use-case-shaped; do not create generic abstraction frameworks before needed.
+2. Core contracts use Lunowa concepts, not Gmail/Microsoft SDK types.
+3. Evidence, interpretation, accepted Responsibility state, safe action, and UI projection remain distinct.
+4. AI returns structured candidate interpretation, not authoritative Responsibility state or authorization.
+5. Durable jobs reload/re-authorize/re-check current state before effects.
+6. External side effects define idempotency/reconciliation semantics explicitly.
+7. Search/AI projections resolve back to current authorized records.
+8. Contracts stay use-case-shaped; do not create generic workflow abstraction before required.
+9. One evidence event may produce multiple Responsibility effects.
+10. Stale evidence/model results cannot win merely because they complete later.
 
 ---
 
 ## 2. Provider adapter contract
 
-Provider integrations should satisfy a normalized set of capabilities while allowing provider-specific implementation behind the boundary.
+Provider integrations expose normalized capabilities without forcing artificial feature parity.
 
-Do not force every provider into artificial feature parity. Capability checks are allowed.
-
-### 2.1 Normalized capabilities
-
-Conceptual capability set:
+### 2.1 Capabilities
 
 ```text
 ProviderCapabilities {
@@ -54,19 +60,11 @@ ProviderCapabilities {
 }
 ```
 
-The product layer should ask whether a capability exists rather than branching on provider string wherever possible.
-
 ### 2.2 Account connection
-
-Conceptual command:
 
 ```text
 connectAccount(auth_result) -> ConnectedAccountConnection
-```
 
-Output:
-
-```text
 ConnectedAccountConnection {
   provider_account_id
   email_address
@@ -79,18 +77,16 @@ ConnectedAccountConnection {
 
 Requirements:
 
-- verify the provider identity from the provider, not client-submitted email alone;
-- store credentials only in the server-side credential boundary;
-- return normalized account identity;
-- expose reconnect-required errors distinctly from transient provider failure.
+- verify provider identity from provider evidence, not client-submitted email alone;
+- keep credentials server-side;
+- normalize account identity;
+- distinguish reconnect-required from transient failure.
 
 ### 2.3 Incremental change fetch
 
 ```text
 fetchChanges(account, cursor?) -> ProviderChangeBatch
-```
 
-```text
 ProviderChangeBatch {
   changes[]
   next_cursor?
@@ -99,7 +95,7 @@ ProviderChangeBatch {
 }
 ```
 
-Each `change` should be normalized to a small set such as:
+Normalized change kinds may include:
 
 ```text
 MESSAGE_UPSERT
@@ -108,22 +104,14 @@ THREAD_METADATA_CHANGED
 MAILBOX_STATE_CHANGED
 ```
 
-The adapter may internally call multiple provider APIs.
+Duplicates are allowed at the boundary; ingestion is idempotent. Invalid cursor returns explicit resync/reconciliation state. Cursor advancement becomes locally authoritative only after the corresponding local changes are durable.
 
-Requirements:
-
-- duplicates allowed at boundary; ingestion must be idempotent;
-- invalid cursor returns explicit `RESYNC_REQUIRED`, not silent empty success;
-- `next_cursor` becomes authoritative locally only after corresponding changes are durably applied.
-
-### 2.4 Fetch normalized message/thread data
+### 2.4 Fetch normalized message/thread
 
 ```text
 fetchMessage(account, provider_message_id) -> NormalizedProviderMessage
 fetchConversationSeed(account, provider_thread_id) -> NormalizedProviderConversation
 ```
-
-Conceptual normalized message:
 
 ```text
 NormalizedProviderMessage {
@@ -145,7 +133,7 @@ NormalizedProviderMessage {
 }
 ```
 
-Sanitization for browser rendering may occur after normalization, but provider HTML must remain untrusted throughout.
+Provider HTML/content remains untrusted.
 
 ### 2.5 Send message
 
@@ -180,36 +168,24 @@ ProviderSendResult {
 
 Requirements:
 
-- adapter must map ambiguous timeout/error states distinctly when the provider may have accepted the send;
-- the application must reconcile ambiguous send results before blindly retrying;
-- a provider SDK retry must not bypass Lunowa SendOperation idempotency rules.
+- ambiguous timeout/error states are distinct when provider may have accepted;
+- application reconciles ambiguous sends before blind retry;
+- provider retry cannot bypass Lunowa SendOperation idempotency;
+- provider acceptance is evidence of accepted send, not proof of unrelated external-world outcomes.
 
-### 2.6 Mailbox mutation
+### 2.6 Mailbox mutations
 
-Use narrowly shaped operations, for example:
-
-```text
-markRead(...)
-archive(...)
-trash(...)
-reportSpam(...)
-```
-
-Do not expose a generic arbitrary provider mutation tool to AI or UI.
+Expose narrow operations (`markRead`, `archive`, `trash`, `reportSpam`) rather than a generic arbitrary provider-mutation tool available to AI/UI.
 
 ---
 
 ## 3. Sync / ingestion contract
 
-The sync pipeline converts provider changes into normalized durable communication events.
-
-### 3.1 Account sync command
-
 ```text
 syncAccount(connected_account_id, reason) -> SyncResult
 ```
 
-Reason examples:
+Reasons may include:
 
 ```text
 PUSH_NOTIFICATION
@@ -219,8 +195,6 @@ RECONNECT
 RECONCILIATION
 INITIAL_SYNC
 ```
-
-Output:
 
 ```text
 SyncResult {
@@ -233,33 +207,42 @@ SyncResult {
 }
 ```
 
-### 3.2 Ingestion invariants
+### 3.1 Ingestion invariants
 
 For each provider message:
 
-1. validate account ownership;
+1. authorize account ownership;
 2. normalize provider payload;
 3. upsert by `(connected_account_id, provider_message_id)`;
-4. attach to the correct local Conversation;
+4. attach to correct local Conversation;
 5. persist message/attachment metadata;
-6. commit local state;
-7. enqueue downstream interpretation/index/re-evaluation idempotently;
-8. advance cursor only according to provider consistency semantics and after local durability.
+6. commit local evidence;
+7. advance semantic evidence revision as appropriate;
+8. enqueue interpretation/index/re-evaluation idempotently;
+9. advance provider cursor only according to provider consistency semantics after required local durability.
 
-### 3.3 Relevant inbound reply event
+### 3.2 Semantic chronology
 
-After normalization, domain logic may emit:
+Observed/worker order is not semantic authority.
+
+A late older message MUST NOT roll back a later explicit correction solely because it was ingested last.
+
+Normalization should preserve source sent/received time and explicit relation evidence needed by the reducer.
+
+### 3.3 Inbound observation event
 
 ```text
 InboundMessageObserved {
   message_id
   conversation_id
   connected_account_id
+  semantic_time
   observed_at
+  evidence_revision
 }
 ```
 
-Temporal Contract matching consumes this normalized event and current contract state. Provider webhook payloads must never directly fire user attention changes.
+Provider webhook payloads never directly mutate Responsibility attention/state.
 
 ---
 
@@ -267,272 +250,287 @@ Temporal Contract matching consumes this normalized event and current contract s
 
 ### 4.1 Input boundary
 
-The AI receives only context already authorized for the current user and feature.
+The AI receives only context authorized for the current user/feature.
 
 Conceptual input:
 
 ```text
 InterpretationInput {
   schema_version
+  behavior_config_version
+  evidence_revision
   locale
   timezone
+
+  focal_message_id?
+
   conversation_context {
     conversation_id
+    connected_account_id
     topic?
     messages[] {
       message_id
       direction
       sender
       recipients
+      cc[]?
       timestamp
       subject
       text_content
+      attachment_metadata[]?
     }
   }
-  existing_action_items[]?
+
+  existing_responsibility_context[]?
+  authorized_external_context[]?
 }
 ```
 
-Do not pass provider credentials, unrelated scopes/accounts, or unrestricted database access.
+Do not pass provider credentials, unrelated accounts/scopes, or unrestricted database access.
 
 ### 4.2 Output schema
 
-The model should produce structured **candidate facts**.
+The model returns structured **candidate interpretation**, not state mutation.
+
+Conceptual output:
 
 ```text
 InterpretationOutput {
   schema_version
-  conversation_topic_candidate? {
-    value
-    confidence
+  basis_evidence_revision
+
+  zoning_candidates[]?
+
+  communication_acts[] {
+    act_id
+    type                   // REQUEST | COMMITMENT | PROPOSAL | DECISION | CORRECTION | CANCELLATION | COMPLETION_SIGNAL | INFORMATION
+    speaker
+    obligation_bearer_candidate?
+    obligation_bearers_candidate[]?
+    assignment_shape_candidate?
+    action_or_event?
+    object?
+    modality?
+    obligation_strength?
+    polarity?
+    condition?
+    constraints[]?
+    temporal_expressions[]?
     source_message_ids[]
+    source_locators[]?
   }
 
-  action_candidates[] {
-    candidate_key
-    goal
-    requested_action?
-    next_owner_candidate
-    deadline_candidate? {
-      value
-      timezone_context?
-      confidence
-      source_message_ids[]
-    }
-    waiting_for?
-    completion_signal? {
-      kind
-      confidence
-      source_message_ids[]
-    }
-    follow_up_signal?
-    confidence
-    risk_hint?
-    source_message_ids[]
-  }
+  communicated_claims[]?
+  proposed_terms[]?
 
-  no_action_signal? {
-    confidence
-    source_message_ids[]
-  }
+  no_responsibility_signal?
 
   uncertainty[] {
     field
     reason_code
+    source_message_ids[]?
   }
 }
 ```
 
-The exact JSON schema may evolve, but these semantics must remain.
+Exact production schema may evolve. The semantic distinctions are not optional.
 
 ### 4.3 Explicit exclusions
 
-The AI output MUST NOT be treated as authoritative for:
+AI output is not authoritative for:
 
 - user authorization;
 - ConnectedAccount ownership;
 - send permission;
-- direct lifecycle state mutation;
-- hidden/deferred state without policy/rule validation;
+- direct Responsibility mutation;
+- live activation/defer/hiding without product policy;
 - irreversible provider action;
+- provider-observed facts that should be deterministically read from provider data;
 - cost/usage limits;
-- scope membership.
+- scope membership;
+- high-risk compliance legitimacy.
 
-### 4.4 Abstention
+### 4.4 Abstention/uncertainty
 
-The schema must allow the model to say it is uncertain or no reliable action can be extracted.
+The schema supports uncertainty and no reliable Responsibility signal.
 
-Invalid/low-confidence output should degrade to `UNCERTAIN`/traditional mail presentation rather than forcing a confident classification.
+Invalid output must not force a confident classification. However, model uncertainty alone also does not dictate product review; the reducer/safety layer considers source ambiguity, contradiction, risk, and deterministic observations.
 
-### 4.5 Provenance
+### 4.5 Provenance and freshness
 
-Important candidate fields should include source message IDs. The product may later add exact text locators/excerpts.
+Material candidate fields include source message IDs/locators where practical.
 
-A deadline/action/completion claim shown to a user should be traceable to original communication when practical.
+`basis_evidence_revision` is required wherever stale results could race newer evidence.
+
+```text
+basis_revision matches current revision
+```
+
+is necessary but not sufficient for application.
 
 ---
 
-## 5. Lifecycle reducer contract
+## 5. Responsibility reduction contract
 
-The lifecycle reducer owns authoritative ActionItem state transitions from validated facts/events.
+The Responsibility reducer owns accepted evidence-relative domain effects from validated interpretation/trusted observations/user commands.
 
-Conceptual pure-ish function:
+Conceptual pure-ish contract:
 
 ```text
-reduceLifecycle(current_state, domain_event, policy_context)
-  -> LifecycleDecision
+reduceResponsibilityEvidence(
+  current_responsibilities,
+  evidence_event,
+  policy_context
+) -> ResponsibilityDecision
 ```
 
-Where:
-
 ```text
-LifecycleDecision {
-  action_item_changes[]
-  temporal_contract_changes[]
-  attention_changes[]
+ResponsibilityDecision {
+  effects[] {
+    responsibility_ref?
+    operation              // CREATE | UPDATE | RESOLVE | REOPEN | SUPERSEDE | INVALIDATE | NO_OP
+    resolution_reason?
+    field_changes[]
+    reason_codes[]
+  }
+
+  field_decisions[]?
+  temporal_contract_changes[]?
+  attention_changes[]?
+  projection_invalidations[]?
   audit_reasons[]
   requires_user_confirmation?
 }
 ```
 
-### 5.1 Domain events
+### 5.1 Why `effects[]`
+
+One focal message may supersede one Responsibility and create another. Do not force one scalar lifecycle/matching operation.
+
+`SUPERSEDE` is terminal on the old Responsibility and conceptually results in `RESOLVED/SUPERSEDED`; replacement creation is a separate `CREATE` effect.
+
+### 5.2 Canonical semantic dimensions
+
+Reduction preserves the orthogonal model:
+
+```text
+resolution status/reason
+live tracking activation
+attention/defer
+obligation legs + actionability/conditions
+expected events
+completion criteria
+constraints
+pending proposals/agreed facts
+temporal facts
+field-level uncertainty/risk
+provenance
+```
+
+The superseded seven-state lifecycle enum MUST NOT be restored as canonical state.
+
+### 5.3 Domain/evidence events
 
 Examples:
 
 ```text
 INTERPRETATION_ACCEPTED
+MESSAGE_OBSERVED
+USER_FIELD_CORRECTED
+USER_TRACKING_ACTIVATED
+USER_TRACKING_CLOSED
 USER_DEFERRED
-USER_CORRECTED_STATE
-USER_SENT_REQUIRED_REPLY
-INBOUND_MESSAGE_OBSERVED
 TEMPORAL_TRIGGER_FIRED
-DEADLINE_CHANGED
 SEND_RECONCILED
-EXPLICIT_COMPLETION_OBSERVED
+PROVIDER_FACT_RECONCILED
+EXTERNAL_FACT_OBSERVED
 ACCOUNT_RESYNC_RECONCILED
 ```
 
-### 5.2 Initial transition semantics
+Event names remain implementation-open.
 
-#### OPEN
+### 5.4 Core transition semantics
 
-May transition to:
+- explicit user request may create an actionable USER obligation leg;
+- user send reconciliation may satisfy a send leg, but not necessarily the whole Responsibility;
+- remaining OTHER/EXTERNAL expected work projects `WAITING`;
+- follow-up trigger can create a current USER follow-up action in the same Responsibility;
+- hold adds/changes a constraint/expected resume event and is not cancellation;
+- cancellation resolves with a non-satisfaction reason;
+- same unsatisfied operational outcome can REOPEN;
+- genuinely closed earlier episode plus new work normally CREATEs a new Responsibility;
+- pending proposal does not become agreed fact before acceptance evidence;
+- field conflict preserves evidence and can project REVIEW without erasing a definitely tracked Responsibility;
+- historical evidence-relative open loop does not automatically activate live tracking.
 
-- `ACTION_REQUIRED`
-- `WAITING`
-- `COMPLETED`
-- `UNCERTAIN`
+### 5.5 False-negative safety
 
-based on validated evidence.
+When material uncertainty could hide a real user obligation, prefer conservative visibility/review over unsupported `Done/Waiting/Later`.
 
-#### ACTION_REQUIRED -> DEFERRED
-
-Requires:
-
-- an action exists;
-- user does not need to attend now;
-- an executable Temporal Contract exists;
-- for early/high-risk active obligations, user confirmation may be required before hiding.
-
-#### DEFERRED -> ACTION_REQUIRED
-
-When active Temporal Contract fires and the obligation remains unresolved.
-
-#### ACTION_REQUIRED -> WAITING
-
-When strong evidence shows the user's required action was completed and the next owner is another party/event.
-
-A successful Lunowa send of the required response can be strong evidence when mapped to the relevant ActionItem.
-
-#### WAITING -> FOLLOW_UP
-
-When the agreed/passive follow-up condition fires and completion/reply has not occurred.
-
-#### FOLLOW_UP -> WAITING
-
-After a follow-up is successfully sent/reconciled and the system is again waiting on the other party.
-
-#### * -> COMPLETED
-
-Completion must be conservative. Strong explicit evidence or user confirmation is preferred.
-
-#### COMPLETED -> new active work
-
-New relevant inbound communication may create a new ActionItem or reopen one when goal identity is sufficiently clear.
-
-### 5.3 False-negative safety rule
-
-When uncertainty is material, prefer keeping an obligation visible/uncertain over hiding it as completed/waiting/deferred.
-
-The reducer may use confidence and risk together; confidence alone is insufficient.
+A system that sends everything to review is also a product failure. Review is reserved for decision-critical ambiguity/risk.
 
 ---
 
 ## 6. Conversation aggregate contract
 
-The UI needs one primary chip/state for a Conversation.
-
-Conceptual projection:
-
 ```text
-projectConversationAttention(action_items[]) -> ConversationAttention
+projectConversationAttention(responsibilities[]) -> ConversationAttention
 ```
 
 ```text
 ConversationAttention {
-  primary_action_item_id?
-  user_facing_state          // action_required | deferred | waiting | completed | none
-  attention_level
-  deadline_at?
+  primary_responsibility_id?
+  user_facing_state         // MY_TURN | WAITING | LATER | DONE | REVIEW | NONE or client mapping
+  attention_level?
+  nearest_relevant_time?
   reason_code
 }
 ```
 
-### Rules
+Rules:
 
-- only active Action Items participate;
-- `UNCERTAIN` must not disappear merely because another task is completed;
-- nearest/high-risk user-owned obligation can outrank a lower-risk state;
-- projection is deterministic and testable;
-- projection is derived and rebuildable.
-
-Do not hard-code UI list ordering independently from the same domain projection rules.
+- only appropriate live Responsibilities participate in active-work projection;
+- unresolved/uncertain work must not disappear because another Responsibility resolves;
+- actionable critical/overdue USER obligation can outrank lower-risk work;
+- nearest meaningful due/blocker may affect ordering;
+- newest message is not the default authority for primary selection;
+- projection is deterministic/testable/rebuildable.
 
 ---
 
 ## 7. Temporal Contract contract
 
-### 7.1 Create/update contract
+### 7.1 Create/update
 
 ```text
-upsertTemporalContract(action_item_id, contract_spec, actor)
+upsertTemporalContract(responsibility_id, contract_spec, actor)
   -> TemporalContract
 ```
 
-Conceptual spec:
-
 ```text
 TemporalContractSpec {
-  kind                    // active_obligation | passive_waiting
+  kind                    // active-obligation-defer | passive-waiting | other
   triggers[] {
     type                  // TIME | REPLY_RECEIVED | DEADLINE
     at?
     deadline_policy?
   }
-  desired_attention_on_fire
+  desired_attention_on_fire?
   user_confirmed?
 }
 ```
 
-### 7.2 Schedule trigger
+Communication hold/pause is separate from attention defer.
+
+### 7.2 Schedule
 
 ```text
 scheduleTrigger(trigger_id, trigger_at)
 ```
 
-The scheduler is infrastructure; the database record is the durable intent.
+Scheduler is infrastructure; persisted contract/trigger is durable intent.
 
-### 7.3 Fire trigger
+### 7.3 Fire
 
 ```text
 processTemporalTrigger(trigger_id) -> TriggerProcessingResult
@@ -540,36 +538,29 @@ processTemporalTrigger(trigger_id) -> TriggerProcessingResult
 
 Required sequence:
 
-1. load trigger + contract + ActionItem in current transaction/consistency boundary;
-2. verify trigger status is active;
-3. verify contract version/status is current;
-4. claim using idempotent compare/update;
-5. run lifecycle re-evaluation;
-6. persist resulting transition/resurfacing/audit;
-7. mark trigger fired/cancelled/superseded;
-8. cancel or update sibling triggers as rules require.
+1. load trigger + contract + current Responsibility/evidence;
+2. verify active/current version;
+3. claim idempotently;
+4. re-evaluate current evidence;
+5. persist resulting Responsibility/attention/resurfacing/audit effects;
+6. mark trigger fired/cancelled/superseded;
+7. cancel/update stale sibling triggers as rules require.
+
+A trigger does not itself imply notification.
 
 ### 7.4 Reconciliation
 
-```text
-reconcileOverdueTriggers(now) -> count/results
-```
+Overdue active triggers are discoverable/reprocessed idempotently after downtime.
 
-Must discover active time triggers whose `trigger_at <= now` and process them idempotently.
+### 7.5 Reply matching
 
-### 7.5 Reply-trigger matching
-
-On `InboundMessageObserved`, evaluate active reply triggers associated with the relevant Conversation/ActionItem.
-
-A provider notification is not sufficient; matching happens against normalized current domain state.
+Inbound normalized events are matched to relevant current Responsibility/contract state, not provider webhook payloads alone.
 
 ---
 
-## 8. Attention/resurfacing contract
+## 8. Attention / resurfacing contract
 
-Resurfacing and notification are distinct.
-
-Conceptual levels:
+Conceptual surfacing strength:
 
 ```text
 NONE
@@ -579,23 +570,17 @@ ATTENTION_LIST
 NOTIFICATION
 ```
 
-MVP may implement only a subset.
+Attention/defer is orthogonal to Responsibility resolution/live activation.
 
-The Temporal Contract decides when the item should be reconsidered; Attention Policy decides how strongly to surface it.
-
-This separation prevents every scheduler trigger from becoming an intrusive notification.
+`LATER` requires intentional defer semantics and a return condition; a communication hold waiting on someone else ordinarily remains `WAITING`.
 
 ---
 
 ## 9. Draft contract
 
-### 9.1 Save draft
-
 ```text
 saveDraft(draft_id?, expected_version?, payload) -> Draft
 ```
-
-Payload:
 
 ```text
 DraftPayload {
@@ -615,29 +600,23 @@ DraftPayload {
 
 Requirements:
 
-- authorize sending account ownership;
+- authorize sending account;
 - validate recipients/attachments;
-- optimistic version conflict detection or equivalent;
-- autosave is idempotent;
+- optimistic conflict detection or equivalent;
+- autosave idempotent;
 - draft survives navigation/viewport changes.
 
-### 9.2 Discard
-
-Explicit discard deletes/marks discarded the Lunowa draft and orphaned temporary uploads according to retention policy.
-
-Do not infer discard from closing a pane.
+Explicit discard is distinct from closing a pane.
 
 ---
 
 ## 10. Send operation contract
 
-### 10.1 Request send
-
 ```text
 requestSend(draft_id, mode, scheduled_for?) -> SendOperation
 ```
 
-Possible modes:
+Modes:
 
 ```text
 IMMEDIATE
@@ -645,21 +624,21 @@ UNDO_DELAY
 SCHEDULED
 ```
 
-The API returns durable operation state, not a fictional `sent=true` before provider dispatch/reconciliation.
+API returns durable operation state, never fictional `sent=true` before provider evidence.
 
-### 10.2 Undo Send
+### 10.1 Undo Send
 
-For `UNDO_DELAY`:
+For Lunowa-controlled delay:
 
 ```text
 PENDING/CANCELLABLE
- -> user cancels before cancellable_until -> CANCELLED
+ -> user cancels -> CANCELLED
  -> window expires -> DISPATCHING
 ```
 
-After provider dispatch becomes irreversible, generic Lunowa Undo is no longer available.
+After irreversible provider dispatch, generic Lunowa recall is unavailable unless separately implemented/provider-supported.
 
-### 10.3 Worker dispatch
+### 10.2 Worker dispatch
 
 ```text
 dispatchSendOperation(operation_id)
@@ -667,26 +646,23 @@ dispatchSendOperation(operation_id)
 
 Required:
 
-1. claim operation idempotently;
+1. claim idempotently;
 2. re-authorize account/user state;
-3. verify not cancelled and schedule due;
-4. build ProviderSendRequest from frozen send snapshot or protected draft version;
-5. call adapter;
-6. record unambiguous or ambiguous provider result;
-7. reconcile provider sent message when needed;
-8. update related lifecycle state only after appropriate send success/reconciliation evidence.
+3. verify schedule/cancellation/current draft snapshot;
+4. call provider adapter;
+5. record unambiguous or ambiguous result;
+6. reconcile sent message when necessary;
+7. apply Responsibility effect only after sufficient evidence for the specific closure condition.
 
-### 10.4 Ambiguous provider result
+### 10.3 Ambiguous provider result
 
-Timeout after dispatch can mean unknown acceptance.
+Timeout after dispatch may mean unknown acceptance.
 
-Never automatically retry an ambiguous send as though definitely unsent. First use provider-specific reconciliation if available; otherwise surface a guarded failure requiring resolution.
+Never blindly retry as definitely unsent. Reconcile first or surface guarded unresolved state.
 
 ---
 
 ## 11. Search contract
-
-### 11.1 Query
 
 ```text
 search(user_id, SearchRequest) -> SearchResultPage
@@ -696,34 +672,21 @@ search(user_id, SearchRequest) -> SearchResultPage
 SearchRequest {
   query
   scope_id_or_all
-  result_types[]?        // conversation | message | person | file
+  result_types[]?
   cursor?
   limit
 }
 ```
 
-### 11.2 Result
+Results resolve to current authorized sources.
 
-```text
-SearchResult {
-  type
-  source_id
-  conversation_id?
-  title
-  snippet
-  match_locations?
-  timestamp?
-  authorized_scope_context
-}
-```
+Rules:
 
-### 11.3 Rules
-
-- default to current Scope;
-- broadening to All must be explicit;
-- result source must be current and authorized at response time;
-- stale search projection may reduce recall temporarily but must not leak inaccessible data;
-- click behavior follows design spec: conversation/message result opens `会話` and jumps/highlights when possible; status/action result may open `今の要点` only when intentionally represented as such.
+- default current Scope;
+- broadening to All is explicit;
+- stale projection may reduce recall but never leak inaccessible data;
+- semantic similarity/search is not Responsibility merge authority;
+- conversation/message result opens ordinary conversation unless intentionally represented as a Responsibility/action result.
 
 ---
 
@@ -738,22 +701,17 @@ PersonContext {
   identity
   organization?
   recent_conversations[]
-  current_open_action_items[]
+  current_open_responsibilities[]
   recent_files[]
   remembered_facts[] {
     value
-    confidence?
+    uncertainty_or_confidence?
     provenance
   }
 }
 ```
 
-Rules:
-
-- respect current scope/authorization;
-- remembered facts require provenance when material;
-- no CRM pipeline/deal semantics in v1;
-- context may degrade gracefully if AI memory/enrichment is unavailable.
+Respect authorization/scope. No CRM pipeline/deal semantics in v1.
 
 ---
 
@@ -765,7 +723,7 @@ getAttachmentPreview(attachment_id) -> PreviewDescriptor
 
 ```text
 PreviewDescriptor {
-  mode                // inline_pdf | image | text | download | external
+  mode
   content_url_or_stream_reference
   filename
   mime_type
@@ -776,46 +734,49 @@ PreviewDescriptor {
 
 Requirements:
 
-- re-authorize attachment/message/account ownership;
-- do not expose long-lived raw provider credentials in URLs;
-- use short-lived signed/streamed access when necessary;
-- preserve conversation state if preview fails;
-- sanitize/render only supported types safely.
+- re-authorize ownership;
+- do not expose provider credentials in URLs;
+- use short-lived signed/streamed access as needed;
+- preserve conversation if preview fails;
+- sanitize/render supported types safely.
+
+Opening/previewing an attachment is not completion evidence by itself.
 
 ---
 
 ## 14. User correction contract
 
-Trust requires a path to correct the system.
+User correction is field-scoped where practical.
 
 ```text
-correctActionItem(action_item_id, correction) -> ActionItem
+correctResponsibility(responsibility_id, correction, expected_evidence_revision?)
+  -> ResponsibilityResult
 ```
 
 Potential corrections:
 
-- mark as no action required;
-- mark action required;
-- change deadline;
-- change next owner;
-- complete;
+- responsibility should/should-not be tracked;
+- obligation bearer/action;
+- source due interpretation;
+- user target/defer/return condition;
+- completion/resolution reason;
 - reopen;
-- change/deactivate Temporal Contract.
+- Temporal Contract change/deactivation.
 
 Requirements:
 
-- persist actor as user;
-- record meaningful LifecycleTransition/AuditEvent;
-- user correction should outrank stale AI interpretation until new strong evidence or explicit product rules justify reconsideration;
-- do not immediately overwrite a user correction with the same old interpretation result.
+- persist user authority/provenance;
+- record meaningful domain transition/audit;
+- correction to one field does not freeze unrelated fields;
+- stale AI result cannot immediately overwrite the correction;
+- user target does not rewrite external source fact;
+- user tracking-close does not assert objective satisfaction.
 
 ---
 
 ## 15. Client error contract
 
-The application API should return stable product-level errors rather than raw provider/model exceptions.
-
-Conceptual categories:
+Stable product categories may include:
 
 ```text
 AUTH_REQUIRED
@@ -835,13 +796,11 @@ INTERNAL_RETRYABLE
 INTERNAL_FATAL
 ```
 
-UI copy should explain impact and recovery rather than technical stack traces.
+UI explains impact/recovery rather than raw technical exceptions.
 
 ---
 
 ## 16. Job contract
-
-Every durable job should carry:
 
 ```text
 JobEnvelope {
@@ -853,82 +812,93 @@ JobEnvelope {
   created_at
   not_before?
   correlation_id?
+  basis_evidence_revision?
 }
 ```
 
-Worker behavior:
+Workers:
 
-- load authoritative current state;
-- no trust in stale job payload for authorization/state;
-- bounded retry policy by job type;
-- dead/permanent failure observable;
-- side effects idempotent or reconciled.
-
-Do not put entire message bodies or credentials into queue payloads when stable entity references suffice.
+- load current authoritative state;
+- do not trust stale job payload for authorization/domain truth;
+- use bounded retry;
+- expose permanent failure;
+- make effects idempotent/reconcilable;
+- avoid putting full bodies/credentials in queue payloads when references suffice.
 
 ---
 
 ## 17. Versioning contract
 
-Version material behavior inputs:
+Version material behavior inputs such as:
 
 - AI structured-output schema;
-- lifecycle rule version when necessary for migration/debug;
+- behavior/reducer config where mixed semantics require traceability;
 - model/prompt/config identifier;
-- search projection version if rebuild behavior changes;
+- evidence revision;
 - Temporal Contract version;
+- search projection version;
 - public/client API only when compatibility requires it.
 
-Avoid versioning every internal function. Version only where mixed/stale data or regression traceability needs it.
+Do not version every internal function.
 
 ---
 
 ## 18. Testing implications
 
-These contracts imply specific tests.
+### Provider/sync
 
-### Provider contract tests
-
-- duplicate message ingestion;
-- invalid sync cursor;
-- rate limit/transient errors;
+- duplicate ingestion;
+- invalid cursor;
+- provider transient/rate-limit errors;
 - ambiguous send timeout;
-- provider payload normalization;
-- reconnect.
+- normalization;
+- reconnect/resync;
+- out-of-order ingestion preserving semantic correction.
 
-### Lifecycle tests
+### Responsibility/domain
 
-- multiple Action Items in one Conversation;
-- action required -> deferred -> resurfaced;
-- send -> waiting;
-- waiting -> follow-up;
-- completion/reopen;
-- uncertainty preserves visibility;
-- user correction not overwritten by stale AI output.
+- zero/one/many Responsibilities in one Conversation;
+- request vs no-responsibility admission;
+- multiple obligation legs;
+- conditional activation;
+- partial completion criteria;
+- proposal/counterproposal/agreement;
+- hold vs cancellation vs defer;
+- send leg -> Waiting vs whole-outcome completion;
+- follow-up as action in same Responsibility;
+- REOPEN vs new episode;
+- supersede old + create replacement in one event;
+- field-scoped conflict/review;
+- historical open vs live activation;
+- user correction not overwritten by stale AI;
+- cross-account lookalikes not auto-merged.
 
-### Scheduler tests
+### Scheduler
 
 - duplicate trigger execution;
-- trigger cancelled before fire;
-- contract updated while old trigger pending;
+- cancellation/version race;
 - downtime/overdue reconciliation;
-- reply arrives before scheduled time;
+- reply before scheduled time;
 - stale sibling trigger ignored.
 
-### Send tests
+### Send
 
 - client double-submit;
 - worker retry;
 - undo cancellation;
 - scheduled send after restart;
-- ambiguous provider acceptance.
+- ambiguous provider acceptance;
+- reconciled send only closes appropriate operational outcome.
 
-### Authorization tests
+### Authorization/safety
 
-- cross-user account/message access rejected;
-- cross-scope search does not leak when scope is restricted;
-- AI context excludes unauthorized data;
-- attachment access re-authorized.
+- cross-user/account access rejected;
+- search/AI context respects scope;
+- attachment access re-authorized;
+- prompt-injection text cannot gain tool authority;
+- high-risk requested action is separated from safe next action.
+
+Canonical semantic truth for these tests is supplied by `responsibility/` scenarios/transition oracles; passing prompt eval alone is insufficient.
 
 ---
 
@@ -937,13 +907,13 @@ These contracts imply specific tests.
 A change is contract-significant when it changes:
 
 - authority/ownership;
-- lifecycle semantics;
+- Responsibility admission/identity/resolution/actionability/projection semantics;
 - provider normalization;
 - Temporal Contract guarantees;
 - send idempotency/irreversibility;
 - authorization/data exposure;
 - AI schema/decision boundary;
-- search scope semantics;
+- search scope;
 - user-visible error/recovery behavior.
 
-Such changes should update this document and relevant tests/specs in the same change.
+Such changes update this document and relevant Responsibility decisions/scenarios/tests in the same durable change.

@@ -3,20 +3,39 @@
 ## Status
 
 Accepted — 2026-08-19
+Terminology reconciled with Responsibility v0.1 — 2026-08-23
 
 ## Context
 
-Lunowa needs a responsive web application, provider integrations, durable background work, relational state, AI interpretation, and Temporal Contract scheduling. These concerns create clear logical modules, but the product is being built by a solo/small-team workflow and has not demonstrated a need for independent service deployment or scaling.
+Lunowa needs a responsive web application, provider integrations, durable background work, relational state, AI interpretation, Responsibility-domain reduction, and Temporal Contract scheduling.
 
-Splitting the product into microservices early would add deployment, networking, observability, consistency, testing, and coding-agent context cost before it solves a measured product problem.
+These concerns create clear logical modules, but the product is being built through a solo/small-team workflow and has not demonstrated a need for independently deployed/scaled services.
+
+Splitting the product into microservices early would add deployment, networking, observability, distributed consistency, testing, and coding-agent context cost before solving a measured product problem.
 
 ## Decision
 
 Use a **modular monolith** as the default architecture.
 
-Logical modules such as provider integration, sync, lifecycle, AI interpretation, search, compose/send, and scheduling should have explicit contracts and dependency directions, but they remain in one product codebase and one coherent domain.
+Logical modules such as:
 
-Background work may run in a separate worker process/runtime where required. Process separation does not imply service/domain separation.
+```text
+provider integration
+sync / ingestion
+communication / Conversation
+Responsibility domain / reduction
+AI interpretation
+Temporal Contract / scheduling
+compose / send
+search
+context / audit
+```
+
+should have explicit contracts/dependency directions while remaining in one product codebase and one coherent domain unless measured evidence justifies extraction.
+
+Background work may execute in a separate worker/runtime where needed. Process/runtime separation does not imply service/domain separation.
+
+Responsibility v0.1 specifically requires the domain boundary to preserve evidence → interpretation → accepted state → safety → projection semantics; modular-monolith implementation must not collapse those concerns merely because they share one deployment.
 
 ## Alternatives considered
 
@@ -24,31 +43,33 @@ Background work may run in a separate worker process/runtime where required. Pro
 
 Rejected because current scale/team/deployment needs do not justify distributed-system overhead.
 
-### Fully serverless function-per-feature architecture
+### Fully serverless function-per-feature as the domain architecture
 
-Not adopted as a domain architecture. Individual platform functions may be used as deployment mechanics if they preserve the product contracts, durable jobs, transactions, and operational simplicity.
+Not adopted. Platform functions may be deployment mechanics if they preserve product contracts, durable jobs, transactions, authorization, idempotency, and semantic authority.
 
 ### Single unstructured application module
 
-Rejected because provider, lifecycle, AI, scheduler, and send boundaries are important enough that uncontrolled coupling would make correctness and future provider expansion difficult.
+Rejected because provider, Responsibility, AI, scheduler, send, authorization, and search boundaries are important enough that uncontrolled coupling would make correctness and future provider expansion difficult.
 
 ## Consequences
 
 Positive:
 
 - simpler deployment/operations;
-- easier transactions and consistency;
+- easier transactions/consistency;
 - lower solo-developer maintenance cost;
 - easier Codex/human repository reasoning;
 - explicit module boundaries remain possible;
 - services can be extracted later only with evidence.
 
-Negative/trade-off:
+Trade-offs:
 
 - modules are not independently deployable/scalable by default;
 - discipline/tests may be needed to prevent cross-module reach-through;
-- later extraction could require migration work if scale genuinely demands it.
+- later extraction could require migration work if measured scale/failure-isolation needs arise.
 
 ## Revisit when
 
-Reconsider only when measured evidence shows a component needs independent deployment/scaling/failure isolation/team ownership that is cheaper than continued monolith operation.
+Reconsider only when measured evidence shows a component needs independent deployment, scaling, failure isolation, security boundary, or team ownership that is cheaper/safer than continued monolith operation.
+
+Do not use Responsibility-model complexity alone as a reason to create services; first preserve the domain boundary inside the monolith.

@@ -2,17 +2,18 @@
 
 ## Status
 
-**Current product-design source of truth.**
+**Current product-design source of truth, reconciled with Responsibility v0.1.**
 
-This document defines Lunowa's accepted product-design model, visual principles, information architecture, and implementation guardrails. It is intentionally more authoritative than any single generated screenshot.
+This document defines Lunowa's accepted product-design model, visual principles, information architecture, and implementation guardrails. It is more authoritative than any single generated screenshot.
 
-The visual reference set under `docs/design/references/` is required implementation context, but generated screenshots can contain incidental inconsistencies, sample data, or visual artifacts. When a screenshot conflicts with this document, follow this document unless a later explicit decision supersedes it.
+Visual references under `docs/design/references/` remain required implementation context, but screenshots can contain incidental inconsistencies/sample data/artifacts. When a screenshot conflicts with current Markdown semantics, follow the current textual specification.
 
 Related sources:
 
-- `docs/design/INTERACTIONS.md` — interaction semantics, lifecycle behavior, Moment View, Temporal Contract, menus, compose/search/context behavior.
-- `docs/design/RESPONSIVE.md` — pane behavior and responsive adaptation.
-- `docs/design/references/README.md` — reference-image catalog and authority rules.
+- `docs/design/INTERACTIONS.md` — interaction/projection behavior, Moment View, Temporal Contract, menus, compose/search/context/error behavior;
+- `docs/design/RESPONSIVE.md` — pane/responsive adaptation;
+- `docs/design/references/README.md` — visual-reference authority/caveats;
+- `docs/product/responsibility/README.md` — canonical Responsibility semantic source map.
 
 ---
 
@@ -20,230 +21,186 @@ Related sources:
 
 Lunowa is a communication-management layer built around ordinary email workflows.
 
-It is not trying to win by maximizing features, AI visibility, dashboard density, or provider parity. The product should reduce the amount of communication-management work the user must perform.
+It should not win by maximizing features, visible AI, dashboard density, or provider parity. It should reduce Communication Management Burden.
 
 ### North Star
 
 > 必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。
 
-### Internal product principle
+### Internal principle
 
 > **Eliminate work, not control.**
 
-The product should remove unnecessary management burden while preserving user control, reversibility, source visibility, and safe fallback behavior.
+Remove unnecessary management work while preserving source visibility, user authority, reversibility, and safe fallback.
 
 ### Communication Management Burden
 
-Lunowa should reduce four kinds of burden:
+Reduce:
 
-1. **Monitoring cost / 時間** — the user should not need to remember when to check again.
-2. **Execution cost / 操作** — reduce searching, navigation, app switching, copying, manual task creation, and repeated clicks.
-3. **Interpretation cost / 視覚・理解** — reduce the work required to reconstruct what matters from long threads.
-4. **Verification cost / 信頼** — reduce repeated checking of the original message, sent state, account identity, and AI correctness without hiding the evidence needed to verify when desired.
+1. **Monitoring cost / 時間** — user should not remember when to check again.
+2. **Execution cost / 操作** — reduce searching, navigation, switching, copying, manual task creation, repeated clicks.
+3. **Interpretation cost / 視覚・理解** — reduce reconstruction of what matters from threads.
+4. **Verification cost / 信頼** — reduce `念のため` re-checking without hiding evidence/control.
 
-A feature is justified when it materially reduces one or more of these burdens without creating a larger trust, complexity, or operational cost.
+A feature is justified when it materially reduces one/more burdens without creating greater trust/complexity/operational cost.
 
 ---
 
 ## 2. Product scope
 
-### 2.1 In scope for the initial product
+### 2.1 Initial product
 
-Lunowa should support the ordinary mail capabilities required to function as a credible daily email client, plus the differentiated lifecycle/attention layer.
+Lunowa should support credible daily-email capabilities plus its differentiated Responsibility/attention layer:
 
-Core capabilities:
-
-- connect Gmail and Microsoft/Outlook accounts through provider-supported authorization flows;
-- support one or multiple accounts;
-- optionally group accounts into user-understandable scopes such as `仕事`, `個人`, or `大学`;
-- browse conversations/threads;
-- compose, reply, reply-all, and forward;
-- select sender account;
-- To / Cc / Bcc;
-- subject editing for new messages and forwards;
-- attachments;
-- basic formatting;
-- signatures;
+- Gmail + Microsoft/Outlook connection through supported authorization;
+- one/multiple accounts and optional user-understandable Scopes;
+- browse Conversations/messages;
+- compose/reply/reply-all/forward;
+- explicit sender account;
+- To/Cc/Bcc, subject, attachments, formatting, signatures;
 - autosaved drafts;
-- Sent, Drafts, Archive, Trash, Spam/Block, Read/Unread;
+- Sent/Drafts/Archive/Trash/Spam/Block/Read-Unread;
 - search;
 - pinning;
-- Undo Send where technically supported by Lunowa's send pipeline;
+- Undo Send where backed by Lunowa's real send pipeline;
 - Send Later;
 - recipient/contact autocomplete;
-- multi-select and basic bulk actions where practical;
-- attachment/file preview;
-- person/company context surface;
-- lifecycle state and Moment View;
-- Temporal Contract / resurfacing behavior;
-- responsive desktop/tablet/mobile UI;
-- explicit error, offline, reconnect, sync, and AI-degraded states.
+- basic bulk actions where practical;
+- attachment preview;
+- person/company context;
+- `My Turn / Waiting / Later / Done / Review` Responsibility projections + Moment View;
+- Temporal Contract/resurfacing;
+- responsive desktop/tablet/mobile;
+- explicit error/offline/reconnect/sync/AI-degraded states.
 
 ### 2.2 Not a v1 goal
 
-Do not expand the first implementation into:
+Do not turn the first product into:
 
-- a full CRM;
-- a project-management suite;
-- a calendar-first productivity system;
-- a visual graph explorer as a primary navigation mode;
-- a generic automation/rule-builder platform;
-- a replacement mail transport protocol;
-- a feature-complete reimplementation of every Gmail or Outlook setting;
-- a chat-first AI product that requires users to prompt the system for routine work.
-
-Those ideas may be revisited only if product evidence shows they materially improve retention, willingness to pay, or the North Star behavior.
+- full CRM;
+- project-management suite;
+- calendar-first productivity system;
+- graph explorer as primary nav;
+- generic automation/rule builder;
+- replacement mail transport;
+- feature-complete Gmail/Outlook clone;
+- chat-first AI that makes users prompt routine work;
+- generic workflow/BPMN engine.
 
 ---
 
 ## 3. Core product model
 
-### 3.1 Conversation is not the lifecycle state
+### 3.1 Conversation is not Responsibility state
 
-A conversation can contain multiple independent obligations. Therefore Lunowa **must not** model a thread as having one irreversible lifecycle state.
-
-Conceptually:
+A Conversation can contain zero/one/many independent Responsibility loops.
 
 ```text
 Conversation
-├── Communication Events
-│   ├── received message
-│   ├── sent message
-│   ├── attachment
-│   ├── provider/calendar/time event
-│   └── other relevant event
-└── Action Items
-    ├── Action Item A
-    ├── Action Item B
-    └── Action Item C
+├── Communication Evidence
+│   ├── received messages
+│   ├── sent messages
+│   ├── provider observations
+│   └── trusted external/user events
+└── Responsibilities
+    ├── Responsibility A
+    ├── Responsibility B
+    └── Responsibility C
 ```
 
-Each Action Item may have its own state, owner, deadline, confidence, risk, provenance, and Temporal Contract.
+A Responsibility is the smallest communication-bounded operational outcome with a coherent closure condition.
 
-The conversation row presents an **aggregate user-facing status** derived from the active Action Items. The aggregate must not destroy the underlying task-level structure.
+The Conversation row may display one aggregate state, but it is a deterministic projection and must not destroy underlying Responsibility structure.
 
-### 3.2 Internal Action Item states
+### 3.2 Canonical semantics are orthogonal
 
-Accepted internal state vocabulary:
+Do **not** use the former monolithic internal lifecycle enum as canonical truth.
 
-```text
-OPEN
-ACTION_REQUIRED
-DEFERRED
-WAITING
-FOLLOW_UP
-COMPLETED
-UNCERTAIN
-```
-
-These are internal product semantics. User-facing Japanese labels should remain simple and need not expose the enum names.
-
-### 3.3 Orthogonal properties
-
-State is not urgency and is not ownership. Keep these concepts separate.
-
-Recommended properties include:
+The stable semantic dimensions include:
 
 ```text
-next_owner
-attention_level
-confidence
-risk
-Temporal Contract
+resolution status/reason
+live tracking activation
+attention/defer
+obligation legs/actionability/conditions
+expected events
+completion criteria
+constraints
+pending proposals/agreed facts
+temporal facts
+uncertainty/risk
 provenance
-related_messages
-related_files
 ```
 
-Example `next_owner` values:
+UI buckets are projections over these dimensions.
 
-```text
-USER
-OTHER_PARTY
-BOTH
-EXTERNAL_EVENT
-NONE
-UNKNOWN
-```
+### 3.3 User-facing projection vocabulary
 
-Example attention levels:
-
-```text
-NONE
-LOW
-NORMAL
-HIGH
-CRITICAL
-```
-
-Do not create exploding combined states such as `URGENT_WAITING` or `HIGH_PRIORITY_DEFERRED`.
-
----
-
-## 4. User-facing lifecycle vocabulary
-
-The primary state surfaces are:
+Primary surfaces:
 
 - `すべて`
-- `対応が必要`
-- `あとで`
-- `待ち`
-- `完了`
+- `対応が必要` / My Turn
+- `あとで` / Later
+- `待ち` / Waiting
+- `完了` / Done
+- `確認` / Review where material ambiguity/safety requires it
 
-`フォローアップ` may appear when an expected reply or event has not arrived and user action is again useful. It can be a surfaced condition/state without necessarily becoming a permanent top-level navigation item in every layout.
+`フォローアップ` is normally a reason/current action within `対応が必要`, not a separate canonical lifecycle species.
 
-### 4.1 `対応が必要`
+### 3.4 Projection meanings
 
-The user currently owes an action, for example:
+#### `対応が必要` / My Turn
 
-- reply;
-- submit a requested document;
-- confirm a choice;
-- choose a schedule;
-- review and approve.
+At least one currently actionable USER obligation leg exists.
 
-### 4.2 `あとで`
+Examples: reply, submit document, decide/confirm, review, follow-up.
 
-The item is not worth current attention and is safe to hold under an explicit resurfacing promise.
+For high-risk requests, the safe action may be `確認する`/`検証する` rather than blindly executing the sender's requested action.
 
-This state is not merely cosmetic snooze. It should be backed by a Temporal Contract when Lunowa removes the item from current attention.
+#### `あとで` / Later
 
-### 4.3 `待ち`
+The Responsibility is intentionally outside current attention under an explicit/validated return condition.
 
-The user has already done the relevant action and is now waiting on another person or external event.
+```text
+communication hold != Later
+```
 
-### 4.4 `完了`
+#### `待ち` / Waiting
 
-No current action or follow-up is needed. Completion should be inferred conservatively and must be reversible when a new relevant event arrives.
+No current user action is required; another party/external event is expected.
 
-### 4.5 `フォローアップ`
+A communication hold awaiting legal clearance/resume normally belongs here unless separately snoozed.
 
-An expected reply/event has not arrived by the relevant threshold or deadline, so the item should regain attention and Lunowa may prepare a follow-up action.
+#### `完了` / Done
+
+The tracked Responsibility is resolved. Resolution is not always successful satisfaction; cancellation/decline/user-close/supersession must be represented truthfully where relevant.
+
+#### `確認` / Review
+
+A decision-critical semantic/safety question cannot be safely collapsed into a normal bucket.
+
+Examples: conflicting due dates, ambiguous assignment, completion claim vs provider contradiction, high-risk unverified request.
+
+Review should not become a dumping ground for harmless uncertainty.
 
 ---
 
-## 5. Information architecture
+## 4. Information architecture
 
-### 5.1 Canonical desktop shell
-
-The canonical wide-screen structure is a stable three-pane workspace:
+### 4.1 Canonical desktop shell
 
 ```text
 Sidebar | Conversation List | Detail
 ```
 
-This shell is the primary visual and spatial model of Lunowa.
+**Stable Shell / Adaptive Content:** spatial model stays predictable while Detail content adapts.
 
-**Stable Shell / Adaptive Content:** pane placement and core controls remain predictable while content inside Detail adapts to the selected conversation and context.
+### 4.2 Sidebar
 
-### 5.2 Sidebar
-
-The sidebar should remain calm and limited to high-frequency navigation.
-
-Recommended order:
+Recommended high-frequency order:
 
 ```text
-Lunowa brand
+Lunowa
 
 [ ＋ 新規メール ]
 
@@ -253,6 +210,7 @@ Lunowa brand
 対応が必要
 あとで
 待ち
+確認  (only if useful enough to deserve a surface)
 ピン留め
 
 その他 ▾
@@ -263,203 +221,202 @@ Accounts
 設定
 ```
 
-`完了`, Drafts, Sent, Scheduled, Archive, Spam, and Trash may live under `その他` when top-level density would become excessive.
+`完了`, Drafts, Sent, Scheduled, Archive, Spam, Trash may live under `その他` when top-level density is too high.
 
-Do not expose internal terminology such as `Space` merely because the implementation uses that concept. User-facing scope names should be concrete (`仕事`, `個人`, `大学`, `全体`).
+Scope labels should be concrete (`仕事`, `個人`, `大学`, `全体`).
 
-### 5.3 Conversation list
-
-The list should optimize for fast identification rather than maximum raw metadata density.
+### 4.3 Conversation list
 
 Information hierarchy:
 
-1. who / organization;
+1. who/organization;
 2. topic/subject;
 3. useful preview;
-4. one primary status when useful;
+4. one primary projection/status when useful;
 5. time/date;
-6. secondary account/provider context when useful.
+6. account/provider context when useful.
 
-A row represents a **topic/thread**, not every message and not an entire person's history.
+A row represents a topic/thread, not every message and not all history for a person.
 
-Target desktop density should generally allow roughly 8–12 useful conversation rows in a typical laptop viewport without making text cramped.
+Target desktop density: roughly 8–12 useful rows in a typical laptop viewport without cramped text.
 
-### 5.4 Detail pane
+### 4.4 Detail
 
-The Detail pane is the reading/action workspace.
-
-Its two primary modes are:
+Primary modes:
 
 - `会話`
 - `今の要点`
 
-**`会話` is the default for an ordinary conversation-row open.**
+Ordinary row open defaults to `会話`. `今の要点` is contextual, not a mandatory gate.
 
-`今の要点` is contextual and should not become a mandatory intermediate screen before reading mail.
+### 4.5 Reply composer
 
-### 5.5 Reply composer
+Keep near conversation bottom; feel closer to modern messaging than a disconnected form page.
 
-The reply composer stays available near the bottom of the conversation view and should feel closer to a modern messaging composer than to a separate form page.
-
-AI is an assistive control, not the dominant interaction.
+AI is assistive, not dominant.
 
 ---
 
-## 6. Moment View / `今の要点`
+## 5. Moment View / `今の要点`
 
-### 6.1 Purpose
-
-`今の要点` exists to answer one immediate question with minimal interpretation cost.
-
-Core rule:
+### 5.1 Purpose
 
 > **1 Moment = 1 Primary Question = generally 1 Primary Action.**
 
-The conversation may be complex. The moment should remain simple.
+Complex canonical state should project into a simple immediate decision.
 
-### 6.2 State-specific primary questions
+### 5.2 Projection-specific questions
 
-- `ACTION_REQUIRED` → **今、何をすればいい？**
-- `DEFERRED` → **いつ戻る？**
-- `WAITING` → **今は誰の番？**
-- `FOLLOW_UP` → **今、何をすればいい？**
-- `COMPLETED` → **もう何もしなくていい？**
+- `MY_TURN` → **今、何をすればいい？**
+- `LATER` → **いつ戻る？**
+- `WAITING` → **今は誰/何を待っている？**
+- `DONE` → **もう何もしなくていい？**
+- `REVIEW` → **何を確認すれば安全に進められる？**
 
-### 6.3 Multiple tasks
+Follow-up uses the My Turn question.
 
-When a conversation has multiple Action Items, do not render several equal-priority CTAs.
+### 5.3 Multiple Responsibilities
 
-Preferred structure:
+Do not render multiple equal-priority CTAs.
 
 ```text
-Primary task
-[ primary action ]
+Primary Responsibility
+[ primary safe action ]
 
 ────────
 Other items
-- task/status 1
-- task/status 2
+- item/status 1
+- item/status 2
 ```
 
-Primary-task selection should prefer the most attention-worthy unresolved user obligation. Additional items remain visible but subordinate.
+Primary selection should prefer critical/overdue actionable USER work, nearest material user due, blocking work, and other high-attention unresolved user work rather than newest message.
 
-### 6.4 Progressive disclosure
+### 5.4 Parallel obligation legs
 
-Normal `今の要点` should show only what is needed for the current decision.
+One Responsibility may contain multiple required legs.
 
-Do not permanently show large AI-explanation or audit cards. Instead expose provenance progressively, for example:
+Example:
 
 ```text
-締切 8/22 17:00   原文 ↗
+USER + Tanaka both must sign
+USER not signed -> My Turn
+USER signed, Tanaka pending -> Waiting
 ```
 
-Selecting the source should jump to or highlight the exact originating message when feasible.
+Do not collapse this into an opaque `BOTH` owner.
+
+### 5.5 Progressive disclosure/provenance
+
+Normal Moment shows only current-decision information.
+
+Do not permanently show large AI/audit cards. Make source one click/tap away when material:
+
+```text
+締切 8/28    原文 ↗
+```
+
+Source inspection should jump/highlight originating evidence when practical.
 
 ---
 
-## 7. Temporal Contract
+## 6. Temporal Contract
 
-### 7.1 Definition
+A Temporal Contract is Lunowa's persisted promise describing when a Responsibility is reconsidered/resurfaced.
 
-A Temporal Contract is Lunowa's explicit promise describing when a communication can leave the user's current attention and under which conditions it will return.
-
-It is an internal product concept; the UI should express the promise in plain language rather than forcing the term itself on users.
-
-Preferred deferred copy pattern:
+Plain-language UI example:
 
 ```text
-8月21日 9:00に戻します
+8月27日 9:00に戻します
 
 田中さんから返信が来れば、
-それより先に戻します。
+それより先に再確認します。
 
 [条件を変更]
 ```
 
-Avoid verbose combinations such as `今は忘れて大丈夫`, multiple competing task descriptions, and many trigger explanations in the same card.
-
-### 7.2 Initial trigger set
-
-MVP should prioritize high-value, explainable triggers:
+### 6.1 Initial triggers
 
 - scheduled time;
 - deadline threshold;
-- reply received.
+- relevant reply received.
 
-Richer triggers can be added later only when reliability and user comprehension are strong.
+### 6.2 Active work vs passive waiting
 
-### 7.3 Active vs passive contracts
+- actionable USER obligation: automatic hiding is riskier;
+- passive Waiting: more automatic attention management may be safer.
 
-- **Active obligation:** user still owes work. Auto-hiding is riskier; conservative defaults and explicit user approval are preferred initially.
-- **Passive waiting:** user has completed their action and is waiting on another party/event. Lunowa may manage attention more automatically because false hiding is less dangerous.
+### 6.3 Hold is not snooze
 
-### 7.4 Product promise implies reliability
+If communication says `法務確認まで止めて`, the semantic state may be Waiting on legal/resume.
 
-If the UI says `8月21日 9:00に戻します`, that is a real product promise, not decorative AI copy.
+Only a separate attention defer decision produces Later.
 
-Implementation must eventually support durable execution semantics such as persistence, idempotency, retries, missed-event recovery, reconciliation, timezone correctness, provider-outage recovery, and auditability. These reliability details belong in architecture/runtime docs, but design must not promise behavior the runtime cannot honor.
+### 6.4 Product promise implies reliability
+
+If UI says `9:00に戻します`, runtime must eventually support durable persistence, idempotency, retries, missed-event recovery, reconciliation, timezone correctness, and auditability.
+
+---
+
+## 7. Temporal information UX
+
+Do not visually conflate:
+
+```text
+source due
+expected-event time
+user target
+resurface time
+follow-up time
+```
+
+Examples:
+
+- `金曜までに提出` = source due;
+- `明日修正版を送ります` from counterpart = expected-event time;
+- user chooses `木曜にやる` = user target;
+- snooze until Thursday = resurface time.
+
+`Friday` must not be rendered as an invented `17:00` deadline unless justified by source/reference context.
 
 ---
 
 ## 8. Search
 
-Search is a first-class navigation mode, not a separate AI feature.
+Search is first-class navigation, not a separate AI product.
 
-Search should support useful retrieval across:
+Support useful retrieval across Conversation/Message/Person/File and intentionally represented Responsibility/action results.
 
-- conversations/messages;
-- people;
-- files;
-- sender/recipient;
-- subject;
-- attachment names;
-- message content;
-- semantic/fuzzy meaning where confidence is acceptable.
+Default current Scope; broadening to `全体` is explicit.
 
-Default search scope is the current user-selected scope. Broadening to `全体` should be explicit; Lunowa should not silently cross personal/work boundaries.
-
-The UI may use result categories such as:
+Categories may be:
 
 ```text
 すべて | 会話 | 人 | ファイル
 ```
 
-Selecting a result should update the Detail pane while preserving search context. Exact message hits should be highlighted or scrolled into view where possible.
-
-Do not brand ordinary retrieval as `AI Search` unless there is a user-understandable reason.
+Search/semantic similarity never becomes Responsibility merge authority.
 
 ---
 
 ## 9. Person/company context
 
-Selecting a person/avatar/company may open a context side sheet or secondary panel containing only information that helps understand the communication relationship.
+May show current relevant issues, recent topics, evidence-backed remembered facts, basic organization/contact context, recent files, related Conversations.
 
-Useful content:
+Not CRM pipeline/deal management.
 
-- current active issue(s);
-- recent topics;
-- remembered facts with provenance;
-- basic contact/organization information;
-- recent files;
-- related conversations.
-
-This surface must **not** evolve into a CRM pipeline by default. No deals, stages, custom sales fields, or heavy account-management workflow without product evidence.
+Material AI-inferred facts expose provenance on demand.
 
 ---
 
 ## 10. Attachments and links
 
-Preview safe, useful file types inside Lunowa when practical:
+Preview safe/useful file types in context when practical.
 
-- PDF;
-- images;
-- simple text/document previews where reliable.
+If unreliable, offer download/open externally rather than generic embedded browser complexity.
 
-If internal rendering is not reliable, expose download/open-externally actions rather than building a generic embedded browser.
+Attachment preview preserves Conversation context.
 
-External web links should normally open in a new browser tab so the Lunowa state remains intact.
-
-Attachment preview should preserve conversation context rather than navigating the entire application away.
+Opening/previewing a file is not automatically completion evidence.
 
 ---
 
@@ -467,183 +424,119 @@ Attachment preview should preserve conversation context rather than navigating t
 
 ### 11.1 Brand direction
 
-Lunowa should feel:
+Calm, trustworthy, warm, slightly soft, modern, consumer-friendly without childishness, cleaner than dense enterprise dashboards.
 
-- calm;
-- trustworthy;
-- warm;
-- slightly soft;
-- modern;
-- consumer-friendly without becoming childish;
-- cleaner than a dense enterprise dashboard.
-
-The lunar-rabbit symbol is the primary brand character. Avoid introducing a second competing mascot identity.
+Lunar-rabbit symbol is primary brand character.
 
 ### 11.2 Core brand colors
-
-Canonical brand tokens derived from the accepted logo system:
 
 - **Lunowa Navy:** `#0F1B3D`
 - **Lunar Gold:** `#F2D9A6`
 
-Functional state colors are semantically separate from brand identity. Initial intended direction:
+Functional projection colors are separate from brand identity. Initial direction:
 
-- `対応が必要` — coral/red family;
-- `あとで` — amber/orange family;
-- `待ち` — blue family;
-- `完了` — mint/green family.
+- My Turn / `対応が必要` — coral/red family;
+- Later / `あとで` — amber/orange family;
+- Waiting / `待ち` — blue family;
+- Done / `完了` — mint/green family;
+- Review / `確認` — neutral/attention color chosen to avoid implying success/failure.
 
-The exact implementation tokens should be normalized once in code/design tokens; individual screenshots must not introduce random shades for the same state.
+Normalize exact tokens in implementation rather than copying random screenshot shades.
 
-### 11.3 State color consistency
+### 11.3 State/projection color consistency
 
-The same state should have the same semantic color across:
+Same projection meaning should use consistent semantic color across sidebar, chips, Moment accents, and relevant icons.
 
-- sidebar markers;
-- conversation chips;
-- Moment View accents;
-- relevant icons;
-- system status surfaces.
-
-Do not let generated screenshots create inconsistent color meaning.
+Color must not be the sole signal.
 
 ### 11.4 Brand usage
 
-The top-left logo should be recognizable but not dominate the working UI. The accepted direction is slightly smaller and quieter than early concepts.
-
-Primary working attention belongs to mail content, not the logo.
+Logo recognizable but quiet; working attention belongs to mail content.
 
 ### 11.5 Typography
 
-Use a highly readable Japanese-capable UI sans-serif. The reference direction is close to `Noto Sans JP` / modern system sans typography.
+Highly readable Japanese-capable UI sans-serif. Use weight/spacing for hierarchy rather than oversized headings.
 
-Typography should use weight and spacing for hierarchy rather than very large headings.
+### 11.6 Cards/borders/shadows
 
-### 11.6 Cards, borders, shadows
+Prefer light neutral/ivory background, subtle 1px borders, soft radius, restrained shadows, generous-not-wasteful spacing.
 
-Preferred direction:
-
-- light neutral/ivory background;
-- subtle 1px borders;
-- soft radius;
-- restrained shadows;
-- generous but not wasteful spacing.
-
-Avoid glassmorphism, heavy gradients throughout the app, strong drop shadows, or dashboard-card overload.
+Avoid glassmorphism/heavy gradients/strong shadows/dashboard-card overload.
 
 ### 11.7 Icons
 
-Use a consistent line-icon family where possible. Do not mix unrelated filled, 3D, emoji, and line styles for equivalent controls.
+Use a consistent line-icon family where possible.
 
 ### 11.8 Motion
 
-Motion should preserve orientation, not decorate.
-
-Prefer subtle:
-
-- pane/sheet transitions;
-- local fades;
-- in-place content changes.
-
-Avoid slow page-turn or full-screen theatrical transitions.
-
-Respect reduced-motion preferences.
+Use motion to preserve orientation, not decorate. Prefer subtle pane/sheet transitions/local fades; respect reduced motion.
 
 ---
 
 ## 12. Visual grammar by information type
 
-Use visualization only when it beats plain text.
+Use visualization only when better than text:
 
-Examples:
-
-- time/date change → before/after diff;
-- deadline → date + remaining-time emphasis;
-- waiting → person/owner + waiting state;
-- multiple tasks → checklist/list;
-- file submission → file + primary action;
+- date/time change → before/after diff;
+- deadline → date + appropriate remaining-time emphasis;
+- Waiting → actor/event + waiting state;
+- multiple Responsibilities/criteria → concise list/checklist;
+- file submission → file + safe primary action;
 - meeting → compact brief;
-- temporal sequence → timeline only when sequence is genuinely useful;
+- temporal sequence → timeline only when genuinely useful;
 - amount change → old → new;
-- schedule candidates → calendar/time slots.
+- schedule proposals → candidate slots until agreement.
 
-A complex thread graph/tree is not a default tab. If later validated, it should be optional progressive disclosure such as `… → 会話の流れを見る`.
+Do not turn proposed time into visually “confirmed” time before acceptance evidence.
 
 ---
 
 ## 13. Compose experience
 
-New mail is mandatory foundational functionality.
+Desktop compose stays in workspace.
 
-Desktop new compose should preserve the surrounding workspace rather than replacing the entire app with a separate page.
+Expected fields/actions: From, To, progressive Cc/Bcc, Subject, body, attachments, formatting, signature, autosave state, Send, Send Later, minimize/restore, safe close.
 
-Expected fields/actions:
-
-- From account selector;
-- To;
-- Cc/Bcc progressive disclosure;
-- Subject;
-- body;
-- attachments / drag-and-drop;
-- basic formatting;
-- signature;
-- draft autosave indicator;
-- Send;
-- Send Later;
-- minimize/restore draft;
-- close with safe draft preservation.
-
-No `今の要点` is required for a fresh compose.
+No Moment is required for fresh compose.
 
 ### Inline completion
 
-Lunowa may provide context-aware inline completion/ghost text while typing.
+Never interfere during active Japanese IME composition. Suggest only after commit/pause/context. Repeated rejection should suppress aggressive suggestions.
 
-For Japanese input, **never interfere during active IME composition**. Suggestions should appear only after composition confirmation and an appropriate pause/context threshold.
-
-Repeated rejection should suppress aggressive suggestions.
+Material dates/amounts/recipients/commitments should not be silently strengthened/rewritten.
 
 ---
 
 ## 14. Pinning
 
-Prefer user-facing `ピン留め` semantics over ambiguous `重要` automation.
-
-Pin is a **user override** and is orthogonal to lifecycle state.
+Pin is explicit user retrieval control, orthogonal to Responsibility semantics.
 
 ```text
-Lifecycle state = Lunowa interpretation
+Responsibility projection = derived product state
 Pin = explicit user control
 ```
 
-A pinned conversation remains pinned until the user unpins it, even if lifecycle state changes.
+Pin stays until user unpins.
 
 ---
 
 ## 15. Onboarding
 
-Onboarding goal:
-
 > **使い方を教える前に、使えるようにする。**
 
-Preferred first-run path:
+Preferred:
 
 ```text
 Googleで始める / Microsoftで始める
-↓
-Provider OAuth/account picker
-↓
-Inbox usable
+→ Provider authorization/account picker
+→ Inbox usable
 ```
 
-Do not require profile questionnaires, feature carousels, rules, AI-preference configuration, or workspace setup before the user can see mail.
+Do not require profiles/carousels/rule-builders/AI preference setup before mail.
 
-When a second account is added, Lunowa may ask whether to:
+Second account may offer `一緒に見る / 分けて使う`; organization remains reversible.
 
-- `一緒に見る`
-- `分けて使う`
-
-Organization can be changed later. Do not auto-classify personal/work irreversibly with AI.
+Historical initial sync must not interpret every old unanswered request as live My Turn work.
 
 ---
 
@@ -651,166 +544,111 @@ Organization can be changed later. Do not auto-classify personal/work irreversib
 
 ### 16.1 Highest-risk false negative
 
-The most dangerous classification error is:
-
-> an actually required user action is incorrectly classified as waiting/completed/deferred and hidden.
-
-Initial product behavior should therefore be conservative about hiding unresolved obligations.
+A true material USER obligation must not be incorrectly hidden as Waiting/Done/Later/NONE.
 
 ### 16.2 Provenance
 
-For extracted facts such as deadline, requested action, or completion signal, source inspection should be one click/tap away where practical.
+Material extracted facts should link to source/trusted observation where practical.
 
-### 16.3 Confidence-aware fallback
+### 16.3 Uncertainty-aware fallback
 
-When interpretation confidence is too low:
+Do not treat model confidence alone as truth.
 
-- prefer ordinary mail presentation;
-- avoid silently hiding the thread;
-- show a lightweight uncertainty indicator only when useful;
-- allow user correction.
+When a decision-critical question is unresolved, use Review/ordinary mail and allow minimal correction. Harmless uncertainty should not automatically prompt the user.
 
-### 16.4 Sender identity
+### 16.4 High-risk requests
 
-The exact sending account must be clearly visible before sending. Cross-account mistakes are trust-destroying and should be mechanically prevented where possible.
+```text
+requested action != safe next action
+```
 
-### 16.5 Core app survives AI failure
+Payment/contract/login/destructive/high-impact requests may surface verification/decision as the primary action even when the source request is clear.
 
-If summarization/classification/AI drafting fails, the user must still be able to:
+### 16.5 Sender identity
 
-- read mail;
-- search basic data;
-- compose/reply;
-- send;
-- access attachments;
-- change folders/views.
+Exact sending account visible before send. Cross-account mistakes should be mechanically prevented.
 
-AI degradation must not make the mail client unusable.
+### 16.6 Core app survives AI failure
+
+Reading, basic search, compose/reply/send, attachments, and normal navigation remain available.
 
 ---
 
-## 17. Loading, error, offline, and update principles
+## 17. Loading/error/offline/update principles
 
-System-state design follows these rules:
-
-- keep working where possible;
-- preserve user input;
-- preserve context;
-- explain impact and next action rather than surfacing technical error jargon first;
-- use cached/stale data rather than blank screens when safe;
-- recover quietly when possible;
-- do not unexpectedly reorder/jump the list because new mail arrived; surface a `新しいメール` affordance instead;
-- sending failure must preserve the draft;
-- account reconnect problems should affect only the relevant account;
-- application updates must not destroy an active draft.
+Keep working where possible; preserve input/context; explain impact/recovery; use cached data rather than blank screen when safe; recover quietly when practical; do not unexpectedly jump list on new mail; preserve draft on send failure/ambiguity; isolate reconnect issue to relevant account; do not destroy active draft during app update.
 
 ---
 
 ## 18. Accessibility baseline
 
-The visual implementation must support at least:
-
-- keyboard focus visibility;
-- usable keyboard navigation for primary desktop flows;
-- semantic labels for icon-only controls;
-- touch targets appropriate for mobile/tablet;
-- state meaning not conveyed by color alone;
-- readable contrast;
-- reduced-motion support;
-- zoom/text resizing without breaking core flow.
-
-Accessibility is part of product quality, not a later decorative pass.
+Support visible keyboard focus, logical keyboard navigation, semantic icon labels, adequate touch targets, non-color-only state meaning, readable contrast, reduced motion, and zoom/text resizing without breaking core flow.
 
 ---
 
 ## 19. Reference interpretation rules
 
-Generated screenshots are **visual references**, not literal data specifications.
+Generated screenshots are visual references, not literal semantic/data specs.
 
-Codex/implementers must not treat the following as requirements merely because they appear in an image:
+Do not treat sample dates/names/amounts/counts/files, accidental wording/typos, legacy labels/state terminology, color inconsistencies, provider-specific examples, or impossible sample data as requirements.
 
-- sample dates;
-- sample names/companies;
-- example email addresses;
-- counts/badges;
-- accidental typos;
-- obsolete labels such as `スター付き` where current text specifies `ピン留め`;
-- inconsistent state colors introduced by generation;
-- provider-specific features not otherwise specified;
-- fake numeric values or sample documents.
+Use images for composition, hierarchy, density, scale, visual tone, component placement, projection-specific visual treatment.
 
-Use screenshots for:
-
-- composition;
-- hierarchy;
-- density;
-- relative scale;
-- visual tone;
-- component placement;
-- state-specific presentation.
-
-Use Markdown specifications for:
-
-- behavior;
-- semantics;
-- state transitions;
-- exact interaction rules;
-- edge cases;
-- accessibility;
-- responsive behavior;
-- conflict resolution.
+Use Markdown specs for semantics, behavior, edge cases, accessibility, responsive behavior, authority, and conflict resolution.
 
 ---
 
 ## 20. Source-of-truth priority
 
-Authority depends on the question being answered, but for **design-specific conflicts** use the following practical order:
+For design-specific conflicts:
 
-1. current explicit accepted product/design decision in `docs/design/*.md`;
-2. `references/00-brand-system.png` for logo/brand direction;
-3. `references/01-component-system.png` for reusable component styling/states;
-4. `references/02-desktop-conversation-default.png` for canonical desktop shell/layout;
-5. state/feature-specific references for the specific state/feature they demonstrate.
+1. current accepted `docs/design/*.md` + `docs/product/responsibility/*` for Responsibility semantics;
+2. `00-brand-system.png` for brand direction;
+3. `01-component-system.png` for reusable component appearance;
+4. `02-desktop-conversation-default.png` for canonical desktop shell;
+5. state/feature references for intentional visual treatment only.
 
-A state-specific screenshot must not silently redefine the global shell, brand palette, typography, or component system.
+A screenshot must not redefine global shell/brand/typography/component semantics or revive a superseded lifecycle model.
 
 ---
 
-## 21. Implementation acceptance criteria for the first high-fidelity slice
+## 21. First high-fidelity slice acceptance criteria
 
-Before the UI is considered faithful enough to continue into provider/runtime integration, the implementation should demonstrate with realistic fake data:
+With realistic fake data demonstrate:
 
-- canonical desktop three-pane shell;
-- resizable panes with safe minimums;
-- normal row click → `会話`;
-- status-chip click → `今の要点`;
-- all key Moment View states;
-- multiple Action Items with one primary task;
-- new compose;
-- reply composer;
+- canonical three-pane desktop shell;
+- resizable panes;
+- row click → `会話`;
+- status/projection chip → `今の要点`;
+- representative My Turn / Later / Waiting / Done / Review Moments;
+- follow-up as My Turn reason/action;
+- multiple Responsibilities with one primary Moment;
+- parallel obligation-leg visual behavior where needed;
+- new compose/reply;
 - pinning;
 - account/scope surface;
-- search mode;
+- search;
 - attachment preview;
-- person context surface;
-- representative loading/error/offline states;
+- person context;
+- loading/error/offline;
 - tablet/mobile adaptation;
-- keyboard focus and no major visual overflow at intended reference widths.
+- keyboard/focus and no major overflow.
 
-The purpose of this slice is to validate the interaction model and visual system before expensive Gmail/Microsoft/AI/scheduler integration locks in the wrong experience.
+The slice validates interaction/visual model before expensive provider/AI/scheduler integration.
 
 ---
 
 ## 22. Product guardrails
 
-When an implementation decision is ambiguous, prefer the option that:
+When ambiguous, prefer the option that:
 
-1. reduces communication-management burden;
-2. preserves user control and source visibility;
-3. keeps ordinary email behavior familiar;
-4. avoids unnecessary configuration;
-5. avoids hidden cross-scope behavior;
-6. is reversible and easy to correct;
-7. is simpler to implement and maintain when product value is equivalent.
+1. reduces Communication Management Burden;
+2. preserves control/source visibility;
+3. keeps ordinary email familiar;
+4. avoids unnecessary configuration/questions;
+5. avoids hidden cross-account/scope behavior;
+6. is reversible/correctable;
+7. is simpler to implement/maintain for equal product value;
+8. does not confuse projection with canonical Responsibility truth.
 
 Do not add a feature merely because AI makes it easy to code.

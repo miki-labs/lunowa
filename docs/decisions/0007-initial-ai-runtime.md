@@ -1,16 +1,32 @@
-# ADR 0007 — Initial AI runtime
+# ADR 0007 — Initial AI Runtime
 
 ## Status
 
 Accepted — 2026-08-19
+Amended / reconciled with Responsibility v0.1 — 2026-08-23
 
 ## Context
 
-Lunowa uses AI to reduce interpretation burden: identify possible actions, owners, deadlines, waiting/completion signals, and evidence inside email conversations.
+Lunowa uses AI to reduce interpretation burden inside ordinary email communication. The model is useful for probabilistic language understanding, not for owning authorization, provider facts, accepted Responsibility state, Temporal Contract execution, or privileged side effects.
 
-The model is probabilistic and email content is untrusted/sensitive. AI output therefore cannot own lifecycle state, authorization, provider actions, send authority, or Temporal Contract execution.
+Responsibility v0.1 refined the interpretation target. The model should not merely emit `next_owner`, one `deadline`, or a lifecycle-state guess. It should produce structured candidate interpretation that preserves distinctions such as:
 
-The implementation should prove one useful, evaluated extraction path before adding provider abstraction, agents, tool orchestration, or multiple fallback models.
+```text
+communication act
+speaker vs obligation bearer
+requested action/event/object
+modality / obligation strength
+proposal vs agreement
+communicated claim vs provider observation
+source temporal expression
+correction/cancellation/completion signal
+uncertainty
+provenance
+```
+
+The trusted application then performs admission, identity/effect reduction, safety/actionability policy, and deterministic projection.
+
+Email content is sensitive and untrusted. The implementation should prove one useful evaluated interpretation path before adding provider abstraction, agent tool orchestration, or multiple fallback models.
 
 ## Decision
 
@@ -18,168 +34,257 @@ Use:
 
 - the official OpenAI SDK;
 - the Responses API;
-- Structured Outputs / JSON Schema for interpretation results;
-- application-side runtime validation of the result;
-- a thin Lunowa-owned `ConversationInterpreter` interface;
-- `store: false` by default for email interpretation requests;
-- model/config selection through configuration and eval evidence rather than a hard-coded permanent model name.
+- Structured Outputs / JSON Schema for interpretation candidates;
+- application-side runtime/source/provenance validation;
+- a thin Lunowa-owned `ConversationInterpreter` or equivalent interface;
+- `store: false` as the accepted initial interpretation default, subject to current official OpenAI data-control requirements at implementation/release time;
+- model/config selection through configuration + eval evidence rather than a permanently hard-coded model name.
 
-Do **not** add user-facing agent/tool autonomy for the initial lifecycle interpreter.
+Do **not** add user-facing agent/tool autonomy to the initial Responsibility interpreter.
 
-The deterministic lifecycle reducer remains authoritative:
+The accepted boundary remains:
 
-> **AI understands; rules decide state.**
+> **AI understands; trusted rules decide accepted Responsibility state.**
 
 ## Interpretation pipeline
 
 ```text
-authorized normalized conversation
+authorized normalized communication/context
     -> context builder
     -> OpenAI Responses request
     -> strict structured interpretation candidate
     -> runtime schema validation
-    -> provenance/source validation
-    -> deterministic lifecycle reducer
-    -> ActionItem/lifecycle proposal or transition
+    -> source/provenance/material-value validation
+    -> evidence-revision freshness validation
+    -> Responsibility admission + identity/effect reducer
+    -> safety/actionability policy
+    -> accepted evidence-relative Responsibility state
+    -> deterministic product projection
 ```
 
-The AI result is evidence/candidate input. It is not authoritative database state merely because it matches the JSON schema.
+A schema-conformant AI result is still only candidate interpretation. It never becomes authoritative database state solely because JSON validation succeeded.
 
 ## Initial output expectations
 
-The exact schema lives in `docs/product/CONTRACTS.md`, but the model should produce bounded structured facts such as:
+The exact runtime DTO lives in `docs/product/CONTRACTS.md` and may evolve, but semantic output should remain bounded around concepts such as:
 
-- requested action / goal;
-- action owner / next owner;
-- deadline/date candidate;
-- completion signal;
-- waiting signal;
-- follow-up expectation;
-- confidence/uncertainty;
-- supporting message/provenance identifiers.
+```text
+focal message / zoning candidates
+communication_acts[]
+  type
+  speaker
+  obligation_bearer candidate(s)
+  assignment shape candidate
+  action/event/object
+  modality / obligation strength
+  polarity
+  condition / constraints
+  temporal expressions
+  source message IDs / locators
+
+communicated_claims[]
+proposed_terms[]
+uncertainty[]
+no_responsibility_signal?
+basis_evidence_revision
+```
+
+The model should **not** be required to output the canonical Responsibility state vector itself.
 
 Missing/ambiguous facts are represented explicitly rather than guessed.
 
+## Runtime validation outside the model
+
+Structured Outputs reduce syntax/parser ambiguity but do not establish semantic correctness.
+
+Lunowa still validates, outside the model:
+
+- current user/account/scope authorization;
+- message/participant identifiers;
+- source message existence;
+- provider observations such as attachment presence;
+- material values such as dates/amounts/identities/URLs where deterministic validation is practical;
+- source locators/provenance;
+- evidence revision freshness;
+- cross-account identity boundaries;
+- Responsibility admission/identity invariants;
+- high-risk safety/actionability constraints.
+
+`basis_evidence_revision == current_revision` is necessary for applying an interpretation result when revisions matter, but is not sufficient for authority.
+
 ## Rationale
 
-### Structured output reduces parser ambiguity
+### Structured output gives a narrow interface
 
-OpenAI's current Responses API supports Structured Outputs with JSON Schema. This is a better boundary than parsing prose or relying on legacy JSON-object mode.
+A versioned JSON Schema is safer and more testable than free-form prose parsing. It also makes AI provider/model changes easier to evaluate against the same semantic contract.
 
-Structured output does not eliminate semantic mistakes, so Lunowa still validates identifiers, authorization scope, dates, ownership, provenance, and lifecycle invariants outside the model.
+### One provider first reduces operational variance
 
-### One provider first reduces operating complexity
+The product risk is whether AI interpretation actually reduces Communication Management Burden without introducing missed obligations, false completion, false merge, or unsafe actionability. Multiple model providers do not answer that question.
 
-Lunowa's product risk is whether AI interpretation is accurate/trustworthy enough to reduce communication burden — not whether the system can route between many model vendors.
+A thin interface preserves replaceability without building a generic AI gateway.
 
-A thin interface preserves replaceability without building a generic AI gateway prematurely.
+### Model selection follows eval evidence
 
-### Model choice should follow evals
+Model availability, latency, price, and behavior change. Durable architecture specifies behavior/evaluation gates, not a permanent model name.
 
-Model availability, quality, latency, and price change. Durable architecture should specify the behavior contract and eval threshold rather than permanently encoding today's favored model.
-
-At Phase 6, compare current candidate models on the same representative email set and choose the cheapest candidate that passes the required quality/trust thresholds.
+At AI activation time, compare current viable candidates on the same canonical/holdout corpus and select the lowest-cost option that satisfies the required quality/safety thresholds.
 
 ## Data/privacy requirements
 
-Email content can contain personal, confidential, financial, employment, education, or organizational data.
+Email can contain personal, financial, employment, education, contractual, and organizational data.
 
 Requirements:
 
-- build model context only after user/ConnectedAccount/Scope authorization;
-- send only the minimum conversation context required for the extraction task;
-- use `store: false` by default;
-- do not log complete email bodies/prompts/outputs by default;
-- retain Lunowa-owned interpretation/provenance only according to the product's retention/privacy policy;
-- never expose one user's/provider account's content to another user's retrieval/model context;
-- treat email body instructions as untrusted content, not system/tool instructions.
+- build model context only after User/ConnectedAccount/Scope authorization;
+- send the minimum context required for the interpretation task;
+- use the accepted no-storage request behavior where current provider controls support it and verify current official policy at implementation/release time;
+- do not log full email bodies/prompts/model outputs by default;
+- retain Lunowa-owned accepted interpretation/provenance only under explicit product retention/privacy policy;
+- never expose one user's/account's content to another user's retrieval/model context;
+- treat email-body instructions as untrusted data, not system/tool instructions.
 
-OpenAI's current data-control documentation states that Responses API application state is retained by default unless controls such as `store: false`/eligible retention settings are used. Therefore `store: false` is the normal Lunowa interpretation default.
+Provider/API retention behavior is time-sensitive and must be rechecked against current official documentation before production activation rather than assumed indefinitely from this ADR.
 
 ## Authority and action limits
 
 The model must not directly decide or execute:
 
 - user authentication/authorization;
-- provider token scope;
-- hidden vs visible access permissions;
+- mailbox token scope;
+- account/scope ownership;
 - destructive provider actions;
-- sending an email without the trusted application action boundary;
-- Temporal Contract trigger fire;
-- final lifecycle state when deterministic policy rejects/abstains;
+- sending without the trusted application action boundary;
+- payment/contract/approval compliance;
+- Temporal Contract trigger effects;
+- final Responsibility admission/identity/effects;
+- live tracking/defer/hiding;
 - billing/entitlement/cost controls.
 
-Any later model tool/action capability requires a separate review of permissions, idempotency, confirmation, and evals.
+Any later tool/action capability requires separate permission, idempotency, confirmation, safety, and eval review.
 
 ## Initial eval gate
 
-Before AI controls material lifecycle behavior, maintain representative cases including:
+The AI runtime MUST use the canonical Responsibility evaluation artifacts rather than a small ad-hoc happy-path set.
 
-- explicit user action request;
-- explicit deadline;
-- ambiguous relative date;
-- waiting on another party;
-- action already completed;
-- no action required;
-- multiple tasks in one thread;
-- quoted historical request that is no longer active;
-- follow-up request after prior completion;
-- signature/footer noise;
-- Japanese business email;
-- English email when enabled;
-- prompt-like/malicious text inside email content;
-- low-confidence case where abstention is correct.
+Primary sources:
 
-Measure observable structured extraction and resulting reducer behavior, not the model's self-description of success.
+```text
+docs/product/responsibility/COVERAGE-PLAN.md
+docs/product/responsibility/TIER-0-SCENARIO-MATRIX.md
+docs/product/responsibility/TIER-0-CRITICAL-ORACLES.md
+docs/product/responsibility/TRANSITION-ORACLES.md
+```
+
+Evaluation should include, as applicable to the AI layer:
+
+- direct inbound/outbound Request/Commitment contrasts;
+- firm vs plan/intention/capability;
+- proposal vs agreement;
+- indirect Japanese business requests;
+- `DO_NOT_TRACK` cases;
+- quoted/forwarded content;
+- multiple Responsibilities and obligation-bearer ambiguity;
+- source due vs expected-event time vs user target;
+- explicit correction vs unresolved conflict;
+- attachment claim vs provider observation;
+- completion strength;
+- high-risk payment/contract/login requests;
+- prompt-injection/tool-like text;
+- typo/IME/noise invariance and meaning-changing sensitivity;
+- stale evidence revision;
+- cross-account lookalikes;
+- genuine AMBIGUOUS / USER_DEPENDENT cases.
+
+Transition oracles are tested at the runtime layer that owns them; a model prompt eval alone cannot prove send reconciliation, scheduler, sync ordering, authorization, or stale-job safety.
+
+### Evaluation views
+
+Do not reduce quality to one overall accuracy number. Track at least relevant layers separately:
+
+```text
+zoning
+communication-act / claim extraction
+obligation-bearer correctness
+material temporal extraction
+provenance coverage
+uncertainty behavior
+typo invariance
+semantic sensitivity
+run stability
+```
+
+Then separately evaluate downstream:
+
+```text
+admission
+identity/effects
+resolution safety
+safe-action policy
+projection
+```
+
+### Holdout discipline
+
+Model/prompt development must not repeatedly tune on the complete golden corpus and report that same corpus as evidence of generalization. Maintain family-stratified holdout and later organic/production regression cases.
 
 ## Failure/degraded behavior
 
-If the provider is unavailable, rate-limited, invalid, or returns unusable output:
+If the model/API is unavailable, rate-limited, times out, or returns unusable output:
 
-- ordinary mail reading/composing/search/navigation continues;
-- do not silently infer a safe-to-hide state;
-- preserve the last trustworthy deterministic state;
-- show a quiet degraded/uncertain state only where relevant;
-- bounded retry/background reprocessing may occur where justified.
+- ordinary mail reading/composing/sending/basic search/navigation continues;
+- do not invent a safe-to-hide state;
+- preserve last accepted state until new valid evidence/reduction changes it;
+- surface Review/ordinary mail only where material uncertainty warrants it;
+- use bounded retry/background reprocessing where justified;
+- do not rerun/reclassify merely because a user opened a screen.
 
 ## Alternatives considered
 
 ### Multiple AI providers from day one
 
-Rejected. It doubles integration/eval/behavior variance without validating that provider failure warrants the cost.
+Rejected. It adds integration/eval/behavior variance before validating the product need.
 
 ### LangChain/general agent framework
 
-Rejected initially. The interpretation pipeline is a bounded structured extraction call plus deterministic application logic. A general agent framework adds abstraction and tool authority without current need.
+Rejected initially. The required path is bounded interpretation plus trusted application logic, not a generic autonomous agent.
 
-### Model directly manages lifecycle state
+### Model directly manages Responsibility state
 
-Rejected. This would make probabilistic output the authority for hiding/resurfacing obligations, which conflicts with Lunowa's trust proposition.
+Rejected. This would make probabilistic output authoritative for hiding/resurfacing/identity/safety.
+
+### Legacy `next_owner + deadline + lifecycle` output contract
+
+Superseded by Responsibility v0.1 because it cannot faithfully represent parallel/conditional obligations, negotiation, historical activation, field-level uncertainty, or safe-action separation.
 
 ### Legacy JSON mode / prose parser
 
-Rejected where Structured Outputs is available. Strict schema generation is a better boundary, followed by normal application validation.
+Rejected where strict Structured Outputs are available and suitable; runtime/source validation is still required afterward.
 
 ## Consequences
 
 Positive:
 
-- small AI surface;
-- easier evals and rollback;
-- predictable application contract;
-- reduced prompt/tool-injection authority;
-- model can be replaced without rewriting lifecycle rules.
+- small bounded AI surface;
+- stronger eval/rollback discipline;
+- model replacement without rewriting domain authority;
+- better prompt-injection containment;
+- explicit stale-result handling;
+- source-grounded material facts;
+- no need for the model to imitate a generic workflow engine.
 
 Costs/risks:
 
-- deterministic reducer/domain code remains necessary;
+- trusted Responsibility reducer/domain code remains necessary;
 - schema-conformant output can still be semantically wrong;
-- email-data privacy/provider cost must be monitored;
-- model changes require regression evidence.
+- evidence/provenance validation adds implementation work;
+- email-data privacy/cost/latency need monitoring;
+- model/config changes require regression evidence.
 
-## Evidence checked
+## Evidence checked when originally accepted
 
-- OpenAI quickstart / Responses API: https://platform.openai.com/docs/quickstart
-- OpenAI API model/Structured Outputs documentation: https://developers.openai.com/api/docs/models
-- OpenAI data controls: https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
-- Reusable local AI-runtime rules: `../ai-product-runtime.md`
+- OpenAI Responses API / Structured Outputs documentation;
+- OpenAI data controls;
+- reusable local AI runtime rules in `../ai-product-runtime.md`.
+
+These external facts are time-sensitive. Re-check current official OpenAI documentation at implementation/release time rather than treating the 2026-08-19 snapshot as permanent.

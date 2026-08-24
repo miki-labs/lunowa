@@ -14,7 +14,7 @@ Answer for v0.2: **yes; the protocol is incomplete.**
 
 # 1. A13 — stale CREATE has no authoritative pre-Responsibility revision check
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Protected by:** stale-AI invariant, T15, T0-043 missing-context revision, admission/matching correctness
 
 v0.2 has:

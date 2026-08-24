@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-08-19  
+Accepted — 2026-08-19
 Terminology reconciled with Responsibility v0.1 — 2026-08-23
 
 ## Context

@@ -26,5 +26,3 @@ Issue #13 and Issue #14 are related but distinct verification tasks. They must
 use different database/Compose/temp/browser namespaces and must not share a
 running PostgreSQL instance or host port unless the task explicitly provisions
 isolated databases and verifies that isolation.
-
-

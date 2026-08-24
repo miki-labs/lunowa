@@ -42,7 +42,7 @@ They must not be collapsed merely to simplify rendering.
 
 # 2. PMA-B3-01 — Admission-level Review must not be a fake Responsibility
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Pressure:** T0-041, T0-043, T0-044
 
 `NEEDS_REVIEW` at admission means Lunowa has not safely decided that a canonical Responsibility exists.
@@ -156,7 +156,7 @@ Do not solve this by adding `REVIEW` as a lifecycle enum.
 
 # 4. PMA-B3-03 — FieldDecision scope must remain narrow
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-026
 
 A USER-originated semantic fact is not automatically a field override.
@@ -200,7 +200,7 @@ It is not:
 
 # 5. PMA-B3-04 — REOPEN should not rewind child history
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-029
 
 A prior action may have genuinely occurred even if the operational outcome was not ultimately satisfied.
@@ -236,7 +236,7 @@ The aggregate is current-state + history, not a rewindable one-state task object
 
 # 6. PMA-B3-05 — ObligationLeg is not one row per verb
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-031
 
 The instruction:
@@ -272,7 +272,7 @@ The physical model should follow demonstrated state pressure, not verb count.
 
 # 7. PMA-B3-06 — One message creating multiple Responsibilities is cleanly representable
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Pressure:** T0-032
 
 No new source-message join model is required solely because one message creates R1 and R2.
@@ -301,7 +301,7 @@ A dedicated many-to-many `message_responsibilities` table remains optional and s
 
 # 8. PMA-B3-07 — Outbound semantics do not require separate persistence machinery
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Pressure:** T0-003/T0-004
 
 Outbound request/commitment cases fit the same core model:
@@ -327,7 +327,7 @@ The physical temporal model must therefore link due facts to their semantic targ
 
 # 9. PMA-B3-08 — Responsibility row is already the operational episode
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Pressure:** T0-029/T0-030
 
 The current model does not need a separate generic `episode` parent merely to distinguish:
@@ -351,7 +351,7 @@ is not required for correctness and should not be added until product/query evid
 
 # 10. PMA-B3-09 — Missing context requires context revision, not invented state
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Pressure:** T0-043
 
 A pre-admission review artifact must distinguish:
@@ -391,7 +391,7 @@ but the concurrency/idempotency rule must be explicit before schema freeze.
 
 # 11. PMA-B3-10 — User-dependent admission does not justify a generic relationship engine
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Pressure:** T0-044
 
 Some product admission decisions may legitimately depend on an authorized user convention for a sender/relationship.

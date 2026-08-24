@@ -38,7 +38,7 @@ These are not cosmetic changes. They prevent stale-AI overwrite, high-risk actio
 
 # 2. PMA-01 — Current field authority must be directly queryable
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Finding:** the first candidate preferred append-only domain events alone for user field decisions. That is too weak as the normal authorization/reducer lookup path.
 
 Fixed semantic requirement:
@@ -91,7 +91,7 @@ If implementation shows all user corrections can be represented by a tiny set of
 
 # 3. PMA-02 — Risk cannot become one complete parent scalar
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Finding:** `PHYSICAL-MODEL-DESIGN.md` listed `risk_class?` on the parent. That is acceptable only as a derived/aggregate summary, not as complete canonical truth.
 
 Counterexample:
@@ -134,7 +134,7 @@ may be derived/cached for list ordering or conservative policy, but must not era
 
 # 4. PMA-03 — Evidence application must be idempotent mechanically
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Finding:** `evidence_revision + aggregate_version` protects stale/concurrent writes but does not alone prevent the same normalized source event from being applied twice.
 
 Canonical hazards:
@@ -177,7 +177,7 @@ For one focal event producing effects on two Responsibilities, each aggregate re
 
 # 5. PMA-04 — Activation semantics need a precise meaning before enum freeze
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Finding:** phrases such as `live_tracking_state`, `activation_status`, and “active work” can still be misread.
 
 Required distinction from T20:
@@ -214,7 +214,7 @@ but should not be frozen until detailed historical/user-close oracles are comple
 
 # 6. PMA-05 — `semantic_details_jsonb` needs hard boundaries
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Finding:** one typed details document is viable only if it does not become a dumping ground for every difficult field.
 
 Allowed current contents are limited to demonstrated low-global-query structures:
@@ -257,7 +257,7 @@ separate retention/authorization lifecycle
 
 # 7. PMA-06 — Completion criteria in JSON remain acceptable, but only provisionally
 
-**Severity:** MEDIUM/HIGH  
+**Severity:** MEDIUM/HIGH
 **Finding:** T0-033/T17 make completion criteria canonical, but do not yet prove they require their own table.
 
 Current case shape:
@@ -287,7 +287,7 @@ Until then, normalization would add schema cost without demonstrated product val
 
 # 8. PMA-07 — Proposals/agreed facts should remain aggregate-local for now
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Finding:** T0-009/T0-010/T05 prove proposal/agreement semantics exist, but not that Lunowa is a calendar/workflow database.
 
 Current preferred representation:
@@ -316,7 +316,7 @@ If an accepted meeting time becomes a real calendar integration object, that int
 
 # 9. PMA-08 — Hold constraints in JSON are acceptable only because actionability is normalized
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Finding:** a hold has operational consequences and cannot exist merely as explanatory text.
 
 The hybrid candidate remains valid because the two critical execution-facing facts are normalized:
@@ -338,7 +338,7 @@ If future constraints begin directly blocking provider tools/actions outside Res
 
 # 10. PMA-09 — ANY_OF assignment is the strongest current pressure against the hybrid
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Finding:** T0-040 cannot safely be represented as two ordinary required obligation legs, but a full group-assignment subsystem is unvalidated.
 
 Current safe shape:
@@ -372,7 +372,7 @@ Until evidence exists, do not build team collaboration machinery into a personal
 
 # 11. PMA-10 — Temporal facts need conflict-friendly currentness, not a uniqueness shortcut
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Finding:** a naive constraint such as:
 
 ```text
@@ -400,7 +400,7 @@ This also reinforces that `SOURCE_DUE_CANDIDATE` is not a temporal kind; candida
 
 # 12. PMA-11 — Parent `connected_account_id` is intentionally restrictive in v0.1
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Finding:** a single parent account simplifies privacy, matching, reply identity, and provider provenance, and is aligned with the current cross-account no-merge rule.
 
 Known OPEN question:
@@ -425,7 +425,7 @@ If production evidence shows frequent legitimate cross-thread continuation withi
 
 # 13. PMA-12 — Operational outcome text is identity semantics, not a machine primary key
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Finding:** `operational_outcome_text` is useful for humans/product display but must not become the automatic merge key.
 
 Identity matching uses evidence hierarchy such as:
@@ -447,7 +447,7 @@ The opaque `responsibility_id` remains identity authority after creation.
 
 # 14. PMA-13 — Safe action does not need a dedicated parent column yet
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Finding:** T0-037 distinguishes:
 
 ```text
@@ -472,7 +472,7 @@ If later high-risk workflows require a persistent authorization object, design t
 
 # 15. PMA-14 — Domain events need correlation for composite effects
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Finding:** T12 allows one focal event to affect multiple Responsibilities.
 
 Each aggregate event row should support a shared application/evidence correlation identifier:
@@ -498,7 +498,7 @@ PostgreSQL can still commit both effects in one transaction when they are part o
 
 # 16. PMA-15 — Derived projection cache remains deferred
 
-**Severity:** LOW/MEDIUM  
+**Severity:** LOW/MEDIUM
 **Finding:** storing `MY_TURN / WAITING / ...` is tempting for inbox queries, but premature caching risks making projection stale/authoritative.
 
 Initial path:

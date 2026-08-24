@@ -101,7 +101,7 @@ New executable fixtures use the reconciled `SCENARIO-SCHEMA.md` vocabulary.
 
 # 3. CA-01 — `active_obligations[]` was too narrow
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** RESOLVED
 
 T16 requires parallel obligation legs. T18 requires a known future user obligation that is not actionable before an external condition. High-risk requests may also contain a communicated requested action whose execution is blocked by safety policy.
@@ -127,7 +127,7 @@ An actionable user obligation is a derived subset, not the entire canonical mode
 
 # 4. CA-02 — completion criteria were missing from the scenario shape
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** RESOLVED
 
 T0-033/T17 require one Responsibility with multiple jointly required criteria such as identity-document front + back.
@@ -144,7 +144,7 @@ Physical child-table/JSON/specialized representation remains open.
 
 # 5. CA-03 — one focal event can have multiple Responsibility effects
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** RESOLVED
 
 T12 proves one communication may:
@@ -180,7 +180,7 @@ Do not encode `RESOLVE + SUPERSEDE` as two independent operations. Earlier narra
 
 # 6. CA-04 — communication hold was conflated with `LATER`
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** RESOLVED
 
 ```text
@@ -202,7 +202,7 @@ optional independent defer -> LATER
 
 # 7. CA-05 — historical semantic openness is not live activation
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Status:** RESOLVED semantically; physical enum/schema OPEN
 
 ```text
@@ -225,7 +225,7 @@ User activation can make it live without rewriting source history. User tracking
 
 # 8. CA-06 — explicit attention dimension required
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** RESOLVED
 
 `LATER` is a projection over intentional defer/attention state, not owner/lifecycle shorthand.
@@ -236,7 +236,7 @@ User activation can make it live without rewriting source history. User tracking
 
 # 9. CA-07 — high-risk payment oracle mixed temporal kind with legitimacy
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** ERRATUM RECORDED
 
 For:
@@ -268,7 +268,7 @@ Safety/legitimacy must not be encoded by inventing a temporal kind.
 
 # 10. CA-08 — requested action vs accepted product obligation
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** CLARIFIED
 
 For an unverified/malicious request:
@@ -297,7 +297,7 @@ Do not rewrite what the sender requested into the safe action.
 
 # 11. CA-09 — send attempt vs reconciled send
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Status:** CONFIRMED AND PROPAGATED
 
 ```text
@@ -320,7 +320,7 @@ T10 REOPEN should be read as a case where prior evidence was sufficient under th
 
 # 12. CA-10 — temporal semantic kind is not inferred from token/direction alone
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Status:** CLARIFIED
 
 Temporal meaning depends on communication semantics and which obligation/event it applies to.
@@ -344,7 +344,7 @@ A date token is not automatically a USER deadline.
 
 # 13. CA-11 — scenario risk vs product/action risk
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Status:** RESOLVED conceptually
 
 Top-level oracle `risk_class` means test/harm priority.
@@ -357,7 +357,7 @@ Do not reuse one field silently for both meanings.
 
 # 14. CA-12 — admission review vs projection review
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** CONFIRMED
 
 `NEEDS_REVIEW` at admission means whether a Responsibility should exist is itself unsafe to decide.
@@ -370,7 +370,7 @@ Canonical example: T0-028 has a definite user Responsibility but conflicting due
 
 # 15. CA-13 — stale Tier-0 transition `8/20` text
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Status:** HISTORICAL/SUPERSEDED
 
 `TIER-0-SCENARIO-MATRIX.md` predates dedicated transition expansion. Its `8/20` assignment-state text is historical.
@@ -389,7 +389,7 @@ This remains design coverage, not execution/pass evidence.
 
 # 16. CA-14 — v0.1 status wording
 
-**Severity:** LOW  
+**Severity:** LOW
 **Status:** RECONCILED
 
 Responsibility v0.1 is an **accepted versioned semantic baseline**.
@@ -406,7 +406,7 @@ It does not mean:
 
 # 17. CA-15 — product engineering/design source-of-truth drift
 
-**Severity:** CRITICAL for implementation routing  
+**Severity:** CRITICAL for implementation routing
 **Status:** RECONCILED
 
 The first audit identified stale Responsibility shapes in:
@@ -466,7 +466,7 @@ provenance
 
 # 18. CA-16 — durable ADRs could silently resurrect old semantics
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Status:** RECONCILED
 
 The ADR audit found old terms in accepted decisions that coding agents could reasonably treat as stronger than later explanatory docs:
@@ -500,7 +500,7 @@ no generic workflow engine
 
 # 19. CA-17 — technology stack terminology was semantically stale
 
-**Severity:** MEDIUM/HIGH for agent execution  
+**Severity:** MEDIUM/HIGH for agent execution
 **Status:** RECONCILED
 
 `TECH-STACK.md` is not semantic authority, but it previously referred to:

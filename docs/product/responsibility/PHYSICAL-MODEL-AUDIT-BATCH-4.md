@@ -40,7 +40,7 @@ The new pressure is metadata inside existing structures, not new structure count
 
 # 2. PMA-B4-01 — Commitment force is interpretation/expectation metadata, not lifecycle
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-005..008
 
 The system must distinguish:
@@ -116,7 +116,7 @@ This reduces false deadline/expectation creation and keeps the temporal table se
 
 # 4. PMA-B4-03 — Preference does not require a normalized preference entity
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Pressure:** T0-011
 
 A preference can be relevant evidence during negotiation without becoming an agreed fact.
@@ -142,7 +142,7 @@ unless a real product query/integration later requires independent identity.
 
 # 5. PMA-B4-04 — Approval semantics do not move authorization into Responsibility
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-012/T0-013
 
 `確認します` and `承認します` are semantically different.
@@ -165,7 +165,7 @@ Do not add an organization/approval-role graph to Responsibility merely to satis
 
 # 6. PMA-B4-05 — DO_NOT_TRACK should normally leave no durable product-state row
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-019/T0-021/T0-023/T0-024
 
 A determinate rejected candidate does not need:
@@ -192,7 +192,7 @@ This prevents the new AdmissionReview boundary from becoming a generic archive o
 
 # 7. PMA-B4-06 — Direct recipient/CC evidence stays upstream
 
-**Severity:** MEDIUM/HIGH  
+**Severity:** MEDIUM/HIGH
 **Pressure:** T0-020/T0-021
 
 Provider/message metadata already records:
@@ -218,7 +218,7 @@ The same recipient metadata may support different responsibility conclusions dep
 
 # 8. PMA-B4-07 — Provenance requires support roles for compositional evidence
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-022/T0-025
 
 A current request can derive from multiple source zones:
@@ -262,7 +262,7 @@ Do not turn support roles into a generic knowledge graph. They are audit/reducti
 
 # 9. PMA-B4-08 — Quoted/forwarded zoning needs no new persistence aggregate
 
-**Severity:** MEDIUM  
+**Severity:** MEDIUM
 **Pressure:** T0-022..025
 
 Message normalization/zoning belongs to evidence/interpretation boundaries.
@@ -289,7 +289,7 @@ but source zone is not workflow state
 
 # 10. PMA-B4-09 — Sarcasm/non-literal ambiguity requires no special workflow state
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Pressure:** T0-042
 
 When plausible literal/non-literal readings reverse whether a Responsibility exists, the existing pre-admission Review boundary is sufficient:

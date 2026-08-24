@@ -44,7 +44,7 @@ Findings A01–A08 are required corrections before L2 freeze.
 
 # 2. A01 — CREATE idempotency must not depend on `responsibility_id`
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Protected by:** V16, T12, duplicate provider/job delivery, retry after timeout
 
 Initial uniqueness:
@@ -102,7 +102,7 @@ For a new Responsibility there is no existing row to lock. The transaction may o
 
 # 3. A02 — Same-parent child relations belong in PostgreSQL
 
-**Severity:** CRITICAL  
+**Severity:** CRITICAL
 **Protected by:** T18 conditional activation, T0-026 temporal targeting, T0-036 parallel legs
 
 The initial candidate leaves these as reducer-only checks:
@@ -178,7 +178,7 @@ Do not weaken the TRACK-resolution invariant merely to make hard delete convenie
 
 # 5. A04 — Stale same-revision AdmissionReview resurrection
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Protected by:** T0-041..044, stale AI principle
 
 Initial partial unique index prevents two **simultaneously OPEN** rows but allows:
@@ -216,7 +216,7 @@ This allows a genuinely new evidence revision to generate a new review episode w
 
 # 6. A05 — TRACKed review must link to same-account Responsibility
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Protected by:** T0-039, H06/H13
 
 A UUID FK alone proves that the Responsibility exists, not that it belongs to the Review's account.
@@ -307,7 +307,7 @@ The duplication is justified as a tenant-integrity boundary; it is not an indepe
 
 # 9. A08 — Provenance message/account integrity should be mechanical
 
-**Severity:** HIGH  
+**Severity:** HIGH
 **Protected by:** T0-022..025, T0-039, provenance trust requirements
 
 The initial provenance row can associate a Gmail Responsibility with a Message UUID from another account if application code is wrong.

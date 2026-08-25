@@ -16,6 +16,8 @@ This document consolidates the strongest Product reasoning reached on 2026-08-26
 
 This candidate is intentionally narrower than a feature specification. It defines **what Lunowa is trying to be, what it refuses to become, what responsibility it accepts, when that responsibility ends, and how authority may or may not be delegated to AI/agents.**
 
+This candidate does **not** authorize a new persistence aggregate, table, lifecycle enum, or runtime merely because it introduces Product-level language such as `Open Coordination Loop` or `Attention Contract`. Canonical Responsibility semantics remain owned by `docs/product/responsibility/` until explicitly superseded through the existing decision process.
+
 Labels used below:
 
 - **DOCTRINE CANDIDATE** — proposed durable Product principle;
@@ -41,11 +43,17 @@ The user is not buying a richer ontology, a better label system, or merely a fas
 
 The desired behavioral change is **monitoring relinquishment**: the user stops parallel manual checking because Lunowa has earned enough trust to carry the monitoring burden.
 
-## 1.3 Internal managed object
+## 1.3 Product-level managed concept
 
-**SUPPORTED INFERENCE / PRODUCT HYPOTHESIS:** the strongest current internal managed object is an **Open Coordination Loop** — an unresolved communication-borne outcome whose progress depends on the user, another person/organization, future time, an external event, approval, document, payment, decision, or other changing evidence.
+**SUPPORTED INFERENCE / PRODUCT HYPOTHESIS:** the strongest current Product-level description is an **Open Coordination Loop** — an unresolved communication-borne operational outcome whose progress depends on the user, another person/organization, future time, an external event, approval, document, payment, decision, or other changing evidence.
 
-This is an internal model, not required user-facing vocabulary.
+This is Product-level vocabulary, not a new canonical domain entity.
+
+Current Responsibility v0.1 already fixes `Responsibility` as the canonical semantic concept for the smallest communication-bounded operational outcome with coherent closure. Therefore, until explicitly changed:
+
+> **Open Coordination Loop describes the Product problem/behavior; Responsibility remains the canonical semantic object used to represent tracked operational outcomes.**
+
+A Conversation may contain zero, one, or many Responsibilities/open loops. Do not create a parent `CoordinationLoop` aggregate merely because this Product framing is useful.
 
 ---
 
@@ -121,7 +129,7 @@ Example:
 ```text
 email says "payment sent"
   + payment provider later confirms receipt
-  -> stronger evidence for the coordination loop
+  -> stronger evidence for the tracked operational outcome
 ```
 
 This does not require Lunowa to become the accounting system.
@@ -132,11 +140,11 @@ This does not require Lunowa to become the accounting system.
 
 ## 3.1 Product promise
 
-**PRODUCT HYPOTHESIS:** the Product contract can be modeled as an **Attention Contract**:
+**PRODUCT HYPOTHESIS:** the Product promise can be described as an **Attention Contract**:
 
-> Lunowa agrees to monitor a specific unresolved outcome and keep the user silent from it while no material user attention is required, then return it under defined conditions.
+> Lunowa agrees to monitor a specific unresolved outcome and keep it out of the user's active attention while no material user attention is required, then return it under defined conditions.
 
-An Attention Contract may include:
+An Attention Contract may describe:
 
 - what outcome/state Lunowa is monitoring;
 - what evidence/expected events matter;
@@ -146,7 +154,7 @@ An Attention Contract may include:
 - delivery urgency;
 - authority boundaries and required human review.
 
-`Temporal Contract` remains the durable time/event reconsideration mechanism beneath this broader Product-level concept.
+`Attention Contract` is Product-level framing only at this stage. It does **not** authorize a new persisted object. `Temporal Contract` remains the accepted durable time/event reconsideration mechanism beneath this broader idea.
 
 ## 3.2 Attention Need is not Notification
 
@@ -161,7 +169,7 @@ Do not collapse these into one generic priority/confidence score.
 
 ## 3.3 New message is not an attention event
 
-A message/reply is evidence. It may or may not change the coordination state.
+A message/reply is evidence. It may or may not change the accepted Responsibility state or attention projection.
 
 Examples:
 
@@ -190,26 +198,28 @@ This is not yet a frozen algorithm or threshold model.
 
 # 4. Coordination semantics
 
-## 4.1 Conversation is evidence context, not the work state
+## 4.1 Conversation is evidence context, not one work state
 
-A Conversation may contain zero, one, or many unresolved coordination objects / Responsibilities.
+A Conversation may contain zero, one, or many Responsibilities.
 
 `1 thread = 1 task` is not accepted semantics.
 
-## 4.2 Minimal conceptual grammar
+## 4.2 Product-level conceptual grammar
 
-Current strongest synthesis:
+Current strongest synthesis, expressed without creating a new aggregate:
 
 ```text
-Open Coordination Loop
-  -> Outcome
-  -> Responsibilities[]
+Tracked unresolved operational outcome
+  -> Responsibility identity / outcome
+  -> Obligation legs / Responsibilities in the user-facing sense
   -> Expected Events[]
   -> Evidence[]
   -> Return Triggers[]
-  -> Closure Criteria
+  -> Completion / Closure Criteria
   -> Uncertainty / Authority
 ```
+
+The exact canonical semantic shape remains the Responsibility v0.1 authority, including obligation legs, expected events, completion criteria, temporal facts, provenance, and orthogonal resolution/live-tracking/attention dimensions.
 
 `My Turn / Waiting / Later / Review / Done` remain projections, not canonical lifecycle truth.
 
@@ -217,7 +227,7 @@ Open Coordination Loop
 
 - **Action** — something an actor does;
 - **Expected Event** — a future observation that should cause reconsideration;
-- **Outcome** — the state the loop is ultimately trying to reach.
+- **Outcome** — the state the tracked Responsibility is ultimately trying to reach.
 
 An expected reply can occur without satisfying the outcome.
 
@@ -245,7 +255,7 @@ The expected event explains what Lunowa should continue monitoring.
 
 > **Communication activity is evidence, not closure.**
 
-A reply, completion claim, sent attachment, or executed action does not automatically prove that the user's expected outcome has been satisfied.
+A reply, completion claim, sent attachment, or executed action does not automatically prove that the expected operational outcome has been satisfied.
 
 ## 5.2 Performed != satisfied != closed
 
@@ -254,56 +264,60 @@ Distinguish at least conceptually:
 ```text
 action performed
 != claimed completion
-!= outcome satisfied
-!= monitoring closed
+!= successful outcome satisfaction
+!= user/Lunowa monitoring close
 ```
+
+This is compatible with current Responsibility doctrine, which already separates successful satisfaction from resolution and user tracking close from external-world closure.
 
 The core Product question is not "did something happen?" but:
 
-> **Is there any material reason the user or Lunowa still needs to monitor this loop?**
+> **Is there any material reason the user or Lunowa still needs to monitor this tracked outcome?**
 
 ## 5.3 Closure gates
 
 **PRODUCT HYPOTHESIS:** automatic monitoring closure should normally require all relevant gates:
 
 1. **Outcome gate** — the relevant expected outcome is satisfied or otherwise no longer required;
-2. **Obligation gate** — no material Responsibility remains open;
+2. **Obligation gate** — no material obligation leg/current Responsibility requirement remains open;
 3. **Evidence gate** — sufficient source-grounded evidence supports the conclusion;
-4. **Authority gate** — Lunowa/system has authority to make this determination without user judgment.
+4. **Authority gate** — accepted Product/domain policy permits the determination without user judgment.
 
 If a material gate fails, stay open or route to Review.
+
+These gates are a Product synthesis, not a replacement for the canonical reducer/oracle semantics.
 
 ## 5.4 Silence does not prove satisfaction
 
 > **Lunowa never treats communication silence alone as proof that the desired outcome was satisfied.**
 
-A policy may intentionally stop tracking after a period of silence, but its semantic result should be something like expiration/abandonment, not false satisfaction.
+A policy may intentionally stop tracking after a period of silence, but its semantic result should not be false successful satisfaction.
 
-## 5.5 Candidate terminal dispositions
+## 5.5 Candidate terminal/reason vocabulary
 
-Rich internal semantics may distinguish:
+Existing Responsibility semantics already distinguish successful satisfaction, cancellation, invalidation/user-close and `SUPERSEDE` behavior. The following broader vocabulary is therefore only a **Product hypothesis for later reconciliation**, not a new enum:
 
 - **Satisfied** — desired outcome actually satisfied;
 - **Cancelled / Waived** — user no longer requires the outcome;
-- **Superseded** — replaced by a new loop/condition;
+- **Superseded** — replaced by a new operational outcome/condition;
 - **Expired** — purpose ceased due to time/event;
 - **Abandoned** — user intentionally stops pursuing it.
 
-A missed promise / violation usually creates a new attention condition rather than automatically closing the loop.
+A missed promise / violation usually creates a new attention condition rather than automatically closing monitoring.
 
-User-facing UI may still project several dispositions simply as `Done` where appropriate.
+User-facing UI may still project several reasons simply as `Done` where appropriate.
 
-## 5.6 Satisfied != Closed
+## 5.6 Successful satisfaction != monitoring close
 
-Outcome disposition and monitoring responsibility are separate axes.
+Outcome/resolution semantics and live monitoring responsibility are separate axes.
 
-A result may be provisionally satisfied while Lunowa retains short-lived monitoring where evidence can reasonably be invalidated. This should be risk-based, not universal.
+A result may be treated as provisional where later evidence can reasonably invalidate a candidate satisfaction. This should be risk-based and must be reconciled with existing REOPEN/resolution semantics before canonical adoption.
 
-## 5.7 Closure is reversible in history
+## 5.7 Closure preserves history
 
 Closing monitoring must not destroy evidence/history.
 
-New contradictory evidence may reactivate a previously closed loop while preserving the prior decision trail.
+New contradictory evidence may reopen/reactivate the same operational outcome where canonical REOPEN semantics apply, while genuinely new work after a closed episode normally creates a new Responsibility.
 
 ---
 
@@ -313,7 +327,7 @@ New contradictory evidence may reactivate a previously closed loop while preserv
 
 **DOCTRINE CANDIDATE:**
 
-> **Lunowa first delegates attention, not authority.**
+> **Lunowa first delegates attention, not consequential authority.**
 
 Initial Product responsibility should emphasize:
 
@@ -349,7 +363,7 @@ Conceptually:
 | --- | --- |
 | read authorized source evidence | allowed within scope |
 | derive candidate interpretation | allowed; never canonical merely because AI said so |
-| reconcile internal monitored state under deterministic rules | allowed where acceptance contract permits |
+| reconcile internal monitored state under accepted trusted rules | allowed where current domain/admission policy permits |
 | internal low-risk resurfacing/scheduling | allowed |
 | prepare summary/context | allowed |
 | prepare draft | allowed |
@@ -376,6 +390,8 @@ LLM proposes
 -> outcome is verified/reconciled
 ```
 
+This is consistent with current ADR 0002: AI interprets, while trusted Product/domain logic owns accepted state, authorization, and privileged effects.
+
 ## 6.5 Reversibility matters, but apparent undo is not enough
 
 An action should not be treated as low-risk merely because the UI advertises an undo window.
@@ -397,9 +413,11 @@ Human review should concentrate at **material authority boundaries**:
 
 Low-risk internal monitoring should not require routine approval merely to claim `human-in-the-loop`.
 
+This remains compatible with current Responsibility doctrine: uncertainty does not automatically imply asking the user, and Review should be reserved for decision-critical ambiguity/risk rather than harmless uncertainty.
+
 ## 6.7 Bounded pre-authorization may exist later
 
-Current frontier products show session/action/recipient-scoped pre-authorization is feasible.
+A current frontier product (Microsoft Copilot Cowork) demonstrates session/action/recipient-scoped pre-authorization patterns in addition to draft-and-approve defaults.
 
 **PRODUCT HYPOTHESIS:** future Lunowa may allow narrowly bounded standing authorization only when:
 
@@ -416,7 +434,7 @@ This is **not** initial default permission for autonomous email sending.
 
 ## 6.8 Autonomy must degrade safely
 
-When evidence, authorization, or confidence in the accepted state is insufficient:
+When evidence, authorization, or accepted-state confidence is insufficient:
 
 ```text
 autonomous action
@@ -431,7 +449,7 @@ Do not compensate for uncertainty by silently expanding authority.
 
 ## 6.9 Verification follows execution
 
-Action execution does not close a loop merely because the tool call succeeded.
+Action execution does not close a Responsibility merely because the tool call succeeded.
 
 ```text
 attempted action
@@ -548,7 +566,7 @@ Managed by Lunowa
 
 ## 9.3 Moment is context rehydration
 
-When a loop returns after being forgotten, Moment should answer:
+When a Responsibility returns after being forgotten, Moment should answer:
 
 - why now?
 - what materially changed?
@@ -567,7 +585,7 @@ Before adding a Product capability, ask in order:
 Did unresolved work materially emerge through communication/evidence Lunowa observes?
   no -> normally OUT
 
-Is there a material unresolved outcome?
+Is there a material unresolved operational outcome?
   no -> normally OUT
 
 Does it depend on another person/event/time or changing external state?
@@ -598,8 +616,9 @@ It does **not** prove:
 - Product-market fit;
 - willingness to pay;
 - acceptable real-world false-negative/false-positive rates;
-- that Open Coordination Loop is the final optimal ontology;
-- that Attention Contract is the final user-facing or internal terminology;
+- that `Open Coordination Loop` should replace Responsibility as a canonical entity — it should not under current authority;
+- that `Attention Contract` should become a persisted domain object;
+- that the proposed closure vocabulary should become new enums/tables;
 - that a full email client is required;
 - that Lunowa can outperform current alternatives;
 - that autonomous external action should be a near-term feature;
@@ -615,6 +634,8 @@ Before promoting this candidate into canonical Product authority, perform a full
 
 - `docs/product/PRODUCT.md`;
 - `docs/product/responsibility/*` canonical semantics;
+- ADR 0002 (`AI interprets; trusted rules decide accepted state/privileged effects`);
+- ADR 0003 (`Temporal Contracts use durable scheduling; attention != notification`);
 - `docs/design/*` accepted interaction rules;
 - `docs/product/IMPLEMENTATION-PLAN.md`;
 - live Product-discovery contracts, especially Issue #36;
@@ -636,4 +657,4 @@ High-value falsifiers include:
 
 # 13. Compact Product Constitution candidate
 
-> **Lunowa exists to let people stop carrying unresolved email-borne coordination in their heads. It primarily stewards externally dependent, temporally open communication loops that are not already better owned by a structured system of record. Lunowa should preserve evidence, maintain state continuity, stay silent while the user is not needed, and return attention only when a material action, decision, promised awareness, or delay risk requires it. A reply or completion claim is evidence, not closure; monitoring ends only when the relevant outcome and obligations are sufficiently resolved under adequate evidence and authority, or when the user intentionally cancels, supersedes, expires, or abandons the loop. Lunowa first delegates attention, not consequential authority: AI may interpret, monitor, prepare, and propose, while external actions are mediated by explicit action-specific policy, least privilege, verification, and human approval where impact, ambiguity, or irreversibility warrants it. Lunowa does not become a task manager, project manager, CRM, ticket system, or autonomous general agent merely because it can.**
+> **Lunowa exists to let people stop carrying unresolved email-borne coordination in their heads. It primarily stewards externally dependent, temporally open communication outcomes that are not already better owned by a structured system of record. Lunowa should preserve evidence, maintain state continuity, stay silent while the user is not needed, and return attention only when a material action, decision, promised awareness, or delay risk requires it. A reply or completion claim is evidence, not closure; monitoring ends only when the tracked Responsibility is sufficiently resolved under adequate evidence and authority, or when tracking legitimately ends for another explicit reason. Lunowa first delegates attention, not consequential authority: AI may interpret, monitor, prepare, and propose, while external actions are mediated by explicit action-specific policy, least privilege, verification, and human approval where impact, ambiguity, or irreversibility warrants it. Lunowa does not become a task manager, project manager, CRM, ticket system, or autonomous general agent merely because it can.**

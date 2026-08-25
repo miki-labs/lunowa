@@ -6,14 +6,14 @@
 
 This document owns the Product-level synthesis that must survive session changes: why Lunowa should exist, what user burden it is trying to remove, the strongest current initial-value hypothesis, who may experience that problem, what is differentiation versus table stakes, switching/trust/retention logic, validation logic, scope boundaries, and major unknowns.
 
-It deliberately does **not** replace the more detailed authorities for UX, Responsibility semantics, architecture, persistence, implementation, or live task state:
+It deliberately does **not** replace the more detailed authorities for UX, Responsibility semantics, architecture, persistence, implementation, research evidence, or live task state:
 
 - `docs/design/DESIGN.md` + `INTERACTIONS.md` + `RESPONSIVE.md` own detailed UX/interaction behavior;
 - `docs/product/responsibility/` owns canonical Responsibility semantics/evaluation/persistence-proof status;
 - `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, and `CONTRACTS.md` own Product-engineering boundaries;
 - `docs/product/TECH-STACK.md` + accepted ADRs own concrete technology choices;
 - `docs/product/IMPLEMENTATION-PLAN.md` owns the living implementation sequence;
-- `docs/product/research/` preserves material external evidence inputs, but is not Product authority by itself;
+- `docs/product/research/` preserves material external evidence inputs but is not Product authority by itself;
 - GitHub Issues/PRs/CI own current task/candidate/review state;
 - `docs/continuity/CURRENT.md` is only the mutable current checkpoint/router.
 
@@ -25,12 +25,15 @@ Product reasoning in this file uses these classes:
 - **EXTERNAL EVIDENCE** — supported by cited research/current market evidence preserved under `docs/product/research/`.
 - **INFERENCE** — a conclusion derived from evidence but not directly established as a Lunowa outcome.
 - **HYPOTHESIS / NEEDS VALIDATION** — a falsifiable Product bet.
-- **UNKNOWN** — material question not established by current evidence.
+- **UNKNOWN** — a material question not established by current evidence.
 - **DEFERRED** — intentionally outside the current learning scope.
 
 A hypothesis is never promoted to fact because code, schema, design references, or a polished prototype already exist.
 
-This revision reconciles the repository with a fresh external evidence audit through **2026-08-25**. The detailed research record is `docs/product/research/COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md`.
+This revision reconciles the repository with an external evidence and competitor audit through **2026-08-25**. Detailed research is preserved in:
+
+- `docs/product/research/COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md`;
+- `docs/product/research/CURRENT-COMPETITOR-CONVERGENCE-2026-08.md`.
 
 ---
 
@@ -46,7 +49,7 @@ That phrase is a vision, not a measurable market claim or release acceptance cri
 
 > **必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。**
 
-The 2026 evidence audit strengthens the internal coherence of this North Star, but does not validate Lunowa as a market solution.
+The current evidence audit strengthens the internal coherence of this North Star, but does not validate Lunowa as a market solution.
 
 ### 1.3 Current Product thesis
 
@@ -58,7 +61,7 @@ Japanese working expression:
 
 > **Lunowaは、未完了の非同期コミュニケーションをユーザーの代わりに継続監視し、自分の注意が本当に必要になった時だけ、根拠と最小限の文脈とともに戻すProductである。**
 
-Short internal shorthand:
+Internal shorthand:
 
 - **Attention Delegation** — the broader value transfer;
 - **Open-loop Monitoring Offload** — the current initial-wedge shorthand.
@@ -69,9 +72,9 @@ Lunowa is therefore not primarily an inbox skin, AI chat box, generic task manag
 
 **CURRENT DIRECTION:** do not equate Lunowa's Product value with “a standalone replacement mail client.”
 
-A standalone client, an assistant embedded in an existing inbox, a companion/overlay, or another surface can in principle deliver parts of Attention Delegation. Which surface creates the best value/cost trade-off is a **Product/form-factor hypothesis** until evidence requires one.
+A standalone client, an assistant embedded in an existing inbox, a companion/overlay, or another surface can in principle deliver parts of Attention Delegation. Which surface creates the best value/cost trade-off remains a **Product/form-factor hypothesis** until evidence requires one.
 
-Current responsive-web implementation direction remains valid as the present experimentation/build substrate; it is not proof that full-client replacement is required for Product-market fit.
+The current responsive-web implementation remains the accepted experimentation/build substrate. That engineering direction is not proof that full-client replacement is required for Product-market fit.
 
 ### 1.5 Internal Product principle
 
@@ -100,17 +103,17 @@ A flow can be fast in clicks yet still fail if the user must keep remembering �
 
 **EXTERNAL EVIDENCE:** email has repeatedly been observed functioning as an informal task/reminder system rather than communication alone. Classic HCI field studies found that collaborative email tasks become difficult when work cannot complete until another person responds, causing multiple incomplete tasks to interleave and forcing users to keep track of them, often through messages left in inboxes/folders.
 
-**EXTERNAL EVIDENCE:** a 2024 CSCW study of AI-powered email reminders found real value in surfacing forgotten/missed commitments, but also found that inaccurate, stale, already-completed, or already-tracked recommendations reduce value. The same work cautions that more longitudinal research is needed.
+**EXTERNAL EVIDENCE:** a 2024 CSCW study of AI-powered email reminders found value in surfacing forgotten/missed commitments while also identifying stale, inaccurate, already-completed, or already-tracked reminders as sources of reduced value. The study itself calls for further longitudinal research.
 
-**EXTERNAL EVIDENCE:** prospective-memory research shows external reminders can improve delayed-intention performance, particularly under higher load. A 2026 study further found that after participants experienced highly reliable reminders, they reduced conscious maintenance of the intention and shifted attention to ongoing work; unexpected reminder withdrawal then harmed retrieval. A separate 2026 study also found post-offloading impairment when reminders were removed.
+**EXTERNAL EVIDENCE:** prospective-memory research shows external reminders can improve delayed-intention performance, particularly under higher load. A 2026 study found that, after participants experienced highly reliable reminders, they reduced conscious maintenance of the intention and shifted attention toward ongoing work; unexpected reminder withdrawal then harmed retrieval. A separate 2026 study also found post-offloading impairment after reminder removal.
 
-These findings support the **mechanism plausibility** of trusted cognitive offloading. They do **not** prove that Lunowa will earn such trust, that email users will adopt it, or that its current UX/model is correct.
+These findings support the **mechanism plausibility** of trusted cognitive offloading. They do **not** prove that Lunowa will earn such trust, that email users will adopt it, or that the current Responsibility/Moment UX is correct.
 
-Detailed sources/limitations: `docs/product/research/COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md`.
+Detailed sources and limitations are in the Product research artifacts.
 
 ### 2.2 Current causal model of Communication Management Burden
 
-**INFERENCE:** Lunowa should no longer treat its four burden dimensions as a flat list. The strongest current causal hypothesis is:
+**INFERENCE:** the strongest current causal hypothesis is:
 
 ```text
 asynchronous + interdependent communication
@@ -122,14 +125,14 @@ asynchronous + interdependent communication
   -> verification burden when automation cannot be trusted
 ```
 
-The four burden dimensions remain useful:
+The four existing burden dimensions remain useful:
 
 1. **Monitoring / attention-maintenance cost** — remembering what must be checked again, what is waiting, what may become urgent, and when a communication loop should return to attention.
 2. **Interpretation / reconstruction cost** — recovering the operational meaning: who owes what, what changed, what remains open, what matters now.
 3. **Execution / coordination cost** — searching, switching views/accounts, copying information, creating manual tasks, reopening threads, and repeated mechanical actions.
 4. **Verification / trust cost** — rechecking original email “just in case” because the attention system may be wrong, stale, incomplete, or operating under the wrong identity/scope.
 
-**CURRENT STRONGEST PROBLEM HYPOTHESIS:** Monitoring/attention maintenance is the leading causal burden Lunowa should initially target. Interpretation, execution, and verification are not secondary in importance, but they become especially costly around repeated monitoring/re-entry.
+**CURRENT STRONGEST PROBLEM HYPOTHESIS:** Monitoring/attention maintenance is the leading causal burden Lunowa should initially target. Interpretation, execution, and verification remain essential because they determine whether monitoring can actually be delegated without creating a replacement burden.
 
 ### 2.3 The Product is not optimizing for Inbox Zero
 
@@ -143,7 +146,7 @@ Lunowa is intended to reduce failures such as:
 
 - keeping a reply/follow-up obligation in one's head for days;
 - scanning Inbox or Sent repeatedly to see whether anything changed;
-- receiving a reply that changes context but does not yet require user action, and having to decide that manually again;
+- receiving an intermediate reply that changes context but does not yet require user action, then having to decide that manually again;
 - forgetting an important but non-urgent/ad-hoc commitment;
 - rereading a long thread after days of waiting to reconstruct the current state;
 - manually creating a task/reminder/flag merely so the communication is not forgotten;
@@ -185,13 +188,19 @@ Likely weaker initial fit:
 - users whose monitoring is already delegated to an assistant/team process;
 - environments where third-party mail access cannot be authorized.
 
-### 3.3 Important contemporary work-style signal
+### 3.3 Structured-system competition changes segment selection
 
-**EXTERNAL EVIDENCE / LIMITED:** the 2024 Microsoft/CSCW reminder study found positive interaction associated with communicating about tasks via email and creating tasks from email, while many scheduled meetings and task delegation were negatively associated in its small self-report model. The authors explicitly limit the generalizability.
+**EXTERNAL EVIDENCE / CURRENT MARKET FACT:** Salesforce Sales Engagement and HubSpot can own follow-up through CRM task queues, sequences/cadences, and automated/reminder-driven outreach.
 
-**INFERENCE:** “executive with lots of email” should not be assumed to be the best first ICP. A hands-on operator who personally carries asynchronous commitments may be a stronger candidate than a high-status manager whose task monitoring is already delegated.
+**INFERENCE:** obvious high-follow-up sectors such as sales may have severe pain but also strong systems of record. Lunowa should not choose a segment merely because follow-up pain is visible. The better initial opportunity may be a segment with comparable asynchronous/interdependent communication burden where no adequate structured system owns the loop.
 
-### 3.4 What still needs validation before ICP freeze
+### 3.4 Customer / business-model orientation
+
+**CURRENT DIRECTION / HYPOTHESIS:** Product design remains primarily individual/prosumer/professional-oriented. Solo operators and small-business owners may fit naturally where email carries operational commitments but a full CRM/project system is too heavy.
+
+A team/enterprise collaboration model is **not** a current v1 assumption. This does not rule it out permanently; it prevents team-workflow complexity from expanding the first Product before the individual Attention Delegation thesis is proven.
+
+### 3.5 What still needs validation before ICP freeze
 
 - frequency and severity of open-loop monitoring;
 - number/type/duration of concurrent externally dependent loops;
@@ -210,7 +219,7 @@ Likely weaker initial fit:
 
 ### 4.1 Typical workaround classes
 
-Current users can already approximate pieces of the job through:
+Users can already approximate pieces of the job through:
 
 - keeping messages unread/in inbox;
 - starring/flagging;
@@ -228,13 +237,16 @@ The Product question is not whether Lunowa can replicate these controls. It is w
 Current primary-source audit shows:
 
 - **Gmail AI Inbox** can surface prioritized Suggested to-dos, explain what needs action, expose related source/context, and support View/Reply/Mark done;
-- **Superhuman** can classify Respond/Waiting-like states, detect outbound messages needing follow-up, resurface unanswered sent email, draft follow-ups, and offer an Email Assistant that works directly in Gmail/Outlook;
-- **Shortwave** supports todos, AI organization, no-reply follow-up reminders, reply-or-time resurfacing, and background automation through Tasklet;
-- **Spark** already offers unified multi-account inbox, Snooze, Set Aside, Reminders, and Mark as Done;
-- **Front** currently organizes work into Open/Later/Done, with Later including waiting and snoozed conversations, and supports send-and-snooze follow-up;
-- **Notion Mail** will shut down its standalone inbox on 2026-09-22 while preserving Gmail connector/agent email workflows. This is a market fact, **not evidence of why the Product was shut down**.
+- **Outlook Copilot** can prioritize incoming email, lean toward action-required mail, replace row text with summaries, explain why mail is important, and expose triage actions;
+- **Superhuman** can classify Respond/Waiting-like states, detect outbound messages needing follow-up, resurface unanswered sent email, draft follow-ups, and provide an Email Assistant directly inside Gmail/Outlook;
+- **HEY** offers `Bubble Up: If no reply by` specifically for waiting on someone without forgetting;
+- **Shortwave** supports todos, AI organization, follow-up reminders, reply-or-time resurfacing, and background automation;
+- **Spark** offers unified multi-account inbox, Snooze, Set Aside, Reminders, and Mark as Done;
+- **Front** organizes work into Open/Later/Done, with Later including waiting and snoozed conversations, and supports follow-up workflows;
+- **Salesforce/HubSpot** provide structured follow-up queues/cadences/sequences inside systems of record;
+- **Notion Mail** will shut down its standalone inbox on 2026-09-22 while connector/agent-oriented email capability continues. This is a market fact, **not evidence of why the Product was shut down**.
 
-Detailed source links are preserved in the research artifact.
+Detailed current sources and limitations are in `docs/product/research/CURRENT-COMPETITOR-CONVERGENCE-2026-08.md`.
 
 ---
 
@@ -253,7 +265,7 @@ The first wedge is **not** merely:
 - a faster summary;
 - a new Done button.
 
-Those are already represented in incumbent/adjacent products.
+Those mechanisms already exist across incumbent/adjacent products.
 
 ### 5.2 Strongest current wedge hypothesis
 
@@ -284,11 +296,19 @@ communication changes
 
 Example hypothesis: if a counterpart replies “Legal has it; we expect approval Friday,” that message may update the expected event without returning the whole loop to active user attention.
 
-**CRITICAL UNKNOWN:** current research does not establish that competitors lack equivalent semantic/stateful monitoring, and rapidly evolving agent products may converge. This is therefore a **differentiation hypothesis to benchmark**, never a uniqueness claim.
+### 5.3 Wedge is not moat
 
-### 5.3 The value test
+**CRITICAL UNKNOWN:** current research does not establish that competitors lack equivalent semantic/stateful monitoring, and rapidly evolving agent products may converge quickly.
 
-The wedge is meaningful only if the user can say, behaviorally rather than rhetorically:
+Therefore:
+
+> **State-aware Attention Delegation is the current wedge to test, not a uniqueness or defensibility claim.**
+
+Even if the wedge is validated, defensibility must be investigated separately: superior longitudinal state quality, trust/reliability, user-feedback loops, cross-provider evidence, chosen-segment depth, distribution, or accumulated Product learning are possible sources, but none is currently proven.
+
+### 5.4 The value test
+
+The wedge is meaningful only if the user's behavior shows:
 
 > “I gave this open communication to Lunowa, I did not keep checking it myself, and it came back when I actually needed it.”
 
@@ -391,6 +411,24 @@ Original sent/received communication remains immutable evidence of what was comm
 
 **ACCEPTED:** explicit user correction can override applicable Lunowa-derived state under the domain authority model without rewriting original communication or silently freezing unrelated fields forever.
 
+### 8.6 Current information architecture direction
+
+Detailed behavior remains in `docs/design/`.
+
+Current canonical desktop/web experiment shell remains:
+
+```text
+Sidebar | Conversation List | Detail
+```
+
+Detail has `会話` for source communication and `今の要点` for the current operational Moment. The shell is a current design direction, not evidence that a three-pane full client is required for the eventual winning form factor.
+
+### 8.7 “10-second” immediate-understanding hypothesis
+
+**NEEDS VALIDATION / INTERNAL USABILITY HYPOTHESIS:** in representative prepared cases, a user should be able to open the Product and determine the next meaningful action/attention state in roughly **10 seconds or less**, without rereading the entire thread.
+
+This is an immediate mechanism/usability target, **not** a production SLA and **not** evidence that the user will trust Lunowa enough to stop monitoring the loop over days/weeks.
+
 ---
 
 ## 9. Responsibility, Temporal Contract, and Moment — correct Product hierarchy
@@ -489,7 +527,7 @@ The candidate combination is:
 
 Cross-account/provider aggregation may multiply value for some segments, but it is no longer placed inside the core differentiation definition by default.
 
-### 10.3 Differentiation must survive actual alternatives
+### 10.3 Outcome differentiation, not feature novelty
 
 The comparison baseline must eventually include the participant's **real workaround stack**, not an artificially weak inbox:
 
@@ -502,7 +540,13 @@ Gmail/Outlook/Spark/etc.
 + CRM/ATS/ticketing where applicable
 ```
 
-A Lunowa feature is not differentiated because it looks novel in Lunowa. It must materially reduce a behavior/cost relative to what the target user actually does today.
+A Lunowa capability is not differentiated because it looks novel in Lunowa. It must materially reduce a behavior/cost relative to what the target user actually does today.
+
+### 10.4 Defensibility is still UNKNOWN
+
+Even successful validation of state-aware Attention Delegation would not prove a moat. Incumbent inboxes, structured CRMs, and general-purpose agents can converge rapidly.
+
+Do not use the sophistication of Responsibility semantics as evidence of defensibility. A durable advantage, if one emerges, must be supported by user outcome, longitudinal state quality, trust/reliability, feedback/data learning, segment depth, distribution, or another demonstrated mechanism.
 
 ---
 
@@ -521,17 +565,19 @@ A companion/in-client surface can reduce (1). It cannot eliminate (2), because (
 
 **HYPOTHESIS / OPEN:** do not freeze full-client replacement as a Product requirement before evidence shows it is needed.
 
-The standalone responsive-web shell remains a valid experimental/implementation direction, and a credible full client remains a possible long-term Product. But Product validation should be able to change the surface strategy if Attention Delegation is better delivered with lower replacement friction.
+The standalone responsive-web shell remains a valid experimental/implementation direction, and a credible full client remains a possible long-term Product. Product validation should be allowed to change the surface strategy if Attention Delegation is better delivered with lower replacement friction.
 
-### 11.3 Notion Mail is a signal, not a causal lesson
+### 11.3 Current market signal
 
-Notion's announced 2026-09-22 shutdown of the Notion Mail inbox while preserving connector/agent email workflows reinforces the need to keep form factor falsifiable. **Do not infer the cause of the shutdown from this fact.**
+Superhuman's in-client assistant demonstrates lower-friction delivery inside existing Gmail/Outlook. Notion's announced 2026-09-22 shutdown of the Notion Mail inbox while preserving connector/agent email workflows reinforces the need to keep form factor falsifiable.
+
+**Do not infer the cause of Notion Mail's shutdown from this fact.**
 
 ---
 
 ## 12. Trust, reliability, and failure economics
 
-### 12.1 Trust is not a supporting feature; it gates the core value
+### 12.1 Trust gates the core value
 
 **INFERENCE from external cognitive evidence:** users may continue internal monitoring until external support earns reliability. Therefore:
 
@@ -631,6 +677,36 @@ Remove as standalone differentiation claims:
 - generic no-reply reminder;
 - email-to-task transfer.
 
+### 13.6 Current platform direction
+
+**CURRENT ACCEPTED ENGINEERING/PRODUCT DIRECTION:** responsive **web-first** implementation using the accepted Next.js/TypeScript stack. Native mobile is not required before the interaction/value model is validated.
+
+This is the current build direction, not evidence that a web/full-client surface is the eventual market winner.
+
+### 13.7 Current language direction
+
+**CURRENT DIRECTION:** optimize initial Product copy and validation for Japanese users while keeping Lunowa-owned UI internationalizable from the beginning through the accepted `next-intl` direction. English expansion is a later Product/distribution option, not a current release promise.
+
+### 13.8 Explicit initial non-goals
+
+Do not turn the first Product into:
+
+- a full CRM;
+- a project-management suite;
+- a calendar-first productivity system;
+- a graph explorer as primary navigation;
+- a generic automation/rule builder;
+- a replacement mail transport;
+- a feature-complete Gmail/Outlook clone;
+- a chat-first AI Product;
+- a generic BPM/workflow engine;
+- an autonomous high-impact action agent;
+- a team/enterprise collaboration suite before the individual/professional thesis is validated.
+
+### 13.9 Credible-client direction vs validated MVP
+
+Existing design references and detailed mail interactions may continue to describe a **credible future client direction**. They do not imply that every depicted capability belongs in the market-validation MVP or must ship before learning. The exact release surface remains adjustable as evidence arrives.
+
 ---
 
 ## 14. MVP and Product-validation logic
@@ -723,7 +799,7 @@ Internal shorthand:
 
 > **Reliance without vigilance** — the user repeatedly entrusts eligible communication to Lunowa without maintaining a parallel checking habit.
 
-Standard retention/conversion/revenue metrics still matter. This principle only prevents optimizing DAU in a way that contradicts the North Star.
+Standard retention, conversion, and revenue metrics still matter. This principle only prevents optimizing DAU in a way that contradicts the North Star.
 
 ### 15.4 Safety-quality balance
 
@@ -733,7 +809,7 @@ A false negative on a material obligation is especially dangerous, but indiscrim
 
 ## 16. Biggest current unknown
 
-The highest-impact unresolved Product question is now:
+The highest-impact unresolved Product question is:
 
 > **Can Lunowa become reliable and context-correct enough that a coherent, reachable user segment actually stops self-monitoring important email-mediated communication loops — and is that relief valuable enough to adopt and pay for despite incumbent alternatives?**
 
@@ -746,10 +822,11 @@ Sub-unknowns:
 - Does cross-account attention materially amplify value for the winning segment?
 - What level of reliability/freshness is required before users stop checking manually?
 - Is the resulting value strong enough for continued reliance and payment?
+- If the wedge works, what creates defensibility as incumbents and agents converge?
 
 ---
 
-## 17. Monetization and distribution
+## 17. Monetization, distribution, and retention status
 
 ### 17.1 Monetization
 
@@ -763,7 +840,7 @@ Do not derive price from competitor price matching alone. Payment behavior/value
 
 **UNKNOWN:** no acquisition/distribution channel is proven.
 
-The ICP must be reachable, not merely theoretically painful. Segment research should therefore evaluate both problem density and reachable distribution.
+The ICP must be reachable, not merely theoretically painful. Segment research should evaluate both problem density and reachable distribution.
 
 ### 17.3 Retention
 
@@ -828,6 +905,10 @@ Current web/client work remains useful, but full-client replacement must earn it
 
 Provider/AI/persistence breadth remains downstream of the smallest Product tests able to retire the highest uncertainty.
 
+### 19.10 Feature wedge -> outcome test; moat remains separate
+
+State-aware Attention Delegation is the current wedge hypothesis. It must not be promoted to a durable moat claim merely because the repository has richer semantics than a competitor's public documentation.
+
 ---
 
 ## 20. Deferred exploratory directions
@@ -881,7 +962,8 @@ Evaluate proposed work by asking whether it:
 8. addresses a real problem in a coherent/reachable segment;
 9. is supported by evidence rather than sunk-cost protection;
 10. keeps differentiation claims current against 2026 competitors;
-11. avoids infrastructure/feature breadth unsupported by the current learning need;
-12. uses the **smallest/cheapest experiment that can falsify the highest-impact unresolved Product assumption** before broad implementation.
+11. separates wedge validation from defensibility claims;
+12. avoids infrastructure/feature breadth unsupported by the current learning need;
+13. uses the **smallest/cheapest experiment that can falsify the highest-impact unresolved Product assumption** before broad implementation.
 
 If stronger evidence changes a Product-level decision, update this document and the owning canonical design/domain/architecture artifact in the same accepted change where applicable.

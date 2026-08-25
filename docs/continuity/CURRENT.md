@@ -19,7 +19,7 @@ This is a compact, mutable bootstrap checkpoint. It is **not** a Product, design
 - Knowledge continuity is not a current critical-path blocker.
 
 Primary Product authority: `docs/product/PRODUCT.md`.  
-Primary external-evidence input: `docs/product/research/COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md`.  
+Primary external-evidence inputs: `docs/product/research/`.  
 Implementation sequence authority: `docs/product/IMPLEMENTATION-PLAN.md`.
 
 ---
@@ -42,7 +42,7 @@ Current strongest wedge hypothesis:
 
 > **State-aware Attention Delegation** — keep monitoring an unresolved communication outcome and resurface it when evidence, expected events, time, risk, or responsibility state has changed enough that the user meaningfully needs attention again.
 
-This is a hypothesis, not proof that current competitors lack equivalent semantic monitoring.
+This is a hypothesis, not proof that current competitors lack equivalent semantic monitoring. It is also **not a moat claim**; defensibility remains a separate unknown under rapid 2026 incumbent/agent convergence.
 
 ---
 
@@ -82,9 +82,25 @@ Live state at reconciliation:
 
 Always re-query PR #34 before acting; this checkpoint may become stale.
 
+### Issue #29 / PR #30 — bounded execution-plan gate
+
+Live state at reconciliation:
+
+- Issue #29 / PR #30 remain open.
+- PR #30 is draft, mergeable, and planning-only at head `d02768e37450cd7b55a989d34f6fed393518b5da`.
+- the plan is **not current implementation authority** merely because its mechanical checks have run;
+- Issue #32 / PR #34 exists specifically to close the deterministic scenario/oracle gap identified during plan review;
+- after an oracle is accepted, PR #30 still requires reconciliation against that accepted oracle/current Product contract and a durable plan-review disposition before it may authorize #28 implementation.
+
+Do not skip this gate by moving directly from an oracle candidate to write-heavy UI work.
+
 ### Issue #28 — bounded fake-data implementation
 
-Issue #28 remains the implementation target for the comparative prototype, not full Phase 1. It is downstream of the accepted experiment-oracle/planning gates and the separate unattended implementation-harness resume gate recorded in its durable discussion.
+Issue #28 remains the implementation target for the comparative prototype, not full Phase 1. It is downstream of:
+
+1. an accepted deterministic scenario/oracle;
+2. a reconciled/accepted bounded execution plan;
+3. the separate unattended implementation-harness resume gate recorded in Issue #28's durable discussion.
 
 Do not broaden #28 into Gmail/Microsoft/auth/DB/AI/send/provider parity.
 
@@ -134,7 +150,8 @@ Material unknowns include:
 - what reliability/freshness threshold causes users to stop manual re-checking;
 - standalone client vs companion/in-client/other form factor;
 - whether cross-account attention is central, a multiplier, or unnecessary for the winning segment;
-- switching behavior, WTP/pricing/package, reachable distribution, acquisition efficiency, and continued reliance/retention.
+- switching behavior, WTP/pricing/package, reachable distribution, acquisition efficiency, and continued reliance/retention;
+- defensibility if incumbents/agents reproduce the same surface behavior.
 
 Do not describe a polished prototype, technical proof, positive comment, or current architecture as evidence that these are solved.
 
@@ -155,7 +172,9 @@ Do not describe a polished prototype, technical proof, positive comment, or curr
 - Moment as re-entry/context-restoration interface;
 - My Turn / Waiting / Later / Done / Review as projections/mechanisms;
 - safe degraded/reconciliation behavior;
-- Product validation before integration breadth.
+- Product validation before integration breadth;
+- responsive web-first as the current build/experimentation direction;
+- Japanese-first Product copy/validation with internationalizable UI.
 
 ### Changed emphasis
 
@@ -163,6 +182,7 @@ Do not describe a polished prototype, technical proof, positive comment, or curr
 - Monitoring/attention maintenance -> leading causal problem hypothesis;
 - Responsibility/Moment -> mechanisms serving the thesis, not the thesis itself;
 - differentiation -> trusted state-aware attention transfer, not labels/reminders/unified inbox;
+- state-aware Attention Delegation -> wedge hypothesis, **not** moat proof;
 - cross-account -> segment-dependent multiplier/hypothesis rather than core differentiation;
 - full-client parity -> form-factor hypothesis rather than a pre-validation requirement;
 - retention -> include self-check reduction/delegated reliance, not raw DAU alone.
@@ -174,7 +194,7 @@ Do not describe a polished prototype, technical proof, positive comment, or curr
 - cross-account centrality;
 - broad person/company context;
 - broad settings/onboarding;
-- full mobile/tablet fidelity;
+- full native-mobile/tablet fidelity;
 - production AI/persistence breadth before Product gates;
 - generic automation/CRM/workflow expansion;
 - travel/subscription/location/time-of-day convenience ideas.
@@ -189,7 +209,7 @@ Unified/multi-account inbox, generic AI summary/drafting/search, task/due extrac
 
 - Responsibility L2 final freeze still requires direct executable evidence from #13 + #14 and independent #15 review.
 - L3 Responsibility production migrations/runtime remain unauthorized until a separate post-L2-PASS implementation decision.
-- #28 write-heavy prototype implementation remains downstream of accepted experiment-oracle/planning gates plus the separate harness resume gate.
+- #28 write-heavy prototype implementation remains downstream of accepted experiment-oracle + reconciled plan gates plus the separate harness resume gate.
 
 ---
 
@@ -204,6 +224,7 @@ Unified/multi-account inbox, generic AI summary/drafting/search, task/due extrac
 - Ask-AI/chat-first routine workflow -> system-led intelligence.
 - plain multi-account/unified inbox as differentiation -> table stake; cross-account value remains a segment hypothesis.
 - implicit full-client requirement -> delivery form remains falsifiable; responsive web is current build substrate, not market proof.
+- feature wedge as moat -> state-aware Attention Delegation is a testable wedge; defensibility remains separate and unproven.
 - Gmail/provider/AI-first implementation -> bounded Product evidence first.
 - non-default branch as practical current authority -> accepted history lives on default `main`; candidates remain candidates until accepted.
 - “all open GitHub work is active authority” -> live state requires durable classification and current re-query.
@@ -215,7 +236,7 @@ Unified/multi-account inbox, generic AI summary/drafting/search, task/due extrac
 Do not broaden implementation from this Product-thesis revision.
 
 1. **Product research lane:** continue narrowing WHO/problem concentration using external evidence and, when external evidence reaches its limit, recent-event/workflow evidence rather than opinion-only interviews.
-2. **Current prototype lane:** finish the existing #32/PR #34 oracle gate as a bounded mechanism-test prerequisite; do not silently reinterpret #26 as longitudinal Attention Delegation proof.
+2. **Current prototype-spec lane:** finish #32/PR #34's oracle gate, then reconcile/review #29/PR #30; do not silently reinterpret #26 as longitudinal Attention Delegation proof.
 3. **After mechanism test:** the next stronger Product evidence must eventually include real waiting periods and measure whether users actually reduce self-checking (`N_self_check`) before broad provider/client parity.
 4. **Engineering/Responsibility lanes:** #21 and #13/#14/#15 may proceed independently but must not substitute for Product evidence.
 
@@ -229,10 +250,12 @@ Use the smallest experiment that can falsify the highest-impact unresolved Produ
 
 - `docs/product/PRODUCT.md` — Product thesis/problem/users/wedge/differentiation/switching/trust/scope/validation/unknowns.
 - `docs/product/research/README.md` — research-evidence authority boundary.
-- `docs/product/research/COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md` — current external evidence audit.
+- `docs/product/research/COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md` — communication-monitoring/cognitive-offloading evidence audit.
+- `docs/product/research/CURRENT-COMPETITOR-CONVERGENCE-2026-08.md` — current competitor/alternative/form-factor convergence audit.
 - `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` — detailed UX/interaction behavior.
 - Issue #26 — comparative mechanism-level Product validation; query live.
 - Issue #32 / PR #34 — current deterministic scenario-oracle gate; query live.
+- Issue #29 / PR #30 — bounded execution-plan gate; query live.
 - Issue #28 — bounded prototype implementation; query live.
 
 ### Responsibility / data / architecture

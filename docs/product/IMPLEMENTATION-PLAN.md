@@ -2,14 +2,16 @@
 
 ## Status
 
-**Active initial execution plan, reconciled with Responsibility v0.1 and the current L2 executable-proof gate.**
+**Active initial execution plan, reconciled with the current Product thesis and Responsibility v0.1 / L2 executable-proof gate.**
 
-This plan sequences implementation to reduce product/technical risk without activating production infrastructure or feature breadth before the core interaction/domain model is proven.
+This plan sequences implementation to reduce Product and technical risk without activating production infrastructure or feature breadth before the core user problem, interaction, and domain model are sufficiently supported.
 
-It is a living execution artifact. Durable semantics belong in `docs/product/responsibility/`, design, architecture, data-model, contracts, and ADRs.
+It is a living execution artifact. Durable Product truth belongs in `PRODUCT.md`; Responsibility semantics belong in `responsibility/`; detailed design/architecture/contracts remain in their owning sources.
 
 Related sources:
 
+- `PRODUCT.md`;
+- `research/communication-monitoring-evidence-2026-08.md`;
 - `../design/DESIGN.md`;
 - `../design/INTERACTIONS.md`;
 - `../design/RESPONSIVE.md`;
@@ -27,18 +29,21 @@ Related sources:
 
 ## 1. Execution principle
 
-Build vertical slices that can be behaviorally/visually verified.
+Build the smallest evidence-producing vertical slice that can falsify the highest-impact current assumption.
 
-Do not implement every provider, AI feature, mailbox action, scheduler feature, and responsive edge case at once.
+Do not implement every provider, AI feature, mailbox action, scheduler feature, design reference, and responsive edge case merely because the eventual Product may need them.
 
-Current high-level product sequence:
+Current high-level sequence:
 
 ```text
 Bootstrap
-  -> High-fidelity fake-data product shell using Responsibility projections
-  -> Responsibility persistence foundation
+  -> Problem / ICP evidence for communication-monitoring burden
+  -> Minimal comparative fake-data wedge prototype
+  -> Longitudinal safe-forgetting / monitoring-relinquishment proof
+  -> only then broaden the credible-client shell as Product evidence requires
+  -> Responsibility persistence foundation when its Product/runtime use is justified
   -> One real provider read path
-  -> Real compose/send path
+  -> Real compose/send path when client ownership is justified
   -> Deterministic Responsibility reduction + Temporal Contract
   -> AI interpretation behind validated domain contracts/evals
   -> Search/context quality
@@ -46,11 +51,13 @@ Bootstrap
   -> Beta hardening
 ```
 
-Bounded technical spikes may run ahead of their production phase when they retire a costly-to-reverse uncertainty without activating production infrastructure. The current Responsibility L2 executable proof is such a spike; it does **not** authorize production persistence before the relevant product/phase gates.
+These are evidence/implementation gates, not a requirement that all research work be serialized. Bounded technical spikes may run ahead when they retire a costly-to-reverse uncertainty without activating production infrastructure. The current Responsibility L2 executable proof is such a spike; it does **not** authorize production persistence or broad client implementation before Product evidence warrants it.
 
-Key rule:
+Key rules:
 
-> **Prove the user experience, semantic oracles, and core domain contracts before integration breadth.**
+> **Prove the real user problem and smallest differentiated behavior before integration or client breadth.**
+
+> **A polished full shell is not a substitute for evidence that users delegate monitoring and reduce self-checking.**
 
 ---
 
@@ -58,21 +65,21 @@ Key rule:
 
 ### Goal
 
-Create the smallest reproducible runtime/repository foundation supporting canonical UI and later durable background work.
+Create the smallest reproducible runtime/repository foundation supporting Product experiments and later durable background work.
 
 ### Required work
 
-- inspect `AGENTS.md`, relevant reusable engineering docs, product/design docs;
+- inspect `AGENTS.md`, relevant reusable engineering docs, Product/design docs;
 - choose stack deliberately;
 - prefer framework/platform defaults + mature official SDKs;
 - establish install/run/typecheck/lint/test/build/verify paths;
 - establish environment/secrets pattern;
 - establish browser/runtime inspection;
-- activate persistence only when Phase 2 requires it.
+- activate persistence only when a later accepted phase requires it.
 
 ### Non-goals
 
-No microservices, Kubernetes, vector DB, search cluster, multi-provider AI, Gmail/AI activation merely because the stack supports them.
+No microservices, Kubernetes, vector DB, search cluster, multi-provider AI, Gmail/AI activation, or broad mail-client implementation merely because the stack supports them.
 
 ### Exit criteria
 
@@ -81,92 +88,150 @@ No microservices, Kubernetes, vector DB, search cluster, multi-provider AI, Gmai
 - trivial route renders;
 - secrets/environment handling documented;
 - material stack choices recorded in `TECH-STACK.md`/ADRs;
-- no production credentials needed for ordinary UI development.
+- no production credentials needed for ordinary Product experimentation.
 
 Current repository status indicates the mechanical Phase-0 foundation already exists; repository/branch protection is a separate safety follow-up.
 
 ---
 
-## 3. Phase 1 — High-fidelity fake-data product shell
+## 3. Phase 1 — Product-learning before broad client construction
 
-### Goal
+### 3.1 Phase 1A — Problem / ICP evidence
 
-Validate the interaction/visual model without coupling UI construction to provider/AI complexity.
+#### Goal
 
-### Primary visual references
+Determine whether communication open-loop monitoring is frequent and painful enough in a reachable segment to justify a Product wedge.
 
-Use `00`–`02` for global brand/component/shell, then relevant state/feature references `03`–`19`.
+#### Evidence to collect
 
-Historical filenames such as `moment-action-required`, `moment-deferred`, and `moment-follow-up` are **visual filenames**, not canonical domain lifecycle enums. Read `docs/design/references/README.md` before implementation.
+Use recent real-workflow observation/interview rather than abstract preference questions. Look for:
 
-### Required behavior
+- concurrent unresolved communication loops;
+- external/interpersonal dependency;
+- waiting duration and irregularity;
+- repeated Inbox/Sent/thread self-checking;
+- flags/stars/snooze/reminders/task/calendar/note workarounds;
+- missed/late follow-up consequences;
+- whether CRM/ATS/ticketing/project software already solves the problem;
+- adoption autonomy and current switching constraints.
 
-#### Shell
+#### Exit / stop logic
 
-- desktop 3-pane layout;
-- resizable panes with safe min/max;
-- persistent local pane widths;
-- normal row click -> `会話`;
-- Responsibility/status chip -> `今の要点`;
-- stable selection/context.
+Do not freeze an ICP from job title or email volume alone.
 
-#### Conversation list
+If repeated monitoring burden is weak, rare, already solved, or insufficiently costly in the candidate segment, narrow or reject the wedge before broad implementation.
 
-- person/topic hierarchy;
-- projection/status chip;
-- unread/pin/account treatment;
-- representative long/short data.
+### 3.2 Phase 1B — Minimal comparative fake-data wedge prototype
 
-#### Detail
+#### Goal
 
-- thread timeline;
-- readable long mail;
-- quote/signature treatment;
-- attachment cards;
-- reply composer.
+Test whether the current Responsibility/Moment candidate mechanism produces immediate comparative value on realistic communication scenarios without provider/AI/database breadth.
 
-#### Moment View
+This is the implementation purpose of the current Product-validation path (#26/#28 and their live prerequisite/review state). Re-query GitHub before execution.
 
-Implement fake domain-shaped scenarios for:
+#### Required scenario coverage
+
+Use a bounded set of domain-shaped fake scenarios sufficient to test the current hypotheses, including:
 
 ```text
 MY_TURN
-LATER
 WAITING
+LATER
 DONE
 REVIEW
 multiple Responsibilities
-parallel obligation-leg behavior where useful
+parallel obligation-leg behavior where material
 follow-up as a MY_TURN reason/action
 ```
 
-Do not recreate a canonical `FOLLOW_UP`, `DEFERRED`, or `ACTION_REQUIRED` lifecycle enum in UI fixtures.
+Scenario evidence and expected outcomes must be deterministic enough for a fair baseline-vs-Lunowa comparison. Do not let the implementation agent invent the experimental oracle.
 
-#### Compose/supporting surfaces
+#### Minimum interaction surface
 
-New message, From/To/Cc/Bcc/subject/body/attachments/formatting/autosave/minimize, search, person context, preview, menus, Scope/account, onboarding, settings, system states, responsive layouts.
+Implement only the surfaces needed to compare the wedge credibly:
 
-### Fixture constraint
+- a conventional baseline inbox condition using the same underlying synthetic evidence;
+- a Lunowa condition with the minimum list/conversation/Moment behavior needed by the accepted scenario oracle;
+- enough source/provenance/account identity to test trust and fairness;
+- desktop primary viewport plus only the compact sanity coverage required by the accepted experiment contract.
 
-Use domain-shaped fake fixtures through a repository/interface boundary. Fake state should reflect the **projection semantics** needed by UI while avoiding premature assumptions about final SQL schema.
+Do **not** require the full visual reference set or broad client completeness for this experiment.
 
-### Visual verification
+#### What is specifically deferred from this gate
 
-Run the real app, capture target viewports, compare hierarchy/component placement, and verify interactions separately from static screenshot matching.
+Unless a live accepted experiment contract requires it, do not make Phase 1B depend on:
 
-### Exit criteria
+- full compose feature completeness;
+- production search;
+- person-history/context product;
+- account onboarding/settings breadth;
+- attachment feature breadth beyond scenario evidence;
+- tablet/mobile pixel fidelity;
+- Gmail/Microsoft integration;
+- production persistence;
+- production AI;
+- real send.
 
-- canonical views are representable;
-- list→conversation and chip→Moment interactions are clear;
-- one primary Moment persists with multiple Responsibilities;
-- Review/safe-action behavior can be demonstrated;
-- compose/search/context/preview preserve context;
-- responsive behavior works;
-- no real provider/AI required.
+Existing visual references remain design direction; they are not a mandate to build all surfaces before wedge evidence.
 
-### Stop condition
+#### Measures this phase can support
 
-If real rendered interaction hierarchy is materially confusing, change design/spec before expensive integration.
+Examples:
+
+- time-to-next-meaningful-action/state;
+- navigation/decision count;
+- reread/reconstruction behavior;
+- immediate source rechecks;
+- state/safe-action correctness;
+- comprehension of Waiting/Later/Review;
+- provenance/account identity errors;
+- qualitative control/trust reactions after the timed task.
+
+#### What this phase cannot prove
+
+A single-session prototype cannot establish:
+
+- safe forgetting over days/weeks;
+- monitoring relinquishment;
+- longitudinal reliability;
+- switching/retention;
+- willingness to pay;
+- necessity of a full mail client.
+
+### 3.3 Phase 1C — Longitudinal monitoring-offload proof
+
+#### Goal
+
+Test the North-Star mechanism: whether a user actually stops parallel self-monitoring when Lunowa is responsible for bringing an unresolved loop back at the right time.
+
+#### Preferred scope
+
+Use the smallest real or concierge setup that can observe actual waiting periods without requiring broad client implementation.
+
+Possible candidate measures—not frozen metrics—include:
+
+- `N_self_check` before Lunowa resurfacing;
+- source-inbox fallback frequency;
+- parallel manual reminder/task creation;
+- correct resurfacing rate;
+- material false-negative rate;
+- unnecessary Review/resurfacing burden;
+- context-restoration time after waiting;
+- continued delegated monitoring across days/weeks.
+
+#### Exit / stop logic
+
+If users keep checking the original inbox “just in case,” the core offloading promise is not proven even if the immediate prototype is fast.
+
+If reliability can only be achieved by forcing large Review/notification burden, the wedge must be revised rather than hidden behind model accuracy metrics.
+
+### 3.4 Phase 1D — Credible client breadth only after evidence
+
+The broader full-client design may be implemented after the wedge and Product form justify it.
+
+Potential later surfaces include the existing 3-pane shell, compose/reply/search/context/preview/onboarding/settings/system states/responsive layouts from `docs/design/` and visual references `00`–`19`.
+
+Do not assume all are required if a companion/overlay or hybrid proves to be the better Product form.
 
 ---
 
@@ -174,7 +239,7 @@ If real rendered interaction hierarchy is materially confusing, change design/sp
 
 ### Goal
 
-Implement the **smallest physical model** that satisfies validated Responsibility semantics and core product ownership without building a generic workflow engine.
+Implement the **smallest physical model** that satisfies validated Responsibility semantics and core Product ownership without building a generic workflow engine.
 
 ### Current design/proof state
 
@@ -204,7 +269,7 @@ Before a production Responsibility migration is accepted:
 7. if executable evidence changes v0.4, update the canonical DDL design and rerun all affected tests;
 8. record an explicit L2 PASS/FREEZE decision before any production migration task.
 
-The L2 spike may run before Phase-1 UI completion because it is an isolated falsification experiment. **Production persistence activation remains a separate implementation decision and must not silently reorder the product sequence.**
+The L2 spike may run before Phase-1 Product evidence because it is an isolated falsification experiment. **Production persistence activation remains a separate Product/implementation decision and must not silently reorder the evidence sequence.**
 
 ### Minimum broader entities when production persistence activates
 
@@ -299,7 +364,7 @@ Do not create/accept production migrations if:
 
 ### Goal
 
-Prove one real mailbox can authorize, sync, normalize, persist evidence, and render through Lunowa without AI/write breadth.
+Prove one real mailbox can authorize, sync, normalize, persist evidence, and render through Lunowa without AI/write breadth **after Product evidence justifies a real-inbox path**.
 
 ### Required behavior
 
@@ -336,9 +401,9 @@ A real Gmail mailbox can be read through normalized evidence/domain boundaries w
 
 ### Goal
 
-Make Lunowa a credible minimal client for one provider.
+Provide real compose/send only when the chosen Product form requires Lunowa to own that client behavior.
 
-### Required behavior
+### Required behavior when this phase is authorized
 
 - compose/reply/reply-all/forward;
 - explicit sender account;
@@ -362,6 +427,8 @@ Even reconciled acceptance closes a Responsibility only when sending is sufficie
 Undo Send uses real pre-provider delay semantics. Send Later reuses durable scheduling principles rather than creating a second unreliable scheduler.
 
 ### Exit criteria
+
+If a client/hybrid form is selected:
 
 ```text
 read -> compose/reply -> attach -> send -> reconcile result
@@ -431,7 +498,7 @@ Do not activate AI-powered automatic attention/hiding before deterministic reduc
 
 ### Goal
 
-Reduce interpretation burden without giving the model state/authorization authority.
+Reduce interpretation/monitoring burden without giving the model state/authorization authority.
 
 ### Required work
 
@@ -491,13 +558,13 @@ Initial rollout remains conservative:
 
 ### Exit criteria
 
-AI measurably reduces interpretation burden on canonical + holdout cases without violating critical forbidden outcomes, and core mail remains usable with AI disabled.
+AI measurably reduces interpretation/monitoring burden on canonical + holdout cases without violating critical forbidden outcomes, and core mail remains usable with AI disabled.
 
 ---
 
 ## 9. Phase 7 — Search/context quality
 
-Start with lexical/full-text authorized search across Conversation/Message/Person/File and exact source jump/highlight.
+Start with lexical/full-text authorized search across Conversation/Message/Person/File and exact source jump/highlight **only when real usage shows it is required by the selected Product form**.
 
 Default current Scope; explicit All broadening.
 
@@ -509,16 +576,16 @@ Person Context uses participant identity, recent Conversations, active/live Resp
 
 ## 10. Phase 8 — Microsoft/Outlook adapter
 
-Goal: prove provider boundary without rewriting domain/UI.
+Goal: prove provider boundary without rewriting domain/UI once second-provider demand is justified.
 
-Required:
+Required when authorized:
 
 - current official Microsoft authorization;
 - normalization to existing contracts;
-- sync/read/send/reply/attachments for supported v1 behavior;
+- sync/read/send/reply/attachments for supported behavior;
 - reconnect/failure semantics;
 - capability differences behind adapter boundary;
-- mixed Gmail + Outlook accounts/Scopes;
+- mixed Gmail + Outlook accounts/Scopes if Product evidence requires them;
 - explicit sender-account safety;
 - cross-account semantic lookalikes remain separate Responsibilities initially.
 
@@ -528,7 +595,7 @@ Success: mostly adapter/provider-contract work, not duplicate Responsibility/sea
 
 ## 11. Phase 9 — Beta hardening
 
-Required categories:
+Required categories, to the extent activated by the accepted Product form:
 
 - OAuth/token/storage security;
 - account deletion/removal;
@@ -541,21 +608,25 @@ Required categories:
 - cost/usage bounds;
 - privacy/retention;
 - responsive/browser/accessibility verification;
-- analytics for product hypotheses;
+- analytics for Product hypotheses;
 - incident-safe disable/degraded mode for AI/automation.
 
-Candidate product measures:
+Candidate Product measures:
 
-- Attention Recall Rate;
-- Unnecessary Attention Rate;
-- Re-check Rate;
-- manual memory actions;
-- processing time + correctness;
-- source/original-view rate;
+- `N_self_check` / Re-check Rate;
+- source-inbox fallback;
+- parallel manual memory/reminder actions;
+- correct resurfacing rate and latency;
+- false-negative material obligation rate;
+- unnecessary Attention/Review rate;
+- context-restoration time + correctness;
 - correction/undo rate;
 - missed communication rate;
 - Temporal Contract success/latency;
+- delegated-monitoring retention/reliance across days/weeks;
 - Communication Management Burden per completed outcome where measurable.
+
+Do not optimize DAU/open frequency at the expense of the North Star; a successful offloading Product may intentionally reduce unnecessary opens.
 
 ---
 
@@ -573,7 +644,8 @@ Do not let these delay core validation:
 - advanced analytics dashboard;
 - team/shared mailbox collaboration without demand;
 - custom search infrastructure before need;
-- full provider parity.
+- full provider parity;
+- full-client surface completeness before client form is justified.
 
 ---
 
@@ -585,7 +657,7 @@ Each non-trivial slice should specify:
 
 - Goal / Why;
 - current Source of Truth;
-- exact relevant visual refs;
+- exact relevant visual refs only when required by the slice;
 - Scope / Non-goals;
 - invariants;
 - reuse requirements;
@@ -612,30 +684,8 @@ Complex/high-risk tasks should use the Issue-driven handoff plus a repository-lo
 
 A phase is not complete because code exists/build passes/tests are green.
 
-Exercise intended behavior with the required combination of browser/runtime inspection, screenshot comparison, unit/domain tests, integration/provider tests, failure injection, accessibility checks, persisted-state/log inspection, and database/concurrency proof where applicable.
+Exercise intended behavior with the required combination of Product evidence, browser/runtime inspection, screenshot comparison, unit/domain tests, integration/provider tests, failure injection, accessibility checks, persisted-state/log inspection, and database/concurrency proof where applicable.
 
 Never claim provider/scheduler/send/security/database behavior verified when only mocked.
 
----
-
-## 15. Current next work
-
-### Product implementation
-
-The first product slice remains:
-
-> implement the canonical `00`–`02` desktop shell using fake domain-shaped data with `row body -> 会話` and `status/projection chip -> 今の要点`, then implement the projection-specific Moment visuals before real mailbox/AI integration.
-
-When `03`–`08` images are used, translate their legacy filenames into current projections using `docs/design/references/README.md`.
-
-### Parallel bounded technical proof
-
-The currently authorized persistence work is **not production Phase-2 implementation**. It is the bounded L2 falsification sequence:
-
-```text
-Issue #13 PostgreSQL/Drizzle executable proof
-Issue #14 Better Auth UUID proof
-Issue #15 independent combined review/freeze decision
-```
-
-Do not proceed from these spikes directly into migrations without a separate post-PASS task.
+Never claim safe forgetting / monitoring relinquishment verified from a single-session fake-data usability result.

@@ -1,209 +1,317 @@
 # Current Project Checkpoint
 
-This is a compact, mutable bootstrap checkpoint. It is not a product, design, architecture, decision, or live-execution source of truth. Summarize only decision-relevant state and link to canonical sources; query GitHub for live Issue/PR/review/CI state.
+This is a compact, mutable bootstrap checkpoint. It is not a Product, design, architecture, decision, or live-execution source of truth. Summarize only decision-relevant state and link to canonical sources; query GitHub for live Issue/PR/review/CI state.
 
 ## Checkpoint metadata
 
 - Last reconciled: `2026-08-26`
-- Repository base before the current Product-thesis candidate: default `main` at `770d3dc8a80efe68a3b8e3d0a72ebd1763e5478b`.
+- Accepted Product baseline before this checkpoint update: `main` includes PR #35 (`f67c1c342066416cd754e761374773c2585b84e5`).
 - Continuity schema version: `0.1`
-- Fresh-session Bootstrap Evaluation v0.1: **PASS WITH NON-BLOCKING FINDINGS**; durable evaluation evidence is in Issue #25.
-- Live GitHub state must be re-queried whenever task/review/CI state matters; this checkpoint may lag live execution.
+- Fresh-session Bootstrap Evaluation v0.1: **PASS WITH NON-BLOCKING FINDINGS**; detailed evidence remains in Issue #25.
+- Live GitHub state must be re-queried whenever task/review/CI state matters.
 
 ## Current phase
 
-- Phase 0 application/runtime/verification foundation is mechanically established.
-- Phase 1 **high-fidelity fake-data Product-learning slice** remains materially unimplemented; the current application route is bootstrap-level rather than the intended Lunowa Product.
-- Responsibility semantics/persistence design is ahead of Product implementation: L0/L1 are frozen baselines; exact L2 v0.4 is static-review complete; L2 executable proof is pending; L2 final freeze is blocked; L3 migrations/runtime remain unauthorized.
-- Product reasoning has now been reassessed against current 2026 external evidence. The strongest current Product hypothesis is **Open-loop Monitoring Offload**: Lunowa should try to let users stop manually monitoring unresolved communication until attention is genuinely needed again.
-- Responsibility / Temporal Contract / Moment remain candidate mechanisms for delivering that outcome; they are not the reason the Product exists.
+- Phase 0 runtime/verification foundation is mechanically established.
+- The real Lunowa Product UI remains materially unimplemented; the current application route is bootstrap-level.
+- Product learning now precedes broad client/provider/AI/database implementation.
+- Responsibility semantics/persistence design remains ahead of Product evidence: L0/L1 are frozen baselines; exact L2 v0.4 is static-review complete; executable proof is pending; final L2 freeze is blocked; L3 migrations/runtime remain unauthorized.
+- The strongest current Product problem/wedge hypothesis remains **Open-loop Monitoring Offload**.
+- Responsibility / Temporal Contract / Moment remain candidate mechanisms beneath that Product outcome, not the reason the Product exists.
 
-Primary phase/sequence authority: `docs/product/IMPLEMENTATION-PLAN.md`. Product intent/validation authority: `docs/product/PRODUCT.md`.
+Primary Product authority: `docs/product/PRODUCT.md`.
+Primary Product evidence reviews:
 
-## Active Product learning
+- `docs/product/research/communication-monitoring-evidence-2026-08.md`;
+- `docs/product/research/product-frontier-and-icp-evidence-2026-08-26.md`.
 
-### Highest-level Product unknown
+Implementation/evidence sequence authority: `docs/product/IMPLEMENTATION-PLAN.md`.
 
-Current strongest unresolved question:
+---
 
-> **Is communication monitoring painful and frequent enough for a specific reachable segment that they will delegate it to Lunowa, and can Lunowa earn enough trust that they actually stop re-checking?**
+## Highest Product priority — Issue #36
 
-Current Product evidence supports the plausibility of communication/task-monitoring burden and trusted cognitive offloading, but does **not** establish Lunowa ICP, demand, switching, longitudinal reliance, willingness to pay, or product-market fit.
+GitHub **Issue #36 — `[Product Discovery]: Validate the first ICP and real communication-monitoring burden`** is the current highest-priority Product-learning gate.
 
-### Issue #26 — comparative mechanism validation
+Current highest-level question:
 
-Issue #26 remains an important Product-learning contract for a **comparative high-fidelity fake-data prototype experiment**.
+> **Does a specific reachable self-managing asynchronous segment have enough currently under-served communication-monitoring burden, and can Lunowa plausibly beat that segment's real tools/workarounds on reliable delegated state continuity enough that users would actually stop checking for themselves?**
 
-Its proper interpretation is narrower than the whole Product thesis:
+Issue #36 must establish the **problem/segment**, using recent real-workflow evidence, before write-heavy prototype implementation is treated as the next Product-critical action.
 
-- it can test immediate reconstruction/decision work, projection comprehension, provenance/trust cues, and Responsibility/Moment comparative behavior;
-- it cannot by itself prove safe forgetting, monitoring relinquishment, days/weeks reliance, switching, retention, or willingness to pay.
+### Current recruitment prior — not accepted ICP
 
-Do not close or interpret #26 as Product-thesis validation merely because a prototype performs well in a single session.
+Prefer workflow characteristics over titles:
 
-### Product-discovery lane — problem/ICP evidence
+- communicates tasks/commitments materially through email;
+- creates tasks/reminders from email or repeatedly rechecks mail to preserve state;
+- substantial asynchronous work;
+- personally tracks work rather than routinely delegating it;
+- multiple unresolved loops;
+- external/interpersonal waiting where relevant;
+- meaningful delay/miss cost;
+- current system does not already close the heterogeneous loop adequately;
+- adoption autonomy.
 
-Before freezing an ICP or broadening implementation, collect recent real-workflow evidence around:
+A first cohort candidate is independent / small-firm B2B professionals who personally handle multiple clients/counterparties. This remains a **recruitment hypothesis**, not ICP truth.
 
-- number and kind of simultaneous communication open loops;
-- other-person/external dependency;
-- waiting duration;
-- repeated Inbox/Sent/thread self-checking;
-- manual flags/snooze/task/calendar/note workarounds;
-- consequence of missed/late follow-up;
-- whether an existing CRM/ATS/ticketing/project system already solves the tracking problem.
+---
 
-The cheapest current evidence is recent-event workflow observation/interview. This can proceed without provider/auth/database/AI implementation.
+## Competitive-frontier correction — 2026-08-26
 
-### Longitudinal lane — safe forgetting / monitoring relinquishment
+Current Product reasoning must **not** assume differentiation from any one of:
 
-If the immediate mechanism remains credible, a later real or concierge longitudinal experiment must test whether users actually reduce parallel checking across waiting periods.
-
-Candidate—not frozen—measures include `N_self_check`, source-inbox fallback, parallel manual reminders, correct resurfacing, false-negative burden, Review burden, and continued delegated monitoring.
-
-## Current differentiation boundary
-
-Do **not** assume defensible differentiation from any one of:
-
-- unified inbox / multiple accounts;
+- unified inbox / multi-account;
 - AI summary/drafting/search;
 - task/due-date extraction;
-- `My Turn` / `Respond`;
-- `Waiting`;
-- no-reply reminders;
-- Snooze/Later;
-- Done/archive.
+- priority classification;
+- `My Turn` / `Respond` / `Waiting`;
+- no-reply tracking / follow-up reminders/drafts;
+- Snooze/Later/Done;
+- commitment extraction;
+- owner/waiting-on state;
+- `reply != expected outcome satisfied`;
+- stateful longitudinal tracking as a concept;
+- multiple actions/commitments per thread;
+- companion/overlay form factor.
 
-Current 2026 competitors already cover substantial portions of those behaviors.
+Current competitors/products already implement or claim substantial parts of that frontier, including Gmail, Superhuman, Fyxer, SaneBox, Quell, Pendingly, and newer outcome/commitment-tracking products. Vendor claims are frontier evidence, **not proof of quality/traction**.
 
-The stronger current **HYPOTHESIS** is stateful, longitudinal communication-loop management: track the unresolved outcome/obligation across messages and time, distinguish a reply from actual satisfaction of the awaited outcome, resurface on meaningful state/time/event conditions, and restore minimal context when attention returns.
+### Current differentiation standard
 
-Cross-account/provider support may amplify value for some users but is not the current wedge.
+Differentiation is now treated as an **empirical comparative outcome**, not feature/ontology novelty.
+
+A plausible success regime requires the combined system to produce, versus the user's real current workflow:
+
+```text
+less parallel self-checking
++ less reconstruction
++ correct resurfacing
++ acceptably low material false negatives
++ acceptably low unnecessary Review/resurfacing burden
++ preserved source/provenance/control
++ enough recurring value to justify trust/switching/dependency
+```
+
+No threshold is frozen yet.
+
+---
+
+## Current evidence relevant to Product strategy
+
+### Japanese market context
+
+Current 2026 Japanese business-email evidence supports that email remains widely used and frequently checked, but does not prove Lunowa's target ICP/problem.
+
+### Generic AI efficiency
+
+A large randomized field experiment shows integrated generative AI can already reduce email time materially. Therefore generic `make email faster` is not sufficient differentiation.
+
+### Workstyle prior
+
+A small 2024 CSCW Microsoft study associates positive use of AI-powered email reminders with communicating tasks via email, creating tasks from email, fewer scheduled meetings, and less delegation. Use this only as a directional recruitment prior.
+
+### Human offloading mechanism
+
+Current prospective-memory research supports the plausibility that trusted/reliable reminders can reduce internal intention maintenance. This supports the North Star mechanism, not Lunowa demand.
+
+### LLM prospective-memory warning
+
+Current 2026 benchmarks/preprints show prospective memory remains difficult for LLM agents. Do not assume the model alone can safely remember future conditions. Durable state/trigger/reconciliation remains a trust requirement, not a differentiation claim.
+
+---
+
+## Existing Product-learning lane reinterpretation
+
+### Issue #26 — downstream mechanism validation
+
+Issue #26 remains useful, but its scope is now explicitly narrower than the highest Product question.
+
+It can test:
+
+- immediate Responsibility/Moment reconstruction/decision burden;
+- projection comprehension;
+- one-primary-Moment interaction;
+- provenance/control;
+- immediate source rechecking;
+- multiple-Responsibility complexity.
+
+It cannot establish:
+
+- ICP/problem severity;
+- monitoring relinquishment across real waiting periods;
+- market differentiation against actual incumbent tools;
+- switching/retention/WTP.
+
+The conventional inbox condition remains useful as a controlled baseline. Market comparison later must also account for the participant's actual current workflow/products.
+
+### Issue #28 — write-heavy prototype implementation
+
+Issue #28 should **not resume merely because its UI/specification lane becomes mechanically ready**.
+
+Before write-heavy implementation is treated as Product-supported:
+
+1. Issue #36 must produce a disposition that preserves a coherent real problem/segment;
+2. the Issue #26 mechanism contract must be reconciled with that discovery result where needed;
+3. existing scenario/specification/harness/review gates must still pass.
+
+### Issue #32 / PR #34 — scenario-oracle specification
+
+Issue #32 / PR #34 may continue as bounded, reversible specification work.
+
+They are **not Product critical path** and do not authorize Issue #28 implementation.
+
+PR #34 was created from an older pre-PR-35 main and must not be merged/used as current Product authority without:
+
+- resolving its existing independent-review blocker(s);
+- reconciling it against current Product authority / Issue #36 / updated Issue #26 if those change scenario or baseline meaning;
+- refreshing exact-head/base evidence.
+
+Do not discard the oracle work merely because Product priority changed; preserve useful deterministic experiment specification while refusing stale authority.
+
+---
+
+## Longitudinal Product gate
+
+If Issue #36 preserves a real problem and the immediate mechanism remains credible, run the smallest real or concierge longitudinal experiment capable of testing:
+
+- `N_self_check` before resurfacing;
+- source-inbox fallback;
+- parallel reminder/task creation;
+- correct resurfacing;
+- material false-negative burden;
+- unnecessary Review/resurfacing burden;
+- context-restoration cost;
+- continued delegated monitoring across days/weeks.
+
+A single-session fake-data prototype cannot prove the North Star.
+
+---
 
 ## Product form-factor status
 
-A full email client is **not considered validated Product truth**.
+A full email client is **not validated Product truth**.
 
-Current design and engineering may continue to explore a responsive web client, but Product form remains open among:
+Current Product form remains open among:
 
 - full client;
-- companion/overlay working with existing Gmail/Outlook;
+- companion/overlay inside/alongside existing Gmail/Outlook;
 - hybrid.
 
-This is material because current competitors can provide meaningful automation directly inside Gmail/Outlook, lowering their replacement switching cost.
+Current engineering remains responsive web-first unless Product/distribution evidence changes it.
 
-## Other active workstreams
+Existing full-client design references remain design direction, not an implementation mandate before wedge evidence.
+
+---
+
+## Product blockers / unknowns
+
+- exact early ICP / segment priority;
+- frequency/severity of repeated open-loop monitoring in that segment;
+- current tool/workaround adequacy;
+- whether the independent/small-firm B2B recruitment prior survives real-workflow evidence;
+- whether Responsibility/Moment improves immediate burden on representative cases;
+- whether users actually reduce self-checking over real waiting periods;
+- attainable reliability / trust threshold;
+- false-negative versus Review/resurfacing trade-off;
+- whether Lunowa beats actual current alternatives rather than a plain inbox only;
+- whether Responsibility is the simplest adequate internal model;
+- full client vs companion/hybrid;
+- cross-account incremental value;
+- willingness to pay / price / package;
+- distribution/acquisition;
+- retention/reliance after novelty.
+
+## Technical blockers
+
+- Responsibility L2 final freeze requires executable evidence from #13 + #14 and independent #15 review.
+- L3 production migrations/runtime remain unauthorized until a separate post-L2 decision.
+
+Technical proof must not be misclassified as Product validation.
+
+---
+
+## Other workstreams
 
 ### Blueprint ↔ Lunowa reconciliation — Issue #21
 
-Issue #21 remains engineering-baseline maintenance, not a reason to block Product learning. `docs/continuity/BLUEPRINT-ADOPTION.md` remains the adoption-metadata authority. Do not infer “latest Blueprint = current Lunowa policy” before the issue is completed.
+Engineering-baseline maintenance only. It must not block Product discovery.
 
-### Responsibility L2 executable proof — Issues #13 / #14 / #15
+### Responsibility L2 proof — Issues #13 / #14 / #15
 
-- #13: real PostgreSQL 18 / Drizzle executable acceptance proof for the non-auth matrix.
-- #14: Better Auth → PostgreSQL UUID persistence proof for acceptance IDs 47–49.
-- #15: independent combined review; only this step may decide L2 PASS/FREEZE vs FAIL/REVISE after #13/#14 evidence exists.
+Independent technical-evidence lane. May proceed when capacity/isolation requirements are met.
 
-Issue #16 is completed on default `main`. When the L2 proof lane resumes, use fresh intended-main workspaces and current isolation/preflight rules.
-
-### Continuity maintenance — Issue #25
-
-Issue #25 records the first Fresh-session Bootstrap Evaluation and the post-#22 checkpoint reconciliation. Continuity is not a critical-path Product blocker unless a concrete reconstruction/drift failure appears.
-
-### Legacy open candidates
+### Legacy candidates
 
 Open does not imply current authority:
 
-- PR #5 / Issue #6 — **DEFERRED HARDENING**;
-- PR #7 — **NEEDS RECONCILIATION**;
-- PR #8 — **NEEDS RECONCILIATION**.
+- PR #5 / Issue #6 — deferred hardening;
+- PR #7 — needs reconciliation;
+- PR #8 — needs reconciliation;
+- Issue #12 — old broad Phase-1 shell path remains on hold/superseded by evidence-first Product sequencing.
 
-## Current blockers / dependencies
+---
 
-### Product blockers / unknowns
+## Current supersessions — do not regress
 
-- exact early ICP / segment priority;
-- frequency/severity of communication monitoring and current workaround adequacy;
-- whether Responsibility/Moment improves immediate reconstruction/decision work versus current workflows;
-- whether Lunowa can cause actual reduction in self-checking across real waiting periods;
-- whether reliability/trust can be high enough without creating a large Review/resurfacing burden;
-- whether stateful longitudinal loop management is materially better than Gmail/Superhuman/Shortwave/Spark/current user workflows;
-- whether the differentiated gain overcomes replacement switching cost and delegation/trust cost;
-- whether a full client is needed at all;
-- willingness to pay / price / package;
-- reachable distribution / acquisition efficiency;
-- retention/reliance after novelty.
+- `ActionItem` / message-level task framing -> `Responsibility`.
+- monolithic lifecycle -> orthogonal state + deterministic projections.
+- follow-up lifecycle -> action/reason after trigger.
+- Ask-AI/chat-first routine workflow -> system-led intelligence.
+- native-mobile-first -> responsive-web-first engineering direction.
+- provider/AI-first implementation -> Product evidence first.
+- plain multi-account as differentiation -> table stakes / possible multiplier only.
+- Responsibility-centered Product story -> monitoring-offload-centered Product story.
+- full-client shape as Product truth -> form remains open.
+- **stateful/outcome-aware/commitment tracking as presumed differentiation -> empirical comparative differentiation only.**
+- **generic knowledge-worker ICP -> behavior-based recruitment prior; exact ICP still unknown.**
 
-### Technical blockers
+---
 
-- Responsibility L2 final freeze requires executable evidence from #13 + #14 and independent #15 review.
-- L3 Responsibility production migrations/runtime remain unauthorized until a separate post-L2-PASS implementation decision.
+## Next recommended actions
 
-## Decisions currently pending
+Use the smallest experiment that can falsify the highest-impact assumption.
 
-- Product evidence: exact early ICP/segment priority and problem severity.
-- Product wedge: whether Open-loop Monitoring Offload causes meaningful behavioral offloading in real workflows.
-- Product mechanism: whether current Responsibility / Temporal Contract / Moment model is the simplest trustworthy way to deliver the wedge.
-- Product differentiation: whether stateful longitudinal communication-loop management is materially better than existing workflows/products.
-- Product switching/trust: whether users reduce parallel checking enough to justify reliance.
-- Product form: full client vs companion/overlay vs hybrid.
-- Commercial evidence: willingness to pay/pricing/package, distribution, acquisition efficiency.
-- Product UX: automation/control balance; Review prominence; resurfacing/notification policy; historical activation policy.
-- Platform/product: whether/when native mobile becomes necessary beyond responsive web-first implementation.
-- Responsibility persistence: L2 PASS/FREEZE vs FAIL/REVISE after #13/#14/#15.
-- Engineering baseline: Blueprint classifications/adoptions through #21.
+1. **Issue #36 — highest Product priority:** recent-event real-workflow discovery for ICP/problem severity and current-workaround adequacy.
+2. **Mechanism preparation:** Issue #32 / PR #34 may continue only as bounded reversible spec work, subject to current Product reconciliation; do not let it displace #36.
+3. **Issue #26:** reconcile/run the comparative Responsibility/Moment mechanism test only after discovery supports a coherent target problem.
+4. **Issue #28:** keep write-heavy implementation blocked until the Product-discovery and existing spec/harness gates support it.
+5. **Longitudinal:** if mechanism remains credible, test real delegated monitoring over days/weeks.
+6. **Implementation breadth:** provider/auth/database/AI/client breadth follows Product evidence.
 
-## Current supersessions that must not regress
+For review handoff, `agent:review-ready` means **ready to inspect, never PASS**. Reviewer disposition must be durable before integration decisions.
 
-- `ActionItem` / message-level task framing → canonical `Responsibility` model.
-- single monolithic lifecycle enum → orthogonal Responsibility state with deterministic projections.
-- follow-up as lifecycle species → action/reason after appropriate trigger.
-- Ask-AI/chat-first routine workflow → system-led intelligence.
-- native-mobile/React-Native-first exploration → current responsive web-first engineering path.
-- Gmail/provider/AI-first implementation → Product-learning before integration breadth.
-- plain multi-account aggregation as differentiation → table stakes / possible multiplier only.
-- **Responsibility-centered Product story → monitoring-offload-centered Product story.** Responsibility/Moment remain candidate mechanisms beneath the Product outcome.
-- full-client shape as implicit Product truth → Product form remains open until switching/value evidence justifies it.
+---
 
-## Next recommended Product actions
-
-Use the smallest experiment that can falsify the highest-impact unresolved Product assumption.
-
-1. **Problem/ICP lane:** collect recent-event workflow evidence for communication open-loop monitoring burden and current workaround adequacy.
-2. **Mechanism lane:** continue Issue #26 / its scenario-oracle gate as the bounded comparative test of immediate Responsibility/Moment value; do not treat it as longitudinal North-Star proof.
-3. **Longitudinal lane:** only after a credible immediate mechanism exists, test real/concierge monitored loops over days/weeks and measure self-check reduction/reliance.
-4. **Implementation breadth:** provider/auth/database/AI/client breadth follows Product evidence rather than substituting for it.
-5. **Engineering lanes:** Issue #21 and Responsibility #13/#14/#15 may proceed independently when capacity permits; technical PASS is not Product validation.
-
-For review handoff, `agent:review-ready` means **ready to inspect, never PASS**. Reviewer disposition must be recorded durably before queue clearing; merge remains explicitly authorized by the acting reviewer/maintainer.
-
-## Deep links to canonical sources
+## Deep links
 
 ### Product / research / UX
 
 - `docs/product/PRODUCT.md` — highest-level Product contract.
-- `docs/product/research/communication-monitoring-evidence-2026-08.md` — dated evidence review; evidence artifact, not Product truth by itself.
-- `docs/design/DESIGN.md` — accepted detailed design model.
-- `docs/design/INTERACTIONS.md` — interaction semantics and flows.
-- `docs/design/RESPONSIVE.md` — responsive/pane behavior.
-- GitHub Issue #26 — comparative mechanism-validation experiment; query live.
+- `docs/product/research/communication-monitoring-evidence-2026-08.md` — first monitoring evidence review.
+- `docs/product/research/product-frontier-and-icp-evidence-2026-08-26.md` — current frontier/ICP correction.
+- `docs/product/IMPLEMENTATION-PLAN.md` — evidence/implementation sequence.
+- `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` — detailed UX.
+- Issue #36 — current Problem/ICP discovery authority; query live.
+- Issue #26 — downstream mechanism experiment; query live.
+- Issue #28 — downstream prototype implementation; query live.
+- Issue #32 / PR #34 — scenario oracle lane; query live.
 
-### Responsibility / data / architecture
+### Responsibility / architecture
 
-- `docs/product/responsibility/README.md` — authoritative Responsibility freeze/proof status and semantic routing.
-- `docs/product/responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact current L2 candidate.
-- `docs/product/responsibility/L2-EXECUTABLE-PROOF-GATE.md` — evidence gate before final L2 freeze.
-- `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md`, `TECH-STACK.md`, `IMPLEMENTATION-PLAN.md`.
-- GitHub Issues #13/#14/#15 — L2 executable proof/final-review chain; query live.
+- `docs/product/responsibility/README.md` — Responsibility authority/proof routing.
+- `docs/product/responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact L2 candidate.
+- `docs/product/responsibility/L2-EXECUTABLE-PROOF-GATE.md` — L2 evidence gate.
+- `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md`, `TECH-STACK.md`.
+- Issues #13/#14/#15 — technical proof chain; query live.
 
-### Continuity / engineering baseline / live work
+### Continuity / engineering
 
-- `docs/continuity/README.md` — continuity operating contract.
-- `docs/continuity/KNOWLEDGE-MAP.md` — question → authority routing.
-- `docs/continuity/BLUEPRINT-ADOPTION.md` — Blueprint adoption metadata; consult live Issue #21.
-- GitHub Issue #25 — Fresh-session Bootstrap Evaluation evidence.
-- GitHub Issue #21 — Blueprint reconciliation; query live.
+- `docs/continuity/README.md` — continuity contract.
+- `docs/continuity/KNOWLEDGE-MAP.md` — question -> authority routing.
+- `docs/continuity/BLUEPRINT-ADOPTION.md` — Blueprint adoption metadata.
+- Issue #21 — Blueprint reconciliation; query live.
 
 ## Update lifecycle
 
-Revise this checkpoint only after canonical knowledge and live evidence have been reconciled. If it conflicts with a canonical source, actual code/test/runtime evidence, or live GitHub state, the authoritative/current source wins and this checkpoint must be repaired when appropriate. Keep detailed evaluation/task history in its owning Issue/PR rather than turning this file into a changelog or knowledge dump.
+If this checkpoint conflicts with canonical Product/design/domain sources, executable evidence, or live GitHub task state, the authoritative/current source wins. Repair this router rather than treating stale checkpoint prose as authority.

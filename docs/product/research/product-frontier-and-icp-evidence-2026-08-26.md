@@ -111,14 +111,22 @@ Additional Lunowa-specific candidate characteristics remain:
 
 ## 6. Independent / small-firm B2B professionals as a recruitment prior
 
-Current freelance-market evidence supports adoption autonomy and multiple client/counterparty relationships, but does not directly prove Lunowa's email-monitoring problem.
+**EXTERNAL EVIDENCE / LIMITED:** The Freelance Association Japan's `Freelance White Paper 2026` survey (`n=1,426`) reports that only `19.9%` of respondents had one client/counterparty, while `33.1%` had 2–3, `21.9%` had 4–5, and additional respondents reported larger counts. Its published summary also identifies work-style discretion / career autonomy and flexibility as major reasons people choose freelance/parallel careers.
 
-**PRODUCT HYPOTHESIS:** Independent consultants, fractional specialists, solo professional-service providers, and small client-service operators are reasonable first recruitment candidates because they may combine:
+Sources:
+- https://blog.freelance-jp.org/wp-content/uploads/2026/06/FreelanceSurvey2026-3.pdf
+- https://blog.freelance-jp.org/20260609-25645/
+
+**CRITICAL LIMITATION:** this evidence supports that many respondents manage multiple counterpart/client relationships and that autonomy is salient to the work style. It does **not** establish that they use email for those relationships, that they have Lunowa's monitoring burden, that they personally control software procurement/adoption, or that they would pay for Lunowa.
+
+**PRODUCT HYPOTHESIS:** Independent consultants, fractional specialists, solo professional-service providers, and small client-service operators are reasonable first recruitment candidates because they **may** combine:
 
 - multiple counterpart/client relationships;
 - personal responsibility for follow-through;
 - heterogeneous work that does not map cleanly into one CRM/ATS/ticket workflow;
-- relatively high autonomy to try a companion or alternate mail workflow.
+- relatively high adoption autonomy compared with employees constrained by organization-wide tooling.
+
+The last three bullets are hypotheses to test during discovery, not claims established by the freelance survey.
 
 This remains a **recruitment prior**, not an accepted ICP.
 
@@ -326,6 +334,7 @@ This is deliberately harder than:
 
 - Japanese association survey: strong current contextual evidence, not a representative causal study of Lunowa's target users.
 - Microsoft CSCW reminder study: peer-reviewed but small, Microsoft-only, self-assessment; use as recruitment prior only.
+- Freelance Association survey: current evidence of respondent client counts and work-style context, not direct email-monitoring or software-adoption evidence.
 - GenAI field experiment: randomized and large, but tests integrated general-purpose AI rather than Lunowa/open-loop delegation specifically.
 - Prospective-memory cognitive study: laboratory mechanism evidence, not professional email Product validation.
 - TriggerBench / PM-Bench: current preprint/benchmark evidence, not production reliability estimates.

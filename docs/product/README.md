@@ -2,104 +2,89 @@
 
 ## Status
 
-This directory contains Lunowa-specific durable product and product-engineering knowledge.
+This directory contains Lunowa-specific durable Product and Product-engineering knowledge.
 
-It complements the reusable engineering baseline in `docs/*.md` and the visual/interaction design sources in `docs/design/`.
-
-Do not treat raw chat history as product source of truth when a current repository artifact exists.
+Do not treat raw chat history, an open PR, or a generated visual as Product authority when a current accepted repository artifact exists. Live Issue/PR/CI state must be re-queried when execution/review status matters.
 
 ---
 
-## Documents
+## Authority map
 
-### `PRODUCT.md`
+### `PRODUCT.md` — Product intent authority
 
-Current product-level intent and validation boundary:
+Owns:
 
-- vision / North Star;
-- Communication Management Burden and product problem;
-- accepted product principles;
-- current user/ICP hypotheses and explicit validation gaps;
-- core jobs to be done;
-- system-led/invisible-AI experience thesis;
+- Vision / North Star;
+- current **Attention Delegation** Product thesis;
+- evidence-backed problem framing and current WHO hypothesis;
+- initial wedge / Golden Flow;
 - differentiation vs table stakes;
-- v1 direction / non-goals;
-- MVP/validation logic;
-- candidate success metrics;
-- monetization/distribution status;
-- important supersessions and deferred exploratory directions.
+- switching/trust/form-factor reasoning;
+- KEEP / CHANGE / DEFER / remove-from-differentiation scope classification;
+- Product-validation evidence ladder;
+- candidate metrics including longitudinal self-check/reliance signals;
+- monetization/distribution/retention unknowns;
+- important supersessions/refinements.
 
-This is the primary authority for **what product Lunowa is trying to become and which market/product claims remain hypotheses**. Detailed interaction behavior remains in `docs/design/`; Responsibility semantics remain in `responsibility/`.
+It distinguishes accepted internal direction from external evidence, inference, hypothesis, and unknowns.
+
+### `research/` — external evidence inputs
+
+Research is **not Product authority by itself**. It preserves primary/peer-reviewed/current-market evidence used to challenge and update `PRODUCT.md`.
+
+Current research artifacts:
+
+- `research/COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md` — communication monitoring, cognitive offloading, trust/reliability, WHO/wedge/validation evidence;
+- `research/CURRENT-COMPETITOR-CONVERGENCE-2026-08.md` — Gmail, Outlook, Superhuman, Shortwave, Spark, HEY, Front, Salesforce, HubSpot, form-factor and fast-convergence audit;
+- `research/README.md` — evidence/authority rules.
+
+Before making an external differentiation claim, re-check current competitor primary sources. Feature absence in an old research artifact is not durable evidence of absence.
+
+### `IMPLEMENTATION-PLAN.md` — living execution sequence
+
+Owns the current ordering from Product-learning gates into later technical/product slices.
+
+Current sequence is **not** “finish a credible mail client before learning.” The active path is:
+
+```text
+mechanical foundation
+  -> bounded comparative Responsibility/Moment mechanism experiment
+  -> real workflow / longitudinal Attention Delegation evidence
+  -> smallest real-provider slice required by stronger evidence
+  -> reliable state/reconsideration/reconciliation
+  -> AI/runtime behavior only behind accepted Product/domain evidence
+  -> evidence-supported send/search/provider/client breadth
+```
+
+The separate Responsibility L2 proof lane may proceed as bounded technical risk retirement but does not authorize production persistence or prove Product value.
 
 ### `ARCHITECTURE.md`
 
-Current product-specific architecture:
-
-- modular-monolith default;
-- module ownership;
-- provider boundaries;
-- sync/async architecture;
-- Responsibility/domain authority;
-- AI boundary;
-- Temporal Contract reliability;
-- send/search/security/failure architecture;
-- architectural invariants.
-
-The Responsibility-related architecture is reconciled to v0.1 semantics.
+Owns Product-specific architecture and module boundaries, including provider, Responsibility/domain authority, AI, Temporal Contract, send/search/security/failure boundaries.
 
 ### `DATA-MODEL.md`
 
-Conceptual durable model:
-
-- User / Scope / ConnectedAccount;
-- Conversation / Message / Attachment;
-- Responsibility and scenario-required semantic concepts;
-- provenance / user field corrections;
-- TemporalContract / TemporalTrigger;
-- Draft / SendOperation;
-- derived search/audit projections;
-- concurrency/versioning invariants.
-
-Responsibility L1 persistence boundaries are accepted by ADR 0009 / `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`. The exact PostgreSQL/Drizzle design is now a **v0.4 statically reviewed candidate**, but final L2 freeze remains blocked on executable PostgreSQL/Drizzle/Auth proof.
+Owns the conceptual durable model: User/Scope/ConnectedAccount, Conversation/Message/Attachment, Responsibility and supporting semantic concepts, provenance/correction, TemporalContract/TemporalTrigger, Draft/SendOperation, and derived projections.
 
 ### `CONTRACTS.md`
 
-Logical contracts between modules:
+Owns logical module contracts across provider/sync, AI interpretation, Responsibility reduction/effects, attention/resurfacing, Temporal Contract scheduling, drafts/send, search/context, background execution, versioning and failure semantics.
 
-- provider adapter;
-- sync/ingestion;
-- AI structured interpretation;
-- Responsibility reduction/effects;
-- conversation aggregate projection;
-- Temporal Contract scheduler;
-- attention/resurfacing;
-- drafts/send;
-- search/context/preview;
-- background jobs;
-- error/versioning/testing semantics.
+### `TECH-STACK.md`
 
-### `responsibility/`
+Owns accepted concrete technology direction unless superseded by an accepted ADR/decision. Current baseline includes Node 24, pnpm, strict TypeScript, Next.js 16/React 19, Tailwind 4, next-intl, PostgreSQL/Drizzle, Better Auth, durable background execution direction, Gmail first/Microsoft later, and current verification tooling.
 
-Primary authority for canonical Responsibility semantics, annotation/evaluation behavior, the accepted L1 persistence boundary, the current exact L2 candidate, and the executable proof gate.
+Technology capability does not authorize Product scope.
 
-Recommended reading order:
+---
 
-1. `responsibility/README.md` — scope/status/freeze levels/current implementation gate;
-2. `responsibility/DECISIONS.md` — FIXED/OPEN/SUPERSEDED semantic decisions;
-3. `responsibility/CONSISTENCY-AUDIT.md` — reconciliation findings/errata;
-4. `responsibility/ANNOTATION-GUIDELINES.md` — evidence/communication/admission/identity semantics;
-5. `responsibility/SCENARIO-SCHEMA.md` — canonical focal-event oracle contract;
-6. `responsibility/TRANSITION-SCHEMA.md` — multi-event trace contract;
-7. `responsibility/COVERAGE-PLAN.md` — mandatory corpus coverage inventory;
-8. `responsibility/TIER-0-SCENARIO-MATRIX.md` — base-oracle assignments/variants;
-9. detailed Tier-0 oracle files — 44/44 full layered base semantic contracts;
-10. `responsibility/TRANSITION-ORACLES.md` — all 20 mandatory transition traces;
-11. physical-model audit files — adversarial persistence-boundary pressure;
-12. `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — accepted L1 boundary and L2 requirements;
-13. `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact v0.4 L2 candidate;
-14. `responsibility/L2-EXECUTABLE-PROOF-GATE.md` — required evidence before final L2 freeze.
+## Responsibility authority
 
-### Responsibility freeze levels
+`responsibility/` is the primary authority for canonical Responsibility semantics, annotation/evaluation behavior, accepted logical persistence boundary, exact L2 candidate, and executable proof gate.
+
+Recommended entry point: `responsibility/README.md`.
+
+Current freeze/proof status:
 
 ```text
 L0 semantic model                         FROZEN v0.1 baseline
@@ -110,10 +95,9 @@ L2 final freeze                            BLOCKED
 L3 migrations/runtime                     NOT AUTHORIZED
 ```
 
-The current L1 boundary is conceptually:
+Conceptual accepted aggregate boundary:
 
 ```text
-# Accepted Responsibility aggregate
 Responsibility
 ObligationLeg[]
 ExpectedEvent[]
@@ -121,211 +105,92 @@ TemporalFact[]
 FieldDecision[]
 ProvenanceReference[]
 DomainEvent[]
-SemanticDetails (typed/versioned local document)
-
-# Accepted unresolved pre-admission product state
+SemanticDetails
 AdmissionReview[]
-
-# Separate evidence/inference systems
-Message / Attachment / provider observations
-AIInterpretationRun
-
-# Separate durable operational authorities
-TemporalContract / TemporalTrigger
-Draft / SendOperation
 ```
 
-The exact candidate currently exists, but **candidate != frozen production schema**. PostgreSQL/Drizzle-generated SQL, concurrency, delete/privacy, tenancy/FK, and Better Auth UUID behavior must still pass the executable gate before production migrations are proposed.
+Evidence/inference systems and operational authorities such as Message/Attachment/provider observations, AIInterpretationRun, TemporalContract/TemporalTrigger, and Draft/SendOperation remain separated as defined in the owning sources.
 
-### Responsibility source-of-truth reconciliation
+**Important Product hierarchy:** Responsibility is the current best candidate semantic mechanism for representing an unresolved communication obligation/expected-outcome loop. The existence or sophistication of that model is not evidence that users need Lunowa, that Attention Delegation is validated, or that the model is a moat.
 
-The prior conflict between Responsibility v0.1 and older lifecycle-specific text has been reconciled across the durable routing/design/engineering sources that could otherwise steer implementation:
+---
+
+## Design routing
+
+Detailed UX authority remains in:
+
+- `../design/DESIGN.md`;
+- `../design/INTERACTIONS.md`;
+- `../design/RESPONSIVE.md`;
+- `../design/references/README.md` and committed visual references.
+
+The design corpus can intentionally cover a **credible future client** more broadly than the current Product-validation MVP. `PRODUCT.md` owns Product scope and `IMPLEMENTATION-PLAN.md` owns active sequencing; a design screen does not become current implementation scope merely because it exists.
+
+Current interaction semantics such as row-body -> `会話`, Responsibility chip -> `今の要点`, one-primary-Moment behavior, and My Turn / Waiting / Later / Done / Review projections remain valid unless an accepted Product/design decision supersedes them.
+
+---
+
+## Current Product-learning execution routing
+
+Always query GitHub for live state. At the 2026-08-25 reconciliation the intended chain is:
 
 ```text
-AGENTS.md
-README.md
-docs/design/DESIGN.md
-docs/design/INTERACTIONS.md
-docs/design/RESPONSIVE.md
-docs/design/references/README.md
-docs/product/ARCHITECTURE.md
-docs/product/DATA-MODEL.md
-docs/product/CONTRACTS.md
-docs/product/IMPLEMENTATION-PLAN.md
-docs/product/TECH-STACK.md
-docs/decisions/0001-modular-monolith-default.md
-docs/decisions/0002-ai-understands-rules-decide-state.md
-docs/decisions/0003-temporal-contracts-use-durable-scheduling.md
-docs/decisions/0004-web-runtime-and-ui-stack.md
-docs/decisions/0005-auth-and-persistence-stack.md
-docs/decisions/0006-provider-sync-and-background-runtime.md
-docs/decisions/0007-initial-ai-runtime.md
-docs/decisions/0008-responsibility-state-is-orthogonal.md
-docs/decisions/0009-responsibility-persistence-boundary.md
+Issue #26 — Product/mechanism validation contract
+  -> Issue #32 / PR #34 — deterministic S1-S7 oracle
+  -> Issue #29 / PR #30 — reconciled bounded execution plan
+  -> Issue #28 — bounded fake-data implementation
+  -> Issue #31 — independent browser/visual/mechanical verification
+  -> Issue #26 — participant/comparative evidence
 ```
 
-Current semantic direction is orthogonal across:
+Issue #28 also contains a separate unattended implementation-harness resume gate. Do not infer authorization from this static map.
+
+A positive #26 fake-data comparison is **mechanism evidence**, not proof of longitudinal Attention Delegation. Stronger subsequent evidence must observe real waiting periods and whether users actually reduce self-checking.
+
+---
+
+## Separate technical lane
+
+Responsibility L2 proof remains:
 
 ```text
-resolution status/reason
-live tracking activation
-attention/defer
-obligation legs/actionability/conditions
-expected events
-completion criteria
-constraints
-pending proposals/agreed facts
-temporal facts
-uncertainty/risk
-provenance
+Issue #13 — PostgreSQL/Drizzle executable matrix
+Issue #14 — Better Auth -> PostgreSQL UUID proof
+Issue #15 — independent combined acceptance review
 ```
 
-The former single lifecycle enum, scalar `next_owner/BOTH`, one `deadline_at`, and follow-up-as-lifecycle model are not canonical truth.
-
-### `TECH-STACK.md`
-
-Accepted initial implementation stack and activation policy:
-
-- Node.js 24 LTS / pnpm / TypeScript strict;
-- Next.js 16.x App Router / React 19.x;
-- Tailwind CSS 4 / shadcn/ui / next-intl;
-- PostgreSQL 18 / Neon / Drizzle;
-- Better Auth for Lunowa application sessions, separated from mailbox authorization;
-- Trigger.dev for durable background execution once real sync/scheduling begins;
-- Gmail API first, Microsoft Graph second;
-- OpenAI Responses API + Structured Outputs for initial AI runtime;
-- PostgreSQL full-text search first;
-- Vitest / React Testing Library / Playwright verification stack.
-
-Re-check current official provider/runtime facts whenever they materially affect implementation/release.
-
-### `IMPLEMENTATION-PLAN.md`
-
-Active staged execution plan:
-
-- bootstrap;
-- fake-data high-fidelity UI using current Responsibility projections;
-- bounded L2 executable proof, then persistence implementation only after freeze authorization;
-- Gmail read slice;
-- real send;
-- deterministic Responsibility/Temporal Contract behavior;
-- AI interpretation behind canonical evals;
-- search/context;
-- Microsoft adapter;
-- beta hardening.
-
-This is a living plan, not permanent product semantics.
-
-### Current task-specific execution
-
-Implementation handoff is **Issue-driven**.
-
-Use the current GitHub Issue for task-specific Goal / Why / Scope / Acceptance / Verification. Use repository documents for durable constraints. A repository-local plan/design/task artifact is required only when the Issue explicitly links one or the work is too complex/high-risk for the Issue contract alone.
-
-Do not invent a missing `docs/plans/active/*` artifact or infer current task intent from an obsolete path.
+Technical PASS/FREEZE is not Product validation and does not automatically activate L3 production migrations/runtime.
 
 ---
 
-## Durable architecture decisions
+## Current high-level Product distinctions
 
-Material choices that should not silently change during ordinary implementation live under `docs/decisions/`.
+Do not regress these boundaries:
 
-Current high-value ADRs include:
-
-- `0001-modular-monolith-default.md`;
-- `0002-ai-understands-rules-decide-state.md` — AI interpretation vs trusted Responsibility authority;
-- `0003-temporal-contracts-use-durable-scheduling.md` — durable/reconcilable attention promises;
-- `0004-web-runtime-and-ui-stack.md`;
-- `0005-auth-and-persistence-stack.md`;
-- `0006-provider-sync-and-background-runtime.md`;
-- `0007-initial-ai-runtime.md` — initial bounded Structured Outputs runtime/eval boundary;
-- `0008-responsibility-state-is-orthogonal.md` — orthogonal canonical state + deterministic UI projections;
-- `0009-responsibility-persistence-boundary.md` — accepted hybrid L1 persistence boundary; exact L2 final freeze remains pending executable evidence.
-
-A decision may be superseded by stronger evidence, but rationale/consequences should be recorded.
+- message/thread != Responsibility;
+- My Turn / Waiting / Later / Done / Review are projections, not one lifecycle enum;
+- follow-up is normally a renewed My Turn reason/action, not a lifecycle species;
+- AI prepares; human commits for material external action;
+- original communication remains source evidence;
+- multi-account/unified inbox is table stake, not differentiation;
+- generic AI summary/drafting/search, task extraction, priority classification, Waiting labels, Snooze/Later, Done and no-reply reminders are not standalone differentiation claims;
+- cross-account value is segment-dependent, not assumed core wedge;
+- state-aware Attention Delegation is a **wedge hypothesis, not a moat claim**;
+- full-client replacement is a form-factor hypothesis; responsive web remains the current build/experiment direction;
+- Product learning precedes broad provider/AI/persistence/client breadth.
 
 ---
 
-## Related product/UX sources
+## Fresh-session reading order for Product work
 
-- `PRODUCT.md` — product intent, users/hypotheses, differentiation, MVP/validation/commercial status;
-- `../design/DESIGN.md` — accepted design model/information architecture/visual principles;
-- `../design/INTERACTIONS.md` — detailed interaction semantics;
-- `../design/RESPONSIVE.md` — responsive behavior;
-- visual references under `../design/references/`.
+Use the smallest relevant context:
 
-`DESIGN.md` / `INTERACTIONS.md` are reconciled with Responsibility v0.1: `My Turn / Waiting / Later / Done / Review` are interaction projections, not the old canonical lifecycle enum. Legacy visual filenames are interpreted through `references/README.md`.
+1. `docs/continuity/CURRENT.md` for the mutable checkpoint/router;
+2. `PRODUCT.md` for Product truth/classification;
+3. relevant `research/` artifact if the question depends on external evidence/current competitors;
+4. `IMPLEMENTATION-PLAN.md` only when sequencing work;
+5. relevant `docs/design/` source for UX behavior;
+6. `responsibility/README.md` and only the minimum deeper semantic source needed for the task;
+7. re-query live GitHub Issue/PR/CI state before execution or review.
 
----
-
-## Reusable engineering sources
-
-Read when relevant:
-
-- `../core-principles.md`;
-- `../implementation-workflow.md`;
-- `../greenfield-bootstrap.md`;
-- `../architecture-design.md`;
-- `../reuse-dependencies.md`;
-- `../reliability-operability.md`;
-- `../security-privacy.md`;
-- `../verification-review.md`;
-- `../platform-development.md`;
-- `../production-readiness.md`;
-- `../product-operations.md`;
-- `../monetization-engineering.md`;
-- `../ai-product-runtime.md`;
-- `../coding-agent-harness.md`;
-- `../repository-knowledge.md`;
-- `../references.md`.
-
----
-
-## Authority by question
-
-| Question | Primary authority |
-| --- | --- |
-| Product vision/problem/user hypothesis/differentiation/validation status? | `docs/product/PRODUCT.md` |
-| Canonical Responsibility semantics / annotation/eval rules? | `docs/product/responsibility/*` + ADR 0008 |
-| Responsibility logical persistence boundary? | ADR 0009 + `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` |
-| Current exact Responsibility PostgreSQL/Drizzle candidate? | `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` (v0.4 candidate) |
-| Has exact L2 been executable-proof frozen? | `responsibility/L2-EXECUTABLE-PROOF-GATE.md` + live Issue #13/#14/#15 evidence; currently no |
-| Product-level Responsibility architecture/module boundary? | `ARCHITECTURE.md` + ADRs 0002/0008/0009 |
-| Conceptual Responsibility persistence/ownership? | `DATA-MODEL.md` + ADRs 0008/0009 |
-| Module/API/job Responsibility semantics? | `CONTRACTS.md` + Responsibility semantic baseline |
-| User-facing Responsibility interaction/projection behavior? | `docs/design/INTERACTIONS.md` + `docs/design/DESIGN.md` |
-| AI interpretation authority/runtime? | ADRs 0002/0007 + `CONTRACTS.md` + canonical eval artifacts |
-| Temporal Contract durability/attention semantics? | ADR 0003 + `ARCHITECTURE.md` + `CONTRACTS.md` |
-| Other product-specific technical boundary/invariant? | `ARCHITECTURE.md` + accepted relevant ADR |
-| Technology/runtime choice? | `TECH-STACK.md` + relevant ADR |
-| Current implementation sequence? | `IMPLEMENTATION-PLAN.md`; current GitHub Issue supplies task-specific intent |
-| What is actually implemented now? | current code/schema/migrations/tests/runtime evidence |
-| Generic engineering rule? | relevant reusable `docs/*.md` baseline |
-| Current Gmail/Microsoft/AI/platform fact? | current official provider documentation at implementation time |
-
-If sources materially conflict again, do not silently guess. Treat the contradiction as a spec defect and reconcile it before durable implementation.
-
----
-
-## High-value product invariants
-
-1. Normal row click opens `会話`; Responsibility/status chip opens `今の要点`.
-2. Conversation can contain multiple Responsibilities; Conversation is not one workflow-state owner.
-3. One Moment generally presents one primary current question/action.
-4. Evidence, interpretation, admission, accepted Responsibility state, safe action, and UI projection are distinct.
-5. AI interprets; trusted product/domain logic owns accepted Responsibility state and privileged effects.
-6. Resolution, live tracking activation, and attention/defer are orthogonal.
-7. Parallel/contingent work may require multiple obligation legs; scalar `BOTH` is not canonical truth.
-8. Temporal facts remain distinct: source due, expected-event time, user target, resurface, follow-up.
-9. Temporal Contracts are durable/reconcilable promises.
-10. Communication hold is not automatically Later/snooze.
-11. Provider observations and Lunowa domain facts have field-scoped authorities.
-12. Send attempt is not provider-reconciled acceptance; reconciliation closes only the appropriate operational outcome.
-13. Core reading/composing remains usable when AI is unavailable.
-14. Scope/account boundaries apply before search/retrieval/AI context exposure.
-15. Cross-account semantic similarity does not authorize Responsibility merge.
-16. Admission `NEEDS_REVIEW` may exist before a Responsibility; durable surfaced Review must not be modeled as a fake Responsibility.
-17. Determinate `DO_NOT_TRACK` normally produces no Responsibility or durable AdmissionReview product-state row.
-18. Projection equality does not imply semantic equality.
-19. Pin is independent of Responsibility semantics.
-20. App auth and connected-mailbox authorization are separate boundaries.
+Do not load the entire Responsibility corpus or all design references by default when the question is only Product positioning/validation.

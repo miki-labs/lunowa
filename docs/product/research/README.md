@@ -15,8 +15,10 @@ Rules:
 - do not convert vendor marketing telemetry into independent causal evidence;
 - do not treat a research artifact as proof of ICP, switching, willingness to pay, or retention for Lunowa;
 - preserve material counter-evidence and limitations, not only evidence favorable to the current thesis;
+- treat rapidly changing competitor/agent capability as perishable evidence and re-check primary sources before external positioning;
 - when evidence materially changes Product direction, update `docs/product/PRODUCT.md` in the same accepted change where practical.
 
 ## Current artifacts
 
-- `COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md` — evidence audit for asynchronous communication monitoring, cognitive offloading, current workarounds, competitor convergence, switching/trust implications, and the current Attention Delegation wedge hypothesis.
+- `COMMUNICATION-ATTENTION-DELEGATION-EVIDENCE-2026-08.md` — research evidence for asynchronous communication monitoring, cognitive offloading, trust/reliability implications, candidate WHO, Golden Flow, validation, and the Attention Delegation wedge hypothesis.
+- `CURRENT-COMPETITOR-CONVERGENCE-2026-08.md` — current competitor/alternative audit covering Gmail, Outlook, Superhuman, Shortwave, Spark, HEY, Front, Salesforce, HubSpot, form-factor convergence, and the boundary between wedge and defensibility.

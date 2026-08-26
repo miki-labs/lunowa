@@ -120,6 +120,8 @@ These are not “bad participants.” They test the Product boundary that a stro
 
 Do not recruit only friends/founders already enthusiastic about AI/productivity; that sample will overstate adoption and problem salience.
 
+Before a cohort receives `SUPPORTED FOR NEXT TEST`, its support should **not rest entirely on one personal network or one panel source**. Cross-check the emerging pattern through at least one materially independent recruitment path or network, while treating source differences as a limitation rather than as statistical representativeness.
+
 ---
 
 # 4. Incentive policy
@@ -132,8 +134,10 @@ Practical pilot for this study:
 
 - standard 45-minute professional interview: **¥8,000–¥10,000**;
 - scarce/high-opportunity-cost B2B participant: up to roughly **¥12,000–¥15,000** if recruitment proves difficult;
-- pay promptly after a completed valid session;
-- compensate time, not “positive” answers;
+- pay promptly after a completed **eligible** session under the pre-disclosed compensation policy;
+- compensate time, not “positive,” detailed, or Product-supportive answers;
+- never withhold compensation merely because a participant provides disconfirming evidence, says the problem is already solved, or gives less Product-useful answers;
+- if fraud/ineligibility may affect compensation, define that rule before recruitment and apply it consistently rather than making an ad hoc post-interview judgment;
 - do not reveal detailed qualification logic or unusually emphasize the incentive in public recruitment copy.
 
 If cost/fill-rate data contradict this range, adjust transparently. Incentive amount is an operational parameter, not Product evidence.
@@ -306,6 +310,7 @@ Controls:
 - watch for clusters of red flags: generic/scripted answers, inability to elaborate on concrete events, inconsistent work/tool descriptions, unusual recruitment bursts, repeated incentive-focused communication, duplicated identities/contact patterns;
 - camera-on may improve verification/rapport but should not be the sole validity criterion; preserve accessibility/privacy alternatives;
 - do not accuse or exclude a participant based on a single ambiguous flag;
+- predefine what happens to scheduling/data/compensation when fraud or ineligibility is suspected; use a documented review rather than one moderator’s instant judgment;
 - document exclusions and reasons outside Product evidence so suspicious data do not silently disappear.
 
 No raw identity documents, email addresses, IP addresses, private messages, or client data go into GitHub.
@@ -432,6 +437,15 @@ Keep the pre-task light; do not ask participants to manufacture logs or count we
 
 Store only de-identified structured observations.
 
+Use Issue #36 evidence classes strictly:
+
+- `DIRECT OBSERVED` — moderator directly observes participant behavior or an artifact/tool state during the session; a participant’s verbal description of past behavior is **not** direct observation;
+- `RECENT-EVENT RECALL` — participant reconstructs a specific recent event/workflow, even if aided by a timeline or their own artifact;
+- `SELF-REPORT` — opinion, preference, estimated/general behavior, or hypothetical delegation response;
+- `EXTERNAL EVIDENCE` — published/current source evidence; normally stored in research rationale, not as a participant-loop observation;
+- `INFERENCE` — researcher conclusion derived from evidence;
+- `UNKNOWN` — not established.
+
 Per participant:
 
 - cohort/recruitment channel;
@@ -444,7 +458,7 @@ Per reconstructed loop:
 
 | Field | Record |
 |---|---|
-| evidence class | `DIRECT OBSERVED` / `RECENT-EVENT RECALL` / `SELF-REPORT` / `INFERENCE` / `UNKNOWN` |
+| evidence class | one or more of the classes above |
 | loop/outcome | non-sensitive operational description |
 | external dependency | person/org/event/time/document/etc. |
 | started | approximate date/time |
@@ -554,7 +568,7 @@ Issue #36 must end with one of:
 - `WEAK`;
 - `FALSIFIED`.
 
-A `SUPPORTED FOR NEXT TEST` disposition requires a coherent explanatory pattern across recent behavior, current baseline tools, residual gap, and delegation boundary. It does not establish market size, WTP, retention, or PMF.
+A `SUPPORTED FOR NEXT TEST` disposition requires a coherent explanatory pattern across recent behavior, current baseline tools, residual gap, and delegation boundary. It must also survive a cross-source recruitment check rather than resting entirely on one personal network/panel. It does not establish market size, WTP, retention, or PMF.
 
 The cheapest next experiment should follow from what was actually observed. Do not automatically promote the current five-surface IA, Responsibility UI, or implementation plan merely because the problem appears real.
 
@@ -599,7 +613,7 @@ These sources inform the protocol but do not constitute Product truth:
 - [ ] First exploratory interviews are human-moderated.
 - [ ] Interview guide starts from neutral recent events, not Lunowa concepts or assumed self-checking.
 - [ ] Negative-control quota is preserved.
-- [ ] Incentive/payment method is clear.
+- [ ] Incentive/payment method and suspected-fraud handling are predefined and communicated as appropriate.
 - [ ] Consent/recording/privacy language is ready.
 - [ ] Evidence matrix is ready before first interview.
 - [ ] Raw PII/email content has a storage boundary outside GitHub.
@@ -607,4 +621,5 @@ These sources inform the protocol but do not constitute Product truth:
 - [ ] Evidence is recorded before Product interpretation.
 - [ ] Independent second-pass review is arranged where feasible; AI-only adversarial review is not mislabeled independent.
 - [ ] Analysis occurs between batches, not only at the end.
+- [ ] A supported cohort is cross-checked through an independent recruitment path/network before Product promotion.
 - [ ] No implementation/Product promotion is triggered automatically by interview completion.

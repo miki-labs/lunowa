@@ -56,9 +56,7 @@ If monitoring infrastructure is healthy, Lunowa should continue to:
 - suppress obsolete delivery artifacts;
 - reconstruct current state when the user returns.
 
-However, **monitoring and delivery are separate promises**. A time-sensitive return can reach the user while the app is closed only if an accepted delivery path exists and is available (for example push permission/device delivery where the Product relies on it).
-
-Therefore:
+However, **monitoring and delivery are separate promises**. A time-sensitive return can reach the user while the app is closed only if an accepted delivery path exists and is available.
 
 ```text
 Monitoring Integrity
@@ -68,7 +66,7 @@ Delivery Integrity
 = can Lunowa reach the user within the accepted delivery contract?
 ```
 
-If the user disables external notifications, Lunowa may still monitor correctly, but it must not pretend it can satisfy an `immediate while app closed` return promise. The UI must either weaken the return contract explicitly (`アプリを開いた時に表示`) or ask for the delivery capability needed for the stronger promise.
+If external notifications are disabled, Lunowa may still monitor correctly, but it must not pretend it can satisfy an `immediate while app closed` return promise. The UI must either weaken that return contract explicitly or ask for the delivery capability needed for the stronger promise.
 
 A required morning/evening review ritual would reintroduce part of the monitoring burden Lunowa exists to remove.
 
@@ -212,7 +210,33 @@ Immediate delivery while the app is closed requires an available authorized deli
 
 Any displayed temporal precision must come from accepted evidence; never invent `15:00` from a source that only says `today` or `Friday`.
 
-## 2.5 Integrity conditions
+## 2.5 Delivery strength is dynamically re-evaluated
+
+**DOCTRINE CANDIDATE:** a delivery-strength decision is not a sticky label attached when Needs You/Review first appears.
+
+Delay cost can change while the user is absent. Therefore Lunowa must re-evaluate delivery sufficiency when material time/evidence/integrity conditions change.
+
+Example:
+
+```text
+Monday 09:00
+review requested; source due Friday
+-> Needs You
+-> next-visit sufficient
+
+Thursday 16:00
+still not viewed; source due now near
+-> re-evaluate current state
+-> grouped or immediate delivery may now be justified
+```
+
+Likewise, new evidence can lower urgency or eliminate the item entirely before a queued notification is delivered.
+
+Re-evaluation must use current accepted temporal facts and current evidence; it must not mutate `SOURCE_DUE`, `USER_TARGET`, or other canonical temporal facts merely to implement notification timing.
+
+This implies delivery policy needs durable/current-state reconsideration where the Product makes time-sensitive promises. It does **not** require a new Responsibility lifecycle enum.
+
+## 2.6 Integrity conditions
 
 Provider/sync/scheduler/reconciliation failure is a Product-level **Monitoring Integrity** condition. Notification permission/device-delivery failure can be a **Delivery Integrity** condition where the accepted return contract depends on that path.
 
@@ -246,7 +270,7 @@ accepted contract says “notify immediately even if app is closed”
 
 Do not keep showing generic reassurance while the relevant monitoring/delivery promise cannot currently be honored.
 
-## 2.6 Known candidate-vocabulary reconciliation
+## 2.7 Known candidate-vocabulary reconciliation
 
 `PRODUCT-CONSTITUTION-V1-CANDIDATE.md` currently uses draft delivery labels `Silent / Passive / Deferred-opportune / Immediate`. `V1-PRODUCT-SURFACE-CANDIDATE.md` later clarified that awareness-only information should not enter Needs You.
 
@@ -613,7 +637,8 @@ Do not build around:
 - immediate classification based only on sender importance or wording;
 - delivery rules that mutate canonical temporal facts;
 - replaying obsolete notifications after absence;
-- accepting an immediate-return promise without an available delivery path.
+- accepting an immediate-return promise without an available delivery path;
+- treating a delivery-strength decision as permanently fixed while delay cost changes.
 
 ---
 
@@ -628,7 +653,8 @@ Do not optimize primarily for DAU/session count. A successful delegation Product
 - percent of evidence changes handled silently;
 - grouped vs individual notification count;
 - dismissal/open/action after delivery;
-- immediate false-positive rate.
+- immediate false-positive rate;
+- correctness of delivery escalation/de-escalation as deadlines/evidence change.
 
 ## Delegation quality
 
@@ -698,6 +724,7 @@ ALWAYS
 monitor delegated loops when monitoring integrity is healthy
 reconcile evidence
 maintain current state
+re-evaluate delivery sufficiency as time/evidence/integrity changes
 
 SILENTLY
 handle non-actionable progress
@@ -706,7 +733,7 @@ INFORMATIONALLY
 surface promised awareness without turning it into work
 
 AT THE NEXT SUFFICIENT MOMENT
-return Needs You or Review — next visit or grouped delivery depending delay cost and available channel
+return Needs You or Review — next visit or grouped delivery depending current delay cost and available channel
 
 IMMEDIATELY
 interrupt only when delay is materially costly / explicitly requested AND a valid immediate delivery path exists
@@ -734,5 +761,6 @@ rebuild from current state, suppress stale events, restore minimum context
 10. Which Monitoring/Delivery Integrity failures require immediate delivery versus next allowed visibility?
 11. How should the older Product Constitution candidate's `Passive` vocabulary be reconciled with newer Surface/Daily distinctions before canonical promotion?
 12. Which return contracts should be disallowed or weakened when the user has no reliable external delivery channel enabled?
+13. What durable mechanism should re-evaluate delivery escalation without creating a generic workflow engine?
 
 These require Lunowa-specific Product evidence and must not be resolved solely by intuition or unrelated notification research.

@@ -9,7 +9,8 @@ This document defines how Lunowa should behave across an ordinary day once monit
 - `PRODUCT-CONSTITUTION-V1-CANDIDATE.md`;
 - `V1-PRODUCT-SURFACE-CANDIDATE.md`;
 - `ONBOARDING-TRUST-PROGRESSION-CANDIDATE.md`;
-- canonical Responsibility semantics under `docs/product/responsibility/`.
+- canonical Responsibility semantics under `docs/product/responsibility/`;
+- accepted Temporal Contract semantics in `docs/decisions/0003-temporal-contracts-use-durable-scheduling.md`.
 
 It does not change schema, provider scope, implementation sequencing, current Product-discovery gates, or accepted notification policy.
 
@@ -33,7 +34,7 @@ external evidence changes
   -> ingest/reconcile
   -> update accepted/candidate state
   -> re-evaluate Responsibility / Expected Event / attention need
-  -> choose delivery lane
+  -> choose delivery behavior
 ```
 
 The internal system may react immediately. Human interruption is a separate decision.
@@ -69,25 +70,26 @@ Example:
 14:00 user opens Lunowa
 ```
 
-Do not force the user through a stale 09:00 “still waiting” notification before the current 11:00 result.
+Do not force the user through a stale 09:00 “still waiting” event before the current 11:00 result.
 
 Event history remains inspectable, but the work surface answers what is true and material now.
 
 ---
 
-# 2. Delivery lanes
+# 2. Delivery model
 
-The Product should separate semantic state from delivery strength.
+Semantic state, attention need, delivery urgency, and channel remain separate.
 
 ```text
-Evidence / Responsibility state
-           !=
-Delivery channel / timing
+Operational state
+!= Attention Need
+!= delivery urgency
+!= notification channel
 ```
 
-Five conceptual lanes are useful.
+The accepted Temporal Contract ADR already fixes that a trigger firing does not itself imply notification. This candidate extends that distinction into daily Product behavior.
 
-## 2.1 Lane A — Silent stewardship
+## 2.1 Silent stewardship
 
 Use when:
 
@@ -100,8 +102,8 @@ Use when:
 Examples:
 
 - counterpart says “legal is reviewing”;
-- expected date moves from Thursday to Friday but this does not create user action;
-- a reply arrives that only updates waiting state;
+- an expected date changes but creates no user action;
+- a reply only updates Waiting state;
 - a delegated loop remains healthy and unchanged.
 
 Behavior:
@@ -111,67 +113,82 @@ update state
 -> no push
 -> no Needs You
 -> no Review
--> optionally visible in Managed evidence receipt/history
+-> optionally inspectable in Managed evidence/history
 ```
 
-This lane should be common. Correct silence is core Product value.
+Correct silence is core Product value.
 
-## 2.2 Lane B — Passive awareness
+## 2.2 Informational catch-up — awareness without work
+
+This is **not** the same use of `Passive` found in the older Product Constitution candidate delivery vocabulary.
 
 Use when:
 
 - user explicitly asked to know about an outcome/change;
 - no action/judgment is currently required;
-- delay is acceptable.
+- delivery can be delayed without material harm.
 
 Examples:
 
 - payment confirmation received;
-- package delivered;
-- approval completed where no follow-up is needed;
-- requested informational milestone occurred.
+- requested approval completed where no follow-up is needed;
+- another promised informational milestone occurred.
 
-Behavior candidate:
+Candidate behavior:
 
-- show on next open in a compact `Since you were away` / informational area; and/or
+- show on next open in a compact `前回以降の更新` / informational area; and/or
 - include in an optional predictable digest;
 - do not create durable work in Needs You merely because awareness was promised.
 
-Awareness should age out after being seen/acknowledged according to a simple Product rule; it is not a permanent task queue.
+Awareness is a Product-delivery concept, not a Responsibility lifecycle state or a permanent task queue.
 
-## 2.3 Lane C — Standard attention return
+## 2.3 Actionable return — Needs You becomes current now
 
-Use when:
+When a current user action/judgment genuinely becomes necessary, `Needs You` should reflect that state immediately inside Lunowa.
 
-- a current user action or judgment is genuinely required;
-- delay matters, but not enough to justify immediate interruption.
+External delivery then depends on delay cost:
 
-Behavior:
+### 2.3.1 Next-visit sufficient
+
+Use when the work is current but a push interruption is unnecessary.
 
 ```text
-Needs You becomes current immediately in Product state
--> external notification is grouped / delivered at the next allowed attention window
--> opening Lunowa before that window shows the item immediately
+Needs You current
+-> no external push
+-> next intentional Lunowa visit is sufficient
 ```
+
+This corresponds most closely to the Product Constitution candidate's older `Passive` delivery meaning.
+
+### 2.3.2 Deferred / grouped external delivery
+
+Use when the user should be informed before a likely next natural app open, but immediate interruption is not justified.
+
+```text
+Needs You current
+-> group until next allowed attention window
+-> one external notification can represent multiple current items
+```
+
+This corresponds to the Constitution candidate's `Deferred / opportune` direction.
 
 Examples:
 
-- quotation arrived and needs review later today;
-- reply needs a decision but no imminent deadline;
+- quotation arrived and should be reviewed later today;
+- a reply needs a decision but there is no imminent deadline;
 - a follow-up is due but several hours of delay is acceptable.
 
-The exact batching cadence is **UNKNOWN** and must not be copied mechanically from unrelated notification studies.
+The exact batching cadence is **UNKNOWN**. Do not copy `three times/day` from unrelated smartphone-notification evidence.
 
-## 2.4 Lane D — Urgent attention return
+## 2.4 Immediate actionable return
 
-Use only when delaying until the next normal attention window would cause material expected harm or violate an explicit user-owned immediate-return contract.
+Use only when delaying to the next ordinary attention opportunity would cause material expected harm or violate an explicit user-owned immediate-return contract.
 
 Possible qualifying evidence:
 
 - explicit imminent source due with required user action;
-- a user-configured “tell me immediately when X happens” contract;
-- time-sensitive safety/security/financial communication where the safe action is to verify/review now;
-- another accepted high-delay-cost condition validated by Product evidence.
+- user-configured “tell me immediately when X happens” behavior;
+- accepted high-delay-cost conditions validated by Product evidence.
 
 Do not equate:
 
@@ -180,33 +197,50 @@ Do not equate:
 - new message;
 - model-assigned high importance
 
-with urgent interruption automatically.
+with immediate interruption automatically.
 
 Urgency should be explainable in ordinary language, e.g.:
 
 `今日15:00が回答期限のため、今確認が必要です。`
 
-## 2.5 Lane E — Monitoring-integrity alert
+Any displayed precision must come from accepted temporal evidence; never invent `15:00` from a source that only says `today` or `Friday`.
 
-Provider/sync/scheduler/reconciliation failure is a separate Product-level degraded-state lane, not automatically a Responsibility state.
+## 2.5 Monitoring-integrity alert
+
+Provider/sync/scheduler/reconciliation failure is a separate Product-level degraded-state condition, not automatically a Responsibility, Needs You item, or semantic Review subject.
 
 Delivery strength depends on the risk created by the degradation.
 
 Examples:
 
 ```text
-Gmail sync stale 8 minutes
+Gmail sync stale briefly
 no time-sensitive delegated loops affected
--> passive / next allowed window
+-> next allowed/visible integrity notice
 ```
 
 ```text
 Gmail sync stopped
-3 delegated loops have return conditions inside 30 minutes
--> immediate integrity alert
+multiple delegated loops have near-term return conditions
+-> immediate integrity alert may be warranted
 ```
 
 Do not keep showing generic `Lunowaが見ています` reassurance when monitoring cannot currently be honored.
+
+## 2.6 Known candidate-vocabulary reconciliation
+
+`PRODUCT-CONSTITUTION-V1-CANDIDATE.md` currently uses a draft delivery vocabulary:
+
+```text
+Silent
+Passive
+Deferred / opportune
+Immediate
+```
+
+`V1-PRODUCT-SURFACE-CANDIDATE.md` later clarified that awareness-only information should not enter Needs You. This Daily Operating Model follows that newer surface distinction and therefore uses `Informational catch-up` for awareness-only delivery rather than overloading `Passive`.
+
+If these candidates are promoted canonically, the vocabulary must be reconciled in one owning source rather than preserving two meanings for `Passive`.
 
 ---
 
@@ -216,11 +250,11 @@ Do not keep showing generic `Lunowaが見ています` reassurance when monitori
 
 On open, Home should answer:
 
-1. Is there any material Review?
+1. Is there material Review?
 2. What user action/judgment is current now?
 3. What non-actionable information became relevant since the user last looked?
 4. Is delegated monitoring healthy?
-5. Can the user reach Source immediately?
+5. Can Source be reached immediately?
 
 Candidate composition:
 
@@ -248,13 +282,13 @@ Lunowaが見ています        14
 [会話を見る]
 ```
 
-`前回以降の更新` is a Product hypothesis, not a new domain state.
+`前回以降の更新` is a Product hypothesis, not a new canonical domain state.
 
 ## 3.2 Home must avoid replaying obsolete events
 
 If an awareness update has been superseded by a later actionable state, show the current actionable state once.
 
-If a Needs You item became resolved before the user opened Lunowa, do not keep a stale actionable card merely because a push was previously queued.
+If a Needs You item became resolved before the user opened Lunowa, do not keep a stale actionable card merely because an external notification was previously queued.
 
 ## 3.3 Empty state
 
@@ -274,7 +308,7 @@ Do not require Inbox Zero-style processing of Managed items.
 
 **DOCTRINE CANDIDATE:** Lunowa must not require a daily morning triage to remain safe.
 
-The user may open Lunowa in the morning, but the Product's reliability should not depend on it.
+The user may open Lunowa in the morning, but Product reliability should not depend on it.
 
 ## 4.2 Morning open
 
@@ -291,12 +325,11 @@ Do not dump all overnight mail or all Waiting transitions.
 
 ## 4.3 Scheduled morning briefing is optional
 
-Current agent products support scheduled daily briefings, so the pattern is familiar. However, making one mandatory would create a new daily review obligation.
+Current agent products support scheduled daily briefings, so the pattern is familiar. Making one mandatory would create a new daily review obligation.
 
 **PRODUCT HYPOTHESIS:** allow an optional briefing such as:
 
 ```text
-9:00
 今日あなたが必要: 2件
 確認が必要: 0件
 知っておく更新: 1件
@@ -319,7 +352,7 @@ Throughout the day:
 mail / sent / time / relevant provider evidence
 -> reconcile
 -> update state
--> select delivery lane
+-> select delivery behavior
 ```
 
 The user does not need to watch this process.
@@ -329,7 +362,6 @@ The user does not need to watch this process.
 Example:
 
 ```text
-10:00 user is working elsewhere
 10:12 counterpart: “still checking internally”
 ```
 
@@ -339,41 +371,36 @@ If no action/awareness promise is triggered:
 - do not notify;
 - do not create a badge requiring inspection.
 
-## 5.3 Standard Needs You should be grouped predictably
+## 5.3 Prefer predictable delivery to opaque interruption inference for ordinary work
 
-External evidence supports reducing unpredictable interruption and suggests that proactive interventions are better received at natural workflow boundaries than mid-task. Lunowa v1 may not reliably infer such boundaries.
+External evidence supports reducing unpredictable interruption and suggests that proactive interventions can be better received at workflow boundaries than mid-task. Lunowa v1 may not reliably infer those boundaries.
 
-Therefore the safer Product direction is:
+Therefore:
 
-> **Predictable grouping beats opaque “AI decides when to interrupt” for normal attention returns.**
+> **For normal delay-tolerant returns, predictable grouping is a stronger v1 hypothesis than opaque “AI decides the perfect moment”.**
 
-The exact implementation remains open. Candidate options for validation:
+Candidate options for validation:
 
 - user-chosen delivery windows;
-- coarse work-hours windows;
-- grouped notifications after a short predictable buffer;
-- `next app open` for users who disable standard push.
+- coarse allowed work-hour windows;
+- grouped notifications after a predictable buffer;
+- next-app-open only for users who disable standard push.
 
-Do not fix `3 times/day` merely because one smartphone experiment found benefits at that cadence.
+Do not freeze an exact schedule from unrelated research.
 
 ## 5.4 Multiple normal returns should collapse into one interruption
 
-If three standard Needs You items become current inside one delivery window, prefer:
+If several delay-tolerant Needs You items become current inside one delivery window, prefer one summary notification such as:
 
-```text
-Lunowa
-3件、あなたの対応が必要です
-```
+`3件、あなたの対応が必要です。`
 
-rather than three independent pushes.
+Opening it should show current Needs You ordered by current attention need.
 
-Opening the notification should land on Needs You ordered by current attention need.
+## 5.5 Foreground behavior
 
-## 5.5 If the user is already in Lunowa
+If Lunowa is already foregrounded and the relevant current state is visible, avoid redundant OS push.
 
-Avoid redundant operating-system push for a state the user has already seen in foreground.
-
-Current state changes may update the UI in place; materially disruptive animations/toasts are unnecessary unless action safety requires explicit acknowledgement.
+Update the UI calmly; materially disruptive toasts/animations should be reserved for cases requiring explicit acknowledgement.
 
 ---
 
@@ -387,66 +414,52 @@ Examples:
 
 - `入金を確認しました。何もする必要はありません。`
 - `承認が完了しました。`
-- `予約が確定しました。`
 
 ## 6.2 Candidate delivery
 
-**PRODUCT HYPOTHESIS:** awareness can use two lightweight paths:
+**PRODUCT HYPOTHESIS:** awareness can use lightweight paths:
 
-1. `Since you were away` on next open;
+1. `前回以降の更新` on next open;
 2. optional scheduled digest for users who want one.
 
 Do not create a permanent top-level `Updates` inbox unless Product evidence shows repeated retrieval value.
 
-## 6.3 Awareness should be deduplicated and current
+## 6.3 Awareness must be deduplicated and current
 
-If the user asked to know when a payment is received:
-
-```text
-payment pending
--> payment received
--> refund/correction happens before user opens
-```
-
-Do not show a stale “payment received, nothing to do” card without the later material state.
+If later evidence materially changes the meaning before the user sees an awareness card, show the later current state rather than stale reassurance.
 
 ---
 
-# 7. Urgent delivery
+# 7. Immediate / urgent delivery
 
-## 7.1 Urgent must be rare enough to preserve meaning
+## 7.1 Immediate must remain rare enough to preserve meaning
 
-If “urgent” becomes a synonym for “important”, Lunowa recreates ordinary mail notifications.
+If immediate delivery becomes a synonym for “important”, Lunowa recreates ordinary mail notifications.
 
-Product quality should be judged partly by unnecessary urgent interruption rate.
+Product quality should include unnecessary-immediate-interruption rate.
 
 ## 7.2 User-visible reason
 
-Urgent notification should explain the delay-sensitive condition in one line.
+Immediate notification should explain the delay-sensitive condition in one line.
 
-Example:
+Prefer:
 
-```text
-契約確認が必要です
-今日15:00が回答期限です
-```
+`契約確認が必要です — 今日15:00が回答期限です。`
 
 Not:
 
-```text
-High priority email from ABC Corp
-```
+`High priority email from ABC Corp.`
 
-## 7.3 Quiet-hours exception requires an explicit policy
+## 7.3 Quiet-hours exception requires explicit policy
 
-Default quiet periods should suppress standard attention and awareness deliveries.
+Default quiet/unavailable periods should suppress ordinary grouped action returns and awareness deliveries.
 
-Urgent interruptions during quiet hours should require either:
+Immediate interruption during quiet hours should require either:
 
 - an explicit user-configured exception; or
-- a narrowly defined high-consequence policy that has been separately accepted and validated.
+- a narrowly defined high-consequence policy separately accepted and validated.
 
-Do not silently override sleep/weekend boundaries because the model thinks a message is important.
+Do not override sleep/weekend boundaries because a model believes a sender/message is important.
 
 Exact v1 quiet-hours defaults are **UNKNOWN**.
 
@@ -454,11 +467,11 @@ Exact v1 quiet-hours defaults are **UNKNOWN**.
 
 # 8. Evening / end of day
 
-## 8.1 No mandatory “close your day” review
+## 8.1 No mandatory close-of-day review
 
-A required evening sweep would reintroduce a daily maintenance ritual.
+A required evening sweep would reintroduce daily maintenance.
 
-If Needs You remains open, it remains current according to its semantics; Lunowa does not force ritual completion for Product metrics.
+If Needs You remains open, it remains current according to its semantics; Lunowa does not force ritual completion for engagement metrics.
 
 ## 8.2 Optional end-of-day projection
 
@@ -469,60 +482,50 @@ A user may choose a compact recap such as:
 新しく対応が必要になった: 3
 対応済み: 2
 明日までに必要: 1
-Lunowaが静かに処理した更新: 5
+静かに処理した更新: 5
 ```
 
-This is optional and should avoid gamifying counts or implying that all work should hit zero.
+This should not gamify counts or imply that all work must hit zero.
 
-## 8.3 Stewardship value may be shown periodically, not continuously
+## 8.3 Stewardship value should be legible but not another inbox
 
-Invisible successful monitoring needs to be legible enough to earn trust, but a daily activity report can become another inbox.
-
-**PRODUCT HYPOTHESIS:** prefer contextual closure receipts and occasional compact stewardship recaps over a mandatory daily report.
+**PRODUCT HYPOTHESIS:** contextual closure receipts and occasional compact stewardship recaps are stronger than mandatory daily activity reports.
 
 Exact cadence is open.
 
 ---
 
-# 9. Night, weekends, vacation, and other unavailable periods
+# 9. Night, weekends, vacation, other unavailable periods
 
 ## 9.1 Monitoring continues while delivery may pause
 
-The Product should distinguish:
-
 ```text
 monitoring availability
-!=
-human availability
+!= human availability
 ```
 
 During user quiet/unavailable periods:
 
 - ingest/reconcile normally where infrastructure allows;
 - update internal state normally;
-- keep standard Needs You current;
-- defer ordinary external notification until an allowed window;
-- retain enough context to return correctly later.
+- keep Needs You current;
+- defer ordinary external interruption until an allowed window;
+- preserve context for correct later return.
 
 ## 9.2 When the user returns
 
-Do not deliver every queued historical push.
+Do not replay every queued historical push.
 
-Recompute from current state and show:
+Recompute and show current:
 
-- current Review;
-- current Needs You;
+- Review;
+- Needs You;
 - still-relevant awareness;
 - monitoring integrity.
 
-## 9.3 Vacation and long absence
+## 9.3 Vacation / long absence
 
-Long absence introduces additional uncertainty:
-
-- source deadlines may pass;
-- delegated loops may resolve/reopen;
-- access tokens/provider permissions may degrade;
-- external systems may become authoritative.
+Long absence adds product complexity: deadlines pass, loops can resolve/reopen, provider access may degrade, and off-channel state may diverge.
 
 Exact vacation mode is **DEFERRED/UNKNOWN** for v1. Do not create a generic out-of-office workflow engine prematurely.
 
@@ -532,8 +535,6 @@ Exact vacation mode is **DEFERRED/UNKNOWN** for v1. Do not create a generic out-
 
 ## 10.1 Later changes attention timing, not Responsibility truth
 
-When user defers:
-
 ```text
 Responsibility remains open
 attention intentionally deferred
@@ -542,29 +543,27 @@ return condition recorded
 
 ## 10.2 New evidence during Later
 
-A new message does not automatically cancel the defer.
+A new message does not automatically cancel defer.
 
-Re-evaluate whether the new evidence creates a material reason to return earlier.
-
-Examples:
+Re-evaluate whether new evidence creates a material reason for earlier return.
 
 ```text
-new courtesy reply
+courtesy reply
 -> remain Later
 ```
 
 ```text
-new deadline moved to today
--> return early if material
+accepted deadline materially moves earlier
+-> earlier return may be justified
 ```
 
-This preserves `resurface != interrupt` and avoids source-arrival-driven behavior.
+This preserves `resurface != interrupt` and avoids arrival-driven behavior.
 
 ---
 
 # 11. Notification content contract
 
-## 11.1 Notification should represent the user-relevant state
+## 11.1 Represent user-relevant state, not source activity
 
 Prefer:
 
@@ -572,11 +571,11 @@ Prefer:
 
 over:
 
-`New email from ABC Corp — Re: 見積書`
+`New email from ABC Corp — Re: 見積書`.
 
 ## 11.2 Minimum content
 
-A normal/urgent notification generally needs:
+A normal/immediate notification generally needs:
 
 - concrete subject/person;
 - current user-relevant change/action;
@@ -586,38 +585,36 @@ Do not include long summaries.
 
 ## 11.3 Privacy
 
-Lock-screen content may contain sensitive communication. Product settings should support reduced-detail previews.
+Lock-screen content may expose sensitive communication. Product settings should support reduced-detail previews.
 
-Exact privacy defaults must be reconciled with platform conventions and user testing.
+Exact privacy defaults require platform/user validation.
 
 ---
 
 # 12. Badge semantics
 
-## 12.1 Do not use unread-mail count as Lunowa's primary badge
+## 12.1 Unread-mail count should not be Lunowa's primary badge
 
 Unread count measures source activity, not Attention Need.
 
 ## 12.2 Candidate badge
 
-If a badge is used, the strongest candidate is the number of **current user-attention items**, potentially including material Review according to a clear rule.
-
-However Review and Needs You are semantically distinct; one combined numeric badge may hide that distinction.
+If an OS/app badge is used, a candidate is current user-attention count. However Review and Needs You are semantically distinct, so one combined number may hide meaning.
 
 Exact badge semantics are **UNKNOWN**.
 
-Avoid Managed/Waiting counts on the OS icon by default because they can recreate monitoring burden.
+Avoid Managed/Waiting counts as the default OS badge because they can recreate monitoring burden.
 
 ---
 
-# 13. Relationship to current surfaces
+# 13. Relationship to current surfaces and domain semantics
 
 ```text
 HOME
   current-state composition
 
 NEEDS YOU
-  standard + urgent actionable user work
+  current actionable user work
 
 MOMENT
   why now / what changed / what remains / safe next action
@@ -632,9 +629,11 @@ SOURCE
   original communication / provenance
 ```
 
-Daily Operating Model does not add a new canonical state.
+Daily Operating Model does not add a canonical lifecycle or domain object.
 
-`Awareness`, `urgent`, `silent`, and `delivery window` are Product-delivery concepts and must not be silently turned into Responsibility lifecycle enums.
+`Informational catch-up`, `immediate delivery`, `grouping`, and `delivery windows` are Product-delivery concepts. They must not be silently persisted as Responsibility resolution/lifecycle enums.
+
+Temporal facts remain distinct: source due, expected-event time, user target, resurface time, and delivery time must not overwrite one another.
 
 ---
 
@@ -645,16 +644,16 @@ Do not build the Product around:
 - mandatory morning Inbox triage;
 - mandatory evening review;
 - every new email generating a notification;
-- every reply canceling Waiting and returning attention;
+- every reply returning attention;
 - opaque AI-chosen interruption timing for all normal work;
-- a permanent awareness/update inbox unless validated;
-- unread count as the success metric;
-- Waiting count as a pressure badge;
+- permanent awareness/update inbox without evidence;
+- unread count as success metric;
+- Waiting count as pressure badge;
 - AI activity feed;
-- “daily streak” or Inbox Zero gamification;
-- urgent classification based only on sender importance or wording;
-- delivery rules that mutate canonical communicated due dates;
-- replaying obsolete notifications after long absence.
+- daily streak / Inbox Zero gamification;
+- immediate classification based only on sender importance or wording;
+- delivery rules that mutate canonical temporal facts;
+- replaying obsolete notifications after absence.
 
 ---
 
@@ -662,42 +661,40 @@ Do not build the Product around:
 
 Do not optimize primarily for DAU/session count. A successful delegation Product may reduce opens.
 
-Important measures:
-
 ## Interruption quality
 
 - external notifications per delegated loop;
 - unnecessary immediate interruptions;
-- percent of new messages handled silently;
+- percent of evidence changes handled silently;
 - grouped vs individual notification count;
-- user dismissal/open/action after standard and urgent returns;
-- urgent false-positive rate.
+- dismissal/open/action after delivery;
+- immediate false-positive rate.
 
 ## Delegation quality
 
-- self-checking of Inbox/Sent while Managed;
+- Inbox/Sent self-checking while Managed;
 - Managed inspection without state change;
 - parallel reminder/task creation;
-- time delegated loops remain out of active attention.
+- time delegated loops remain outside active attention.
 
 ## Return quality
 
 - missed Attention events;
-- lateness of return relative to accepted contract;
-- time from Moment open to correct action;
+- return lateness relative to accepted contract;
+- Moment-to-correct-action time;
 - source expansion required before action;
-- stale notification suppression correctness.
+- stale delivery suppression correctness.
 
 ## Awareness quality
 
-- awareness items opened/ignored;
+- informational updates opened/ignored;
 - awareness incorrectly promoted to work;
 - stale/superseded awareness shown;
-- user preference for next-open vs scheduled digest.
+- preference for next-open vs scheduled digest.
 
 ## Integrity
 
-- monitorable time vs degraded time;
+- monitorable vs degraded time;
 - time to integrity disclosure;
 - affected delegated loops per outage;
 - false reassurance during degraded periods (target: zero).
@@ -711,21 +708,21 @@ Important measures:
 - frequent unpredictable notifications interrupt attention;
 - batching/predictability can reduce interruption burden in some contexts;
 - complete notification suppression can create anxiety/FoMO in some populations;
-- proactive AI interventions are more acceptable at workflow boundaries than mid-task in a 2026 developer field study;
-- passive interventions preserve flow better than active interventions in a 2025 meeting technology probe;
-- current agent products notify at meaningful checkpoints such as input/approval/completion rather than requiring continuous monitoring;
+- proactive AI interventions were more acceptable at workflow boundaries than mid-task in a 2026 developer field study;
+- passive ambient interventions preserved flow better than active interventions in a 2025 meeting technology probe;
+- current agent products can notify at meaningful checkpoints instead of requiring continuous monitoring;
 - current mail products distinguish action-oriented to-dos from catch-up/informational surfaces;
-- current state/provenance needs to remain inspectable.
+- current state/provenance should remain inspectable.
 
 ## Lunowa-specific hypotheses requiring validation
 
-- standard Needs You should normally be externally batched;
-- awareness should use `Since you were away` and/or digest rather than a persistent surface;
+- ordinary Needs You should often use next-visit or grouped delivery rather than immediate push;
+- awareness should use `前回以降の更新` and/or digest rather than a persistent surface;
 - no mandatory morning/evening ritual;
 - exact delivery-window defaults;
-- exact urgent criteria;
+- exact immediate criteria;
 - quiet-hours exception behavior;
-- whether an optional daily briefing improves relinquishment or merely creates another checking ritual;
+- whether optional daily briefing improves relinquishment or creates a checking ritual;
 - badge semantics;
 - stewardship recap cadence.
 
@@ -733,11 +730,7 @@ Important measures:
 
 # 17. Candidate Daily Operating Contract
 
-The Product can be summarized as:
-
-> **Lunowa watches continuously, interrupts sparingly, and always returns the current state rather than replaying the inbox.**
-
-More concretely:
+> **Lunowa watches continuously, interrupts sparingly, and returns current state rather than replaying the inbox.**
 
 ```text
 ALWAYS
@@ -748,11 +741,11 @@ maintain current state
 SILENTLY
 handle non-actionable progress
 
-PASSIVELY
-surface awareness the user asked to know
+INFORMATIONALLY
+surface promised awareness without turning it into work
 
-PREDICTABLY
-return ordinary user work in grouped attention windows
+AT THE NEXT SUFFICIENT MOMENT
+return ordinary actionable work — next visit or grouped delivery depending delay cost
 
 IMMEDIATELY
 interrupt only when delay itself is materially costly or explicitly requested
@@ -768,15 +761,16 @@ rebuild from current state, suppress stale events, restore minimum context
 
 # 18. Open Product questions before canonical promotion
 
-1. What is the exact default for standard external notification timing?
-2. Should v1 ship an optional scheduled briefing or rely on next-open current-state Home?
+1. What is the exact default for ordinary external notification timing?
+2. Should v1 ship an optional scheduled briefing or rely on next-open Home?
 3. What validated criteria allow quiet-hours override?
-4. How should weekend/work-hour preferences be collected without a heavy setup flow?
-5. Does `Since you were away` improve orientation or become another inbox?
-6. Should awareness expire automatically after display, and under what conditions?
-7. What exact OS badge semantics best reduce checking?
-8. How does mobile foreground behavior differ from desktop without duplicating pushes?
-9. What maximum delay is acceptable for standard Needs You in the first validated ICP?
-10. Which integrity failures require immediate delivery versus next allowed window?
+4. How should work-hour/weekend preferences be collected without a heavy setup flow?
+5. Does `前回以降の更新` improve orientation or become another inbox?
+6. How should awareness expire after display?
+7. What OS badge semantics reduce checking rather than increase it?
+8. How should foreground desktop/mobile behavior suppress duplicate pushes?
+9. What maximum delay is acceptable for ordinary Needs You in the first validated ICP?
+10. Which integrity failures require immediate delivery versus next allowed visibility?
+11. How should the older Product Constitution candidate's `Passive` vocabulary be reconciled with the newer Surface/Daily distinction before canonical promotion?
 
-These questions require Product evidence and must not be resolved solely by intuition or unrelated notification research.
+These require Lunowa-specific Product evidence and must not be resolved solely by intuition or unrelated notification research.

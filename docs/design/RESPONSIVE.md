@@ -2,129 +2,115 @@
 
 ## Status
 
-**Current responsive-behavior source of truth, reconciled with Responsibility v0.1.**
+**Canonical responsive-behavior source of truth, reconciled with the 2026-08-27 Product/Design/Interaction contract and Responsibility v0.1.**
 
-This document defines how Lunowa's stable product/interaction model adapts across viewport sizes. The goal is not pixel-identical layouts. Preserve orientation, information hierarchy, drafts, selected context, Responsibility projections, and core interaction semantics while reducing simultaneous panes as width decreases.
+Responsive design preserves Lunowa's Product model while reducing simultaneous panes as width decreases. It must preserve orientation, source access, current attention state, Moment context, drafts, and safety semantics — not pixel-identical screenshots.
 
-Related sources:
+Related authorities:
 
+- `docs/product/PRODUCT.md`;
 - `docs/design/DESIGN.md`;
 - `docs/design/INTERACTIONS.md`;
-- `docs/product/responsibility/README.md`;
-- `docs/design/references/02-desktop-conversation-default.png`;
-- `docs/design/references/18-tablet-layout.png`;
-- `docs/design/references/19-mobile-layout.png`.
-
-Historical reference filenames do not define canonical Responsibility lifecycle semantics.
+- `docs/product/responsibility/`;
+- visual references under `docs/design/references/`.
 
 ---
 
-## 1. Responsive principles
+# 1. Responsive principles
 
-### 1.1 Same product model, fewer simultaneous panes
+## 1.1 Same Product, fewer simultaneous panes
 
-Preserve:
+The stable spatial pattern is conceptually:
 
 ```text
-Scope / navigation
-→ Conversation list
-→ Conversation detail
-→ 会話 / 今の要点
-→ secondary context / preview
+Navigation
+-> Surface/List
+-> Detail
+-> optional secondary context/preview
 ```
 
-As width decreases, reduce simultaneous levels instead of squeezing desktop UI until unreadable.
+Depending on Product surface:
 
-### 1.2 Preserve the user's place
+```text
+Needs You -> Attention Items -> Moment
+Managed   -> Managed Items   -> Monitoring Detail / Moment
+Source    -> Conversations   -> Conversation
+Search    -> Results         -> Result Detail
+```
 
-Responsive transitions/browser resizing should preserve where practical:
+As width decreases, collapse simultaneous levels instead of squeezing text.
 
-- current Scope;
-- active filter/projection surface;
-- selected Conversation;
-- selected `会話` / `今の要点` tab;
-- list scroll position;
-- search query/results;
-- draft text/recipients/attachments/sending account;
-- attachment/person-context state when safely representable;
+## 1.2 Preserve the user's place
+
+Viewport/layout changes should preserve where practical:
+
+- active Product surface/filter;
+- selected Responsibility/Conversation;
+- selected Moment/Source context;
+- list/search scroll/query;
+- active contextual draft, recipients, attachments, sending account;
+- attachment/person context;
 - preferred desktop pane widths.
 
-Viewport change must never silently discard an active draft.
+Viewport change never silently discards meaningful input.
 
-### 1.3 Content-fit over device labels
+## 1.3 Content-fit over device labels
 
-`desktop`, `tablet`, `mobile` are shorthand, not device-detection rules.
+`desktop/tablet/mobile` are shorthand. Switch layouts when minimum usable content widths fail, including Japanese copy, zoom, and accessibility scaling.
 
-Switch layouts when minimum usable content widths fail. Tune CSS breakpoints against real rendered Japanese content, zoom, and accessibility scaling.
+## 1.4 Projection semantics do not change by viewport
 
-### 1.4 Responsive collapse is not manual resizing
-
-Manual pane resizing is a desktop preference. Responsive collapse is a fit/safety override. Restore preferred widths when the viewport grows where practical.
-
-### 1.5 Projection is not canonical state
-
-Responsive UI may render:
-
-```text
-MY_TURN
-WAITING
-LATER
-DONE
-REVIEW
-NONE
-```
-
-but viewport/layout code must never create a separate lifecycle model. Projection semantics stay identical across widths.
+Responsive code may render My Turn/Waiting/Later/Done/Review differently, but it must not create a separate lifecycle model or simplify away decision-critical safety information.
 
 ---
 
-## 2. Layout stages
+# 2. Layout stages
 
 ### Stage A — Wide three-pane
 
 ```text
-Sidebar | Conversation List | Detail
+Sidebar | Surface/List | Detail
 ```
 
-Full sidebar/list/detail; resizable boundaries; secondary context/preview may use side sheet/overlay when width permits.
+Full navigation/list/detail; resizable boundaries. Optional context/preview may use a secondary side sheet/overlay.
 
 ### Stage B — Compact three-pane
 
 ```text
-Compact Sidebar | Conversation List | Detail
+Compact Sidebar | Surface/List | Detail
 ```
 
-Narrower sidebar/reduced nonessential spacing, readable list, Detail remains largest. Do not shrink typography merely to preserve panes.
+Reduce nonessential spacing/navigation width before harming text.
 
-### Stage C — Icon rail + list + detail
+### Stage C — Rail + list + detail
 
 ```text
-Icon Rail | Conversation List | Detail
+Nav Rail | Surface/List | Detail
 ```
 
-Scope/account labels move into popovers/drawers; compose remains easy to reach; list + Detail coexist.
+Keep high-value Product surfaces accessible. Generic fresh Compose is not required to occupy a permanent primary rail action.
 
 ### Stage D — Two-pane
 
 ```text
-Conversation List | Detail
+Surface/List | Detail
 ```
 
-Global navigation moves to drawer/sheet/header control. Selected Scope/filter remains visible enough to preserve orientation.
+Global navigation moves to drawer/sheet/header while current surface remains visible enough for orientation.
 
 ### Stage E — Single-pane
 
 ```text
-Conversation List ↔ Detail
+Surface/List ↔ Detail
 ```
 
-Selecting a Conversation opens Detail; Back restores exact list/search context. `会話` / `今の要点` remains available. Compose/reply stays accessible.
+Selecting an item opens Detail; Back restores exact surface/search/list context.
 
 ---
 
-## 3. Breakpoint guidance
+# 3. Initial breakpoint guidance
 
-Initial guidance only; validate against rendered content:
+Validate against rendered content rather than hard device assumptions:
 
 ```text
 Wide desktop:        >= ~1440 CSS px
@@ -134,103 +120,80 @@ Two-pane:            ~720–899 CSS px
 Single-pane:         < ~720 CSS px
 ```
 
-Collapse earlier rather than clip/shrink text when Japanese copy, zoom, or text scaling requires it.
+Collapse earlier rather than clip/shrink core content.
 
 ---
 
-## 4. Desktop pane sizing
+# 4. Desktop sizing
 
 ### Sidebar
 
-Preferred roughly 200–260px; may compact before icon rail. Exact values belong in tokens/constraints.
+Roughly 200–260px before compact/rail adaptation.
 
-### Conversation list
+### Surface/List
 
-Preferred roughly 360–480px; preserve sender/topic/preview/status readability. Collapse panes before pathological wrapping.
+Roughly 360–480px where a list exists. Preserve person/topic/action/status readability.
 
 ### Detail
 
-Receives remaining width and must preserve readable mail/composer content.
+Receives remaining width and must preserve readable Moment/Conversation/composer content.
 
 ### Splitters
 
-Use subtle visible line + larger hit target, pointer drag, min/max constraints, accessible separator semantics where practical, optional keyboard resizing, and optional reset.
+Use subtle visible line + larger hit target, pointer drag, sensible bounds, accessible separator semantics where practical, optional keyboard resizing/reset.
 
 ---
 
-## 5. Sidebar adaptation
+# 5. Navigation adaptation
 
-### Wide/compact desktop
+## Wide/compact
 
-Show logo, compose, Scope switcher, primary Responsibility-projection destinations, secondary navigation, accounts, settings.
+Expose high-value Product jobs such as Home, Needs You, Managed, conditional Review, Source, Pin/Search/Settings according to current Design.
 
-Do not call these destinations a canonical `lifecycle` in implementation; they are filters/projections such as My Turn/Waiting/Later/Done/Review.
+Waiting/Later/Done may appear as filters/details where appropriate; do not require them as permanent top-level destinations at every width.
 
-### Icon rail
+## Rail
 
-Keep high-value icons with tooltip/accessible labels:
+Use icon-only controls only where their meaning remains clear with tooltip/accessible labels.
 
-- Compose;
-- main projection/filter destinations;
-- Pin;
-- More/navigation drawer;
-- account/profile.
+## Two-/single-pane
 
-### Two-/single-pane
-
-Move global nav into drawer/sheet/header. Opening it must not clear Conversation/draft state.
+Move global nav into drawer/sheet/header without clearing current Detail/draft state.
 
 ---
 
-## 6. Conversation-list adaptation
+# 6. Needs You / Home adaptation
 
-### Wide desktop
+## Wide
 
-Rows may show avatar, sender/organization, topic, preview, one primary Responsibility/status projection, time/date, optional pin/account metadata.
+May show attention list and selected Moment simultaneously.
 
-### Compact/narrow
+## Compact/two-pane
 
-Remove low-value metadata before harming text readability.
+Preserve:
 
-Priority:
+1. one current action/question;
+2. due/delay signal;
+3. person/topic;
+4. concise why-now.
 
-1. sender/organization;
-2. topic;
-3. projection/attention indicator;
-4. time/date;
-5. preview.
+Remove low-value metadata before text clarity.
 
-### Single-pane mobile
+## Single-pane
 
-Keep touch-friendly rows with sender/topic/one-line preview/time and one clear projection indicator. Avoid permanent tiny action-button walls.
+Needs You card opens a focused Moment. Back returns to exact attention list position.
 
----
-
-## 7. Detail adaptation
-
-### Wide
-
-Full header, tabs, timeline/content, reply composer, optional context sheet.
-
-### Compact/two-pane
-
-Move low-frequency header actions into overflow before reducing reading width. Preserve subject/topic, sender identity, `会話` / `今の要点`, and core reply/action path.
-
-### Single-pane
-
-Top bar: Back, concise topic, high-value Pin, overflow. `会話` / `今の要点` remains near top.
-
-Avoid nested scroll areas unless preview/editor requires them.
+Unread/source volume must not displace current-action hierarchy.
 
 ---
 
-## 8. `今の要点` adaptation
+# 7. Moment adaptation
 
 Moment becomes **more selective**, not merely smaller.
 
-### Wide desktop
+### Wide
 
-May show projection headline, primary Responsibility/obligation, source due/return/waiting condition, attachment/context, secondary Responsibilities, source link, one primary safe action.
+May show current question, material due/return condition, supporting evidence, additional items, source access, and one primary safe action.
 
 ### Compact/tablet
 
@@ -238,173 +201,195 @@ Prefer vertical stacking over narrow side-by-side cards.
 
 ### Mobile priority
 
-1. current projection / primary question;
-2. primary Responsibility/obligation;
+1. why-now/current question;
+2. primary obligation/outcome;
 3. due/return/waiting/review condition;
 4. primary **safe** CTA if one exists;
 5. concise supporting context;
 6. collapsed additional Responsibilities/source details.
 
-Do not expand audit/provenance metadata by default.
+Do not expand raw audit/model data by default.
 
 ### Multiple Responsibilities
 
-Show one primary item plus compact `他にN件` section. Use the same deterministic primary-selection rule as desktop.
+Show one primary item plus compact `他にN件`. Preserve canonical selection semantics.
 
-### Parallel obligation legs
+### Review
 
-If one Responsibility requires multiple actors, mobile must preserve projection behavior:
-
-```text
-USER leg open -> MY_TURN
-USER leg satisfied + OTHER required leg open -> WAITING
-```
-
-Do not solve narrow layout by collapsing semantics into `BOTH`.
-
-### REVIEW
-
-A Review Moment should show the minimum decision-critical uncertainty/source context. Narrow screens must not hide the conflict merely to simplify the card.
+Never hide decision-critical conflict/safety evidence just to simplify mobile layout.
 
 ---
 
-## 9. Reply composer adaptation
+# 8. Managed adaptation
+
+### Wide
+
+May show aggregate reassurance + intentional inspection list + selected monitoring detail.
+
+### Compact/mobile
+
+Default to aggregate reassurance. Opening `管理中を見る` reveals items in a focused list/sheet.
+
+Managed counts are not a backlog badge. Avoid tiny permanent controls on every item.
+
+If monitoring integrity is degraded, affected scope/recovery must remain visible at every width.
+
+---
+
+# 9. Source Conversations adaptation
+
+### Wide
+
+Conversation list + selected Conversation.
+
+### Compact/two-pane
+
+Remove low-value metadata before sender/topic/time/source readability.
+
+### Single-pane
+
+Touch-friendly source rows open Conversation detail; Back restores list/search state.
+
+A source status/projection affordance may reach Moment, but the row body remains Source interaction.
+
+---
+
+# 10. Contextual reply adaptation
 
 ### Desktop
 
-Inline at Conversation bottom.
+Reply/composer remains near active Conversation/Moment where practical.
 
 ### Tablet/two-pane
 
-Keep inline, collapse low-frequency formatting into menu when needed.
+Keep in Detail; collapse low-frequency formatting/actions.
 
 ### Mobile
 
-Use reachable bottom composer that can expand on focus.
+Use reachable bottom/focused composer that can expand on focus.
 
 Requirements:
 
-- attachment access;
-- sending identity available before send;
-- Send accessible without horizontal scroll;
+- effective sender identity available before Send;
+- Reply All recipients inspectable;
+- attachment access for supported flows;
+- Send reachable without horizontal scroll;
 - IME keyboard does not cover active input/send;
-- draft survives orientation/viewport changes.
+- draft survives orientation/viewport changes;
+- ambiguous provider send preserves draft/context.
 
-An ambiguous provider send result preserves draft/context and does not automatically project Done merely because Send was tapped.
-
----
-
-## 10. New-compose adaptation
-
-Wide: compose occupies Detail while Sidebar/List remain.
-
-Two-pane: compose occupies Detail, list remains.
-
-Single-pane: focused compose with close/back, From, To, progressive Cc/Bcc, Subject, body, attachments/actions, Send.
-
-Back/close preserves draft unless explicitly discarded. Very narrow minimize may use a persistent draft tray instead of desktop floating window.
+Generic fresh compose is optional v1 convenience. If present, it follows the same input-preservation/accessibility rules but is not a Product-validation requirement.
 
 ---
 
-## 11. Search adaptation
+# 11. Search adaptation
 
-Desktop/two-pane: search results in list pane; selected result in Detail.
+### Desktop/two-pane
 
-Single-pane: dedicated results surface; selecting result opens Detail; Back restores query/filter/scroll.
+Results may occupy the list pane; selected result opens Detail.
 
-Result category chips may horizontally scroll rather than create noisy wrapping.
+### Single-pane
 
-Search/account/scope behavior remains authorization-safe at every width.
+Dedicated results surface; selecting a result opens Detail; Back restores query/filter/scroll.
 
----
-
-## 12. Person/company context adaptation
-
-Wide: right-side secondary sheet/column only if reading remains usable.
-
-Compact/two-pane: overlay side sheet.
-
-Mobile: full-height sheet/overlay with clear close/back.
-
-Closing returns to same Conversation position.
+Operational answers preserve source links and current-state context. Search/account authorization boundaries remain identical across widths.
 
 ---
 
-## 13. Attachment preview adaptation
+# 12. People/context adaptation
 
-Wide: side pane/overlay while retaining context where possible.
+### Wide
 
-Tablet/two-pane: overlay or Detail replacement with explicit Back/Close.
+Use a right-side sheet/secondary column only if it does not impair reading/Moment width.
+
+### Compact/two-pane
+
+Overlay side sheet.
+
+### Mobile
+
+Full-height sheet/overlay with clear close/back.
+
+Closing returns to the same source/Moment position.
+
+---
+
+# 13. Attachment preview adaptation
+
+Wide: side pane/overlay where useful.
+
+Tablet/two-pane: overlay or focused Detail with explicit return.
 
 Mobile: focused preview.
 
-Always preserve selected Conversation/message association/return path and safe download/open-external actions.
+Always preserve selected Conversation/Message/Moment association and safe download/open-external fallback.
 
-Opening/previewing is not automatic Responsibility completion evidence.
-
----
-
-## 14. Menus, popovers, sheets
-
-Use the smallest transient surface that fits content.
-
-Desktop: dropdown/popover for short menus, side sheet for context, dialog only for focused decisions.
-
-Mobile: bottom/full-height sheets for longer actions.
-
-Menus remain reachable under zoom/text scaling.
+Opening/previewing is not Responsibility completion evidence.
 
 ---
 
-## 15. Touch, pointer, keyboard
+# 14. Transient surfaces
+
+Use the smallest surface that fits the job:
+
+- desktop dropdown/popover for short menus;
+- side sheet for context/Managed/person details;
+- dialog only for focused decisions;
+- mobile bottom/full-height sheet for longer decisions.
+
+Do not use modal dialogs for harmless uncertainty or routine monitoring details.
+
+---
+
+# 15. Touch / pointer / keyboard
 
 Do not rely on hover for essential functionality.
 
-Pointer may expose hover quick actions/tooltips. Touch gets visible/overflow equivalents. Keyboard gets logical focus order/visible focus across viewport sizes.
+Pointer may expose hover quick actions/tooltips. Touch requires visible/overflow equivalents. Keyboard must have logical focus order and visible focus at every viewport stage.
 
 ---
 
-## 16. Text, zoom, localization resilience
+# 16. Text / zoom / localization resilience
 
 - allow labels to grow;
 - truncate only noncritical labels with accessible full text;
-- avoid Japanese-screenshot-specific fixed button widths;
-- prefer flexible gaps/padding;
+- avoid screenshot-specific fixed button widths;
+- prefer flexible spacing;
 - test >100% zoom/text scaling;
-- never auto-reduce core font size to match a reference.
+- never reduce core font size merely to preserve pane count.
 
 ---
 
-## 17. Motion and navigation continuity
+# 17. Motion and continuity
 
-Motion explains spatial change:
+Motion explains spatial change, not decorates:
 
-- list→detail short push/slide or clear immediate swap;
-- nav drawer side slide;
-- bottom sheet vertical rise;
-- preview/context subtle fade/slide.
+- list → detail short push/slide or clear swap;
+- navigation drawer side slide;
+- sheet vertical/fade transition;
+- preview/context subtle transition.
 
-Avoid long decoration. Respect `prefers-reduced-motion`.
-
----
-
-## 18. Offline/error behavior across layouts
-
-Error/offline surfaces should match impact:
-
-- one account reconnect -> scoped banner/card;
-- sync -> compact indicator;
-- send failure/ambiguity -> composer-local state preserving draft;
-- AI unavailable -> ordinary mail remains usable and accepted state does not randomly reclassify;
-- attachment preview failure -> preview-local fallback.
-
-On mobile, banners must not permanently cover navigation/composer.
+Respect `prefers-reduced-motion`.
 
 ---
 
-## 19. Responsive accessibility baseline
+# 18. Offline/error/integrity across layouts
 
-At all stages:
+Error UX matches impact:
+
+- one-account reconnect → scoped banner/card;
+- sync/integrity degradation → affected monitoring scope visible;
+- send failure/ambiguity → composer/Moment-local state preserving input;
+- AI unavailable → Source/basic search/manual contextual communication remains usable where runtime supports it;
+- attachment preview failure → local fallback.
+
+Mobile banners must not permanently cover navigation/composer or hide urgent Review/safety information.
+
+---
+
+# 19. Accessibility baseline
+
+At every layout stage:
 
 - appropriate touch targets (~44 CSS px where applicable);
 - readable critical text without page-level horizontal scrolling;
@@ -412,41 +397,44 @@ At all stages:
 - focus not hidden by sticky UI;
 - color not sole state cue;
 - screen-reader order matches logical/visual order;
-- orientation change does not discard state.
+- orientation change does not discard state;
+- decision-critical Review/integrity information remains reachable.
 
 ---
 
-## 20. Verification matrix
+# 20. Verification matrix
 
-Verify with realistic data:
+Verify with realistic Product-relevant data:
 
 | Scenario | Wide | Compact | Two-pane | Single-pane |
 |---|---:|---:|---:|---:|
-| Conversation list + long Japanese subject | ✓ | ✓ | ✓ | ✓ |
-| Row click → `会話` | ✓ | ✓ | ✓ | ✓ |
-| Responsibility/status chip → `今の要点` | ✓ | ✓ | ✓ | ✓ |
+| Home / Needs You attention hierarchy | ✓ | ✓ | ✓ | ✓ |
+| Needs You -> Moment | ✓ | ✓ | ✓ | ✓ |
+| Managed reassurance / inspection | ✓ | ✓ | ✓ | ✓ |
+| Source row -> Conversation | ✓ | ✓ | ✓ | ✓ |
+| Source status affordance -> Moment | ✓ | ✓ | ✓ | ✓ |
 | My Turn / Waiting / Later / Done / Review | ✓ | ✓ | ✓ | ✓ |
 | Multiple Responsibilities | ✓ | ✓ | ✓ | ✓ |
-| Parallel obligation-leg projection change | ✓ | ✓ | ✓ | ✓ |
-| New compose with attachment | ✓ | ✓ | ✓ | ✓ |
-| Active reply + IME keyboard | n/a | optional | optional | ✓ |
-| Search and return to result list | ✓ | ✓ | ✓ | ✓ |
-| Person context open/close | ✓ | ✓ | ✓ | ✓ |
-| PDF preview open/close | ✓ | ✓ | ✓ | ✓ |
-| Offline/send ambiguity/failure | ✓ | ✓ | ✓ | ✓ |
+| Parallel obligation-leg projection | ✓ | ✓ | ✓ | ✓ |
+| Contextual reply + attachment | ✓ | ✓ | ✓ | ✓ |
+| Active Japanese IME input | n/a | optional | optional | ✓ |
+| Search + return continuity | ✓ | ✓ | ✓ | ✓ |
+| People/context open-close | ✓ | ✓ | ✓ | ✓ |
+| Attachment preview | ✓ | ✓ | ✓ | ✓ |
+| Integrity/send ambiguity/error | ✓ | ✓ | ✓ | ✓ |
 | 125–200% zoom/text scaling | ✓ | ✓ | ✓ | ✓ |
 
-Also test just above/below collapse thresholds; breakpoint-edge defects matter more than matching one reference device.
+Fresh native new-compose parity is **not** a required Product-validation row unless a live accepted experiment explicitly adds it.
 
 ---
 
-## 21. Default responsive decision rule
+# 21. Default responsive decision rule
 
-When layout does not fit:
+When content does not fit:
 
 1. remove/defer low-value secondary metadata;
 2. tighten nonessential spacing moderately;
 3. collapse global navigation;
 4. reduce simultaneous panes;
 5. move secondary context into sheet/overlay;
-6. never solve fit by making core text unreadable, dropping decision-critical Review/safety information, changing Responsibility semantics, or destroying user state.
+6. never solve fit by making core text unreadable, dropping decision-critical Review/integrity information, changing Responsibility semantics, or destroying user state.

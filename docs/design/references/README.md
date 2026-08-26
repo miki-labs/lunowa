@@ -1,15 +1,16 @@
 # Lunowa Visual References
 
-This directory contains the committed visual references used to implement Lunowa.
+This directory contains committed visual references used to implement Lunowa.
 
-These images are **visual design references, not semantic specifications**. Read them together with:
+These images are **visual design references, not Product-scope or semantic specifications**. Read them together with:
 
-- `../DESIGN.md`;
-- `../INTERACTIONS.md`;
-- `../RESPONSIVE.md`;
+- `../../product/PRODUCT.md` — canonical Product purpose/scope;
+- `../DESIGN.md` — canonical high-level Product design;
+- `../INTERACTIONS.md` — canonical interaction behavior;
+- `../RESPONSIVE.md` — canonical viewport adaptation;
 - `../../product/responsibility/README.md` when Responsibility meaning is involved.
 
-All `00`–`19` reference images remain committed.
+All `00`–`19` reference images remain committed because they preserve useful composition, component, state, and responsive design work. Their presence does **not** mean every depicted feature belongs to current v1 scope.
 
 ---
 
@@ -33,12 +34,43 @@ Review/ambiguity visuals may require a textual-spec-driven state even if no old 
 
 ---
 
+## Product-scope guardrail
+
+A screenshot may show a capability that is now deferred, optional, provider-owned, or only a later Product possibility.
+
+Examples include:
+
+- broad native fresh Compose;
+- Send Later;
+- full Drafts/Sent/folder administration;
+- broad mailbox hygiene actions;
+- second-provider/multi-account breadth;
+- permanent Waiting/Later top-level navigation;
+- source-first landing as the only Product workflow.
+
+Do **not** implement or restore those capabilities merely because an image exists. Current Product scope comes from `../../product/PRODUCT.md` and the live accepted experiment/Issue.
+
+The current v1 direction is Attention-first and may use the same visual shell with different middle/detail objects:
+
+```text
+Needs You -> Attention Items -> Moment
+Managed   -> Managed Items   -> Monitoring Detail / Moment
+Source    -> Conversations   -> Conversation
+Search    -> Results         -> Result Detail
+```
+
+---
+
 ## Critical interaction rule
 
-- normal Conversation-row body click → `会話`;
-- Responsibility/status chip click → `今の要点`.
+Interaction depends on **which Product surface the user is in**.
 
-`今の要点` must not become an unavoidable gate for ordinary mail reading.
+- **Needs You item** → opens `今の要点` / Moment for the current user question.
+- **Managed item** → opens monitoring detail / relevant Moment according to current interaction spec.
+- **Source Conversation row body** → opens original `会話`.
+- **Source Responsibility/status affordance** → may open the relevant `今の要点` without changing row-body Source semantics.
+
+There is no longer one global rule saying every ordinary list row must open Conversation. `今の要点` must also never become an unavoidable gate to original source mail.
 
 See `../INTERACTIONS.md` for normative behavior.
 
@@ -46,13 +78,14 @@ See `../INTERACTIONS.md` for normative behavior.
 
 ## Reference authority
 
-1. Current Markdown specifications define semantics, behavior, edge cases, accessibility, responsive behavior, and conflict resolution.
-2. `00-brand-system.png` is strongest for brand identity/overall visual direction.
-3. `01-component-system.png` is strongest for reusable component appearance.
-4. `02-desktop-conversation-default.png` is strongest for desktop shell/default layout.
-5. State/feature images are visual references for the state/feature they intentionally demonstrate.
+1. `../../product/PRODUCT.md` defines Product value/scope/jurisdiction.
+2. Current Markdown design/domain specifications define semantics, behavior, edge cases, accessibility, responsive behavior, and conflict resolution.
+3. `00-brand-system.png` is strongest for brand identity/overall visual direction.
+4. `01-component-system.png` is strongest for reusable component appearance.
+5. `02-desktop-conversation-default.png` is strongest for the reusable desktop shell/composition pattern, **not** for Product landing/scope.
+6. State/feature images are visual references for the state/feature they intentionally demonstrate, only when that feature is in current accepted scope.
 
-A screenshot must not redefine the Responsibility model, global shell, typography, brand palette, spacing system, component language, or interaction semantics.
+A screenshot must not redefine the Responsibility model, Product scope, global typography/brand/component system, authority boundary, implementation sequence, or revive a superseded lifecycle/full-client assumption.
 
 ---
 
@@ -68,7 +101,8 @@ Non-authoritative details include:
 - small color inconsistencies;
 - provider-specific examples not otherwise specified;
 - impossible/fake sample data;
-- image-generation spacing artifacts.
+- image-generation spacing artifacts;
+- feature breadth that current Product authority has deferred or made optional.
 
 Use images primarily for:
 
@@ -90,7 +124,7 @@ Use images primarily for:
 
 Purpose: brand identity, lunar-rabbit logo, Navy/Lunar Gold relationship, functional-state color direction, typography, border/radius/shadow/icon tone.
 
-Authority: strongest visual brand reference; does not override semantic/interaction specs.
+Authority: strongest visual brand reference; does not override Product/semantic/interaction specs.
 
 ### `01-component-system.png`
 
@@ -104,9 +138,9 @@ Normalize repeated components toward this system when screenshots differ slightl
 
 ### `02-desktop-conversation-default.png`
 
-Purpose: canonical three-pane shell, sidebar/list/detail hierarchy, ordinary thread presentation, inline reply composer, `会話` / `今の要点` relationship.
+Purpose: reusable three-pane shell, sidebar/list/detail hierarchy, ordinary Source-thread presentation, inline reply composition, and `会話` / `今の要点` visual relationship.
 
-Critical note: ordinary row click opens `会話`.
+Critical note: this image is strongest for shell/composition, **not** for asserting that Source Inbox is Home or that every middle-pane row is a Conversation.
 
 ### `03-moment-action-required.png`
 
@@ -124,6 +158,8 @@ Do not interpret a communication hold/waiting state as Later merely because this
 
 Visual purpose: **Waiting / 待ち** Moment — who/what is pending, what the user already did, what/when Lunowa will re-check.
 
+Current Product direction normally keeps Waiting quiet under Managed rather than requiring it as a permanent top-level work queue.
+
 ### `06-moment-follow-up.png`
 
 Visual purpose: **My Turn with follow-up reason/action** — elapsed-no-reply context, prepared follow-up, Send/Edit hierarchy.
@@ -132,7 +168,7 @@ Visual purpose: **My Turn with follow-up reason/action** — elapsed-no-reply co
 
 ### `07-moment-completed.png`
 
-Visual purpose: **Done / 完了** Moment — quiet resolution confirmation with little/no primary action.
+Visual purpose: **Done / 完了** Moment — quiet monitoring-end/resolution explanation with little/no primary action.
 
 Do not infer that every Done means successful satisfaction; cancellation/decline/user-close/supersession may need different copy.
 
@@ -148,23 +184,25 @@ Canonical semantic note: Responsibility state belongs to operational loops, not 
 
 ### `09-compose-new-email.png`
 
-New-message compose within workspace: From/To/Cc/Bcc/Subject/body/formatting/signature/attachments/autosave/Send/Send Later/minimize/close.
+Historical visual exploration for native fresh-message compose: From/To/Cc/Bcc/Subject/body/formatting/signature/attachments/autosave/Send/Send Later/minimize/close.
+
+**Current Product scope note:** broad native fresh Compose and Send Later are not current v1 Product-validation gates. Use this image only if a live accepted Product/Issue later includes native fresh compose, or for reusable composer/component ideas that also apply to contextual reply.
 
 ### `10-search-mode.png`
 
-Search results in center pane, categories, highlighted matches, selected result in Detail while search context remains.
+Search/Operational Retrieval visual direction: results in center pane, categories, highlighted matches, selected result in Detail while search context remains.
 
-Search defaults to current Scope and must not silently cross account/scope authorization boundaries.
+Search must respect current authorization and must not silently mutate accepted Responsibility state or authorize cross-account semantic merge.
 
 ### `11-person-context-panel.png`
 
 Person/company context side sheet: current relevant issue, recent topics, evidence-backed facts, organization/role, files, related Conversations.
 
-Not a CRM pipeline.
+Current Product boundary: communication restoration only, not CRM pipeline/relationship scoring/personality profiling.
 
 ### `12-attachment-preview.png`
 
-Preview a supported attachment without losing Conversation context.
+Preview a supported attachment without losing Conversation/Moment context.
 
 Opening a file is not automatically completion evidence.
 
@@ -174,7 +212,9 @@ Opening a file is not automatically completion evidence.
 
 ### `13-navigation-and-action.png`
 
-Sidebar `その他`, Conversation/message menus, desktop hover actions, keyboard/menu affordance direction.
+Historical navigation/action visual material: sidebar secondary destinations, Conversation/message menus, desktop hover actions, keyboard/menu affordance direction.
+
+Current Product scope/navigation from `PRODUCT.md` / `DESIGN.md` wins. Do not restore permanent provider mailbox administration or old projection navigation merely because this image contains it.
 
 ### `14-scope-account-management.png`
 
@@ -189,23 +229,29 @@ Responsibility projection/filter = what needs attention
 
 Cross-account semantic similarity does not authorize Responsibility merge.
 
+**Current scope note:** second-provider/multi-account breadth is deferred until one-provider complete-loop/Product evidence justifies it. This image remains useful future visual material, not current v1 breadth authority.
+
 ---
 
 ## Entry, settings, and system states
 
 ### `15-onboarding-multi-account.png`
 
-Minimal Google/Microsoft connection, immediate usability, optional second account, `一緒に見る / 分けて使う` choice.
+Historical visual exploration of Google/Microsoft connection and optional multi-account organization.
+
+**Current onboarding direction:** connect one mailbox, preserve Source, choose one real current communication loop, explain the bounded monitoring contract, then let the user explicitly delegate that loop. Multi-account organization is not required before first value.
 
 Historical initial sync must not imply every old unanswered message becomes live My Turn work.
 
 ### `16-settings.png`
 
-Settings information architecture and account/privacy/display direction. Screenshot may include non-v1 settings; textual scope decides shipment.
+Settings information architecture and account/privacy/display direction. Screenshot may include non-v1 settings; textual Product scope decides shipment.
 
 ### `17-system-states.png`
 
 Loading, syncing, offline, send failure/ambiguity, reconnect, empty state, attachment-preview failure, lightweight inline states.
+
+Current Product additionally requires monitoring-integrity degradation to be surfaced honestly when delegated scope can no longer be monitored reliably.
 
 Preserve user input and usable existing content whenever possible.
 
@@ -219,9 +265,9 @@ Compact multi-pane/tablet direction. Follow `RESPONSIVE.md` content-fit rules ra
 
 ### `19-mobile-layout.png`
 
-Mobile list/detail, `会話` / `今の要点`, composer/action scale, touch/density direction.
+Mobile list/detail, Moment/Source, composer/action scale, touch/density direction.
 
-Do not copy sample bottom-nav taxonomy unless current specs agree.
+Do not copy sample bottom-nav taxonomy or assume Source-first list semantics unless current Product/Interaction specs agree.
 
 ---
 
@@ -229,13 +275,15 @@ Do not copy sample bottom-nav taxonomy unless current specs agree.
 
 Before non-trivial frontend work:
 
-1. read relevant Markdown specs;
-2. inspect `00`, `01`, `02` when global shell/styling is involved;
-3. inspect only relevant state/feature references;
-4. identify screenshot/spec conflicts before coding;
-5. implement reusable components/tokens, not screenshot-specific duplication;
-6. run the app and compare render against reference;
-7. verify behavior, responsive states, keyboard/focus, loading/error states, and realistic data;
-8. never derive canonical Responsibility semantics from legacy screenshot labels.
+1. read `../../product/PRODUCT.md` plus the relevant current Issue/experiment contract;
+2. read relevant Markdown design/domain specs;
+3. inspect `00`, `01`, `02` when global shell/styling is involved;
+4. inspect only relevant state/feature references;
+5. classify screenshot-only feature breadth as visual history, not Product scope;
+6. identify screenshot/spec conflicts before coding;
+7. implement reusable components/tokens, not screenshot-specific duplication;
+8. run the app and compare render against the relevant reference;
+9. verify behavior, responsive states, keyboard/focus, loading/error/integrity states, and realistic data;
+10. never derive canonical Responsibility semantics or Product implementation breadth from legacy screenshot labels/images.
 
-Target: one coherent product, not individually hard-coded screenshot replicas.
+Target: one coherent Product, not individually hard-coded screenshot replicas.

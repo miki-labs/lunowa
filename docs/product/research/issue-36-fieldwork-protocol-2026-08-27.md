@@ -6,7 +6,7 @@
 
 This document operationalizes GitHub Issue #36 (`[Product Discovery]: Validate the first ICP and real communication-monitoring burden`). It does **not** change canonical Product truth in `docs/product/PRODUCT.md`, declare an ICP, validate PMF/WTP, or authorize implementation.
 
-The protocol is designed to maximize falsifiability and reduce recall, leading-question, panel-conditioning, and fraudulent-participant risk while preserving participant privacy.
+The protocol is designed to maximize falsifiability and reduce recall, leading-question, founder-expectancy, panel-conditioning, and fraudulent-participant risk while preserving participant privacy.
 
 ---
 
@@ -36,13 +36,29 @@ The initial exploratory wave should be **human-moderated**.
 
 2025–2026 evidence suggests LLM interviewers can improve consistency and scale and can conduct adaptive follow-ups, but deployed systems still show probe-light behavior, multi-question turns, premature termination/information-loss failure modes, and weaker narrative depth in some exploratory settings. Therefore:
 
-- human moderator owns the first 15–24 valid exploratory interviews;
+- human moderator owns the first exploratory wave within the planning range below, subject to cohort stop/redirect rules;
 - AI may assist with guide rehearsal, transcription, de-identified structuring, coding suggestions, contradiction search, and synthesis;
 - AI does not decide participant validity, evidence classification, segment disposition, or Product promotion;
 - raw private client/email content must not be sent to an unapproved external model;
 - AI-moderated interviews may be considered later for **breadth/validation after the human interview model stabilizes**, not as a substitute for the first discovery wave.
 
-## 2.3 Information power, not a magic interview count
+## 2.3 Founder-expectancy / confirmation-bias controls
+
+Because the Product founder may also moderate, the protocol must assume a strong incentive to see confirming evidence.
+
+Controls:
+
+- do not show or explain Lunowa before recent-event reconstruction;
+- use the same neutral core guide for confirming and disconfirming participants;
+- ask for a contrasting “already handled well” event in every valid interview;
+- write the structured loop evidence **before** writing Product interpretation;
+- preserve explicit counterexamples beside supportive cases;
+- after each interview, record a short `what would make the current hypothesis weaker?` memo;
+- after each batch, actively sample the case most likely to contradict the emerging explanation;
+- strongly prefer an independent second-pass review of the first 3 valid interviews and at least one case per cohort using de-identified structured notes/transcripts. The reviewer should look specifically for leading probes, evidence/inference mixing, omitted counterexamples, and unjustified Product-language translation;
+- if no independent human reviewer is available, an AI adversarial review of de-identified material may be used as an additional error-finding aid, but it is **not** classified as independent validation and cannot promote the segment hypothesis.
+
+## 2.4 Information power, not a magic interview count
 
 Use a planning range rather than a fixed “10 interviews is enough” rule.
 
@@ -52,9 +68,9 @@ Initial planning range:
 - small agency / client-service operators: 5–6;
 - small B2B owner/operators: 5–6;
 - strong-system-of-record negative controls: 3–6 across ATS/CRM/accounting/legal/domain-managed workflows;
-- expected initial total: roughly **15–24 valid interviews**.
+- expected initial total: roughly **15–24 valid interviews** if the cohorts continue to carry information value.
 
-This is a resource-planning range, not a prevalence estimator. Continue or redirect sampling based on information power: study aim narrowness, cohort specificity, quality/depth of dialogue, use of prior theory, and whether new cases still change the causal/workflow model.
+This is a resource-planning range, not a prevalence estimator. Continue, stop, or redirect sampling based on information power: study aim narrowness, cohort specificity, quality/depth of dialogue, use of prior theory, and whether new cases still change the causal/workflow model.
 
 Do not claim saturation merely because no new high-level theme appears in a few shallow interviews.
 
@@ -126,7 +142,9 @@ If cost/fill-rate data contradict this range, adjust transparently. Incentive am
 
 # 5. Recruitment screener
 
-Keep the screener short (target 8–12 substantive questions), behavior-based, and non-leading. Do not mention Lunowa, “open loops,” “waiting,” or the desired answer.
+Keep the screener short (target 8–12 substantive questions), behavior-based, and non-leading. Do not mention Lunowa, “open loops,” “waiting,” or the desired answer. Where the tooling permits it, separate questions across pages so later questions do not teach respondents how to answer earlier ones.
+
+Before scaled recruitment, run **2–3 cognitive pretests** with people who resemble the target population and ask what they thought each question meant. Revise ambiguous wording before treating screener output as eligibility evidence.
 
 ## Suggested screener
 
@@ -169,9 +187,9 @@ In the last 2 weeks, which channels did you personally use for work coordination
 
 **Qualification signal:** email is materially used; email need not be the only channel.
 
-### Q4 — Recent unresolved work
+### Q4 — Recent multi-step work
 
-Thinking only about the last 14 days, about how many work matters stayed unresolved for at least overnight after an email was sent or received?
+Thinking only about the last 14 days, about how many work matters involving email took more than one step or remained in progress beyond the initial send/receive?
 
 - none;
 - 1;
@@ -182,11 +200,11 @@ Thinking only about the last 14 days, about how many work matters stayed unresol
 
 Do not treat this estimate as measured prevalence; use it only for screening/context.
 
-### Q5 — What they actually did while waiting
+### Q5 — What they actually did while a matter remained in progress
 
-During the last 14 days, when something remained unresolved after email, which of these did you personally do at least once? Select all that apply.
+During the last 14 days, for work matters involving email that were not finished immediately, which of these did you personally do at least once? Select all that apply.
 
-- reopened Inbox or the thread to check status;
+- reopened Inbox or the thread;
 - searched Sent mail;
 - used star/flag/label/folder;
 - snoozed an email;
@@ -195,9 +213,11 @@ During the last 14 days, when something remained unresolved after email, which o
 - wrote a note/spreadsheet entry;
 - relied on a CRM/ATS/ticket/project tool;
 - asked an assistant/coworker to track it;
-- did nothing / simply waited;
+- did nothing / simply continued work;
 - none of these;
 - other.
+
+The question intentionally does **not** say that manual rechecking is the desired behavior.
 
 ### Q6 — Existing systems
 
@@ -207,7 +227,7 @@ Include CRM, ATS, ticketing, project-management, accounting/practice-management,
 
 ### Q7 — Personal ownership
 
-When an external email-dependent matter is waiting on someone else, who usually remains responsible for noticing if it stalls?
+When an external work matter communicated through email is not finished yet, who usually remains responsible for noticing whether it progresses or stalls?
 
 - mostly me;
 - shared with coworkers;
@@ -217,13 +237,13 @@ When an external email-dependent matter is waiting on someone else, who usually 
 
 ### Q8 — Recent example, open text
 
-Without including names, confidential details, or message text, briefly describe **one work email from the last 14 days that remained unresolved for at least a day**. What outcome were you waiting for, and what did you do next?
+Without including names, confidential details, or message text, briefly describe **one recent work matter involving email that took more than one step to complete or was not finished immediately**. What happened after the first message?
 
-**Manual review required.** Look for concrete temporal/behavioral detail, not Product-friendly language.
+**Manual review required.** Look for concrete temporal/behavioral detail, including cases where another system handled the work well. Do not reward Product-friendly vocabulary.
 
 ### Q9 — Contrast / anti-gaming question
 
-In the last 14 days, was there also a work matter you did **not** need to remember or manually recheck because another system/person handled it well? If yes, briefly describe the kind of system/person.
+In the last 14 days, was there a work matter you did **not** need to remember or manually recheck because another system/person handled it well? If yes, briefly describe the kind of system/person.
 
 This deliberately makes “already solved” a legitimate answer.
 
@@ -309,37 +329,39 @@ Do **not** explain Lunowa’s proposed solution before event reconstruction.
 - What kinds of external people or organizations do you personally coordinate with?
 - Which channels/tools are involved?
 - Which system, if any, is the official place where work status lives?
-- Who normally notices if someone fails to respond or deliver?
+- Who normally notices if something does not progress as expected?
 
 Keep this factual; do not spend the session on generic frustrations.
 
-## 7–22 min — Event A: most recent unresolved/rechecked case
+## 7–22 min — Event A: recent multi-step email matter
 
 Opening prompt:
 
-> Think of the most recent work-related email you checked even though you could not fully act or finish the matter yet. Walk me through it from the beginning.
+> Think of a recent work-related matter involving email that took more than one step to finish, or is still in progress. Walk me through it from the beginning.
+
+Do **not** assume the participant manually rechecked it. Discover whether monitoring burden existed.
 
 Build a visible or note-based timeline:
 
 1. What outcome did you ultimately need?
 2. What started the matter?
 3. At that moment, who/what did you believe had the next move?
-4. What exactly were you waiting to happen?
+4. What did you expect to happen next?
 5. What did you do immediately after sending/receiving the email?
-6. When did you next think about or check it? What triggered that?
-7. Where did you look: Inbox, Sent, search, task app, calendar, CRM, notes, another person?
-8. Did you create any reminder/scaffolding? Why that method?
-9. Did a reply arrive before the actual outcome was complete? If yes, what changed and what remained open?
-10. How did you decide when to look again?
+6. When did you next think about the matter? What triggered that?
+7. Did you look anywhere to determine status? If yes, where: Inbox, Sent, search, task app, calendar, CRM, notes, another person?
+8. Did you create any reminder/scaffolding? If yes, why that method?
+9. Did any message arrive before the actual outcome was complete? If yes, what changed and what remained open?
+10. How did you decide when, if ever, to look again?
 11. What counted as actually finished?
 12. What would have happened if you forgot or were late?
 13. Which part, if any, did your current tools handle well?
 
-For each self-check, probe **why that check happened** rather than merely counting it.
+For each self-check that actually occurred, probe **why that check happened** rather than merely counting it. If there was no self-check, preserve that as disconfirming evidence.
 
-## 22–32 min — Event B: contrasting case
+## 22–32 min — Event B: deliberately contrasting case
 
-Select a deliberately contrasting recent event:
+Select a contrasting recent event:
 
 - a case already handled well by CRM/ATS/project software;
 - a case where reply = completion;
@@ -348,15 +370,15 @@ Select a deliberately contrasting recent event:
 
 Prompt:
 
-> Give me a recent case that worked differently — ideally one you did not need to keep checking, or one where another tool handled it well.
+> Give me a recent case that worked differently — for example, one where another tool/person handled the state well, one that finished quickly, or one you did not need to think about again.
 
 Goal: identify the boundary of the problem, not just confirming examples.
 
 ## 32–38 min — cross-event current workflow
 
-- Across these examples, how do you know what is currently waiting on you versus someone else?
+- Across these examples, how do you know what currently needs your attention versus someone else’s?
 - Is there one place you trust, or do you reconstruct status from several places?
-- When you create a task/reminder, what information do you record? Just a date, or what you are actually waiting for?
+- When you create a task/reminder, what information do you record? Just a date, or what you are actually expecting to happen?
 - Which existing tool already solves this best?
 - What does it still fail to cover?
 - Have you ever stopped using a reminder/follow-up tool? What caused that?
@@ -400,7 +422,7 @@ Never require access to an inbox or credentials. Do not capture screenshots/raw 
 
 A small optional pre-task can improve recall:
 
-> Before the interview, identify two recent work-email matters: one you had to remember/recheck while waiting, and one that another system/person handled well. Do not send us the emails.
+> Before the interview, identify two recent work-email matters: one that took more than one step or stayed in progress, and one that another system/person handled well. Do not send us the emails.
 
 Keep the pre-task light; do not ask participants to manufacture logs or count weeks of history retrospectively.
 
@@ -456,13 +478,13 @@ trigger
 -> unresolved outcome
 -> current next move
 -> participant action/scaffolding
--> waiting
--> self-check(s)
+-> waiting or continued work
+-> self-check(s), if any
 -> evidence/state change
 -> resolution or still open
 ```
 
-Separate fact/event from participant interpretation.
+Separate observed/recalled event from participant interpretation and researcher inference.
 
 ## 11.2 Cross-case second
 
@@ -488,6 +510,7 @@ After each batch of roughly 4–6 valid interviews:
 - list evidence that weakens each current hypothesis;
 - identify the highest-information next participant/cohort;
 - check whether the interviewer is leading, over-probing one theme, or failing to reach concrete events;
+- compare founder interpretation with any available independent/adversarial second-pass review;
 - decide whether to continue, redirect, or stop a cohort.
 
 Do not wait until all interviews are complete before analysis.
@@ -561,7 +584,7 @@ These sources inform the protocol but do not constitute Product truth:
 - Habimana-Jordana & Lanau (2026), *Event Interviews: A Visual Tool to Study Shocks, Change and Adaptation* — timeline/resource reconstruction around participant-identified events.
 - Crossen, Harper & Maloney (2026), *Identifying and Managing Fraudulent Participants in Online Qualitative Research* — current imposter-participant evidence.
 - P-FROST recommendations / recent JMIR and related fraud-method papers (2024–2026) — layered screening and ethical anti-fraud controls.
-- Jack, Cooper & Flower (2026), *Automating the qualitative interview? Using Gen AI chatbots in social science research* — evidence for scalable LLM interviewing with need for methodological limits.
+- Jack, Cooper & Flower (2026), *Automating the qualitative interview? Using Gen AI chatbots in social science research* — evidence for scalable LLM interviewing with methodological limits.
 - Zhang et al. (2026), *When the Interviewer Is a Bot: Behavior, Breakdowns, and Trust in MLLM-Led Interviews* — deployed probe-depth/breakdown evidence.
 - Panfilova et al. (2026), *The AI interviewer: multi-faceted evaluation of adaptive questioning by large language models*, Scientific Reports — structured evaluation of adaptive LLM interviewing.
 - Macromill (2026), current Japanese interview-incentive guidance — operational compensation reference only.
@@ -572,14 +595,16 @@ These sources inform the protocol but do not constitute Product truth:
 # 16. Pre-fieldwork checklist
 
 - [ ] Recruiter copy does not reveal the desired monitoring behavior.
-- [ ] Screener tested on at least 2–3 people for comprehension before scale recruitment.
-- [ ] First interviews are human-moderated.
-- [ ] Interview guide starts from recent events, not Lunowa concepts.
+- [ ] Screener cognitively pretested on at least 2–3 target-like people before scale recruitment.
+- [ ] First exploratory interviews are human-moderated.
+- [ ] Interview guide starts from neutral recent events, not Lunowa concepts or assumed self-checking.
 - [ ] Negative-control quota is preserved.
 - [ ] Incentive/payment method is clear.
 - [ ] Consent/recording/privacy language is ready.
 - [ ] Evidence matrix is ready before first interview.
 - [ ] Raw PII/email content has a storage boundary outside GitHub.
 - [ ] Moderator records disconfirming evidence explicitly.
+- [ ] Evidence is recorded before Product interpretation.
+- [ ] Independent second-pass review is arranged where feasible; AI-only adversarial review is not mislabeled independent.
 - [ ] Analysis occurs between batches, not only at the end.
 - [ ] No implementation/Product promotion is triggered automatically by interview completion.

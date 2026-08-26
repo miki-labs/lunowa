@@ -158,6 +158,8 @@ docs/product/
 
 ADRs under `docs/decisions/` record durable costly-to-change architecture choices.
 
+Architecture/data/contracts may deliberately describe a safe **capability superset** for features that are deferred or optional in the current Product. Capability enumeration is not current scope or implementation authorization; `PRODUCT.md`, `IMPLEMENTATION-PLAN.md`, and the live task contract decide whether/when a capability is activated.
+
 ---
 
 # Current evidence / implementation sequence

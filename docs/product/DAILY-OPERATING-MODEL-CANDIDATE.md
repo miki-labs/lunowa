@@ -43,18 +43,32 @@ The internal system may react immediately. Human interruption is a separate deci
 
 A new email, reply, attachment, timer firing, or provider event is evidence. None is automatically a notification.
 
-## 1.2 The Product must work if the user does not open it today
+## 1.2 Daily app opening must not be the monitoring mechanism
 
-**DOCTRINE CANDIDATE:** daily app opening is not part of the core reliability contract.
+**DOCTRINE CANDIDATE:** ordinary monitoring should not depend on the user opening Lunowa every day.
 
-If monitoring integrity is healthy, Lunowa should continue to:
+If monitoring infrastructure is healthy, Lunowa should continue to:
 
 - watch delegated loops;
 - reconcile new evidence;
 - preserve temporal return conditions;
 - create/clear current Attention Need as state changes;
 - suppress obsolete delivery artifacts;
-- surface current state when the user eventually returns.
+- reconstruct current state when the user returns.
+
+However, **monitoring and delivery are separate promises**. A time-sensitive return can reach the user while the app is closed only if an accepted delivery path exists and is available (for example push permission/device delivery where the Product relies on it).
+
+Therefore:
+
+```text
+Monitoring Integrity
+= can Lunowa continue observing/reconciling the delegated contract?
+
+Delivery Integrity
+= can Lunowa reach the user within the accepted delivery contract?
+```
+
+If the user disables external notifications, Lunowa may still monitor correctly, but it must not pretend it can satisfy an `immediate while app closed` return promise. The UI must either weaken the return contract explicitly (`アプリを開いた時に表示`) or ask for the delivery capability needed for the stronger promise.
 
 A required morning/evening review ritual would reintroduce part of the monitoring burden Lunowa exists to remove.
 
@@ -84,7 +98,7 @@ Operational state, Product projection, delivery urgency, and channel remain sepa
 Operational state
 != Product projection (Needs You / Review / Managed / ...)
 != delivery urgency
-!= notification channel
+!= delivery channel/capability
 ```
 
 The accepted Temporal Contract ADR already fixes that trigger firing does not imply notification. This candidate extends that distinction into daily Product behavior.
@@ -156,13 +170,13 @@ A Review item may be urgent to deliver, but urgency does not convert it into Nee
 
 ## 2.4 Delivery strength for current user-attention items
 
-Once the correct Product projection exists, external delivery depends on delay cost.
+Once the correct Product projection exists, external delivery depends on delay cost and available delivery capability.
 
 ### 2.4.1 Next-visit sufficient
 
 ```text
 Needs You or Review current
--> no external push
+-> no external push required
 -> next intentional Lunowa visit is sufficient
 ```
 
@@ -170,7 +184,7 @@ This corresponds most closely to the older Product Constitution candidate's `Pas
 
 ### 2.4.2 Deferred / grouped external delivery
 
-Use when the user should be informed before a likely next natural app open, but immediate interruption is not justified.
+Use when the user should be informed before a likely next natural app open, but immediate interruption is not justified and an external channel is allowed.
 
 ```text
 current Needs You / Review
@@ -194,11 +208,15 @@ Possible qualifying evidence:
 
 Do not equate important sender, emotional wording, new message, or model-assigned importance with immediate interruption automatically.
 
-Urgency should be explainable in ordinary language. Any displayed temporal precision must come from accepted evidence; never invent `15:00` from a source that only says `today` or `Friday`.
+Immediate delivery while the app is closed requires an available authorized delivery path. If that path is absent/degraded, the Product must disclose the limitation rather than represent the immediate-return promise as healthy.
 
-## 2.5 Monitoring-integrity alert
+Any displayed temporal precision must come from accepted evidence; never invent `15:00` from a source that only says `today` or `Friday`.
 
-Provider/sync/scheduler/reconciliation failure is a separate Product-level degraded-state condition, not automatically a Responsibility, Needs You item, or semantic Review subject.
+## 2.5 Integrity conditions
+
+Provider/sync/scheduler/reconciliation failure is a Product-level **Monitoring Integrity** condition. Notification permission/device-delivery failure can be a **Delivery Integrity** condition where the accepted return contract depends on that path.
+
+Neither is automatically a Responsibility, Needs You item, or semantic Review subject.
 
 Delivery strength depends on the risk created by the degradation.
 
@@ -211,10 +229,22 @@ no near-term delegated contract affected
 ```text
 sync stopped
 multiple near-term delegated return conditions affected
--> immediate integrity alert may be warranted
+-> immediate integrity alert may be warranted if deliverable
 ```
 
-Do not keep showing generic reassurance while monitoring cannot currently be honored.
+```text
+push permission disabled
+contract says “next app open”
+-> no integrity violation
+```
+
+```text
+push permission disabled
+accepted contract says “notify immediately even if app is closed”
+-> delivery contract cannot be represented as healthy
+```
+
+Do not keep showing generic reassurance while the relevant monitoring/delivery promise cannot currently be honored.
 
 ## 2.6 Known candidate-vocabulary reconciliation
 
@@ -235,7 +265,7 @@ On open, Home should answer:
 1. Is there material Review?
 2. What user action is current now?
 3. What non-actionable information became relevant since the user last looked?
-4. Is delegated monitoring healthy?
+4. Are monitoring and relevant delivery capabilities healthy?
 5. Can Source be reached immediately?
 
 Candidate composition:
@@ -284,7 +314,7 @@ Secondary information can show integrity and compact awareness. Managed items do
 
 ## 4.1 No mandatory morning ritual
 
-**DOCTRINE CANDIDATE:** daily morning triage is not required for safe operation.
+**DOCTRINE CANDIDATE:** daily morning triage is not required for safe monitoring operation.
 
 If the user opens naturally, Home is an on-demand current-state briefing:
 
@@ -417,6 +447,22 @@ Do not override sleep/weekend boundaries because a model thinks a sender/message
 
 Exact v1 quiet-hours defaults are **UNKNOWN**.
 
+## 7.4 Delivery capability is part of the promise shown to the user
+
+If an immediate-return contract depends on push while the app is closed, the Product should make that dependency visible during setup/permission loss.
+
+Example:
+
+```text
+この件は「すぐ通知」に設定されています。
+現在プッシュ通知が無効なため、アプリを開くまでお知らせできません。
+
+[通知を有効にする]
+[アプリを開いた時でよい]
+```
+
+Do not convert OS permission state into a communication Responsibility.
+
 ---
 
 # 8. Evening / end of day
@@ -444,6 +490,7 @@ Exact cadence is open.
 ```text
 monitoring availability
 != human availability
+!= external delivery availability
 ```
 
 During quiet/unavailable periods:
@@ -531,7 +578,7 @@ MOMENT
   why now / what changed / what remains / safe next action
 
 MANAGED
-  delegated loops + reassurance + integrity inspection
+  delegated loops + reassurance + monitoring/delivery integrity inspection
 
 REVIEW
   material semantic/authority uncertainty
@@ -542,7 +589,7 @@ SOURCE
 
 Daily Operating Model adds no canonical lifecycle/domain object.
 
-`Informational catch-up`, grouping, immediate delivery, delivery windows, and integrity-delivery strength are Product-delivery concepts, not Responsibility lifecycle enums.
+`Informational catch-up`, grouping, immediate delivery, delivery windows, Monitoring Integrity, and Delivery Integrity are Product-level behavior concepts. They must not be silently persisted as Responsibility resolution/lifecycle enums.
 
 Temporal facts remain distinct: source due, expected-event time, user target, resurface time, follow-up time, and delivery time must not overwrite one another.
 
@@ -565,7 +612,8 @@ Do not build around:
 - daily streak / Inbox Zero gamification;
 - immediate classification based only on sender importance or wording;
 - delivery rules that mutate canonical temporal facts;
-- replaying obsolete notifications after absence.
+- replaying obsolete notifications after absence;
+- accepting an immediate-return promise without an available delivery path.
 
 ---
 
@@ -606,9 +654,10 @@ Do not optimize primarily for DAU/session count. A successful delegation Product
 
 ## Integrity
 
-- monitorable vs degraded time;
+- monitorable vs monitoring-degraded time;
+- deliverable vs delivery-degraded time for contracts requiring external reach;
 - time to integrity disclosure;
-- affected delegated loops per outage;
+- affected delegated loops per outage/permission loss;
 - false reassurance during degraded periods (target: zero).
 
 ---
@@ -646,7 +695,7 @@ Do not optimize primarily for DAU/session count. A successful delegation Product
 
 ```text
 ALWAYS
-monitor delegated loops
+monitor delegated loops when monitoring integrity is healthy
 reconcile evidence
 maintain current state
 
@@ -657,13 +706,13 @@ INFORMATIONALLY
 surface promised awareness without turning it into work
 
 AT THE NEXT SUFFICIENT MOMENT
-return Needs You or Review — next visit or grouped delivery depending delay cost
+return Needs You or Review — next visit or grouped delivery depending delay cost and available channel
 
 IMMEDIATELY
-interrupt only when delay itself is materially costly or explicitly requested
+interrupt only when delay is materially costly / explicitly requested AND a valid immediate delivery path exists
 
 HONESTLY
-surface loss of monitoring integrity
+surface loss of monitoring or delivery integrity
 
 ON RETURN
 rebuild from current state, suppress stale events, restore minimum context
@@ -682,7 +731,8 @@ rebuild from current state, suppress stale events, restore minimum context
 7. What OS badge semantics reduce checking rather than increase it?
 8. How should foreground desktop/mobile behavior suppress duplicate pushes?
 9. What maximum delivery delay is acceptable for ordinary Needs You/Review in the first validated ICP?
-10. Which integrity failures require immediate delivery versus next allowed visibility?
+10. Which Monitoring/Delivery Integrity failures require immediate delivery versus next allowed visibility?
 11. How should the older Product Constitution candidate's `Passive` vocabulary be reconciled with newer Surface/Daily distinctions before canonical promotion?
+12. Which return contracts should be disallowed or weakened when the user has no reliable external delivery channel enabled?
 
 These require Lunowa-specific Product evidence and must not be resolved solely by intuition or unrelated notification research.

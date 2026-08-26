@@ -4,33 +4,33 @@
 
 **Durable Product-surface candidate — NOT canonical design authority and NOT implementation authorization.**
 
-This document converts the current Product Constitution candidate and Golden Flow reasoning into a concrete v1 Product shape. It deliberately sits between Product doctrine and detailed UI specification.
+This document converts the current Product Constitution candidate and Golden Flow reasoning into a concrete v1 Product shape. It sits between Product doctrine and detailed UI specification.
 
 Current authority remains:
 
-- `docs/product/PRODUCT.md` for canonical Product intent;
-- `docs/product/PRODUCT-CONSTITUTION-V1-CANDIDATE.md` for the current noncanonical doctrine synthesis;
-- `docs/product/responsibility/` for canonical Responsibility semantics;
-- `docs/design/DESIGN.md` / `INTERACTIONS.md` / `RESPONSIVE.md` for accepted detailed design behavior;
-- `docs/product/IMPLEMENTATION-PLAN.md` for implementation/evidence sequencing.
+- `docs/product/PRODUCT.md` — canonical Product intent;
+- `docs/product/PRODUCT-CONSTITUTION-V1-CANDIDATE.md` — noncanonical doctrine synthesis;
+- `docs/product/responsibility/` — canonical Responsibility semantics;
+- `docs/design/DESIGN.md` / `INTERACTIONS.md` / `RESPONSIVE.md` — accepted detailed design behavior;
+- `docs/product/IMPLEMENTATION-PLAN.md` — implementation/evidence sequencing.
 
-This candidate does **not** create a new domain object, persistence schema, lifecycle enum, or implementation phase. It proposes the smallest complete Product surface that could express the current Attention Delegation thesis if later accepted.
+This candidate does **not** create a domain object, persistence schema, lifecycle enum, implementation phase, or authority to resume write-heavy implementation.
 
 Labels:
 
 - **SURFACE CANDIDATE** — proposed v1 Product behavior/interface direction;
-- **SUPPORTED INFERENCE** — strongly motivated by evidence/current products but not externally proven for Lunowa;
+- **SUPPORTED INFERENCE** — strongly motivated by current evidence but not proven for Lunowa;
 - **PRODUCT HYPOTHESIS** — requires Lunowa-specific validation;
-- **DEFERRED** — intentionally outside the v1 surface contract;
-- **OUT** — explicitly not part of the Product's core responsibility.
+- **DEFERRED** — intentionally outside the v1 Product-surface contract;
+- **OUT** — explicitly outside the Product's core responsibility.
 
 ---
 
-# 1. v1 thesis: Minimum Complete Delegation Loop
+# 1. v1 thesis — Minimum Complete Delegation Loop
 
 ## 1.1 v1 is not a reduced mail client
 
-**SURFACE CANDIDATE:** v1 should be the smallest Product that completes the full Attention Delegation loop end-to-end:
+**SURFACE CANDIDATE:** v1 should be the smallest Product that completes Attention Delegation end-to-end:
 
 ```text
 unresolved communication
@@ -39,30 +39,30 @@ unresolved communication
   -> decide whether user attention is required
   -> if not required, carry monitoring quietly
   -> re-evaluate on message / time / event / contradiction
-  -> return only when attention is actually required
+  -> return only when user attention is actually required
   -> restore minimum context
   -> enable one safe meaningful action/decision
   -> verify whether the expected outcome is actually satisfied
   -> close monitoring only when justified
 ```
 
-A v1 that stops at `task extraction`, `no-reply reminder`, or `AI draft` is too weak because current products already cover those capabilities substantially.
+A Product that stops at `task extraction`, `no-reply reminder`, or `AI draft` is too weak: those capabilities are already substantial incumbent territory.
 
-A v1 that attempts broad Gmail/Outlook feature parity before proving this loop is too broad because client breadth does not establish Attention Delegation.
+A Product that waits for broad Gmail/Outlook parity before testing this loop is too broad: client breadth does not establish Attention Delegation.
 
-## 1.2 Primary v1 Product promise
+## 1.2 Directional promise
 
 > **今あなたがやる必要がないメールは、Lunowaが見ておく。必要になったら、分かる状態で戻す。**
 
-This is directional Product language, not finalized marketing copy.
+This is directional language, not finalized marketing copy or a reliability guarantee.
 
-## 1.3 Product form candidate
+## 1.3 Product form
 
 **PRODUCT HYPOTHESIS:** v1 should prefer a **companion / hybrid** form over immediate full-client replacement.
 
-The v1 Product must provide enough source access, contextual reply/action, and provenance to make delegated monitoring trustworthy. It does **not** need complete folder/label/filter/spam/contact/settings parity with Gmail or Outlook.
+The Product needs enough source access, contextual reply/action, search, and provenance to make delegated monitoring trustworthy. It does not need complete folder/label/filter/spam/contact/settings parity with Gmail or Outlook before the core loop is proven.
 
-A full client remains a later Product decision, not a prerequisite for proving the core loop.
+A full email client remains an open later Product decision.
 
 ---
 
@@ -72,146 +72,160 @@ The smallest coherent v1 uses five conceptual surfaces:
 
 ```text
 1. NEEDS YOU
-   current attention/work surface
+   current actionable user work
 
 2. MOMENT
-   context-restoration + action surface
+   temporal context restoration + one safe action
 
 3. MANAGED
-   delegated-monitoring reassurance/inspection surface
+   delegated-monitoring reassurance + on-demand inspection
 
 4. REVIEW
-   material ambiguity / authority boundary
+   material semantic / authority ambiguity
 
 5. SOURCE CONVERSATIONS
-   original communication / provenance fallback
+   original communication + provenance fallback
 ```
 
-Supporting surfaces may exist for account connection, search, contextual compose/reply, settings, and degraded/error states. They are not primary Product destinations.
+A lightweight **Home/Landing composition** may contain summaries/entry points into Needs You, conditional Review, Managed reassurance, and Source. Home is a composition, not a sixth semantic work state.
 
-The central separation is:
+Supporting surfaces may exist for provider connection, search, contextual compose/reply, settings, permissions, and degraded/error states.
+
+Core separation:
 
 ```text
-Attention work        != source browsing
-Managed monitoring    != attention queue
-Review                 != generic uncertainty inbox
-Moment                 != thread summary
+Needs You            != important/new email
+Review               != low-confidence AI queue
+Managed              != second Inbox
+Moment               != thread summary
+Source Conversations != primary task model
 ```
 
 ---
 
-# 3. Landing / Needs You
+# 3. Home / Landing
 
 ## 3.1 Job
 
-> **What actually needs me now?**
+On open, the user should learn quickly:
 
-Needs You is not a list of important emails and not a filtered Inbox. It represents current user attention obligations derived from accepted Responsibility semantics.
+1. Do I need to do anything now?
+2. Is there a material ambiguity/safety issue requiring judgment?
+3. Is Lunowa still carrying the rest?
+4. Can I reach the original communication immediately if I want it?
 
-A new message enters Needs You only when current evidence makes user knowledge, judgment, or action materially necessary.
-
-## 3.2 Candidate landing structure
+Candidate composition:
 
 ```text
 Lunowa
 
-あなたの対応が必要        3
+確認が必要                 1   # only when non-zero
+あなたの対応が必要         3
 
 今日
 ────────────────────
 ABC社
-見積書が届きました
+見積書の確認が必要
 今日 17:00まで
 
 田中さん
 日程候補への返信が必要
 
 ────────────────────
-
-Lunowaが見ています       14
-現在、追加の対応はありません
+Lunowaが見ています        14
+現在、追加の対応が必要なものはありません
 
 [会話を見る]
 ```
 
-The landing surface should give the user three answers quickly:
+Do not require arrival-by-arrival Inbox triage before the user can see current work.
 
-1. Do I need to do anything?
-2. Is anything urgent or blocked?
-3. Is Lunowa still carrying the rest?
-
-It should **not** require triaging every newly arrived message.
-
-## 3.3 Ordering
-
-**SURFACE CANDIDATE:** Needs You should use **attention order**, not message-arrival order.
-
-Do not use one opaque AI priority score.
-
-Prefer explainable tiers such as:
-
-1. material Review/safety condition that blocks safe action;
-2. overdue / high delay-cost actionable work;
-3. actionable work with a near source due or explicit user target;
-4. other current actionable work;
-5. awareness-only items when the Attention Contract explicitly requires awareness.
-
-Within a tier, use deterministic factors such as due time and last material state change rather than generic newest-first ordering.
-
-The exact ranking policy remains a Product hypothesis and requires scenario/behavior validation.
-
-## 3.4 Card content
-
-Each Needs You card should normally show only:
-
-- person / organization or concrete subject;
-- one current action/question;
-- relevant due/urgency signal when material;
-- a concise `why now` reason when not obvious.
-
-Do not show by default:
-
-- the entire thread summary;
-- every Responsibility in the Conversation;
-- model confidence percentages;
-- long AI explanations;
-- generic `high/medium/low` importance labels when delay/actionability is more informative.
-
-Selecting the card opens its Moment.
-
-## 3.5 Quick actions
-
-Quick actions should be restricted to low-ambiguity actions whose semantics are already clear, such as:
-
-- `あとで戻す` where a safe explicit return condition can be set;
-- `追跡を終了` where the user intentionally stops monitoring;
-- a prepared simple reply only when sender/account/meaning are unambiguous and normal send confirmation remains intact.
-
-The default is to enter Moment rather than proliferate row controls.
-
-## 3.6 Empty state
+## 3.2 Empty state
 
 Preferred semantic empty state:
 
 > **今、あなたが対応する必要はありません。**
 
-Optional secondary reassurance:
+Secondary reassurance may say that Lunowa is monitoring a number of items, but copy must not overclaim world-state certainty.
 
-> `Lunowaが14件を見ています。`
-
-Do not make `Inbox Zero` or clearing a count the Product success metaphor.
+Do not use Inbox Zero as the central success metaphor.
 
 ---
 
-# 4. Moment
+# 4. Needs You
 
 ## 4.1 Job
 
+> **What action or decision genuinely belongs to me now?**
+
+Needs You contains admitted Responsibilities with a currently actionable material USER obligation/decision under accepted semantics.
+
+It does **not** contain:
+
+- generic important messages;
+- Waiting items;
+- Later items whose attention is intentionally deferred;
+- pre-admission Review subjects;
+- admitted Responsibilities currently blocked by material Review;
+- awareness-only updates where no action/judgment is required.
+
+## 4.2 Ordering
+
+Use **attention order**, not newest-message order and not one opaque model score.
+
+Candidate explainable tiers within Needs You:
+
+1. overdue / materially high delay-cost actionable work;
+2. actionable work with a near source due or explicit user target;
+3. blocking actionable work;
+4. other current actionable work.
+
+Within a tier, prefer deterministic factors such as due time and last material state change.
+
+Review is ordered separately at Home because it is a different subject family, not merely a high-priority Needs You item.
+
+The exact ordering policy remains a Product hypothesis.
+
+## 4.3 Card content
+
+Normally show only:
+
+- person/organization or concrete subject;
+- one current action/question;
+- material due/urgency signal;
+- concise `why now` reason when non-obvious.
+
+Do not show by default:
+
+- full thread summary;
+- every Responsibility in the Conversation;
+- raw model confidence;
+- long AI explanations;
+- generic high/medium/low importance when delay/actionability is more informative.
+
+Selecting a card opens Moment.
+
+## 4.4 Awareness-only return is not Needs You
+
+If the user explicitly asked to be informed when an outcome occurs but no action/judgment is needed, Lunowa may deliver a passive update, digest entry, or non-actionable Moment-style notification such as:
+
+> `入金を確認しました。何もする必要はありません。`
+
+Do not create durable work in Needs You merely because the user wanted awareness.
+
+Exact awareness delivery remains a Product hypothesis.
+
+---
+
+# 5. Moment
+
+## 5.1 Job
+
 > **Rehydrate the minimum context needed to act safely after the user stopped thinking about the loop.**
 
-Moment is not a generic email summary and not a full agent transcript.
+Moment is not a generic summary and not an agent trace.
 
-The stable conceptual questions are:
+Conceptual questions:
 
 ```text
 WHY NOW?
@@ -227,9 +241,9 @@ WHAT NEXT?
 今何をすればいい？
 ```
 
-Not every Moment needs four visible headings; the content hierarchy should answer them with minimal prose.
+Not every Moment needs four explicit headings; the hierarchy should answer them with minimal text.
 
-## 4.2 Primary interaction rule
+## 5.2 Primary interaction
 
 > **1 Moment = 1 Primary Question = generally 1 Primary Action.**
 
@@ -241,22 +255,24 @@ Examples:
 - `[期限を決める]`
 - `[送信者を確認]`
 
-Multiple Responsibilities may be summarized below the primary Moment without competing equally for visual priority.
+Additional Responsibilities may be shown below without competing equally for visual attention.
 
-## 4.3 Progressive disclosure
+## 5.3 Progressive disclosure
 
-Use a trust ladder:
+Trust ladder:
 
 ```text
-current conclusion / action
-  -> material reason
-  -> material evidence/provenance
-  -> full source conversation / attachment
+current conclusion / next action
+  -> short material reason
+  -> source-grounded evidence/provenance
+  -> full Conversation / attachment
 ```
 
-The user should be able to contest/correct Lunowa's interpretation without first reading an AI reasoning transcript.
+The user should be able to contest/correct an interpretation without reading a hidden chain-of-thought or agent transcript.
 
-## 4.4 Example
+Do not use model confidence percentage as a default substitute for evidence.
+
+## 5.4 Example
 
 ```text
 ABC社との見積
@@ -275,39 +291,35 @@ ABC社との見積
 原文を見る
 ```
 
-## 4.5 Contextual reply/draft
+## 5.5 Contextual draft/reply
 
-**SURFACE CANDIDATE:** v1 should strongly support reply/follow-up drafts **inside Moment** because this directly closes the active loop.
-
-It does not require a complete generic compose client.
-
-Flow:
+**SURFACE CANDIDATE:** contextual reply/follow-up is stronger v1 scope than full generic compose parity because it directly closes the active loop.
 
 ```text
 Moment
-  -> Lunowa prepares bounded contextual draft
+  -> bounded contextual draft
   -> user reviews/edits
-  -> explicit sender/recipient visible
-  -> user sends
+  -> sender/recipient/account visible
+  -> explicit user send
   -> provider result reconciled
   -> Responsibility re-evaluated
 ```
 
-Autonomous send is not the v1 default.
+Autonomous external send is not the v1 default.
 
 ---
 
-# 5. Managed / `Lunowaが見ています`
+# 6. Managed / `Lunowaが見ています`
 
-## 5.1 Job
+## 6.1 Job
 
-> **Can I trust that delegated work is still being carried without taking it back into active attention?**
+> **Can I verify that delegated monitoring is still being carried without taking the work back into active attention?**
 
-Managed is an assurance and inspection surface, not a second Inbox and not an agent operations console.
+Managed is assurance + inspection, not a second Inbox and not an agent operations console.
 
-## 5.2 Default presentation
+## 6.2 Default presentation
 
-Default landing should prefer aggregate reassurance over a permanent wall of Waiting/Later items.
+Prefer aggregate reassurance over a permanent wall of Waiting/Later items.
 
 Example:
 
@@ -320,17 +332,17 @@ Lunowaが見ています        14
 [管理中を見る]
 ```
 
-Avoid stronger claims such as `Everything is handled` unless the underlying evidence genuinely warrants them.
+Avoid absolute copy such as `Everything is handled` when the system only has evidence-relative knowledge.
 
-## 5.3 On-demand managed list
+## 6.3 On-demand list
 
-When the user intentionally opens Managed, each item should answer:
+When intentionally opened, each item should answer:
 
-- what outcome is still open;
-- what/who Lunowa is currently waiting for;
-- next expected event or return condition;
-- when the next time-based reconsideration occurs, if any;
-- whether monitoring integrity is degraded;
+- what tracked operational outcome remains open;
+- who/what is currently expected to move;
+- next Expected Event;
+- time/event return condition when relevant;
+- monitoring integrity/degraded state;
 - source access.
 
 Example:
@@ -342,33 +354,33 @@ ABC社の回答待ち
 返信がなければ金曜に再確認
 ```
 
-## 5.4 Waiting / Later as filters, not necessarily primary navigation
+## 6.4 Waiting/Later placement
 
-**PRODUCT HYPOTHESIS:** `Waiting` and `Later` remain meaningful projections but should normally live as Managed filters/details rather than permanent top-level navigation.
+**PRODUCT HYPOTHESIS:** Waiting and Later remain meaningful projections but normally become filters/details under Managed rather than permanent top-level navigation.
 
-Reason:
+Reasoning:
 
-- `Waiting` usually represents work already delegated away from the user;
-- repeatedly exposing a large Waiting count can recreate monitoring burden;
-- `Later` is an attention-defer condition, not necessarily a daily work destination.
+- Waiting usually represents work already delegated away from current user attention;
+- a permanent large Waiting count can recreate monitoring burden;
+- Later is an attention-defer condition rather than necessarily a daily work destination.
 
-This is a material change candidate from current `DESIGN.md` and requires explicit promotion before canonical design is changed.
+This materially differs from current canonical `DESIGN.md` and requires explicit promotion before design authority changes.
 
-## 5.5 Managed controls
+## 6.5 Controls
 
-Allow lightweight ownership/control actions:
+Allow lightweight control:
 
 - inspect source;
-- change a return condition;
-- bring back to current attention when appropriate;
+- modify return condition;
+- bring a tracked item back to current attention when semantically valid;
 - stop tracking;
 - correct a material interpretation.
 
-Do not expose routine scheduler/retry/LLM-agent internals unless a failure requires user action.
+Do not expose routine scheduler/retry/model/tool activity unless a failure requires user action.
 
-## 5.6 Integrity/degraded state
+## 6.6 Integrity failure
 
-If Lunowa cannot safely fulfill monitoring because of provider/sync/background failure, Managed must surface that honestly.
+If Lunowa cannot fulfill monitoring because of provider/sync/background failure, Managed must show this honestly.
 
 Examples:
 
@@ -376,52 +388,57 @@ Examples:
 - `この件の返信監視を確認できません`;
 - `再接続が必要です`.
 
-Trust requires showing loss of monitoring capability, not silently retaining a reassuring count.
+Trust requires visible loss of monitoring capability rather than stale reassurance.
 
 ---
 
-# 6. Review
+# 7. Review
 
-## 6.1 Job
+## 7.1 Job
 
-> **Resolve the smallest material ambiguity or authority question that prevents safe Attention Delegation.**
+> **Resolve the smallest material ambiguity or authority question preventing safe delegation.**
 
-Review is not a queue for all model uncertainty.
+Review may represent either:
 
-## 6.2 Admission rule
+- a pre-admission `NEEDS_REVIEW` subject where Responsibility existence/materiality is unresolved; or
+- an admitted Responsibility with a decision-critical field/safety conflict.
 
-Use Review only when uncertainty is decision-critical, for example:
+These subject types remain distinct internally even if one Product surface presents them.
 
-- conflicting material deadlines;
+## 7.2 Admission rule
+
+Use Review only when uncertainty is material, for example:
+
+- conflicting deadlines;
 - ambiguous obligation bearer;
-- completion claim conflicts with source/provider evidence;
+- completion claim conflicts with provider/source evidence;
 - sender/account/identity uncertainty before a consequential action;
 - Responsibility existence itself is materially ambiguous;
-- high-risk requested action requires legitimacy/authority verification.
+- high-risk request requires legitimacy/authority verification.
 
-Harmless uncertainty should remain hidden or be resolved automatically through cheaper evidence.
+Harmless uncertainty should not be returned to the user merely to make the internal model neat.
 
-## 6.3 Surface placement
+## 7.3 Placement
 
-**SURFACE CANDIDATE:** Review should be visible only when it has material items.
+Review should be visible only when materially populated.
 
-On Home, it may appear above or alongside Needs You when it blocks safe action:
+On Home it may appear above Needs You because it can block safe projection/action:
 
 ```text
 確認が必要              1
 あなたの対応が必要      3
 ```
 
-A permanent empty Review navigation item is unnecessary.
+A permanently empty top-level Review destination is unnecessary.
 
-## 6.4 Review card
+## 7.4 Review card
 
-A Review card should show:
+Show:
 
-- the exact question the system cannot safely decide;
-- the minimum conflicting evidence;
+- exact question that cannot be decided safely;
+- minimum conflicting/material evidence;
 - one/few bounded choices;
-- original source access.
+- source access.
 
 Example:
 
@@ -436,135 +453,132 @@ Example:
 [原文を見る]
 ```
 
-Do not use raw model confidence as the user's authority signal.
+## 7.5 Approval != Review
 
-## 6.5 Approval is not Review by default
+Routine approval of a prepared external action is an execution-authority boundary. It should not automatically become a semantic Review item unless meaning/authority itself is uncertain.
 
-Routine approval of a prepared external action is an authority boundary, but it should not automatically populate a semantic Review queue unless the underlying meaning/authority itself is uncertain.
-
-Keep `review interpretation` and `approve execution` conceptually distinct.
+Keep `review interpretation` and `approve execution` distinct.
 
 ---
 
-# 7. Source Conversations
+# 8. Source Conversations
 
-## 7.1 Job
+## 8.1 Job
 
-> **Give the user immediate access to the original communication and provider truth without making source triage the primary work model.**
+> **Give immediate access to original communication/provider truth without making source triage the primary work model.**
 
-Source remains essential for trust, normal mail use, search, corrections, and edge cases.
+Source remains required for normal mail reading, trust, correction, search, and edge cases.
 
-## 7.2 v1 source capability
+## 8.2 v1 source capability
 
-The v1 Source surface should support enough to make the delegation loop trustworthy:
+Support enough for trustworthy delegation:
 
 - browse normalized Conversations/messages for the connected provider;
 - preserve sender/recipient/account identity;
-- show timestamps and attachments/attachment metadata needed by the scenario;
-- search/find source conversations;
-- open the original provider item where useful;
-- contextual reply/forward where required by an accepted Product flow;
+- show timestamps and scenario-relevant attachments/metadata;
+- search/find source Conversations;
+- open the provider-native item when useful;
+- contextual reply/forward where an accepted Product flow requires it;
 - expose material provenance from Moment/Review.
 
-## 7.3 Not required for v1 proof
+## 8.3 Not required for initial proof
 
-Unless later evidence shows otherwise, the initial delegation Product does not require complete parity for:
+Unless Product evidence requires otherwise, initial delegation proof does not require complete parity for:
 
-- every provider folder/label semantic;
+- every folder/label semantic;
 - spam/filter/rule administration;
-- extensive bulk-mail management;
+- extensive bulk management;
 - complete contact manager;
-- signatures/templates parity;
+- signature/template parity;
 - generic advanced compose;
-- offline-first full-client behavior;
+- full offline behavior;
 - every attachment workflow;
-- every settings surface in Gmail/Outlook.
+- every Gmail/Outlook settings surface.
 
-These may become necessary if a full-client Product form is later supported by evidence.
+## 8.4 Source is optional in the happy path, always available in the trust path
 
-## 7.4 Source is not a mandatory gate
+Do not force source-thread reading for every returned Moment.
 
-A user should not be forced to open the full source thread for every returned Moment.
-
-Likewise, a user must always be able to inspect source when trust, context, or ordinary mail reading requires it.
+Do not hide source when the user wants to verify, correct, or simply read ordinary communication.
 
 ---
 
-# 8. Supporting surfaces
+# 9. Supporting surfaces
 
-## 8.1 Onboarding / provider connection
+## 9.1 Provider connection / onboarding
 
-v1 onboarding should establish:
+Establish clearly:
 
-- which mailbox is connected;
-- what Lunowa can read/monitor;
-- what it will not autonomously send/change;
-- monitoring limitations/degraded-state behavior;
-- source/provenance accessibility.
+- connected mailbox/account;
+- what Lunowa reads/monitors;
+- what it does not autonomously send/change;
+- what happens if sync/monitoring degrades;
+- how original source remains accessible.
 
 Do not begin with a generic feature tour.
 
-## 8.2 Search
+## 9.2 Search
 
-Search is source/context retrieval, not the central work model.
+Search is source/context retrieval, not the primary work model.
 
-Initial search should prioritize reliable source retrieval over ambitious cross-domain AI memory.
+Prefer reliable source retrieval before ambitious cross-domain AI memory.
 
-## 8.3 Settings
+## 9.3 Settings
 
-Keep only Product-relevant controls initially:
+Initial Product-relevant settings only:
 
 - provider/account connection;
-- notification/delivery preferences;
-- explicit monitoring/return preferences where supported;
-- authorization boundaries where supported;
+- delivery/notification preferences;
+- supported monitoring/return preferences;
+- authorization boundaries where applicable;
 - privacy/data controls;
 - language/accessibility basics.
 
-Do not ship a generic automation rule-builder as the default customization model.
+No generic rule-builder is required as the default customization model.
 
 ---
 
-# 9. Delivery / notification contract
+# 10. Delivery contract
 
-## 9.1 Arrival is not notification
+## 10.1 Arrival != notification
 
-A new email/reply/event updates evidence first.
+A new email/reply/event first changes evidence. Current state is then re-evaluated.
 
-Only after re-evaluating accepted state should Lunowa decide whether user attention is needed.
+Notification strength follows the resulting attention need and delay cost, not message arrival alone.
 
-## 9.2 v1 delivery simplification
+## 10.2 Simplified v1 delivery
 
-Keep rich internal semantics but avoid an overbuilt interruptibility engine in initial v1.
+Keep richer internal semantics but avoid a premature general interruptibility engine.
 
-Candidate user-facing delivery:
+Candidate external behavior:
 
 - **Silent** — no current user attention required;
-- **Needs You** — passive queue for current action/judgment;
+- **Needs You** — passive work queue for current action/judgment;
+- **Awareness update** — non-work informational return when explicitly promised;
 - **Immediate** — push/interruption only when delay cost or explicit user contract warrants it.
 
-A predictable low-frequency summary/digest may be tested separately. Exact cadence is not frozen.
+A predictable digest may be tested separately. Exact cadence is not frozen.
 
-## 9.3 No importance-only push
+## 10.3 Immediate delivery
 
-`important` does not imply `interrupt now`.
+Importance alone does not justify push.
 
-Immediate delivery should require a stronger reason such as:
+Stronger reasons include:
 
 - near/overdue material deadline;
-- explicit user request to be told immediately;
-- a newly created obligation whose delay cost is high;
-- material safety/authority problem that blocks imminent action.
+- explicit immediate-awareness request;
+- new obligation with high delay cost;
+- material safety/authority issue blocking imminent consequential action.
 
 ---
 
-# 10. v1 scope by capability
+# 11. v1 capability boundary
 
-## 10.1 Core
+## 11.1 Core Product contract
 
-The v1 Product contract should be able to express/test:
+The candidate v1 must be able to express/test:
 
-- one real connected mailbox/provider end-to-end;
+- one real connected mailbox/provider end-to-end when real integration is Product-authorized;
 - inbound actionable communication;
 - outbound request/wait monitoring;
 - `No Responsibility` for FYI/courtesy/noise;
@@ -573,24 +587,31 @@ The v1 Product contract should be able to express/test:
 - quiet intermediate Waiting updates;
 - explicit Later/return condition;
 - message/time/event re-evaluation;
-- incomplete-result / `reply != satisfied` handling;
+- incomplete result / `reply != satisfied` handling;
 - multiple Responsibilities per Conversation where materially required;
 - material Review;
 - Moment/context restoration;
 - contextual draft/reply + explicit human send confirmation;
 - source/provenance access;
 - tracking stop / non-success resolution distinction;
-- closure and later reactivation on contradictory evidence;
 - honest provider/sync/monitoring degradation.
 
-## 10.2 Supported but not broad UI goal
+### Reopen identity invariant
+
+Later contradictory evidence reopens the **same Responsibility only when it establishes that the same operational outcome was never actually satisfied**.
+
+New work after a genuinely closed episode normally creates a new Responsibility.
+
+This preserves current FIXED Responsibility semantics.
+
+## 11.2 Supported semantic pressure, not broad UI goal
 
 - parallel obligation legs;
-- awareness-only return when user explicitly asked to know;
+- awareness-only return;
 - deadline/source temporal correction;
-- basic attachment evidence needed by representative scenarios.
+- basic attachment evidence required by representative scenarios.
 
-## 10.3 Deferred
+## 11.3 Deferred
 
 - second provider before one-provider complete-loop proof;
 - broad multi-account experience;
@@ -600,14 +621,14 @@ The v1 Product contract should be able to express/test:
 - CRM/project/ticket integrations;
 - person/company relationship intelligence;
 - travel/subscription bundles;
-- generic AI chat as home;
+- generic AI chat as Home;
 - arbitrary MCP/tool automation;
-- automatic follow-up sequences;
+- autonomous follow-up sequences;
 - advanced activity-aware interruption timing;
 - broad attachment-content understanding;
 - cross-account semantic merging.
 
-## 10.4 Out of core responsibility
+## 11.4 Out of core responsibility
 
 - generic task/project management;
 - CRM/ticket/pipeline ownership;
@@ -619,16 +640,16 @@ The v1 Product contract should be able to express/test:
 
 ---
 
-# 11. Golden-flow acceptance set
+# 12. Golden-flow acceptance set
 
-A minimum representative Product-surface test set should include:
+A representative Product-surface test set should include:
 
 1. inbound quick response;
 2. extended user action + Later;
 3. outbound request enters quiet Waiting;
 4. intermediate reply changes expected state but remains silent;
 5. expected result arrives and returns Needs You;
-6. reply arrives but required result is missing/incomplete;
+6. reply arrives but required result is incomplete;
 7. no reply by threshold creates renewed user attention;
 8. material deadline/term changes;
 9. one Conversation contains multiple tracked outcomes;
@@ -636,98 +657,99 @@ A minimum representative Product-surface test set should include:
 11. material ambiguity routes to Review;
 12. high-risk request surfaces safe verification rather than execution;
 13. user stops tracking without false success;
-14. contradictory post-closure evidence reactivates the loop;
-15. source conversation remains inspectable throughout.
+14. contradictory evidence reopens only when the same outcome was not actually satisfied;
+15. genuinely new work after closure creates a new Responsibility;
+16. source Conversation remains inspectable throughout.
 
-Do not call the Product loop complete if it only passes happy-path no-reply reminders.
+Do not call the delegation loop complete if it only passes happy-path no-reply reminders.
 
 ---
 
-# 12. Metrics implied by the surface contract
+# 13. Metrics implied by the surfaces
 
 Do not optimize primarily for inbox opens, session time, message throughput, or zero counts.
 
-Candidate Product metrics:
+Candidate Product measures:
 
 - `N_self_check` of source mailbox before correct resurfacing;
 - source-fallback/open rate while an item is Managed;
 - Managed-list inspection frequency and reason;
-- correct Need-You resurfacing rate;
+- correct Needs You resurfacing;
 - material false-negative rate;
-- unnecessary Needs You / Review rate;
+- unnecessary Needs You / Review burden;
 - context-restoration time after waiting;
 - correction/reopen rate;
 - time from Moment open to safe meaningful action;
-- provider/delegation integrity failures;
+- provider/delegation-integrity failure;
 - continued delegated monitoring across real waiting periods.
 
-Interpretation matters: frequent Managed inspection may indicate mistrust, but can also reflect legitimate browsing. Do not turn one behavioral signal into a universal score without evidence.
+Do not turn any single signal into a universal score before evidence.
 
 ---
 
-# 13. Product anti-patterns
+# 14. Product anti-patterns
 
 Do not let v1 drift into:
 
 - **Inbox-zero clone** — user still triages every arrival;
-- **status taxonomy wall** — every semantic projection becomes permanent navigation;
-- **second task manager** — user manually maintains every Responsibility field;
-- **agent operations console** — trajectory/retry/tool activity dominates the UI;
-- **Review inbox** — every uncertain inference is delegated back to the user;
-- **AI-summary reader** — long generated summaries replace direct progress/context;
-- **full-client parity project** — Product learning waits on peripheral mail features;
-- **autonomy theatre** — more external execution is treated as better Product value.
+- **status taxonomy wall** — every projection becomes permanent navigation;
+- **second task manager** — user manually maintains semantic state;
+- **agent operations console** — technical trajectories dominate UI;
+- **Review inbox** — model ambiguity is routinely pushed back to user;
+- **AI-summary reader** — generated prose replaces concise temporal context;
+- **full-client parity project** — peripheral mail breadth blocks Product learning;
+- **autonomy theatre** — external execution is treated as the main value.
 
 ---
 
-# 14. Material conflicts with current accepted design
+# 15. Material tensions with current accepted design
 
-This candidate intentionally surfaces Product-level tensions that require later promotion/reconciliation rather than silent drift.
+This candidate intentionally records Product-level changes that require later explicit promotion/reconciliation.
 
-## 14.1 Sidebar / projection navigation
+## 15.1 Navigation
 
 Current `DESIGN.md` recommends top-level `すべて / 対応が必要 / あとで / 待ち / 確認 / ピン留め`.
 
-This candidate proposes that:
+This candidate proposes:
 
-- Needs You remains primary;
-- Review appears only when materially populated;
-- Waiting/Later normally move beneath Managed inspection/filtering;
-- Done/history need not be a primary daily destination;
-- Source Conversations remains directly accessible.
+- Needs You primary;
+- Review conditional when materially populated;
+- Waiting/Later normally below Managed inspection/filtering;
+- Done/history not necessarily a primary daily destination;
+- Source Conversations directly accessible.
 
-This is not canonical until explicitly accepted.
+## 15.2 Full-client breadth
 
-## 14.2 Full-client breadth
+Current `DESIGN.md` initial scope lists broad compose/folder/search/account/mail-client capabilities.
 
-Current `DESIGN.md` initial product lists broad compose/folder/search/account/mail-client capabilities.
+This candidate proposes a narrower first Product proof:
 
-This candidate proposes a narrower v1 Product proof:
-
-- source reading/provenance/search sufficient for trust;
+- source reading/search/provenance sufficient for trust;
 - contextual reply/send sufficient for active Moments;
-- complete generic client parity deferred unless Product evidence requires it.
+- complete generic client parity deferred unless evidence requires it.
 
-## 14.3 Default landing semantics
+## 15.3 Landing semantics
 
 Current accepted design is conversation-shell oriented.
 
-This candidate proposes a hybrid Attention-first landing where Needs You and Managed reassurance are primary while Source Conversations remain one direct navigation step away.
+This candidate proposes an Attention-first **hybrid landing**, not removal of the stable shell: Needs You + conditional Review + Managed reassurance become primary, while Source Conversations remain one direct step away.
+
+`Sidebar | List | Detail` may remain the desktop spatial shell even if the selected list changes from Conversations to Attention items.
 
 ---
 
-# 15. Open Product questions before canonical promotion
+# 16. Open Product questions before canonical promotion
 
-The surface direction is coherent but not externally proven for Lunowa. Material remaining questions include:
+Material hypotheses still requiring Product evidence:
 
-- Does `Needs You` as the default work surface reduce self-checking without harming orientation?
-- Does aggregate Managed reassurance reduce checking, or does it create new anxiety?
-- What copy (`対応が必要`, `あなたが必要`, `Lunowaが見ています`, `監視中`) communicates delegation without overclaiming reliability/liability?
-- How much source context must Moment show before users trust it?
-- Should Review be a separate destination or a conditional section inside Needs You?
-- What exact attention ordering is understandable enough to trust?
-- Is contextual compose/reply sufficient, or does the initial target require a full compose client?
-- Is one-provider companion/hybrid sufficient to produce a credible daily workflow?
-- What minimum reliability/integrity evidence is required before Attention-first becomes the default landing rather than an optional mode?
+- Does Needs You as default work surface reduce self-checking without harming orientation?
+- Does Managed aggregate reassurance reduce checking or create anxiety?
+- What copy communicates delegation without overclaiming reliability/liability?
+- How much evidence/context must Moment show before users trust it?
+- Should Review have a dedicated destination or only a conditional Home section/detail mode?
+- What attention ordering is understandable enough to trust?
+- Is contextual compose/reply sufficient for the first real target segment?
+- Is one-provider companion/hybrid sufficient for a credible daily workflow?
+- What reliability/integrity evidence is required before Attention-first becomes default rather than an optional mode?
 
-These are Product-validation questions, not reasons to re-expand v1 before evidence.
+These are validation questions, not reasons to re-expand v1 before evidence.

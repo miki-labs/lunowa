@@ -72,20 +72,22 @@ None implies the others.
 
 # 2. The onboarding goal
 
-The first-week goal is not:
+Early onboarding is not about:
 
-- configure every category;
-- clean the inbox;
-- train an AI persona;
-- learn a new task taxonomy;
-- enable broad automation;
-- reach Inbox Zero.
+- configuring every category;
+- cleaning the inbox;
+- training an AI persona;
+- learning a new task taxonomy;
+- enabling broad automation;
+- reaching Inbox Zero.
 
-The first-week goal is:
+The earliest meaningful Product proof is:
 
-> **Experience at least one complete monitoring handoff in which the user can stop checking, Lunowa stays quiet while no attention is needed, and Lunowa returns the item with enough context at the correct time/state change.**
+> **Experience a complete monitoring handoff in which the user can stop checking, Lunowa stays quiet while no attention is needed, and Lunowa returns the item with enough context at the correct time/state change.**
 
-This is the smallest experiential proof of the Product thesis.
+Do **not** require that this full cycle complete within the first calendar week. Real externally dependent loops may legitimately last days or weeks. Optimizing onboarding for an artificial short completion window could bias the Product toward trivial loops and undermine the actual wedge.
+
+Before the first natural full closure, onboarding can still demonstrate value through bounded delegation, correct silent intermediate handling, evidence receipts, integrity transparency, and correct return behavior.
 
 ---
 
@@ -139,6 +141,8 @@ Candidate prompt:
 ```
 
 The user chooses one concrete communication where monitoring burden already exists.
+
+Selection of a thread does **not** mean `1 thread = 1 Responsibility`. Lunowa must still propose the smallest coherent operational outcome and preserve ordinary admission semantics.
 
 ## 3.4 Step 4 — Show the delegation contract in ordinary language
 
@@ -201,7 +205,7 @@ Lunowa:
 
 ## 4.2 Phase B — Assisted delegation
 
-After successful real loops, Lunowa may proactively identify new candidate loops:
+After successful real interactions, Lunowa may proactively identify new candidate loops:
 
 ```text
 この件、返答を待つ状態として見ておきますか？
@@ -217,12 +221,12 @@ The goal is not to ask this forever. It is temporary scaffolding while the user 
 
 ## 4.3 Phase C — Class-scoped default monitoring
 
-**PRODUCT HYPOTHESIS:** after repeated successful behavior for a recognizable class, Lunowa may offer a scope-specific delegation rule.
+**PRODUCT HYPOTHESIS:** after repeated sufficiently reliable behavior for a recognizable class, Lunowa may offer a scope-specific delegation rule.
 
 Example:
 
 ```text
-これまで、期限つきで相手に依頼した4件をLunowaに任せました。
+これまで、期限つきで相手に依頼した複数の件をLunowaに任せました。
 今後、このタイプは自動で見ておきますか？
 
 対象
@@ -240,15 +244,19 @@ Example:
 
 The exact count/threshold is NOT fixed by this document. Promotion must be based on validated Product evidence, not an arbitrary magic number.
 
+Class-scoped delegation is **permission to monitor eligible admitted Responsibilities**, not permission to bypass Responsibility admission. Every candidate still respects canonical `TRACK / DO_NOT_TRACK / NEEDS_REVIEW` semantics, material uncertainty, identity boundaries, and `No Responsibility` as a correct outcome.
+
+This must not become a generic user-authored rule engine/DSL in v1.
+
 ## 4.4 Phase D — Quiet default
 
 Once the user has explicitly enabled safe class-scoped delegation, the Product may become quieter:
 
 ```text
 mail/evidence arrives
-→ candidate Responsibility update
-→ safe admitted class
-→ monitor automatically
+→ ordinary admission / matching / reduction
+→ eligible safe admitted Responsibility
+→ monitor automatically within delegated scope
 → no interruption unless Attention Need changes
 ```
 
@@ -284,10 +292,12 @@ Time alone proves nothing.
 
 A seven-day onboarding checklist may be useful educationally, but Product authority should expand only because:
 
-- the user experienced relevant loops;
-- the system produced observable correct behavior;
+- the user experienced relevant real loops/interactions;
+- the system produced observable sufficiently reliable behavior for the relevant function/class;
 - material errors/corrections are understood;
 - the user explicitly accepts the broader delegation scope.
+
+A loop taking longer than a week is not an onboarding failure if Lunowa is correctly carrying the monitoring burden during that period.
 
 ---
 
@@ -325,6 +335,8 @@ After a complete loop:
 原文と判断根拠を見る
 ```
 
+The duration in this example is illustrative only; Product value does not depend on rapid closure.
+
 This makes the invisible value legible without requiring constant monitoring.
 
 ## 6.3 Do not manufacture confidence theater
@@ -350,7 +362,7 @@ Initial navigation may keep Source Conversations prominent alongside Needs You.
 
 ## 7.2 Offer the landing shift explicitly
 
-After successful delegation experience, Lunowa may offer:
+After meaningful successful delegation experience, Lunowa may offer:
 
 ```text
 最近は「対応が必要」から始めることが増えています。
@@ -375,7 +387,9 @@ As delegation grows:
 
 # 8. Monitoring integrity is part of trust progression
 
-When the Product owns monitoring burden, loss of monitoring capability is itself an attention event.
+When the Product owns monitoring burden, loss of monitoring capability is itself a **Product-level attention condition**.
+
+It is not automatically a Responsibility, `Needs You`, or semantic `Review` subject. System-integrity/degraded-state UX should remain distinct from communication Responsibility projections unless the failure independently creates a real user obligation/decision.
 
 Examples:
 
@@ -476,6 +490,8 @@ Lunowaは「経過報告」として扱い、戻しませんでした。
 
 Exact repair mechanics require implementation/eval evidence; the Product invariant is transparent impact + concrete recovery, not emotional language.
 
+A safety fallback may temporarily return the affected delegated class to confirmation-oriented behavior, but the user must be told what changed. Do not silently mutate broad permission scope based on an opaque “trust repair” algorithm.
+
 ## 9.4 Integrity failure is not an AI interpretation error
 
 A provider outage/sync failure should be communicated as such rather than anthropomorphically blamed on “AI”.
@@ -505,8 +521,10 @@ Important Product measures include:
 - number/rate of real loops explicitly delegated;
 - class-scoped delegation opt-in;
 - percentage of candidate loops user declines;
-- continued delegation after successful closure;
+- continued delegation after successful closure/return behavior;
 - delegation contraction after errors.
+
+A decline is an observed behavior, not proof of distrust; reasons may include irrelevance, low value, privacy preference, or misclassification.
 
 ## Parallel monitoring behavior
 
@@ -558,7 +576,7 @@ Do not build:
 
 ---
 
-# 12. First-week Product experience candidate
+# 12. Early Product experience candidate
 
 This is behavior-driven, not a mandatory day-by-day unlock schedule.
 
@@ -580,7 +598,8 @@ Lunowa surfaces a Moment when user action/judgment is truly required
 → source remains one click away
 → contextual draft/action may be prepared
 
-FIRST CLOSURE
+FIRST NATURAL CLOSURE
+when the real external loop eventually closes,
 Lunowa verifies/records justified closure
 → shows compact stewardship receipt
 
@@ -588,14 +607,15 @@ NEXT LOOPS
 Lunowa identifies candidates
 → user can accept/decline cheaply
 
-AFTER REPEATED SUCCESS IN A CLASS
+AFTER REPEATED SUFFICIENTLY RELIABLE BEHAVIOR IN A CLASS
 Lunowa may offer class-scoped automatic monitoring
 → explicit opt-in
+→ ordinary admission semantics still apply
 → no automatic expansion of external-action authority
 
 AFTER MATERIAL FAILURE
 transparent incident + affected-scope check
-→ safe fallback/narrowing
+→ safe fallback/narrowing where justified and disclosed
 → delegation is re-earned by behavior, not apology
 ```
 
@@ -630,11 +650,15 @@ Product copy must match actual reliability/authority boundaries.
 
 > **Trust expands by function/scope, not globally.**
 
+> **Class-scoped delegation never bypasses Responsibility admission or material Review.**
+
 > **Monitoring autonomy and external-action autonomy are separate.**
 
 > **The source inbox remains available while Attention-first behavior is earned.**
 
 > **Early transparency should expose evidence and boundaries, not raw agent activity.**
+
+> **Monitoring-integrity alerts are system/degraded-state UX, not automatically fake Responsibilities.**
 
 > **Material misses require impact disclosure and concrete recovery, not apology theater.**
 
@@ -648,13 +672,14 @@ Product copy must match actual reliability/authority boundaries.
 
 Still unresolved and requiring Product evidence:
 
-1. How many/what kinds of successful loops are enough before offering class-scoped automatic monitoring?
+1. What observed behavior/reliability is enough before offering class-scoped automatic monitoring?
 2. Should the first delegated loop be user-selected from Sent, suggested by Lunowa, or both?
 3. How much evidence-receipt detail helps trust without reintroducing checking behavior?
 4. When should Lunowa suggest switching the default landing from Source to Needs You?
-5. Which low-risk loop classes may be auto-admitted by default after onboarding?
+5. Which low-risk loop classes may be auto-monitored after explicit class-scoped opt-in?
 6. What exact incident UX is needed after a material false negative?
 7. How should trust progression differ for users with high existing automation preference versus high desire for control?
 8. Can awareness-only updates be batched without causing users to return to manual checking?
+9. How long can the first natural loop remain open before onboarding needs a second, faster proof loop without manufacturing artificial tasks?
 
 These must not be resolved by arbitrary Product taste alone.

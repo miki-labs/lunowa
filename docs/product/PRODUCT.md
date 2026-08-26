@@ -1,1134 +1,1030 @@
-# Lunowa Product Thesis and Product Contract
+# Lunowa Product Contract
 
 ## Status
 
-**Current durable Product-intent baseline for Lunowa.**
+**Canonical Product authority for Lunowa, reconciled through 2026-08-27.**
 
 This document owns the highest-level Product contract:
 
-- what problem Lunowa exists to solve;
-- what user behavior it tries to change;
-- what first wedge is currently strongest;
-- who may have the strongest problem;
-- what is table stakes versus differentiation;
-- how Responsibility / Temporal Contract / Moment relate to the user outcome;
-- what evidence is required before implementation breadth;
-- what remains unknown.
+- what Lunowa exists to do;
+- what problem/jurisdiction it accepts;
+- the current v1 Product direction;
+- user-facing attention/surface/daily behavior;
+- onboarding/trust progression;
+- closure, retrieval/history, communication-action, autonomy, and failure boundaries;
+- validation sequencing, commercial status, and explicit unknowns.
 
-It deliberately does **not** replace more detailed authorities:
+Detailed authorities remain separate:
 
-- `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` own detailed UX/interaction behavior;
-- `docs/product/responsibility/` owns canonical Responsibility semantics and persistence-proof status;
-- `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` own engineering boundaries;
-- `docs/product/TECH-STACK.md` + accepted ADRs own concrete technology choices;
-- `docs/product/IMPLEMENTATION-PLAN.md` owns implementation/evidence sequence;
-- GitHub Issues/PRs/CI own live task/candidate/review state;
-- `docs/continuity/CURRENT.md` is only the mutable checkpoint/router;
-- `docs/product/research/` contains dated evidence artifacts and does not become Product truth merely by existing.
+- `docs/product/responsibility/` — canonical Responsibility semantics;
+- `docs/design/DESIGN.md` / `INTERACTIONS.md` / `RESPONSIVE.md` — detailed UX/interaction/responsive behavior consistent with this Product contract;
+- `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` — engineering boundaries;
+- `docs/product/TECH-STACK.md` + ADRs — concrete technology decisions;
+- `docs/product/IMPLEMENTATION-PLAN.md` — evidence/implementation sequence;
+- GitHub Issues/PRs/CI — live task/candidate/review state;
+- `docs/continuity/CURRENT.md` — compact mutable router only;
+- `docs/product/research/` — dated evidence/rationale, not Product truth merely by existing.
 
-This document distinguishes:
+Historical noncanonical synthesis files remain useful rationale:
 
-- **ACCEPTED** — current Product direction or safety/authority principle;
-- **EXTERNAL EVIDENCE** — supported by cited research/current market evidence, but not proof of Lunowa Product-market fit;
-- **INFERENCE** — current reasoning derived from evidence;
-- **HYPOTHESIS** — current best Product explanation/direction still requiring validation;
-- **UNKNOWN / NEEDS VALIDATION** — material unresolved Product question;
-- **DEFERRED** — intentionally outside the current learning target;
-- **SUPERSEDED** — prior framing that should not silently return.
+- `PRODUCT-CONSTITUTION-V1-CANDIDATE.md`;
+- `V1-PRODUCT-SURFACE-CANDIDATE.md`;
+- `ONBOARDING-TRUST-PROGRESSION-CANDIDATE.md`;
+- `PRODUCT-SPEC-V1-CANDIDATE.md`.
 
-A hypothesis is not promoted to market fact merely because it appears in this canonical file.
+When they conflict with this file, **this file wins at Product level**. They do not create schema, aggregates, enums, or permissions.
 
-### Current evidence reviews
+### Evidence/decision labels
 
-The current Product thesis was first reframed around communication monitoring on **2026-08-26**, then tightened the same day after a broader current-market / ICP / agent-reliability review.
+- **ACCEPTED** — current Product direction/safety principle;
+- **V1 DIRECTION** — current v1 Product shape, still revisable by evidence;
+- **EXTERNAL EVIDENCE** — research/current market evidence, not proof of Lunowa PMF;
+- **INFERENCE** — reasoning from evidence;
+- **HYPOTHESIS** — Lunowa-specific choice needing validation;
+- **UNKNOWN** — materially unresolved;
+- **DEFERRED** — intentionally later;
+- **OUT** — outside current core responsibility.
 
-Read:
-
-- `docs/product/research/communication-monitoring-evidence-2026-08.md` — first evidence review;
-- `docs/product/research/product-frontier-and-icp-evidence-2026-08-26.md` — current competitive-frontier / ICP correction.
-
-The second review materially changes **ICP prioritization and differentiation discipline**, but does not reject the North Star or the `Open-loop Monitoring Offload` problem/wedge hypothesis.
+A canonical Product contract may contain explicit hypotheses. **Canonical does not mean empirically proven.** GitHub Issue #36 remains the highest-priority problem/ICP discovery gate.
 
 ---
 
-# 1. What Lunowa is for
+# 1. Product identity
 
 ## 1.1 Vision
 
-**ACCEPTED / ASPIRATIONAL:** Lunowa aims to create the most comfortable email experience possible — internally expressed as:
+**ACCEPTED / ASPIRATIONAL:**
 
 > **世界一快適なメール体験**
 
-This is vision, not a measurable market claim or release acceptance criterion.
+This is vision, not a measurable market claim.
 
 ## 1.2 North Star
 
 > **必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。**
 
-This remains the highest-level Product direction.
+## 1.3 Core value
 
-## 1.3 Current one-sentence Product definition
+**ACCEPTED:** Lunowa primarily offers **Attention Delegation**.
 
-**CURRENT STRONGEST PRODUCT THESIS:**
+Directional user promise:
 
-> **Lunowa is a communication-monitoring product delivered through email: it tries to keep unresolved communication loops under control on the user's behalf so the user can stop repeatedly remembering, checking, and reconstructing them until attention is genuinely required again.**
+> **「この件はもう自分で気にしておかなくていい。必要になったらLunowaが戻す。」**
 
-A slightly stricter expression is:
+The target behavioral change is **monitoring relinquishment**: users stop parallel manual checking because Lunowa carries the monitoring burden safely enough.
+
+## 1.4 Product definition
+
+> **Lunowa is an email-centered communication-monitoring Product that keeps unresolved communication outcomes under control on the user's behalf, stays quiet while the user is not needed, and returns the right issue with enough source-grounded context when attention is genuinely required again.**
+
+A stricter expression is:
 
 > **Lunowa tries to make heterogeneous email-borne commitments and dependencies safe to stop monitoring manually.**
 
-`Heterogeneous` matters: the strongest candidate problem is not one rigid sales/support pipeline, but open communication that crosses different people, outcomes, dates, documents, approvals, questions, commitments, and waiting conditions.
+## 1.5 Experience doctrine
 
-## 1.4 What Lunowa is not primarily
+**ACCEPTED:** routine use is **system-led, not prompt-led**.
+
+```text
+communication/evidence changes
+-> preserve authorized source evidence
+-> derive candidate meaning
+-> admit/update trusted Responsibility state
+-> evaluate attention / expected events / time
+-> surface only what matters now
+```
+
+AI should mostly prepare and maintain context behind the interface rather than make the user prompt it to organize routine work.
+
+> **Eliminate work, not control.**
+
+Reduce remembering, checking, reconstruction, navigation, and repetitive preparation while preserving source visibility, sender/account identity, user authority, correction, and safe fallback.
+
+## 1.6 What Lunowa is not primarily
 
 Lunowa is not primarily:
 
-- an inbox skin;
 - an Inbox Zero tool;
-- an AI chat surface;
+- a unified inbox;
+- an AI chat homepage;
 - an AI writing assistant;
-- a generic task manager;
-- a CRM;
-- a unified-inbox product;
-- a collection of `My Turn / Waiting / Done` labels;
-- a no-reply follow-up bot;
-- an ontology showcase.
+- a generic task manager/project manager;
+- a CRM/ticket system;
+- a generic automation/rule builder;
+- a relationship-scoring Product;
+- a generic long-term memory assistant;
+- a general autonomous agent.
 
-Those capabilities may exist. None is enough to justify the Product's existence.
-
-## 1.5 Desired behavior change
-
-The target is stronger than “process email faster.”
-
-```text
-before Lunowa
-  -> user keeps unresolved communication in prospective memory
-  -> checks Inbox / Sent / thread / task tools again
-  -> reconstructs what changed and what remains open
-  -> creates parallel reminder scaffolding when necessary
-
-with a successful Lunowa
-  -> user deliberately or implicitly delegates monitoring of an open loop
-  -> stops parallel manual checking
-  -> Lunowa preserves evidence and maintains the relevant state/return conditions
-  -> nothing demands attention while nothing material requires the user
-  -> the loop returns when the user's attention is genuinely needed
-  -> enough trustworthy context is restored to act safely
-```
-
-**HYPOTHESIS:** the core behavioral outcome is **monitoring relinquishment** — the user genuinely stops carrying/rechecking delegated communication because Lunowa has earned sufficient trust.
+These capabilities or adjacent conveniences may exist. None defines the Product.
 
 ---
 
-# 2. Evidence posture after the 2026-08-26 frontier review
+# 2. Problem, jurisdiction, and ICP
 
-The Product must keep three conclusions separate.
+## 2.1 Core problem
 
-## 2.1 Problem plausibility — strengthened
+**ACCEPTED PROBLEM DIRECTION / HYPOTHESIS OF MARKET SEVERITY:** Lunowa focuses on **unresolved email-borne coordination** whose progress depends on the user, another person/organization, time, an external event, approval, document, payment, decision, or changing evidence.
 
-**EXTERNAL EVIDENCE:** email remains highly used and frequently checked; HCI/CSCW research shows email commonly carries collaborative tasks/commitments; prospective-memory research supports the possibility that reliable external reminders reduce internal intention maintenance.
-
-This makes the problem/mechanism plausible.
-
-It does **not** prove that Lunowa's target segment exists at useful scale or will adopt/pay.
-
-## 2.2 Generic email productivity — increasingly incumbent territory
-
-**EXTERNAL EVIDENCE:** a large randomized field experiment across 66 firms / 7,137 knowledge workers found integrated generative AI users spent roughly two fewer hours/week on email in the latter half of the experiment.
-
-**INFERENCE:** `AI makes email faster`, generic summarization, drafting, priority classification, and simple task extraction are weak Product theses and weak differentiation claims.
-
-## 2.3 Feature-space uniqueness — weakened materially
-
-Current products already implement or claim meaningful portions of:
-
-- `Respond` / `Waiting`;
-- sent-mail/no-reply tracking;
-- automatic follow-up reminders/drafts;
-- commitment/task extraction;
-- multi-account attention;
-- `who owes whom` style queues;
-- overdue commitments;
-- outcome/response verification;
-- richer action/commitment representations.
-
-Therefore:
-
-> **A real problem does not imply Lunowa owns a unique solution category.**
-
----
-
-# 3. The user problem
-
-## 3.1 The core problem is not raw email volume
-
-**HYPOTHESIS:** Lunowa's highest-value problem is created by **communication open loops** — work that cannot yet be treated as resolved because a meaningful outcome depends on:
-
-- the user;
-- another person/organization;
-- a future time;
-- an expected event;
-- a decision/approval;
-- a document/payment/information arrival;
-- unresolved/conflicting evidence.
-
-High volume may amplify the problem but is neither necessary nor sufficient.
-
-## 3.2 Current causal hypothesis
-
-```text
-many unresolved communication loops
-  + external/interpersonal dependency
-  + irregular or extended waiting
-  + meaningful failure/latency cost
-  -> ongoing monitoring burden
-  -> repeated checking / reminder scaffolding
-  -> reconstruction burden when returning
-  -> execution overhead from manual organization
-  -> verification burden when automation cannot be trusted
-```
-
-## 3.3 Communication Management Burden
-
-Lunowa continues to model four Product costs:
-
-1. **Monitoring cost** — remembering what remains open, who/what is pending, and when attention may become necessary.
-2. **Interpretation / reconstruction cost** — rebuilding what happened, what changed, who owes what, and what remains unresolved.
-3. **Execution cost** — searching, switching views/accounts, reopening threads, creating reminders/tasks, copying information, and repeated low-value operations.
-4. **Verification / trust cost** — checking source communication “just in case” because the system may have lost an obligation, state change, source, identity, or timing condition.
-
-**CURRENT PRIORITY HYPOTHESIS:** Monitoring is the strongest wedge-level burden; the other three determine whether monitoring can actually be offloaded.
-
-## 3.4 Representative failure modes
-
-Examples include:
-
-- repeatedly opening Sent to see whether someone replied;
-- receiving a reply that does not actually satisfy the awaited outcome;
-- remembering that “something is still open” without remembering exactly what;
-- forgetting an operational request buried inside ordinary email;
-- losing a sent obligation once it leaves the Inbox;
-- not knowing whether the next move belongs to the user or counterpart;
-- using flags/stars/snooze/tasks/calendar/notes in parallel just to preserve state;
-- rebuilding a long thread before acting;
-- treating one Conversation as one task even though several independent outcomes remain open;
-- hiding a real obligation because an inferred state was wrong;
-- creating so much Review/alert noise that the monitoring system becomes another inbox.
-
-## 3.5 Not Inbox Zero
-
-**ACCEPTED:** unread count, archive count, empty inbox, and throughput are not primary outcomes.
-
-A clean inbox can coexist with a high mental monitoring load.
-
----
-
-# 4. Who may have the strongest problem
-
-The ICP is **not validated or frozen**.
-
-## 4.1 Workflow characteristics outrank job title
-
-**HYPOTHESIS:** prioritize people with the following observable signature:
-
-- tasks/commitments are materially communicated through email;
-- they create or maintain tasks/reminders from received/sent email, or repeatedly reopen mail to preserve state;
-- relevant work is substantially asynchronous;
-- they personally retain responsibility for follow-through rather than routinely delegating it;
-- several unresolved loops coexist;
-- some loops depend on people outside a shared workflow system;
-- waiting periods are irregular/long enough to require monitoring;
-- missed/late action has meaningful cost;
-- a dedicated CRM/ATS/ticketing/project system does not already track the relevant heterogeneous loop adequately;
-- they have sufficient autonomy to adopt a companion or alternate workflow.
-
-## 4.2 Current research prior — self-managing async email-task work
-
-**EXTERNAL EVIDENCE / LIMITED:** A 2024 CSCW study of Microsoft information workers (`N=45` survey, plus interviews) found positive interaction with an AI reminder system associated with:
-
-- communicating about tasks via email;
-- creating tasks from email;
-- fewer scheduled meetings;
-- less task delegation.
-
-**IMPORTANT LIMITATION:** this is a small organization-specific self-assessment study. It is a recruitment prior, not a causal market segmentation result.
-
-**INFERENCE:** `self-managing + asynchronous + email-task-coupled + low-delegation` is a stronger recruitment lens than `high email volume` or `executive`.
-
-## 4.3 Current first recruitment cohort hypothesis
-
-**HYPOTHESIS — NOT ACCEPTED ICP:** begin discovery with independent / small-firm B2B professionals who personally coordinate multiple clients/counterparties, such as:
-
-- independent consultants;
-- fractional specialists;
-- solo professional-service providers;
-- small client-service operators.
-
-Reason for prioritization:
-
-- likely adoption autonomy;
-- personal follow-through ownership;
-- potentially heterogeneous external work;
-- potentially weaker fit with rigid CRM/ATS/ticket flows.
-
-This is a **recruitment prior only**. Do not call `freelancers`, `consultants`, or any occupation the Lunowa ICP until recent real-workflow evidence supports it.
-
-## 4.4 Segmentation lens
-
-Current qualitative lens:
-
-> **Concurrency × Latency × Interdependence × Failure Cost**
-
-moderated by:
-
-- workaround adequacy;
-- delegation availability;
-- dedicated-system coverage;
-- adoption autonomy;
-- trust sensitivity.
-
-This is **not** a validated numeric scoring model.
-
-## 4.5 Candidate disqualifiers
-
-A segment/user is weaker when:
-
-- mail is mostly newsletters/notifications;
-- important loops resolve immediately;
-- CRM/ATS/ticket/project software reliably owns the state already;
-- follow-up is routinely delegated to another person;
-- most work is synchronous/scheduled and email is incidental;
-- the main pain is writing/summarization speed;
-- missed/late open loops have little consequence;
-- organizational policy prevents adoption.
-
-## 4.6 Current Product-discovery authority
-
-GitHub **Issue #36** is the current highest-priority Product-discovery gate for exact ICP/problem evidence.
-
-Do not freeze an ICP before that evidence exists.
-
----
-
-# 5. The initial Product wedge
-
-## 5.1 Current strongest problem/wedge hypothesis
+The strongest current wedge is:
 
 > **Open-loop Monitoring Offload**
 
-Operationally:
+`Open Coordination Loop` is Product-level vocabulary only. It does not create a domain object. `Responsibility` remains the canonical semantic concept for the smallest communication-bounded operational outcome with coherent closure.
 
-> When communication remains unresolved, Lunowa should keep track of the relevant outcome, ownership/actionability, and time/event conditions — then return user attention only when it is actually needed.
+## 2.2 Strong-fit characteristics
 
-Directional user language:
+A case is a stronger Lunowa fit when several are true:
 
-> **自分の番になるまで、気にしなくていい。**
+- it emerges naturally from communication rather than a project plan;
+- a material operational outcome remains unresolved;
+- another person/event/time/evidence must change before closure;
+- waiting is irregular/long enough to create monitoring burden;
+- simple one-time snooze is insufficient;
+- reply arrival may not equal outcome satisfaction;
+- source communication materially evidences state;
+- no stronger structured system already monitors the relevant state adequately.
 
-This is not finalized marketing copy.
+## 2.3 Stewardship modes
 
-## 5.2 The wedge is not differentiation by itself
+### Primary Steward
 
-**IMPORTANT CURRENT CORRECTION:** `Open-loop Monitoring Offload` describes the problem/value wedge Lunowa wants to prove. It does **not** establish a unique market position.
+Lunowa carries monitoring where no stronger structured system adequately owns the heterogeneous communication state.
 
-Current vendors already implement or claim substantial monitoring/follow-up behavior.
+### Overlay / Monitor
 
-## 5.3 Clock reminder versus state/event attention
+A CRM/ticket/project/accounting system may own domain truth while Lunowa owns only the communication-attention gap.
 
-Simple flow:
+### Out / Reference
 
-```text
-user decides mail matters later
-  -> picks a date
-  -> thread returns
-  -> user checks whether anything changed
-```
+Generic personal tasks, project plans, CRM pipelines, support-ticket lifecycle, accounting truth, deterministic recurring automation, broad goals, and generic knowledge storage do not become Lunowa-owned merely because email mentions them.
 
-Stronger Lunowa target:
+**ACCEPTED:**
 
-```text
-communication establishes an open loop
-  -> system preserves what remains unresolved
-  -> source/time/event evidence changes the state
-  -> no attention while nothing requires the user
-  -> attention returns when state warrants it
-```
+> **Integrate evidence without automatically absorbing domain ownership.**
 
-This behavior remains Product-important. It is **not assumed unique**.
+## 2.4 ICP status
 
-## 5.4 Any reply is not necessarily resolution
+**UNKNOWN:** exact ICP is not validated or frozen.
 
-A reply is evidence, not closure.
+**HYPOTHESIS:** first recruitment should prioritize self-managing, asynchronous, email-task-coupled users who personally coordinate several external counterparties, maintain multiple unresolved loops, repeatedly re-check or create reminder scaffolding, face meaningful delay/miss cost, are not already adequately served by a dedicated system of record, and have adoption autonomy.
 
-Examples:
-
-- “I forwarded it to legal” may preserve Waiting;
-- “Can you clarify item 3?” may create My Turn for one obligation while another remains Waiting;
-- “Thanks” may not satisfy a requested document/payment/approval;
-- a Conversation may contain multiple outcomes.
-
-**CURRENT CORRECTION:** competitors now explicitly claim `response verification` / richer commitment tracking as well. Therefore `reply != outcome satisfied` is a semantic requirement candidate, **not a differentiation claim**.
+Independent / small-firm B2B professionals remain a recruitment prior only, not accepted ICP.
 
 ---
 
-# 6. Competitive frontier in 2026
+# 3. Responsibility and semantic authority
 
-Detailed current sources/limitations live in the dated research artifacts.
+Detailed canonical semantics remain in `docs/product/responsibility/`.
 
-## 6.1 Established overlap
+## 3.1 Fixed Product dependencies
 
-Current Gmail/Superhuman/Fyxer/SaneBox and similar products cover meaningful portions of:
+This Product contract relies on these FIXED semantics:
 
-- priority/action classification;
-- Respond/Waiting-style status;
-- sent-mail tracking;
-- no-reply reminders;
-- follow-up drafting;
-- snooze/defer/done;
-- account aggregation or existing-client embedding.
+- Message / Conversation / Responsibility are distinct;
+- a Conversation can contain zero, one, or many Responsibilities;
+- Responsibility identity follows the smallest communication-bounded operational outcome with coherent closure;
+- communication-act detection does not automatically create a Responsibility;
+- admission uses `TRACK / DO_NOT_TRACK / NEEDS_REVIEW`;
+- `No Responsibility` is a first-class correct outcome;
+- Review may represent a pre-admission subject or admitted field uncertainty, with subject type preserved internally;
+- multiple obligation legs and expected events are allowed;
+- claim and observation are distinct;
+- source due, expected-event time, user target, resurface time, and follow-up time are distinct;
+- accepted state is evidence-relative and important facts require provenance;
+- semantic similarity is candidate retrieval, not identity authority;
+- resolution, live tracking, and attention/defer are orthogonal;
+- send attempt and provider-reconciled acceptance are distinct;
+- historical lack of observed closure does not imply live active Responsibility;
+- REOPEN means the same operational outcome was never actually satisfied; genuinely new work after true closure normally creates a new Responsibility;
+- AI failure does not block ordinary source reading/reply/search;
+- cross-account semantic merge is prohibited initially;
+- no generic workflow engine.
 
-## 6.2 Newer frontier claims
+## 3.2 Product grammar
 
-Current early vendors also claim combinations including:
-
-- waiting-on queues;
-- overdue commitments;
-- relationship/commitment health;
-- automatic tracking from CC/forward patterns;
-- response verification against the original requested result;
-- multiple actions/owners/waiting states per communication context.
-
-**Evidence discipline:** these vendor pages show that the **idea/feature space is occupied**. They do not prove accuracy, adoption, retention, moat, or Product quality.
-
-## 6.3 Consequence
-
-Do not reason:
-
-```text
-competitor does not use our word "Responsibility"
-  -> Lunowa is differentiated
-```
-
-or:
+Without creating a parent aggregate:
 
 ```text
-our ontology is deeper
-  -> market will switch
+tracked unresolved operational outcome
+  -> Responsibility identity / outcome
+  -> obligation legs
+  -> expected events
+  -> evidence / provenance
+  -> temporal / return conditions
+  -> completion / closure criteria
+  -> uncertainty / authority
 ```
 
-Feature/ontology novelty is insufficient.
+## 3.3 Action != Expected Event != Outcome
+
+- **Action** — something an actor does;
+- **Expected Event** — a future observation that should cause reconsideration;
+- **Outcome** — the state the Responsibility is ultimately trying to reach.
+
+A reply can satisfy an expected event without satisfying the outcome.
 
 ---
 
-# 7. Differentiation is now an empirical outcome threshold
+# 4. Attention Contract and Temporal Contract
 
-## 7.1 Capabilities that are not differentiation by themselves
+## 4.1 Attention Contract
 
-Do **not** treat any of these alone as defensible differentiation:
+**HYPOTHESIS / PRODUCT-LEVEL LANGUAGE:** `Attention Contract` describes the bounded promise:
 
-- unified inbox / multiple accounts;
-- generic AI summary;
-- generic AI drafting;
-- generic search;
-- task extraction;
-- due-date extraction;
-- priority classification;
-- `My Turn` / `Respond`;
-- `Waiting`;
-- sent-mail/no-reply tracking;
-- automatic follow-up drafting;
-- Snooze / Later;
-- Done/archive;
-- commitment extraction;
-- owner/next-move extraction;
-- `reply != expected outcome satisfied`;
-- stateful/longitudinal tracking as a phrase;
-- multiple actions/commitments per thread as a phrase;
-- companion/overlay form factor.
+> Lunowa monitors a specific unresolved outcome, keeps it out of active attention while the user is not materially needed, and returns it under defined evidence/time/attention conditions.
 
-They may be necessary. They are not automatically unique.
+It may conceptually describe monitored outcome, expected evidence/events, silent/return conditions, delivery urgency, and authority/review boundaries.
 
-## 7.2 Current differentiation standard
+**It is not a new persisted object authorized by this document.**
 
-**HYPOTHESIS:** Lunowa is meaningfully differentiated only if, for a specific target segment and its messy real communication, the complete system can produce a superior **behavioral outcome** versus the user's real alternative.
+## 4.2 Temporal Contract
 
-A candidate success regime is:
+`Temporal Contract` remains the accepted durable mechanism for persisted time/event reconsideration where required.
 
 ```text
-materially less parallel self-checking
-+ materially less state/context reconstruction
-+ correct resurfacing when user attention is needed
-+ sufficiently low material false-negative rate
-+ sufficiently low unnecessary Review/resurfacing burden
-+ preserved source/provenance/account/control
-+ enough recurring value to justify trust and switching/dependency
+trigger fires
+-> reload current evidence/state
+-> ignore stale/cancelled condition
+-> re-evaluate
+-> update attention if warranted
+-> notify only if separate delivery policy warrants it
 ```
 
-No one metric or threshold is frozen yet.
+Trigger firing is not notification.
 
-## 7.3 Real comparator, not straw baseline
+## 4.3 Four distinct Product questions
 
-The market comparator may be:
+**ACCEPTED:** always separate:
 
-- Gmail/Outlook native AI/tasks/reminders;
-- Superhuman;
-- Fyxer;
-- SaneBox;
-- Quell/Pendingly or another follow-up assistant;
-- CRM/ATS/ticketing/project software;
-- Todoist/Notion/calendar;
-- manual flags/snooze/Sent scanning;
-- human assistant/delegation;
-- a combination of these.
+1. **Operational State** — what changed?
+2. **Attention Need** — does the user need to know, decide, or act?
+3. **Delivery Urgency** — when/how should that attention interrupt?
+4. **Authority** — may Lunowa decide/act without explicit approval?
 
-A conventional plain inbox remains useful as a **controlled experiment condition**, but it is not sufficient by itself to establish market differentiation.
-
-## 7.4 Current strongest differentiation hypothesis
-
-The strongest remaining hypothesis is not a named feature. It is:
-
-> **Lunowa may be able to deliver reliable delegated state continuity across heterogeneous communication cases well enough that the user actually stops self-monitoring, with less reconstruction and acceptable error/review burden compared with their real workflow.**
-
-Whether this is achievable and valuable is **UNKNOWN**.
+Do not collapse them into one priority/confidence score.
 
 ---
 
-# 8. Product experience thesis
+# 5. Minimum Complete Delegation Loop
 
-## 8.1 System-led, not prompt-led
+## 5.1 v1 thesis
 
-**ACCEPTED:** ordinary use should not begin with `Ask AI`.
-
-Conceptual flow:
+**V1 DIRECTION:** v1 is the smallest Product that completes Attention Delegation end-to-end, not a reduced Gmail/Outlook clone.
 
 ```text
-communication changes
-  -> preserve authorized source evidence
-  -> derive candidate interpretation
-  -> admit/update trusted communication state
-  -> evaluate actionability / expected event / time condition
-  -> project minimum relevant attention
-  -> user acts only when needed
+material source evidence
+-> candidate interpretation
+-> Responsibility admission/update under trusted rules
+-> evaluate current attention need
+-> if no: offload and monitor quietly
+-> re-evaluate on message / time / event / contradiction
+-> if yes: return attention
+-> restore minimum context
+-> enable one safe meaningful action/decision
+-> reconcile external effects
+-> verify whether outcome is actually satisfied
+-> close monitoring only when justified
 ```
 
-AI should mostly prepare/maintain context behind the interface.
+Task extraction, priority classification, no-reply reminders, drafting, natural-language search, and background email automation are already substantial incumbent territory. Lunowa's Product hypothesis is the **complete behavioral outcome**, not one feature.
 
-## 8.2 AI prepares; human commits
-
-**ACCEPTED:** human final authority remains the default for material external commitments and privileged actions.
-
-Initial Product must not autonomously perform high-impact actions merely because a model inferred intent.
-
-## 8.3 Eliminate work, not control
-
-**ACCEPTED:** remove low-value remembering/checking/reconstruction/navigation/decision work while preserving:
-
-- source visibility;
-- account/sender boundaries;
-- human authority;
-- practical reversibility/correction;
-- safe fallback.
-
-## 8.4 Trust is functional
-
-A flow that causes:
+## 5.2 Golden path
 
 ```text
-Lunowa monitoring
-+ old manual checking
+User sends: "金曜までに見積書をお願いします"
+-> Lunowa admits/updates the tracked outcome
+-> no current user action: quiet Managed monitoring
+
+Counterparty: "社内確認中です。明日回答します"
+-> evidence / expected event update
+-> no user action: remain silent
+
+Usable quotation arrives
+-> user review becomes necessary
+-> Needs You
+-> Moment restores why-now / change / remaining work
+-> user acts
+-> provider effects reconcile
+-> Responsibility becomes Waiting again or closes only if justified
 ```
 
-has failed the core promise even if it is visually elegant or fast.
-
-## 8.5 Trust ladder
-
-Prefer progressive disclosure:
-
-```text
-current conclusion / next action
-  -> short reason
-  -> material provenance
-  -> original communication
-```
-
-Do not use model-confidence percentages as a default substitute for evidence/authority.
+The decisive Product proof is that the user genuinely did not need to keep checking during the silent interval.
 
 ---
 
-# 9. Role of Responsibility, Moment, Temporal Contract
+# 6. Closure and reopening
 
-Detailed semantics remain owned by `docs/product/responsibility/`.
+## 6.1 Communication activity is evidence, not closure
 
-## 9.1 Responsibility is a candidate mechanism
+**ACCEPTED:**
 
-**ACCEPTED PRODUCT POSITIONING:** Lunowa needs some reliable representation of unresolved communication state to monitor it over time.
+> **Reply arrival, completion claim, attachment arrival, send action, read state, or silence does not automatically prove successful satisfaction.**
 
-The current best internal model is **Responsibility**.
+```text
+action performed
+!= completion claimed
+!= outcome satisfied
+!= user/Lunowa monitoring close
+```
 
-> Responsibility exists to serve monitoring offload; Lunowa does not exist to serve the ontology.
+## 6.2 Closure question
 
-If Product evidence supports a simpler/better model, Responsibility can be superseded through explicit decision/reconciliation.
+> **Is there any material reason the user or Lunowa still needs to monitor this Responsibility?**
 
-## 9.2 Conversation is evidence context, not one task state
+## 6.3 Product-level gates
 
-A Conversation may contain zero, one, or many Responsibilities.
+**HYPOTHESIS:** automatic monitoring closure should normally satisfy all relevant:
 
-## 9.3 Current projections
+1. outcome gate;
+2. obligation gate;
+3. evidence gate;
+4. authority gate.
 
-- `対応が必要` / My Turn;
-- `待ち` / Waiting;
-- `あとで` / Later;
-- `完了` / Done;
-- `確認` / Review.
+These are Product synthesis only; canonical reducer/oracle semantics remain authoritative.
 
-These are projections, not canonical lifecycle truth and not differentiation claims.
+## 6.4 Silence / stop tracking / reopen
 
-## 9.4 Moment is context restoration
+- silence alone never proves successful satisfaction;
+- user tracking close does not prove external-world success or cancel counterpart expectations;
+- REOPEN keeps the same identity only where the same outcome was never actually satisfied;
+- genuinely new work after a truly closed episode normally creates a new Responsibility.
+
+---
+
+# 7. Daily Operating Model
+
+## 7.1 Continuous monitoring, episodic human attention
+
+**ACCEPTED DIRECTION:** Lunowa is continuously active; the user is only intermittently required.
+
+The Product should remain useful even when the user does not open it every day. Authorized ingestion/reconciliation, Waiting evolution, Temporal Contract reconsideration, closure/reopen processing, and integrity observation continue according to actual runtime capability.
+
+## 7.2 New evidence is not a notification
+
+```text
+message / reply / time / provider observation
+-> evidence changes
+-> state re-evaluates
+-> attention may or may not change
+```
+
+## 7.3 Delivery lanes
+
+**V1 DIRECTION:**
+
+- **Silent** — state changed; no current user action/awareness required;
+- **Awareness** — no action required, but knowing is useful/explicitly requested;
+- **Normal Attention** — action/judgment required but the next normal review point is safe;
+- **Urgent Attention** — delaying to the normal review point creates material delay cost;
+- **Integrity Alert** — Lunowa cannot reliably fulfill monitoring.
+
+`Integrity Alert` is system/degraded-state UX, not automatically a Responsibility, Needs You item, or semantic Review subject.
+
+> **Not as soon as possible. As late as safely possible.**
+
+Urgency is primarily **delay cost + actionability**, not sender prestige, recency, or model confidence alone.
+
+## 7.4 App open / start of day / digest
+
+On open, show current attention state rather than requiring arrival-by-arrival triage.
+
+**HYPOTHESIS:** an optional start-of-day brief may summarize current attention and overnight awareness without becoming an Inbox recap or mandatory ritual.
+
+**HYPOTHESIS:** an optional awareness digest may make quiet stewardship legible, but:
+
+> **A digest must never be the only place where actionable work is hidden.**
+
+## 7.5 Quiet hours
+
+Quiet hours suppress interruption, never monitoring. State re-evaluation still occurs; delivery may wait only when the relevant delay cost/Attention Contract permits it.
+
+Initial behavior should use simple user-owned schedules rather than invasive activity/location inference.
+
+## 7.6 Engagement metrics
+
+DAU/session count/unread processing are not North-Star metrics. Repeated opening may indicate distrust; a day with no unnecessary Lunowa open can be a successful day.
+
+---
+
+# 8. Product surfaces
+
+## 8.1 Surface set
+
+**V1 DIRECTION:**
+
+1. **Needs You / 対応が必要** — current actionable USER work;
+2. **Moment / 今の要点** — temporal context restoration + safe next action;
+3. **Managed / Lunowaが見ています** — delegated-monitoring reassurance + on-demand inspection;
+4. **Review / 確認** — material semantic/safety ambiguity;
+5. **Source Conversations / 会話** — original communication/provenance fallback;
+6. **Home/Landing** — composition of Review, Needs You, Managed reassurance, and Source entry; not a sixth semantic state.
+
+## 8.2 Needs You
+
+Contains only admitted Responsibilities with a material currently actionable USER obligation/judgment.
+
+It does **not** contain generic important/new mail, Waiting, intentionally deferred Later, pre-admission Review, admitted Responsibilities blocked by material Review, or awareness-only updates.
+
+**HYPOTHESIS:** order by explainable attention tiers such as material overdue/delay cost, near due, blocking work, then other actionable work — not newest-message order or one opaque model score.
+
+## 8.3 Moment
+
+Moment restores the minimum trustworthy context needed after offload:
+
+```text
+WHY NOW?      なぜ今戻った？
+WHAT CHANGED? 何が変わった？
+WHAT REMAINS? 何がまだ未完了？
+WHAT NEXT?    今何をすればいい？
+```
 
 > **1 Moment = 1 Primary Question = generally 1 Primary Action.**
 
-**HYPOTHESIS:** after the user has stopped thinking about a loop, Moment should restore the minimum trustworthy context required to understand why it returned and what safe action/decision is needed.
-
-## 9.5 Temporal Contract
-
-A Temporal Contract is the durable Product promise for when Lunowa will reconsider/resurface an unresolved Responsibility.
-
-Its Product value depends on reliability, not merely UI copy.
-
-## 9.6 Follow-up
-
-Follow-up is normally an action/reason after a waiting trigger; it is not a separate canonical lifecycle species.
-
----
-
-# 10. Reliability and prospective memory
-
-## 10.1 Human offloading evidence
-
-**EXTERNAL EVIDENCE:** 2026 prospective-memory research supports the possibility that sufficiently trusted/reliable reminders reduce internal intention maintenance. Removing relied-upon support can cause performance costs.
-
-**INFERENCE:** if Lunowa succeeds at making the user stop checking, later false negatives become more consequential precisely because monitoring was successfully delegated.
-
-## 10.2 LLM prospective-memory warning
-
-**EXTERNAL EVIDENCE — CURRENT PREPRINT/BENCHMARK:** TriggerBench (June 2026) and PM-Bench (July 2026) report substantial difficulty for LLM agents on prospective-memory / delayed-intention / latent-trigger tasks, including precision-recall trade-offs and degraded performance under overloaded/implicit triggers. PM-Bench's best reported aggregate method reaches `65.1%` macro Set-F1 in its synthetic setting.
-
-These are **not email-production accuracy estimates**.
-
-## 10.3 Product implication
-
-Do not architect Product trust around:
-
-> `the LLM will remember and notice the future event`
-
-alone.
-
-The current source-grounded Responsibility / reducer / Temporal Contract / durable trigger / reconciliation direction is strengthened as a **reliability requirement**, not as a market moat claim.
-
----
-
-# 11. Golden flow
-
-**CURRENT PRODUCT HYPOTHESIS:**
+Progressive disclosure:
 
 ```text
-1. material communication establishes/changes an unresolved loop
-2. Lunowa derives the relevant outcome / obligation / waiting condition
-3. material interpretation is source-grounded and correctable
-4. no current user action -> loop leaves active attention
-5. user stops checking it manually
-6. message / deadline / event / contradiction changes the evidence/state
-7. Lunowa determines whether user attention is now required
-8. loop resurfaces with minimum sufficient context + provenance
-9. user takes one safe meaningful action/decision
-10. loop resolves or returns to monitored Waiting/Later
+current conclusion/action
+-> short material reason
+-> source-grounded evidence
+-> original Conversation / attachment
 ```
 
-Step **5** is essential. Without reduced self-monitoring, the North Star has not been demonstrated.
+## 8.4 Managed
+
+Managed is assurance + inspection, not a second Inbox or agent console.
+
+Default presentation should be quiet/aggregate. Intentional inspection explains tracked outcome, expected actor/event, return condition, integrity status, and source.
+
+**HYPOTHESIS:** Waiting/Later remain meaningful projections but normally become filters/details under Managed rather than permanent high-frequency top-level navigation.
+
+## 8.5 Review
+
+Review asks the **smallest material question** blocking safe delegation/action.
+
+It may present pre-admission `NEEDS_REVIEW` or admitted-field uncertainty while preserving internal subject distinction.
+
+Review is not a low-confidence AI dump and is not routine external-action approval.
+
+## 8.6 Source Conversations
+
+> **Source is optional in the happy path and always available in the trust path.**
+
+Source supports ordinary reading, verification, correction, exact retrieval, provider-native fallback where useful, and cases where the user simply wants email rather than an operational Moment.
 
 ---
 
-# 12. Product form factor remains open
+# 9. Onboarding and trust progression
 
-## 12.1 Unknown
+## 9.1 Earn bounded delegation
 
-Lunowa may ultimately be:
+**ACCEPTED:** onboarding should not ask for general AI trust or Inbox abandonment on day one. It should earn:
 
-- a full email client;
-- a companion/overlay working with Gmail/Outlook;
-- a hybrid.
+> **“I am willing to let Lunowa monitor this kind of communication loop for me.”**
 
-## 12.2 Why full-client ownership is not assumed
+Do not use one global trust score to unlock capabilities.
 
-Current competitors can deliver significant automation inside existing Gmail/Outlook.
+## 9.2 First-run direction
 
-**INFERENCE:** a replacement client adds **replacement switching cost** on top of the unavoidable **delegation/trust cost**.
+**V1 DIRECTION:**
 
-Therefore:
+1. connect one real mailbox;
+2. explain compactly what Lunowa can read/monitor and what it will not autonomously do;
+3. keep provider/source state intact;
+4. choose one real current communication loop rather than broadly activating historical mail;
+5. show a bounded monitoring contract in ordinary language;
+6. user explicitly chooses `[この件を任せる]`;
+7. remove it from active attention only when accepted semantics justify that.
 
-> Do not require full-client replacement unless evidence shows the unique end-to-end value needs or materially benefits from owning the client.
+Thread selection never implies `1 thread = 1 Responsibility`.
 
-## 12.3 Current design references
+## 9.3 Progression
 
-Existing full-client visual references remain design exploration/direction. They are not evidence that Product form is validated or that all surfaces must be implemented before learning.
+- **A — individual loops:** explicit bounded delegation;
+- **B — assisted:** Lunowa proposes candidates; decline is cheap and not automatically “distrust”;
+- **C — class-scoped:** after sufficiently reliable experience, Lunowa may offer a narrow ordinary-language class such as `期限つきで相手に依頼した件`;
+- **D — quiet default:** for explicitly enabled classes, eligible admitted loops may be monitored without routine per-loop confirmation.
 
-## 12.4 Current engineering direction
+Class-scoped monitoring never bypasses `TRACK / DO_NOT_TRACK / NEEDS_REVIEW`, `No Responsibility`, uncertainty, identity, or safety semantics. It is not a generic rule builder.
 
-Responsive web-first remains the current accepted engineering path unless Product/distribution evidence reopens it. This is an implementation direction, not proof that web full-client is the final Product form.
+## 9.4 Monitoring permission != action permission
+
+A user can permit automatic monitoring while external email send remains explicit approval. Future standing action authorization is separately action/context/scope-specific and revocable.
+
+## 9.5 Source-first to Attention-first
+
+Do not force source abandonment. After credible experience, Lunowa may explicitly offer Needs You/Home as default landing; never silently switch based on an internal trust score.
+
+## 9.6 Source-notification migration
+
+**HYPOTHESIS:** mature Attention Delegation may require reducing redundant provider notifications, but only progressively and explicitly after credible reliability has been experienced.
 
 ---
 
-# 13. Ordinary email / UX direction
+# 10. Retrieval, history, and people context
 
-Detailed authority is in `docs/design/`.
+## 10.1 Operational Retrieval
 
-## 13.1 Familiarity before novelty
+Natural-language email search, AI summaries, and broad context retrieval are increasingly incumbent capabilities.
 
-Ordinary read/source/reply/compose/search/account concepts should remain understandable from existing mail mental models wherever those capabilities are included.
+Lunowa's Product job is **Operational Retrieval**:
 
-## 13.2 Current shell hypothesis
+> find evidence **and** explain current unresolved state, material change history, and present attention need.
+
+## 10.2 Retrieval jobs
+
+One search entry may support:
+
+- **Source Find** — exact mail/thread/file retrieval;
+- **Fact Answer** — source-grounded answer;
+- **Operational Recall** — `この件どうなってる？`;
+- **Context Recall** — relevant recent history/person context.
+
+Traditional deterministic search remains available for exact retrieval.
+
+## 10.3 Time-aware current truth
+
+Derived memory must not win merely by semantic similarity.
+
+For changing material facts, prefer current accepted/evidence-relative state and show `as of` / material change when useful.
+
+> **Derived memory is disposable; evidence and accepted state are durable.**
+
+Historical source can be searchable without becoming a live Responsibility.
+
+## 10.4 Retrieval is a read path
+
+Search/answering does not silently mutate Responsibility state. If retrieval exposes a source inconsistency, any accepted mutation still passes ordinary evidence/admission/reducer/authority rules.
+
+Retrieval context is authorization-filtered; semantic similarity is not permission, identity, or cross-account merge authority.
+
+## 10.5 History
+
+Default user-facing history should prefer a meaningful operational timeline (`request -> update -> expected-date change -> result -> user action -> closure`) rather than permanent raw agent/model/tool traces.
+
+## 10.6 People context
+
+People context exists to restore communication context, not to become a Personal CRM.
+
+Useful candidate content:
+
+- authorized identity/organization context;
+- current open Responsibilities involving the person;
+- recent material communication/topics;
+- relevant source Conversations/files.
+
+Relationship scoring, personality profiling, public-enrichment dependence, network graphs, and relationship-health gamification are not v1 core.
+
+---
+
+# 11. Ordinary communication action boundary and Product form
+
+## 11.1 Provider/Lunowa ownership
+
+**ACCEPTED:**
+
+> **Provider remains the primary mailbox/source substrate; Lunowa owns accepted Responsibility state and attention behavior under its own canonical domain authority.**
+
+Provider mailbox state is not authority for Responsibility truth. Lunowa does not need to recreate every provider feature.
+
+## 11.2 Native Action Test
+
+Prefer a native Lunowa action when it:
+
+1. naturally arises from an active Moment/Responsibility;
+2. materially advances/closes the Attention loop;
+3. would cause meaningful context reconstruction if forced back into the provider;
+4. can be represented as a bounded, inspectable, safely authorized action.
+
+Otherwise prefer provider fallback or defer.
+
+## 11.3 Current v1 target action posture
+
+**This is Product direction, not implementation authorization.**
+
+| Action | v1 posture |
+| --- | --- |
+| browse Source Conversation | **CORE NATIVE target** |
+| exact/search retrieval | **CORE NATIVE target** |
+| relevant attachment preview/open | **CORE NATIVE target** |
+| Moment-bound Reply | **CORE NATIVE target** |
+| Reply All with explicit recipients | **CORE NATIVE target** |
+| bounded contextual draft | **CORE NATIVE target** |
+| basic attachment add for active reply | **STRONG v1 candidate** |
+| explicit user Send | **CORE NATIVE target** |
+| provider send reconciliation | **CORE semantic requirement** |
+| arbitrary new Compose | **provider fallback / optional native convenience** |
+| Forward | **provider fallback / optional convenience** |
+| Send Later | **provider-owned / not core** |
+| full Drafts/Sent parity | **not core; source access where needed** |
+| Archive | **manual convenience / provider-owned** |
+| Delete/Trash | **provider-first / not core** |
+| Spam/Block/Unsubscribe | **provider-owned** |
+| Read/Unread management | **secondary source feature** |
+| provider Star | **not Responsibility semantics** |
+| Lunowa Pin | **explicit retrieval control; orthogonal** |
+| provider Snooze | **distinct from Lunowa Later** |
+| bulk mailbox actions | **DEFER** |
+| contact management | **OUT** |
+| basic recipient lookup | **support contextual communication** |
+| calendar availability read | **POST-v1 strong candidate** |
+| calendar create/modify | **DEFER; approval boundary** |
+| generic automation builder | **OUT** |
+| autonomous email Send by default | **NO** |
+
+## 11.4 Mailbox state is not Responsibility state
+
+**ACCEPTED:**
 
 ```text
-Sidebar | Conversation List | Detail
+Unread  != Needs You
+Read    != Done
+Archive != Closed
+Trash   != Cancelled
+Snooze  != Later
+Star    != Responsibility importance
 ```
 
-with:
+Responsibility changes must not automatically archive/delete/relabel provider mail unless a separate explicit Product policy is later accepted.
 
-- `会話` — source communication;
-- `今の要点` — current operational Moment.
+## 11.5 Contextual send path
 
-This remains a candidate expression of the Product thesis, not validated market value.
+```text
+Moment
+-> draft prepared or user writes manually
+-> sender account / recipients / content / attachments visible
+-> explicit user Send
+-> provider call
+-> provider result reconciled
+-> Responsibility re-evaluated
+```
 
-## 13.3 “10-second” target
+A send attempt is not accepted provider send. A reconciled send resolves only when sending itself satisfies that Responsibility's closure condition.
 
-**NEEDS VALIDATION / IMMEDIATE USABILITY HYPOTHESIS:** representative prepared cases should allow a user to identify the next meaningful action/state in roughly 10 seconds or less without rereading the full thread.
+## 11.6 Generic compose asymmetry
 
-This tests reconstruction efficiency only. It does not prove safe forgetting or longitudinal reliance.
+Arbitrary new communication creation does not need to be native v1 scope. The user may compose in the provider; Lunowa can observe authorized Sent evidence and offer/admit monitoring afterward.
+
+Existing-loop actions are more Product-critical than generic compose parity.
+
+## 11.7 Product form
+
+**HYPOTHESIS:** v1 should prefer a **companion/hybrid + one-provider complete-loop proof** over immediate full-client parity.
+
+Distinguish:
+
+1. **replacement switching cost** — adopting a new mail client/workflow;
+2. **delegation/trust cost** — allowing Lunowa to suppress/carry monitoring.
+
+A companion can reduce the first, not the second.
+
+Full-client replacement remains allowed later if actual use shows provider fallback is a material burden after Attention Delegation is proven.
+
+> **Replacement status is earned by usage, not assumed by roadmap.**
+
+Current responsive-web-first engineering direction remains owned by technical/implementation authority and is not changed by this Product form hypothesis.
 
 ---
 
-# 14. Scope classification
+# 12. Autonomy, authorization, and security
 
-## 14.1 KEEP
+## 12.1 Attention delegation before authority delegation
 
-- North Star;
-- Open-loop Monitoring Offload as problem/wedge hypothesis;
-- monitoring/reconstruction/execution/verification burden model;
-- system-led intelligence;
-- source/provenance visibility;
-- explicit account/sender/authorization boundaries;
-- human final authority for material actions;
-- Conversation != Responsibility;
-- Responsibility as current candidate open-loop model;
-- projections as projections, not lifecycle truth;
-- Temporal Contract concept;
-- Moment as context restoration / one-primary-question interaction;
-- graceful ordinary-email fallback;
-- Product evidence before implementation breadth.
+**ACCEPTED:**
 
-## 14.2 CHANGE / CURRENT CORRECTIONS
+> **Lunowa first delegates attention, not consequential authority.**
 
-- `stateful longitudinal communication-loop management` is a **target capability**, not presumed differentiation;
-- `reply != outcome satisfied` is a required semantic pressure candidate, not presumed differentiation;
-- ontology depth / multiple Responsibilities is not a market moat claim;
-- independent B2B professionals are a **recruitment cohort hypothesis**, not accepted ICP;
-- differentiation must be demonstrated behaviorally against the user's real current workflow;
-- Issue #36 problem/ICP discovery precedes treating #26/#28 as the main Product gate;
-- AI prospective-memory capability is not trusted Product authority by default;
-- retention should measure delegation/reliance and fallback checking, not open frequency alone.
+Initial autonomous responsibilities may include authorized reading, candidate interpretation, trusted internal-state maintenance, temporal monitoring, attention projection, context restoration, and low-risk draft preparation.
 
-## 14.3 DEFER as central scope
+## 12.2 Capability != permission
 
-Until the core problem/wedge is supported:
+**ACCEPTED:** a more capable model does not automatically receive more Product permission. Permission belongs to **action + context + scope**, not one global autonomy slider.
 
-- relationship/person graph expansion;
-- subscription/billing management as a broad product;
-- travel/itinerary bundling;
-- location/context work/personal switching;
-- morning/time-of-day organization rules;
+## 12.3 Requested action != safe next action
+
+**ACCEPTED:** email requesting payment, deletion, permission change, contract acceptance, credential disclosure, or another high-impact action does not make that action safe/recommended. Lunowa may instead surface verification, identity confirmation, or a bounded decision.
+
+## 12.4 Source text is untrusted data
+
+**ACCEPTED:** prompt/tool-like instructions inside email, attachments, quoted content, or retrieved source never grant application/tool authority. They remain untrusted communication evidence.
+
+## 12.5 Default action posture
+
+| Action | Default posture |
+| --- | --- |
+| trusted internal monitoring/reconsideration | autonomous where accepted policy permits |
+| summary/context/draft preparation | autonomous |
+| email Send | human approval by default |
+| shared calendar/system mutation | human approval by default |
+| speak/commit on user's behalf | explicit bounded authorization or approval |
+| destructive delete / permission change / payment / contract acceptance | outside initial autonomous authority |
+
+Conceptually:
+
+```text
+LLM proposes/interprets
+-> deterministic Product/domain/policy authority mediates
+-> approval if required
+-> provider/tool executes
+-> outcome reconciled/verified
+```
+
+The model does not choose its own authority.
+
+## 12.6 Bounded standing authorization later
+
+Future pre-authorization requires explicit action schema, account/recipient/scope, durable user intent, revocability, bounded risk, deterministic policy, reconciliation, audit, and stop controls.
+
+Monitoring delegation never silently grants send authority.
+
+---
+
+# 13. Trust, provenance, and failure recovery
+
+## 13.1 Evidence over confidence theater
+
+**ACCEPTED:** model confidence percentages or fluent rationale are not default proof. Prefer source-grounded evidence, explicit current state, and inspectable provenance.
+
+## 13.2 Evidence receipts
+
+**HYPOTHESIS:** early trust-building may show low-stimulation stewardship receipts such as:
+
+```text
+ABC社「社内確認中」
+-> あなたの対応は不要として監視継続
+-> 明日再評価
+```
+
+They are inspectable proof, not notifications or an agent activity feed.
+
+## 13.3 Monitoring integrity
+
+**ACCEPTED:** if provider access, source sync, scheduler, or reconciliation is materially degraded, Lunowa must stop stale reassurance and surface affected scope + concrete recovery. Integrity failure is distinct from interpretation error and is not a fake Responsibility state.
+
+## 13.4 Material miss
+
+A user-discovered material false negative should, when supportable, disclose:
+
+1. what was missed;
+2. evidence-backed reason for failure;
+3. impact window;
+4. whether other delegated loops are affected;
+5. what safe state was restored;
+6. whether the affected delegation scope was narrowed/returned to confirmation mode.
+
+Any safety-driven narrowing of previously granted scope should be disclosed. Repair should be scope-local unless evidence indicates systemic failure.
+
+---
+
+# 14. v1 scope
+
+## 14.1 Core Product targets
+
+- authorized Source Conversation/message reading;
+- one-provider source ingestion/reconciliation sufficient for validated complete-loop behavior;
+- Responsibility admission/update under canonical semantics;
+- inbound/outbound unresolved-loop recognition sufficient for validated scenarios;
+- obligation / expected-event / temporal monitoring;
+- silent Waiting management;
+- time/event/contradiction re-evaluation;
+- Needs You / Moment / Managed / material Review / Source;
+- explicit Later/return condition where valid;
+- closure / stop-tracking / reopen semantics;
+- contextual reply/draft/send + provider reconciliation;
+- exact source search;
+- Responsibility-aware operational retrieval sufficient for validated cases;
+- monitoring-integrity UX;
+- safe fallback when intelligence is degraded.
+
+## 14.2 Strong v1 candidates
+
+- natural-language operational/source search;
+- basic attachment preview and reply attachment upload;
+- basic person context with current open loops + recent material history;
+- optional awareness/digest behavior;
+- simple quiet-hours/delivery preferences.
+
+## 14.3 Deferred
+
+- second provider before first-provider complete-loop proof;
+- multi-account/cross-account breadth for completeness;
+- full generic compose parity;
+- broad Drafts/Sent/folder/label administration;
+- bulk mailbox actions;
+- Send Later parity;
+- calendar integration until core-loop evidence justifies it;
+- public contact enrichment;
+- relationship graph/health scoring;
+- travel bundling;
+- subscription/billing Product;
+- activity/location-based interruptibility;
 - generic automation/rule builder;
-- CRM/project-management expansion;
-- multi-provider breadth for completeness;
-- broad full-client surface completeness;
-- tablet/mobile pixel fidelity beyond validation needs.
+- broad autonomous external actions;
+- full-client/mobile parity not needed for current learning.
 
-## 14.4 REMOVE FROM DIFFERENTIATION CLAIM
+## 14.4 Out from core identity
 
-Do not market/reason as if these are unique by themselves:
-
-- unified inbox / multi-account;
-- AI summary/drafting/search;
-- task/due extraction;
-- priority classification;
-- My Turn/Respond/Waiting;
-- snooze/reminders/no-reply follow-up;
-- Done/archive;
-- commitment extraction;
-- owner/waiting-on extraction;
-- response/outcome verification;
-- stateful tracking;
-- multiple actions per thread;
-- companion integration.
-
-This does not mean remove every feature. It means remove unsupported uniqueness claims.
+- CRM pipeline ownership;
+- project-plan ownership;
+- support-ticket lifecycle ownership;
+- accounting/payment truth;
+- generic personal task management;
+- arbitrary workflow engine;
+- personality/relationship scoring as core value;
+- generic AI chat as primary daily workflow.
 
 ---
 
-# 15. Validation strategy
+# 15. Competitive, commercial, and distribution posture
 
-## 15.1 Evidence ladder
+## 15.1 Competitive frontier
+
+**EXTERNAL EVIDENCE:** current Gmail AI Inbox, Outlook Copilot, Superhuman, Shortwave/Tasklet, Microsoft Cowork and adjacent tools already occupy substantial portions of:
+
+- AI to-do/priority extraction;
+- summaries/drafting;
+- natural-language search;
+- Respond/Waiting-style organization;
+- no-reply monitoring/follow-up drafts;
+- background event-triggered automation;
+- outcome/response verification claims;
+- scoped approval/automation patterns.
+
+Feature presence does not prove competitor quality/traction, but it prevents unsupported uniqueness claims.
+
+## 15.2 Differentiation standard
+
+**HYPOTHESIS:** Lunowa wins only if the **complete system** produces a better behavioral outcome than the target user's real current workflow:
 
 ```text
-real recent workflows show recurring under-served monitoring burden
-  -> coherent candidate segment survives falsification
-  -> candidate Responsibility/Moment mechanism is understandable
-  -> immediate reconstruction/decision work improves
-  -> real/concierge system behaves reliably across waiting periods
-  -> parallel self-check / manual reminder scaffolding decreases
-  -> user relies on Lunowa across days/weeks
-  -> value exceeds the user's actual alternative
-  -> credible workflow change / dependency / payment intent
+less parallel self-checking
++ less context reconstruction
++ correct resurfacing
++ acceptably low material false negatives
++ acceptably low unnecessary Review/resurfacing
++ trustworthy source/provenance/account/control
++ low correction/approval burden
++ enough repeated value to justify dependency/switching/payment
+```
+
+Differentiation is earned empirically, not by ontology depth.
+
+## 15.3 Monetization
+
+**HYPOTHESIS:** paid subscription/prosumer pricing is plausible if Lunowa removes recurring cognitive/operational burden or costly missed outcomes.
+
+**UNKNOWN:** exact price, free tier, packaging, billing interval, individual/business packaging, and willingness to pay.
+
+Do not treat hypothetical WTP before credible value exposure as strong evidence.
+
+## 15.4 Distribution
+
+**UNKNOWN:** no acquisition channel is proven. Reachability/distribution is part of ICP selection rather than a post-build concern.
+
+---
+
+# 16. Validation and metrics
+
+## 16.1 Current highest-priority gate
+
+**ACCEPTED CURRENT SEQUENCE:** GitHub **Issue #36** remains the highest-priority Product-discovery gate.
+
+It tests whether a reachable segment has recurring, costly, currently under-served communication-monitoring burden. This canonical Product consolidation does **not** authorize write-heavy Issue #28, production persistence, or provider/client breadth.
+
+Issue #26 remains downstream mechanism evidence. Responsibility L2 proof remains separate technical evidence.
+
+## 16.2 Evidence ladder
+
+```text
+recent real workflows show recurring under-served monitoring burden
+-> coherent candidate segment survives falsification
+-> Responsibility/Moment mechanism is understandable
+-> immediate reconstruction/decision work improves
+-> real/concierge system survives waiting periods
+-> parallel self-check/reminder scaffolding decreases
+-> user relies on Lunowa across days/weeks
+-> value beats real incumbent/workaround
+-> credible switching/dependency/payment intent
 ```
 
 Do not infer a later arrow from an earlier one.
 
-## 15.2 Current highest-priority gate — Issue #36
+## 16.3 Candidate measures
 
-**ACCEPTED CURRENT SEQUENCE:** first collect recent-event workflow evidence for the problem/ICP.
+### Delegation
+- real loops delegated;
+- continued delegation after success;
+- class-scoped opt-in;
+- delegation contraction/recovery after errors.
 
-The purpose is to establish whether a coherent reachable segment repeatedly self-monitors unresolved communication despite current tools.
+### Parallel monitoring
+- `N_self_check` before Lunowa returns;
+- Inbox/Sent/source fallback during delegated periods;
+- parallel task/reminder creation;
+- repeated Managed inspection without material state change.
 
-Do not lead with Lunowa vocabulary or feature preference.
-
-## 15.3 Issue #26 — downstream mechanism experiment
-
-Issue #26 remains useful for testing:
-
-- reconstruction/decision burden;
-- projection comprehension;
-- one-Moment interaction;
-- provenance/control;
-- immediate source rechecking;
-- multiple-Responsibility complexity.
-
-But it is **not the current top-level Product-discovery gate** and cannot validate longitudinal monitoring relinquishment.
-
-Its controlled conventional inbox baseline may remain useful scientifically, but market differentiation later requires comparison with participants' actual incumbent workflows/products.
-
-## 15.4 Issue #28 / #32 / PR #34
-
-- #28 is implementation for the mechanism prototype and should not resume write-heavy work merely because its UI/spec path becomes ready;
-- #32 / PR #34 may continue as bounded reversible oracle/spec work;
-- neither substitutes for #36 problem/ICP evidence;
-- if #36 changes target workflow/baseline/scenario materially, the mechanism experiment/oracles must be reconciled before use.
-
-## 15.5 Longitudinal gate
-
-A later real/concierge experiment must test actual waiting periods and whether users stop parallel checking.
-
-A single-session fake-data prototype cannot prove this.
-
-## 15.6 Cheapest falsification rule
-
-**ACCEPTED:** prefer the smallest experiment capable of falsifying the highest-impact unresolved Product assumption.
-
-Current mapping:
-
-- problem / ICP -> recent-event workflow reconstruction/observation;
-- mechanism usability -> paired realistic prototype;
-- safe forgetting -> narrow real/concierge longitudinal experiment;
-- actual competitive superiority -> compare against real incumbent/workaround behavior;
-- WTP -> credible payment/pricing test after value exposure;
-- full client necessity -> compare form-factor behavior after wedge value exists.
-
----
-
-# 16. Product success metrics
-
-No single metric or threshold is frozen.
-
-## 16.1 Discovery descriptors
-
-Useful exploratory observations:
-
-- concurrent open loops;
-- waiting duration;
-- current recheck behavior;
-- manual task/reminder scaffolding;
-- missed/late consequences;
-- cases where reply did not equal resolution;
-- current-tool adequacy.
-
-Do not turn exploratory qualitative samples into prevalence estimates.
-
-## 16.2 Immediate mechanism measures
-
-Candidate measures include:
-
-- `T_action` — time to correct next action/state;
-- navigation/decision operations;
-- thread/message rereads;
-- immediate source rechecks;
-- operational-state correctness;
-- safe-action correctness;
-- Review/correction burden;
-- provenance comprehension;
-- account/sender errors.
-
-## 16.3 Longitudinal North-Star-adjacent measures
-
-Candidate measures:
-
-- `N_self_check` — manual checks of a delegated loop before Lunowa resurfaces it;
-- source-inbox fallback frequency;
-- parallel task/reminder creation after delegation;
-- proportion of loops left unmonitored elsewhere;
-- correct resurfacing when attention is needed;
+### Attention quality
+- correct resurfacing;
 - material false-negative rate;
-- unnecessary Review/resurfacing burden;
-- context-restoration time after waiting;
-- continued delegated monitoring across days/weeks.
+- unnecessary resurfacing/Review burden;
+- delivery timeliness.
 
-## 16.4 Retention must fit the North Star
+### Context restoration
+- time from Moment open to correct safe action;
+- source expansion/reread before action;
+- reconstruction operations.
 
-Success may reduce app/inbox opening frequency.
+### Reliability
+- monitorable vs degraded time;
+- integrity-alert latency;
+- reconciliation lag;
+- impact window of discovered misses.
 
-Therefore DAU/open count alone may be misleading.
+### Commercial
+- switching/dependency behavior;
+- retention by delegated monitoring rather than opens alone;
+- credible WTP after value exposure.
 
-A stronger retention signal may be:
+## 16.4 Cheapest falsification
 
-> **How much meaningful communication monitoring the user continues to entrust to Lunowa and whether they revert to their old monitoring workflow.**
-
-## 16.5 Safety-quality trade-off
-
-Two symmetric Product failures matter:
-
-```text
-false negative -> material obligation disappears
-```
-
-and:
-
-```text
-defensive over-alerting -> Review / resurfacing becomes a second inbox
-```
-
-The target regime requires both sufficiently low material misses **and** sufficiently low unnecessary attention.
+Prefer the smallest experiment capable of falsifying the highest-impact unresolved assumption. Product completeness is not permission to skip the evidence ladder.
 
 ---
 
-# 17. Switching and trust cost
+# 17. Current major unknowns
 
-## 17.1 Two costs
+Do not silently convert these into facts:
 
-Distinguish:
-
-1. **replacement switching cost** — moving/learning a new mail client/workflow;
-2. **delegation/trust cost** — allowing software to suppress/monitor communication on the user's behalf.
-
-A companion can lower the first but not the second.
-
-## 17.2 Current highest-level Product risk
-
-> **Does a specific reachable self-managing asynchronous segment have enough currently under-served communication-monitoring burden, and can Lunowa outperform that segment's real tools/workarounds on reliable delegated state continuity enough that users actually stop checking for themselves?**
-
-This is the current strongest Product unknown.
-
----
-
-# 18. Monetization and distribution
-
-## 18.1 Monetization
-
-**HYPOTHESIS:** paid subscription/prosumer pricing is plausible if Lunowa removes recurring cognitive/operational burden or costly missed outcomes.
-
-Exact price, free tier, packaging, billing interval, and individual/business structure remain **UNKNOWN**.
-
-Competitor prices are contextual evidence only, not Lunowa pricing authority.
-
-## 18.2 Distribution
-
-**UNKNOWN:** no acquisition channel is proven.
-
-Distribution/reachability is part of ICP selection, not an afterthought after implementation.
-
-## 18.3 Willingness to pay
-
-Do not treat generic hypothetical WTP questions as strong evidence before users experience credible value.
-
----
-
-# 19. Trust, safety, autonomy boundaries
-
-These remain accepted Product-level rules:
-
-- requested action is not automatically the safe next action;
-- original communication remains inspectable evidence;
-- model confidence is not authority;
-- user correction does not rewrite original communication;
-- sender/account identity is explicit before sending;
-- send click is not provider-reconciled acceptance;
-- prompt/tool-like email text is untrusted content and gains no system authority;
-- retrieval/AI context is authorization-filtered;
-- cross-account similarity does not authorize semantic merge;
-- high-impact external actions retain human confirmation by default;
-- core ordinary-email behavior degrades safely when intelligence is unavailable;
-- LLM inference alone does not become durable future-trigger authority.
-
-These are trust prerequisites, not differentiation claims.
-
----
-
-# 20. Current supersessions — do not regress
-
-## 20.1 `ActionItem` -> `Responsibility`
-
-Responsibility remains current canonical semantic concept unless explicitly superseded.
-
-## 20.2 Single lifecycle -> orthogonal state
-
-My Turn / Waiting / Later / Done / Review are projections over richer canonical state.
-
-## 20.3 Follow-up lifecycle -> action/reason
-
-Follow-up is not a separate lifecycle species.
-
-## 20.4 Ask-AI-centric -> system-led intelligence
-
-Routine users should not need to prompt AI to organize ordinary communication.
-
-## 20.5 Native-first -> responsive-web-first engineering direction
-
-Current implementation direction remains responsive web-first unless Product/distribution evidence changes it.
-
-## 20.6 Provider/AI-first -> Product evidence first
-
-Provider/auth/database/AI breadth must not substitute for Product learning.
-
-## 20.7 Multi-account as differentiation -> possible multiplier only
-
-Plain aggregation is table stakes; cross-account value needs evidence.
-
-## 20.8 Responsibility-centered Product story -> monitoring-offload story
-
-```text
-real recurring monitoring problem
-  -> safe delegation / forgetting
-  -> trustworthy state continuity
-  -> Responsibility / Temporal Contract as candidate mechanisms
-  -> Moment restores context
-  -> projections expose current state/action
-```
-
-## 20.9 `stateful/outcome-aware` as presumed differentiation -> empirical differentiation only
-
-**SUPERSEDED:** do not describe Lunowa as differentiated merely because it tracks state over time, distinguishes reply from resolution, models commitments, or supports multiple Responsibilities.
-
-Current rule:
-
-> **Differentiation is earned only by comparative user outcomes against real alternatives.**
-
-## 20.10 `knowledge workers` as sufficient ICP -> behavioral recruitment profile
-
-Generic knowledge-worker framing is too broad.
-
-Current recruitment prior is self-managing / async / email-task-coupled / low-delegation work; exact ICP remains unvalidated.
-
----
-
-# 21. Current major unknowns
-
-Do not silently convert these into decisions:
-
-- exact early ICP / segment priority;
-- prevalence/severity of repeated open-loop monitoring in that segment;
-- actual current-workflow/tool adequacy;
-- whether independent/small-firm B2B professionals are a coherent first segment;
-- whether Responsibility/Moment produces meaningful immediate comparative value;
-- whether Lunowa can reduce `N_self_check` across real waiting periods;
-- trust/reliability threshold required for delegation;
-- attainable false-negative versus Review/resurfacing trade-off;
-- whether Lunowa can outperform current Gmail/Superhuman/Fyxer/SaneBox/Quell/Pendingly/other workflows rather than merely resemble them;
-- whether Responsibility is the simplest sufficient internal model;
-- whether a full client is necessary or companion/hybrid is superior;
-- cross-account incremental value;
-- willingness to pay / pricing / packaging;
+- exact ICP / first segment;
+- prevalence/severity of monitoring burden;
+- real incumbent adequacy;
+- production false-negative / false-positive / Review trade-off;
+- threshold at which users stop parallel checking;
+- exact delivery/digest/quiet-hours defaults;
+- exact class-scoped delegation criteria;
+- whether `Attention Contract` remains the final Product term;
+- whether the five-surface IA wins real testing;
+- whether companion/hybrid remains superior in mature usage;
+- whether/when native generic compose becomes Product-critical;
+- natural-language Operational Retrieval v1 criticality;
+- attachment-content understanding depth;
+- calendar integration timing;
+- second-provider/multi-account incremental value;
+- pricing/WTP/packaging;
 - acquisition/distribution;
-- continued reliance/retention;
-- notification/resurfacing policy;
-- historical initial-sync activation policy;
-- whether/when native mobile becomes Product-critical.
+- long-term retention;
+- provider-notification migration acceptance;
+- whether Responsibility remains the simplest sufficient mechanism after real data.
 
-Competitor/provider/API/legal/platform facts are time-sensitive and must be rechecked when they affect a decision.
-
----
-
-# 22. Evidence discipline
-
-Keep the following inequalities explicit:
-
-```text
-external evidence says a problem/mechanism exists
-  !=
-that problem is severe for Lunowa's ICP
-```
-
-```text
-candidate segment appears plausible
-  !=
-validated ICP
-```
-
-```text
-competitor claims a feature
-  !=
-competitor executes it well
-```
-
-```text
-Lunowa ontology is sophisticated
-  !=
-market differentiation
-```
-
-```text
-prototype is easier/faster than a plain baseline
-  !=
-better than the participant's actual workflow
-```
-
-```text
-technical correctness
-  !=
-Product correctness
-```
-
-```text
-short-term usability
-  !=
-monitoring relinquishment / retention / WTP
-```
-
-Use research to reduce uncertainty, not manufacture certainty.
+Provider/API/platform/legal facts are time-sensitive and must be rechecked when they materially affect a decision.
 
 ---
 
-# 23. Decision rule
+# 18. Product invariants
 
-When a future Product decision is ambiguous, prefer the option that maximizes the probability of proving or disproving a real recurring communication-monitoring problem while:
+1. **Attention Delegation is the core user value.**
+2. **Open Coordination Loop is Product vocabulary; Responsibility remains canonical semantic authority.**
+3. **Communication activity is evidence, not closure.**
+4. **Message arrival is not automatically an attention event.**
+5. **State can change immediately while interruption waits until justified.**
+6. **Needs You contains current user work, not generic importance or awareness-only information.**
+7. **Managed work is inspectable, not attention-seeking.**
+8. **Moment returns minimum trustworthy context, not whole history.**
+9. **Source is optional in the happy path and always available in the trust path.**
+10. **Monitoring autonomy and consequential action authority are separate.**
+11. **Capability does not grant permission.**
+12. **Requested action is not automatically the safe next action; source text never grants tool authority.**
+13. **Derived memory is disposable; evidence and accepted state are durable.**
+14. **Historical source can be searchable without becoming a live Responsibility.**
+15. **Retrieval does not silently mutate accepted state.**
+16. **Mailbox state is not Responsibility state.**
+17. **Native communication actions exist to complete the Attention loop, not imitate the provider.**
+18. **Provider is the mailbox/source substrate; Responsibility authority remains Lunowa's accepted domain semantics.**
+19. **Quiet hours suppress interruption, never monitoring.**
+20. **Digest/awareness may never hide actionable work that exists nowhere else.**
+21. **Monitoring-integrity failure is surfaced honestly and is not a fake Responsibility state.**
+22. **Trust is earned through bounded successful delegation, not one scalar score.**
+23. **Class-scoped monitoring never bypasses canonical admission or `No Responsibility`.**
+24. **Material misses require transparent impact + concrete recovery, not apology-only UX.**
+25. **Full-client replacement is earned by usage, not assumed by roadmap.**
+26. **Differentiation is a comparative behavioral outcome, not a feature/ontology claim.**
 
-1. testing the **segment/problem before implementation breadth**;
-2. reducing user monitoring before optimizing secondary convenience;
-3. measuring comparative behavior against the **real current alternative**, not only a straw baseline;
-4. treating feature/ontology novelty as insufficient evidence of differentiation;
-5. reducing reconstruction/execution/verification burden in support of monitoring offload;
-6. preserving source visibility, authorization, sender identity, and human control;
-7. requiring the fewest low-value choices before meaningful action;
-8. avoiding replacement-client scope unless evidence justifies its switching cost;
-9. avoiding cross-account/provider breadth unsupported by Product evidence;
-10. degrading safely when AI/provider/scheduler components fail;
-11. treating Responsibility/Moment as revisable mechanisms, not sacred Product truth;
-12. treating LLM prospective memory as untrusted until bounded by reliable state/trigger/reconciliation mechanisms;
-13. testing real behavior change — especially self-check reduction, error burden, and reliance;
-14. using the **smallest/cheapest experiment that can falsify the highest-impact unresolved assumption** before broad implementation.
+---
 
-If stronger evidence changes a Product-level decision, update this document and the owning canonical design/domain/architecture/implementation artifact in the same accepted change where applicable.
+# 19. Decision rule
+
+When a Product choice is ambiguous, prefer the option that:
+
+1. tests the segment/problem before implementation breadth;
+2. reduces monitoring burden before secondary convenience;
+3. measures against the user's real current alternative;
+4. preserves source/provenance/account identity and human control;
+5. returns attention only when justified by state/action/delay cost;
+6. keeps AI interpretation separate from accepted state/authorization;
+7. requires fewer low-value choices/approvals;
+8. avoids full-client/provider/cross-account breadth unsupported by evidence;
+9. degrades safely when AI/provider/scheduler components fail;
+10. treats Responsibility/Moment/Product form as revisable mechanisms rather than sacred truth;
+11. measures actual monitoring relinquishment, error burden, and reliance;
+12. uses the cheapest experiment that can falsify the highest-impact unknown.
+
+If stronger Product evidence changes a decision, update this file and the owning canonical design/domain/architecture/implementation artifact in the same accepted change where applicable.

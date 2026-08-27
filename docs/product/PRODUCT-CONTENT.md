@@ -1002,4 +1002,4 @@ When those hold, `Product Content COMPLETE` means:
 
 > **The intended Product behavior is sufficiently specified and internally coherent to move remaining uncertainty into empirical Product Discovery, technical proof, usability testing, legal/privacy decisions, and implementation gates.**
 
-It does **not** mean PMF, validated ICP, validated reliability thresholds, validated usability, validated WTP/retention, production security/provider feasibility, legal/privacy readiness, Responsibility L2 executable proof, or permission to skip Issue #36.
+It does **not** mean PMF, validated ICP, validated reliability thresholds, validated usability, validated WTP/retention, production security/provider feasibility, legal/privacy readiness, Responsibility L2 executable proof, or permission to treat Issue #36 as passed/obsolete or manufacture its conclusions. Current owner execution order is separately owned by `IMPLEMENTATION-PLAN.md` + live GitHub task state.

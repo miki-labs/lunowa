@@ -39,6 +39,7 @@ Examples:
 Effect:
 
 - user input becomes authorized evidence/decision input according to existing Responsibility authority rules;
+- **user authority remains field-scoped**: correcting one field must not freeze or overwrite unrelated fields;
 - source communication remains immutable;
 - relevant accepted state is re-evaluated;
 - prior material interpretation/history remains reconstructable where needed.
@@ -92,9 +93,10 @@ Examples:
 
 Effect:
 
-- supplies user-authoritative evidence/decision input;
+- supplies user-authoritative evidence/decision input relevant to the affected field/state;
 - existing canonical Responsibility semantics determine satisfaction/cancellation/etc.;
-- does not erase source/history.
+- does not erase source/history;
+- must not silently generalize one user assertion into unrelated fields or future policy.
 
 ## 2.6 Approve external action
 
@@ -147,13 +149,13 @@ Escalate only when a user decision/authority is actually required.
 
 ## 3.3 Correction should not rewrite evidence
 
-Original communication remains source evidence. Correction updates accepted interpretation/state through authorized input; it does not edit the original email or pretend the prior interpretation never existed.
+Original communication remains source evidence. Correction updates accepted interpretation/state through authorized **field-scoped** input; it does not edit the original email or pretend the prior interpretation never existed.
 
 For material cases, the history should remain reconstructable conceptually as:
 
 ```text
 previous accepted interpretation
--> correction / new evidence
+-> field-scoped correction / new evidence
 -> new accepted state
 ```
 
@@ -167,17 +169,18 @@ Routine UI need not show this entire trace unless useful for trust/recovery.
 
 > **Review is a safety valve, not an uncertainty inbox.**
 
-Escalation is justified when uncertainty materially prevents Lunowa from maintaining a safe Product contract.
+Semantic Review escalation is justified when uncertainty materially prevents Lunowa from maintaining a safe Responsibility/Product contract.
 
-Candidate material triggers include:
+Candidate semantic Review triggers include:
 
 - whether a Responsibility exists at all;
 - current user/counterparty ownership or actionability;
 - material due/expected-event interpretation;
 - conflicting evidence about outcome satisfaction/closure;
 - consequential, irreversible, financial, contractual, security, or identity-sensitive requested action;
-- sender/account/recipient/attachment ambiguity that materially changes an external action;
-- monitoring integrity degradation that prevents Lunowa from reliably keeping a delegated promise.
+- sender/account/recipient/attachment ambiguity that materially changes an external action.
+
+**Monitoring integrity degradation is separate system/degraded-state UX.** If Lunowa cannot reliably keep a delegated monitoring promise because sync/provider/scheduler/reconciliation is degraded, route to Integrity Alert/recovery behavior rather than inventing a Responsibility Review subject merely because infrastructure failed.
 
 ## 4.2 Do not escalate harmless uncertainty
 
@@ -263,6 +266,8 @@ A systemic/integrity failure may require broader degradation, but scope should m
 
 Repeated user corrections may be useful evidence for future candidate interpretation or class-specific behavior, subject to privacy/authority constraints.
 
+**This does not imply that correction history becomes a standing instruction, generic preference memory, or new policy object.** Canonical Responsibility semantics currently leave standing communication-instruction memory/preference modeling open.
+
 ## 6.2 Corrections do not silently expand permissions
 
 Repeated correct behavior, user corrections, or model confidence must never automatically grant broader external-action authority.
@@ -341,7 +346,7 @@ Managed remains reassurance/inspection, not a daily management queue.
 
 ## Review
 
-Controls should be specific to the material unresolved question. Do not present generic `Approve AI` or ask users to inspect internal confidence.
+Controls should be specific to the material unresolved semantic/safety question. Do not present generic `Approve AI` or ask users to inspect internal confidence.
 
 ## Integrity alert
 
@@ -352,17 +357,19 @@ Controls should focus on restoring monitoring capability (`[再接続]`, retry/r
 # 9. Product invariants proposed for promotion
 
 1. **Control != constant confirmation.**
-2. **Correction changes accepted interpretation/state; it never rewrites source evidence.**
-3. **The user corrects the material decision, not the model's reasoning.**
-4. **Return attention now != world-state change.**
-5. **Stop tracking != successful completion.**
-6. **Monitoring delegation != external-action authority.**
-7. **Review is a safety valve, not an uncertainty inbox.**
-8. **Approval must expose decision-critical effect, not just offer an `Approve` button.**
-9. **Failure recovery repairs state/integrity and minimizes user diagnostic burden.**
-10. **Repeated material errors narrow delegation locally before wider automation is trusted.**
-11. **Corrections never silently broaden permissions.**
-12. **True reversibility must be distinguished from decorative/apparent Undo.**
+2. **Correction is field-scoped unless canonical semantics explicitly justify a broader effect.**
+3. **Correction changes accepted interpretation/state; it never rewrites source evidence.**
+4. **The user corrects the material decision, not the model's reasoning.**
+5. **Return attention now != world-state change.**
+6. **Stop tracking != successful completion.**
+7. **Monitoring delegation != external-action authority.**
+8. **Review is a safety valve, not an uncertainty inbox.**
+9. **Integrity failure != semantic Review by default.**
+10. **Approval must expose decision-critical effect, not just offer an `Approve` button.**
+11. **Failure recovery repairs state/integrity and minimizes user diagnostic burden.**
+12. **Repeated material errors narrow delegation locally before wider automation is trusted.**
+13. **Corrections never silently broaden permissions or create standing policy.**
+14. **True reversibility must be distinguished from decorative/apparent Undo.**
 
 ---
 
@@ -374,6 +381,7 @@ This candidate does not establish:
 - a new Responsibility lifecycle enum;
 - exact numeric Review/confidence thresholds;
 - universal auto-learning from user corrections;
+- standing preference/policy memory from correction history;
 - global trust/autonomy score;
 - autonomous send permission;
 - a universal recovery SLA;

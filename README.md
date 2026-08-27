@@ -22,9 +22,10 @@ These authorities distinguish accepted direction from hypotheses/unknowns; do no
 
 - Phase-0 runtime/verification foundation is mechanically established.
 - Canonical Product content is reconciled through 2026-08-27; **Product Content COMPLETE means specification closure only, not Product-market validation**.
-- GitHub **Issue #36** remains the next highest-priority empirical Product-discovery gate after Product-content closure.
-- Real Product UI remains materially unimplemented; existing application code is bootstrap/experiment foundation, not proof of the final Product.
-- Responsibility L0/L1 semantics/persistence boundary are frozen; L2 exact DDL is static-review complete but executable proof remains pending; L3 migrations/runtime remain unauthorized.
+- Current owner-directed execution priority is **Product completion first**: Issue #55 UI/UX implementation readiness -> implementation dependency graph -> Minimum Complete Delegation Loop.
+- GitHub **Issue #36** remains open as the highest-priority empirical problem/ICP discovery gate, but is currently deferred in execution order and is no longer a prerequisite for beginning the owner-directed product-completion lane.
+- Real Product UI/runtime remains materially unimplemented; existing application code is bootstrap foundation, not proof of the final Product.
+- Responsibility L0/L1 semantics/persistence boundary are frozen; L2 exact DDL is static-review complete but executable proof remains pending. Production persistence that depends on L2 must still satisfy its executable/freeze gate.
 
 ```text
 L0 semantic model                         FROZEN v0.1
@@ -32,10 +33,10 @@ L1 logical persistence boundary           FROZEN v0.1
 L2 exact PostgreSQL/Drizzle DDL            v0.4 STATIC REVIEW COMPLETE
 L2 executable proof                        PENDING
 L2 final freeze                            BLOCKED
-L3 migrations/runtime                     NOT AUTHORIZED
+L3 migrations/runtime                     NOT AUTHORIZED until its own gate passes
 ```
 
-Product completeness does not authorize implementation breadth.
+Implementation authorization and empirical-claim authorization are separate. Building the accepted Product does not validate ICP, PMF, WTP, retention, or monitoring relinquishment.
 
 ---
 
@@ -80,8 +81,8 @@ Provider remains the mailbox/source substrate. Lunowa's accepted Responsibility 
 
 ## Source and Moment
 
-- Needs You item → **Moment / 今の要点**;
-- Source Conversation row → **会話**;
+- Needs You item -> **Moment / 今の要点**;
+- Source Conversation row -> **会話**;
 - source evidence remains directly inspectable;
 - Moment is not a mandatory gate to ordinary mail.
 
@@ -110,9 +111,9 @@ The current v1 Product direction prefers a **companion/hybrid + one-provider com
 
 Product-critical native targets are actions that complete the current Attention loop, such as Source reading/search, source attachment access sufficient to inspect material evidence, Moment-bound contextual reply/draft/explicit Send, and provider send reconciliation.
 
-Rich native attachment preview, reply attachment add, natural-language search, person context, optional digest, and simple quiet-hours behavior remain strong candidates rather than automatic breadth gates unless validated scenarios require them.
+Rich native attachment preview, reply attachment add, natural-language search, person context, optional digest, and simple quiet-hours behavior remain strong candidates rather than automatic breadth gates unless accepted scenarios require them.
 
-Generic fresh Compose, Forward parity, broad Drafts/Sent/folder administration, bulk mailbox hygiene, Send Later parity, second-provider breadth, calendar mutation, and other provider-client features are not current v1 Product-validation gates unless stronger evidence requires them.
+Generic fresh Compose, Forward parity, broad Drafts/Sent/folder administration, bulk mailbox hygiene, Send Later parity, second-provider breadth, calendar mutation, and other provider-client features are not current v1 completion gates unless stronger evidence/task scope requires them.
 
 Full-client replacement is allowed later if actual usage proves provider fallback itself remains a material burden.
 
@@ -150,6 +151,8 @@ docs/design/
 
 Current Markdown owns Product/interaction semantics. Generated images are visual references only.
 
+Current implementation-readiness work is routed by GitHub **Issue #55**.
+
 ## Responsibility semantics
 
 ```text
@@ -172,35 +175,33 @@ docs/product/
 
 ADRs under `docs/decisions/` record durable costly-to-change architecture choices.
 
-Architecture/data/contracts may deliberately describe a safe **capability superset** for features that are deferred or optional in the current Product. Capability enumeration is not current scope or implementation authorization; current Product authorities, `IMPLEMENTATION-PLAN.md`, and the live task contract decide whether/when a capability is activated.
+Architecture/data/contracts may deliberately describe a safe **capability superset** for features deferred or optional in the current Product. Capability enumeration is not scope/permission; current Product authorities, `IMPLEMENTATION-PLAN.md`, and the live task contract decide activation.
 
 ---
 
-# Current evidence / implementation sequence
+# Current implementation sequence
 
-**Use `docs/product/PRODUCT.md` + `PRODUCT-CONTENT.md` for Product scope, `IMPLEMENTATION-PLAN.md` for sequencing, and the live GitHub Issue for task authority.**
-
-Current high-level sequence:
+**Use `PRODUCT.md` + `PRODUCT-CONTENT.md` for Product scope, `IMPLEMENTATION-PLAN.md` for execution sequencing, `docs/design/` for UX realization, and the live GitHub Issue for task authority.**
 
 ```text
-Bootstrap/runtime foundation
--> Issue #36 problem / ICP evidence
--> bounded comparative fake-data mechanism experiment
--> longitudinal safe-forgetting / monitoring-relinquishment proof
--> only then broaden credible client shell as Product evidence requires
--> Responsibility persistence/runtime when its gates justify it
--> one real provider read path
--> contextual real send path when justified
--> deterministic Responsibility / Temporal Contract runtime
--> AI interpretation behind validated contracts/evals
--> search/context quality
--> second provider only when demand/evidence promotes it
--> beta hardening
+Phase-0 runtime foundation
+-> Issue #55 UI/UX implementation readiness
+-> implementation graph / dependency + safety partitioning
+-> required Responsibility executable/persistence gates
+-> one-provider source/read path
+-> deterministic Responsibility + attention/Temporal Contract loop
+-> Home / Needs You / Managed / Review / Moment / Source
+-> contextual Reply/Reply All + explicit Send + reconciliation where required
+-> bounded AI interpretation behind trusted contracts/evals
+-> failure/reconnect/integrity + attachment-source-access closure
+-> end-to-end Minimum Complete Delegation Loop
+-> beta/early-access hardening
+-> Issue #36 / longitudinal empirical validation and evidence-driven scope expansion
 ```
 
-A bounded Responsibility L2 executable proof may run ahead as a technical falsification spike. It does **not** authorize production persistence or reorder Product discovery.
+A bounded Responsibility L2 executable proof may run as a technical falsification spike. It does not itself validate the Product and its production gate still applies where persistence depends on it.
 
-Issue #28 write-heavy prototype work is not authorized merely because Product/design docs are complete.
+Issue #28 remains its bounded comparative fake-data experiment lane unless explicitly reconciled; its `BLOCKED by #36` state does **not** mean every new Product-completion implementation task is blocked by #36.
 
 ---
 
@@ -210,14 +211,14 @@ Current accepted engineering direction at a high level:
 
 - responsive web-first;
 - Next.js/TypeScript modular monolith;
-- PostgreSQL durable store when persistence activates;
+- PostgreSQL durable store when accepted persistence gates pass;
 - durable background execution when sync/Temporal Contract behavior activates;
-- Gmail technical adapter first, Microsoft Graph only after Product evidence justifies second-provider breadth;
+- Gmail technical adapter first, Microsoft Graph later;
 - one evaluated AI runtime behind structured/domain contracts;
 - PostgreSQL search first; rebuildable derived projections;
 - scenario-driven Responsibility persistence, not generic workflow infrastructure.
 
-Technology choice does not imply Product implementation priority.
+Technology choice does not imply Product breadth.
 
 ---
 
@@ -261,6 +262,14 @@ Build:   pnpm build
 ```
 
 `pnpm verify` runs repository verification; GitHub Actions independently runs `Verify` and `E2E Smoke`.
+
+---
+
+# Durable repository update rule
+
+Do not leave a material accepted priority, behavior, dependency, blocker, or completion state only in chat.
+
+Update the owning GitHub Issue/docs in the same workstream when omission would cause a future agent to act incorrectly. Do not create noisy repository churn for tentative brainstorming or every conversation turn.
 
 ---
 

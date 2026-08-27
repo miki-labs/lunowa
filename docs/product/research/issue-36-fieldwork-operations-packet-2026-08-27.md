@@ -6,15 +6,15 @@
 
 This packet turns `issue-36-fieldwork-protocol-2026-08-27.md` into an executable first-wave workflow.
 
-It does not declare an ICP, record participant findings, authorize implementation, or replace the live Issue #36 task contract.
+It does not declare an ICP, record participant findings, authorize implementation, or replace the live Issue #36 contract.
 
-The first participant may be collected only after every **BLOCKING** field below has an actual value and has been reviewed for the real tools/services used.
+The first real participant may be collected only after every **BLOCKING** field below has an actual value and has been reviewed for the real tools/services used.
 
 ---
 
 # 1. Conservative first-wave operating mode
 
-Unless deliberately changed before recruitment, use this minimum-data posture:
+Unless deliberately changed before recruitment:
 
 | Decision | First-wave default |
 |---|---|
@@ -25,70 +25,66 @@ Unless deliberately changed before recruitment, use this minimum-data posture:
 | artifact sharing | optional, participant-controlled |
 | inbox access | prohibited |
 | screenshots/raw email collection | prohibited |
-| external AI on participant data | **OFF by default**; only de-identified/minimized R1 extracts after processor review |
-| public GitHub row-level data | prohibited |
+| external AI on participant data | **OFF by default** |
+| public GitHub participant/loop rows | prohibited by default |
 | analysis cadence | after each 4–6 valid interviews or earlier |
-| initial recruitment | behavior-based, adaptive cohort blocks |
-| Product pitch | after problem evidence only; no Lunowa pitch in Issue #36 |
+| recruitment | behavior-based, adaptive cohort blocks |
+| Product pitch | none during Issue #36 problem evidence collection |
 
-Why this default:
+This default minimizes sensitive-data collection and keeps the first empirical gate about the problem/segment rather than research tooling.
 
-- it minimizes sensitive data collection;
-- it avoids creating a transcript/recording retention problem before one is needed;
-- it preserves event-centered interviewing through structured notes;
-- it keeps the first empirical gate about problem/segment rather than tooling sophistication.
-
-Recording may later be enabled only by updating this packet's data flow and participant notice before the affected session.
+Recording or external AI processing may be enabled later only after updating the actual data flow, processor review, and participant notice before the affected session.
 
 ---
 
 # 2. BLOCKING pre-fieldwork decision sheet
 
-Fill every item before scheduling the first real interview.
-
-## 2.1 Responsible researcher
+## 2.1 Responsible roles
 
 - Research owner: **MUST RESOLVE**
 - Participant privacy/contact point: **MUST RESOLVE**
 - Fraud/ineligibility adjudicator: **MUST RESOLVE**
 - R1 -> R0 public-disclosure reviewer: **MUST RESOLVE**
+- Independent/second-pass reviewer, if used: **MUST RESOLVE / NONE**
 
-One person may hold multiple roles in a solo study, but each responsibility must be explicit.
+One person may hold multiple roles in a solo study, but each responsibility must be explicit. Any person who can access R1 must be listed in the data-handling decision.
 
-## 2.2 Recruitment services
+## 2.2 Recruitment services/channels
 
-For each actual channel/vendor:
+For every actual source:
 
 | Field | Value |
 |---|---|
 | service/channel | **MUST RESOLVE** |
 | why needed | **MUST RESOLVE** |
-| what personal data it receives | **MUST RESOLVE** |
+| personal data received | **MUST RESOLVE** |
 | account/contract owner | **MUST RESOLVE** |
-| retention/deletion known? | **MUST RESOLVE** |
-| foreign/cloud processing reviewed? | **MUST RESOLVE** |
+| retention/deletion known | **MUST RESOLVE** |
+| foreign/cloud processing reviewed | **MUST RESOLVE** |
 | approved for use | **MUST RESOLVE** |
 
-Direct personal-network recruiting is still a personal-data operation; do not treat it as outside this sheet.
+Direct personal-network recruiting is still a personal-data operation.
 
 ## 2.3 Interview/video service
 
 - service: **MUST RESOLVE**
-- recording disabled in service settings: **MUST VERIFY**
+- recording disabled in settings: **MUST VERIFY**
 - automated transcription/AI notes disabled: **MUST VERIFY**
 - participant can join without exposing unrelated account/profile data where practical: **MUST REVIEW**
 - vendor data processing/privacy terms reviewed for actual use: **MUST REVIEW**
 
 ## 2.4 R1 — protected research working store
 
+R1 contains pseudonymous structured interview/loop evidence and analysis.
+
 Required characteristics:
 
 - not publicly accessible;
-- access limited to research owner/reviewer(s);
-- device/account access protected by strong authentication;
-- storage encryption available and enabled where applicable;
+- access limited to named research owner/reviewer(s);
+- strong authentication;
+- storage/device encryption enabled where applicable;
 - backup behavior known;
-- sharing links disabled/restricted;
+- public/share links restricted;
 - deletion can be executed.
 
 Actual choice:
@@ -97,84 +93,85 @@ Actual choice:
 - authorized people: **MUST RESOLVE**
 - encryption/access verification: **MUST VERIFY**
 - backup location: **MUST RESOLVE**
-- retention: **MUST RESOLVE**
+- concrete retention/deletion rule: **MUST RESOLVE**
 
-Recommended first-wave retention starting point for decision, not a legal rule:
+Do not use an indefinite `keep for research` retention rule. Retain only as long as the stated Issue #36 research/audit purpose requires, then reassess/delete unnecessary row-level detail.
 
-> retain R1 working evidence through the Issue #36 disposition and independent review, then reassess and delete unnecessary row-level detail rather than retaining it indefinitely.
+## 2.5 R2 — identity/admin mapping
 
-Do not use this recommendation as the actual schedule until a concrete duration/event trigger is written above.
-
-## 2.5 R2 — identity / admin mapping
-
-R2 contains only contact/scheduling/participant-code/consent/compensation/follow-up information.
+R2 contains only operational identity/admin data needed for contact, scheduling, participant-code mapping, consent status, compensation, and follow-up permission.
 
 - storage/service/path: **MUST RESOLVE**
 - access: **MUST RESOLVE**
-- participant-code mapping format: **MUST RESOLVE**
+- participant-code mapping: **MUST RESOLVE**
 - retention/deletion trigger: **MUST RESOLVE**
-- accounting/payment records that must be retained separately: **MUST RESOLVE**
+- payment/accounting records that must be retained separately: **MUST RESOLVE**
 
-R2 must not be embedded in R1 analytical notes.
+Do not embed name/email/company/contact data in R1.
 
-## 2.6 R3 — raw media/transcripts
+## 2.6 R3 — raw media/transcript
 
-First-wave setting:
+First-wave default:
 
 ```text
 COLLECT = NO
 ```
 
-If changed to YES, stop and fill:
+If changed to YES, stop and resolve:
 
 - recording purpose;
-- explicit consent wording;
+- explicit participant notice/consent;
 - recording service;
-- transcript processor;
+- transcription processor;
 - access;
 - retention duration;
 - deletion procedure;
-- foreign/cloud processor review;
-- whether external AI has any access.
+- foreign/cloud processing review;
+- external AI access, if any.
 
-## 2.7 External AI / transcription / analysis processors
+## 2.7 External AI / analysis processors
 
-First-wave setting:
+First-wave default:
 
 ```text
 RAW PERSONAL / CLIENT CONTENT TO EXTERNAL AI = NO
 ```
 
-If AI assistance is used on R1 material:
+Before any external AI receives R1 material, resolve:
 
-- tool/model/service: **MUST RESOLVE BEFORE USE**
-- exact data sent: **MUST RESOLVE**
-- de-identification/minimization step: **MUST RESOLVE**
-- retention/training settings/contract reviewed: **MUST REVIEW**
-- foreign/cloud processing reviewed: **MUST REVIEW**
-- approved use class: **MUST RESOLVE**
+- tool/model/service;
+- exact data sent;
+- minimization/de-identification step;
+- retention/training/data-use settings or contract;
+- foreign/cloud processing;
+- approved use class.
 
-Do not assume a consumer AI setting is appropriate for research data merely because it is convenient.
+Do not assume a consumer AI service is appropriate merely because it is convenient.
 
 ---
 
 # 3. Participant-facing study information template
 
-Customize the bracketed fields before use.
+The notice must be truthful without revealing the desired answer before the interview.
+
+Customize bracketed fields.
 
 ## Short pre-booking notice
 
 > **調査内容**  
-> 仕事上のメールや他のツールをまたいで、途中の仕事・やり取りをどのように把握しているかを調べています。最近実際に起きた仕事の流れについて約45分お話を伺います。現在の仕組みで十分うまくいっている例も重要です。
+> LunowaというプロダクトのProduct Discoveryの一環として、仕事上のメールや他のツールにまたがる「途中の仕事・やり取り」を、人が実際にどのように把握・管理しているかを調べています。最近実際に起きた仕事の流れについて約45分お話を伺います。現在の方法でうまくいっている例とうまくいっていない例の両方が重要です。
 >
 > **共有しなくてよい情報**  
 > メール本文、顧客名・会社名、認証情報、契約上の機密情報などを共有する必要はありません。具体例は内容を伏せて説明できます。画面共有も必須ではありません。
 >
 > **記録方法**  
-> [FIRST-WAVE DEFAULT: 録画・自動文字起こしは行いません。研究者が構造化したメモを作成します。]
+> [FIRST-WAVE DEFAULT: 録画・自動文字起こしは行わず、研究者が構造化したメモを作成します。]
 >
 > **利用目的**  
-> LunowaというプロダクトのProduct Discoveryとして、特定の仕事の進め方に「未完了のメール上のやり取りを自分で継続監視する負担」が実際に存在するかを調べるために利用します。マーケティング目的の名簿作成や、回答内容による営業には自動転用しません。
+> 現在の仕事の進め方・既存ツールで十分に管理できる場面と、管理が難しい場面を理解し、Lunowaで今後どの問題を検証すべきか判断するために利用します。回答内容をそのまま営業名簿や無関係なマーケティング目的へ自動転用しません。
+>
+> **アクセス**  
+> 構造化した研究メモはアクセスを限定した研究用保管場所で扱います。[品質確認レビューを行う場合: 必要に応じて、研究品質確認を担当する限定されたレビュー担当者が確認することがあります。]
 >
 > **公開**  
 > 個人単位の詳細な面談記録は公開GitHubに掲載しません。公開する場合は、集約した傾向・反例・研究上の結論を中心とし、再識別につながる詳細を削除・一般化します。
@@ -185,20 +182,23 @@ Customize the bracketed fields before use.
 > **問い合わせ**  
 > [MUST RESOLVE: research/privacy contact]
 
+This purpose description deliberately does **not** say that the study expects `rechecking`, `waiting`, or `monitoring burden`. Those are hypotheses to discover, not answers to teach.
+
 ## Session-start confirmation
 
 Moderator confirms:
 
 - study purpose understood;
-- no need to expose private email text/client names;
+- no need to expose private email/client names;
 - recording posture;
-- optional artifact sharing;
-- participant may skip a question/end session;
-- compensation is not contingent on positive findings;
+- artifact sharing optional;
+- participant may skip questions/end session;
+- compensation is not contingent on positive/Product-supportive findings;
+- research-team/reviewer access if applicable;
 - data handling/publication summary;
 - consent to proceed.
 
-Record only the consent status in R2 and participant code in R1.
+Consent status belongs in R2; only participant code appears in R1.
 
 ---
 
@@ -208,7 +208,7 @@ Record only the consent status in R2 and participant code in R1.
 
 > **仕事でメールを使っている方への45分インタビューのお願い**
 >
-> 仕事上のメールや他のツールをまたいで、途中の案件・やり取りをどのように把握しているかを調べています。
+> LunowaのProduct Discoveryとして、仕事上のメールや他のツールをまたいで、途中の案件・やり取りをどのように把握しているかを調べています。
 >
 > 直近2週間くらいの具体的な仕事の流れについてお話を伺いたいです。現在のツールや仕組みで十分うまく管理できている例も重要なので、「メールに困っている人」だけを探している調査ではありません。
 >
@@ -221,45 +221,54 @@ Record only the consent status in R2 and participant code in R1.
 >
 > ご協力いただける場合は [MUST RESOLVE contact/form] からお願いします。
 
-Do not add Product feature copy or `follow-up/recheck/open-loop` desired-answer hints.
+Do not add `follow-up`, `recheck`, `waiting`, or desired-answer feature copy.
 
-## 4.2 Research-panel description
+## 4.2 Panel study title
 
-Use a broad title such as:
+Recommended broad title:
 
 > `仕事上のメール・複数ツールでの案件把握に関するインタビュー`
 
-Avoid revealing exact eligibility logic to the panel participant.
+Do not reveal exact eligibility logic.
 
 ---
 
-# 5. Screener — copy-ready form
+# 5. Screener operationalization
 
-Use questions from the canonical research protocol. Recommended implementation:
+Use the ten behavior-based questions in the protocol:
 
 1. work arrangement;
 2. external coordination groups;
-3. channels used in last 2 weeks;
-4. count-band of multi-step email-related matters;
-5. actual actions used while a matter stayed in progress;
+3. channels used in the last two weeks;
+4. multi-step email-related work count-band;
+5. actions/tools used while a matter remained in progress;
 6. structured systems/tools used;
 7. who notices progress/stall;
-8. one recent non-confidential example in open text;
+8. one recent non-confidential example;
 9. one already-solved/no-recheck contrast if available;
-10. willingness for a 45-minute privacy-preserving discussion.
+10. privacy-preserving interview willingness.
 
-Operational rules:
+Rules:
 
-- do not expose qualification score;
-- manual review Q8;
+- do not expose a qualification score;
+- manually review the recent-example open text;
 - preserve negative-control candidates;
-- do 2–3 pilot comprehension checks before scale use;
-- record misunderstandings and revise wording;
-- never call pilot comprehension checks `validated screener`.
+- do 2–3 **pilot comprehension checks** before scaled recruitment;
+- continue revising if live recruitment reveals misunderstanding;
+- never call these 2–3 checks `validated screener` or `saturation`.
+
+## Pilot comprehension check boundary
+
+Pilot testers are **method testers, not Issue #36 analytical participants** unless later recruited through the normal study flow.
+
+- do not count their answers toward segment support;
+- collect only what is necessary to understand question interpretation;
+- apply the same privacy/contact separation to any identifiable pilot data;
+- do not ask them to expose private email content merely to test wording.
 
 ---
 
-# 6. Eligibility review sheet — R2/R1 boundary
+# 6. Eligibility review — R2/R1 boundary
 
 ## R2 admin fields
 
@@ -273,8 +282,6 @@ Operational rules:
 
 ## R1 research eligibility note
 
-Use only participant code.
-
 ```text
 Participant: P-___
 Candidate cohort: ___
@@ -287,7 +294,7 @@ Key ambiguity to test: ___
 Eligibility research rationale: ___
 ```
 
-Do not copy contact/name/company into R1.
+Never copy contact/name/company into R1.
 
 ---
 
@@ -320,7 +327,7 @@ Reviewer: ___
 Reason: ___
 ```
 
-Do not publish this form or its row-level results in R0.
+Do not publish row-level adjudication in R0.
 
 ---
 
@@ -334,16 +341,16 @@ Date: ___
 Moderator: ___
 Candidate cohort: ___
 Recruitment source class: ___
-Recording: NO / YES under approved protocol
+Recording: NO / YES under approved data flow
 Artifact use: NONE / REDACTED TIMELINE / LIMITED SCREEN SHARE
 ```
 
 ## Neutral context
 
-- external counterparty types:
-- channels:
-- official system of record, if any:
-- person/system responsible for noticing stalls:
+- external counterparty types;
+- channels;
+- official system of record, if any;
+- person/system responsible for noticing stalls.
 
 ## Event A
 
@@ -369,7 +376,7 @@ Evidence classes:
 
 ## Event B — contrast
 
-Same structure, emphasizing why monitoring was unnecessary/handled well/different.
+Use the same structure and emphasize why monitoring/remembering was unnecessary, handled well, or otherwise different.
 
 ## Late delegation-boundary self-report
 
@@ -395,14 +402,14 @@ Highest-information next case:
 
 # 9. Protected loop evidence table — R1
 
-Recommended spreadsheet/table columns:
+Recommended columns:
 
 | Column | Meaning |
 |---|---|
 | participant_code | pseudonymous code |
 | cohort | current cohort hypothesis |
 | evidence_class | observed / recent-event recall / self-report |
-| loop_id | local protected ID |
+| loop_id | protected local ID |
 | outcome | generalized operational outcome |
 | external_dependency | generalized type |
 | start_range | approximate |
@@ -425,22 +432,18 @@ Recommended spreadsheet/table columns:
 | contrast_case | yes/no |
 | validity_note | limitation |
 
-Never export this row-level table to public GitHub merely after removing participant code.
+Never export this row-level table to public GitHub merely after deleting participant code.
 
 ---
 
 # 10. Claim-evidence grid — R1
 
-For each cohort:
+For each candidate cohort:
 
 | Claim | Supporting cases | Contradicting cases | Strongest evidence class | Real baseline alternative | Limitation | What would falsify/redirect? |
 |---|---|---|---|---|---|---|
 
-Example claim form:
-
-> `Independent professionals coordinating multiple external clients repeatedly re-open sent/inbox state because no current tool owns heterogeneous waiting conditions.`
-
-Do not write `confirmed` unless the evidence warrants the exact scope. Prefer `observed repeatedly in current cohort`, `mixed`, `weak`, etc.
+Do not write `confirmed` merely because several cases share a theme. Prefer scope-accurate language such as `repeatedly observed in the current cohort`, `mixed`, `weak`, or `not established`.
 
 ---
 
@@ -454,23 +457,23 @@ Cohort(s): ___
 Valid cases: ___
 Excluded/limited cases: ___
 
-1. What repeated behavior is directly supported?
-2. Which evidence is RECENT-EVENT RECALL vs SELF-REPORT?
+1. What repeated behavior is supported?
+2. Which evidence is DIRECT OBSERVED vs RECENT-EVENT RECALL vs SELF-REPORT?
 3. Strongest counterexamples?
-4. Which current tools already solve the problem?
+4. Which current tools/features already solve the problem?
 5. Is residual gap coherent or heterogeneous?
-6. Is problem mainly monitoring, or writing/triage/organization instead?
-7. What changed in our segment model?
+6. Is the pain mainly monitoring, or writing/triage/organization instead?
+7. What changed in the segment model?
 8. What evidence weakened it?
 9. Is dialogue depth sufficient?
-10. Is current sample specific/homogeneous enough for the claim?
+10. Is the sample specific/homogeneous enough for the claim?
 11. Continue / deepen / redirect / stop?
 12. Highest-information next participant/cohort?
 13. Moderator-bias correction for next batch?
 14. Recruitment-source/fraud concern?
 ```
 
-Do not pool negative controls into positive-cohort saturation.
+Never pool negative controls into positive-cohort saturation.
 
 ---
 
@@ -478,25 +481,23 @@ Do not pool negative controls into positive-cohort saturation.
 
 Every proposed public finding must pass:
 
-- [ ] no participant code or mapping;
+- [ ] no participant code or identity mapping;
 - [ ] no name/contact/company/client identifier;
 - [ ] exact dates generalized where unnecessary;
 - [ ] rare job/tool/event combinations reviewed;
 - [ ] verbatim quote avoided unless necessary;
-- [ ] if quote retained, minimum excerpt + disclosure/consent compatibility reviewed;
+- [ ] if quote retained, minimum excerpt + participant-notice/consent compatibility reviewed;
 - [ ] no screenshot/raw artifact;
-- [ ] no row-level matrix;
+- [ ] no unreviewed row-level matrix;
 - [ ] small-cell/cohort count disclosure reviewed;
 - [ ] conclusion remains traceable in R1 without exposing the trace publicly;
-- [ ] reviewer signs off on public version.
+- [ ] designated reviewer signs off.
 
-Public GitHub result should normally be **cohort-level synthesis**, not participant dossiers.
+Public GitHub should normally contain **cohort-level synthesis**. Loop-level examples/rows are published only if each specific row passes disclosure review.
 
 ---
 
 # 13. Final public result template — R0
-
-Path when fieldwork is complete should be a new dated result under `docs/product/research/` or `docs/product/experiments/`.
 
 ```markdown
 # Issue #36 Field Product Discovery Result — YYYY-MM-DD
@@ -508,13 +509,13 @@ SUPPORTED FOR NEXT TEST / REVISE / WEAK / FALSIFIED
 - cohort(s) actually recruited
 - recruitment sources
 - valid interview count by cohort
-- method
+- method/interviewer mode
 - important limitations
 
 ## What was repeatedly observed/recalled
 - cohort-level pattern
-- evidence class mix
-- disclosure-safe counts/ranges where useful
+- evidence-class mix
+- disclosure-safe counts/ranges if useful
 
 ## What contradicted the hypothesis
 - already-solved workflows
@@ -527,7 +528,7 @@ SUPPORTED FOR NEXT TEST / REVISE / WEAK / FALSIFIED
 - residual gaps
 
 ## Segment interpretation
-- what workflow-defined cohort, if any, remains coherent
+- coherent workflow-defined cohort, if any
 - who should NOT be in the first wedge
 
 ## Delegation-boundary self-report
@@ -546,23 +547,19 @@ SUPPORTED FOR NEXT TEST / REVISE / WEAK / FALSIFIED
 - no WTP
 - no retention
 - no production reliability
-- no implementation authorization unless a separate accepted task says so
+- no automatic implementation authorization
 ```
 
 ---
 
-# 14. Interviewer-mode bridge form — only if AI moderation is later proposed
+# 14. AI-interviewer bridge form — only if later proposed
 
 Do not use for first wave.
 
-For a bridge sample, compare human vs proposed AI interviewer under a pre-specified design.
-
-Audit:
-
-| Dimension | Human stable-guide reference | AI mode | Acceptable for pooling? |
+| Dimension | Human stable-guide reference | AI mode | Pooling acceptable? |
 |---|---|---|---|
 | concrete recent event reached | | | |
-| deepening probe frequency/quality | | | |
+| deepening probe quality | | | |
 | one-question adherence | | | |
 | leadingness | | | |
 | contrast case surfaced | | | |
@@ -572,7 +569,7 @@ Audit:
 | evidence-class yield | | | |
 | case interpretation/disposition impact | | | |
 
-Final bridge decision:
+Decision:
 
 - `POOLING SUPPORTED FOR THIS RESEARCH QUESTION`
 - `SEPARATE EVIDENCE STREAM`
@@ -584,7 +581,7 @@ Never infer general AI-interviewer equivalence from one bridge.
 
 # 15. Fieldwork launch record
 
-Create this only after all blocking decisions are filled.
+Create/fill only after every blocking decision is concrete.
 
 ```text
 Issue #36 contract checked at: ___
@@ -593,7 +590,7 @@ Research owner: ___
 Privacy/contact owner: ___
 First cohort hypothesis: ___
 Recruitment channels approved: ___
-Video/interview service approved: ___
+Interview service approved: ___
 Recording: OFF / approved ON
 R1 store/access/retention: ___
 R2 store/access/retention: ___
@@ -603,7 +600,7 @@ Fraud rule approved: ___
 Compensation policy: ___
 Participant notice version: ___
 Pilot comprehension checks completed: ___
-Independent/adversarial review plan: ___
+Second-pass review plan: ___
 R1->R0 disclosure reviewer: ___
 
 FIELDWORK START: AUTHORIZED / BLOCKED

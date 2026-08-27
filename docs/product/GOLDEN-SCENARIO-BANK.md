@@ -192,10 +192,10 @@ Exact copy/layout remains usability work unless the semantic meaning itself is s
 **Focus:** delivery vs monitoring.
 
 ## PG-28 — Attachment preview fails locally
-**Situation:** source attachment exists; in-app renderer fails.
-**Expected:** safe download/open-external fallback; context preserved.
+**Situation:** source attachment exists; in-app renderer fails while provider-authorized attachment access remains available.
+**Expected:** safe download/open-external/provider fallback; context preserved.
 **Forbidden:** global Integrity Alert or false attachment-outcome failure solely from renderer.
-**Focus:** local degradation.
+**Focus:** local degradation; access != preview.
 
 ## PG-29 — AI draft assistance fails
 **Situation:** Moment requires a reply; AI draft generation fails; provider/source and manual composer are healthy.
@@ -425,6 +425,12 @@ Exact copy/layout remains usability work unless the semantic meaning itself is s
 **Forbidden:** all quiet-hour events suppressed indiscriminately or all Needs You treated urgent.
 **Focus:** urgency separate from state.
 
+## PG-65 — Provider/security blocks attachment access
+**Situation:** an attachment/provider-file observation exists, but the provider/platform marks the file unsafe or otherwise blocks authorized access; native preview is therefore unavailable by security/capability policy rather than a local renderer bug.
+**Expected:** preserve existence/provenance and the exact unavailable/security boundary; do not bypass the provider/platform protection; show only supported safe alternatives. If unavailable evidence materially breaks an already-delegated monitoring promise, apply affected-scope Integrity/recovery. Create Needs You or Review only if canonical user work/material judgment actually exists.
+**Forbidden:** bypassing provider/security restrictions to satisfy attachment parity; pretending the file was inspected; global degradation when the blocked evidence is irrelevant to the delegated promise.
+**Focus:** source evidence access, capability/security boundary.
+
 ---
 
 # 2. Bank-level forbidden invariants
@@ -454,7 +460,8 @@ Any implementation/prototype/canonical change fails Product-level acceptance if 
 21. meeting mail automatically grants calendar truth/mutation authority;
 22. Product correction/control terminology is silently promoted into new persistence aggregates/enums;
 23. generic workflow/rules semantics are introduced to “cover” edge cases;
-24. Product Content COMPLETE is used as evidence of PMF/ICP/WTP/runtime/legal readiness or implementation authorization.
+24. Product Content COMPLETE is used as evidence of PMF/ICP/WTP/runtime/legal readiness or implementation authorization;
+25. attachment feature parity bypasses provider/platform security restrictions or treats blocked/unsupported content as successfully inspected.
 
 ---
 

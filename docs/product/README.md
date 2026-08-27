@@ -30,7 +30,7 @@ Owns:
 - autonomy/security/failure-recovery principles;
 - high-level v1/deferred/out scope;
 - competitive/commercial posture;
-- Product evidence sequence and metrics.
+- Product evidence priorities and metrics.
 
 This is the primary authority for **what Product Lunowa is trying to become**. It deliberately contains explicit hypotheses/unknowns; canonical does not mean market-proven.
 
@@ -115,6 +115,10 @@ Canonical viewport adaptation:
 
 Visual references under `../design/references/` remain composition/tone references, not Product semantics or implementation breadth authority.
 
+### Current implementation-readiness task
+
+GitHub **Issue #55** owns the current task contract for turning these accepted design authorities into a decision-complete screen/state/interaction/responsive/accessibility/component/data-contract specification before broad UI implementation.
+
 ---
 
 # 3. Responsibility authority
@@ -141,7 +145,7 @@ L1 logical persistence boundary           FROZEN v0.1 baseline
 L2 exact PostgreSQL/Drizzle DDL            v0.4 STATIC REVIEW COMPLETE
 L2 executable proof                        PENDING
 L2 final freeze                            BLOCKED
-L3 migrations/runtime                     NOT AUTHORIZED
+L3 migrations/runtime                     NOT AUTHORIZED until the L2 gate passes
 ```
 
 Current conceptual boundary includes Responsibility, obligation legs, expected events, temporal facts, field decisions, provenance, domain events, typed local details, pre-admission Review, source evidence/inference, Temporal Contract, and Draft/SendOperation boundaries according to the owning artifacts.
@@ -172,42 +176,50 @@ A technology choice does not itself authorize implementation breadth.
 
 ## `IMPLEMENTATION-PLAN.md`
 
-Owns active evidence/implementation sequence.
+Owns the **active owner-directed implementation sequence**.
 
-Current high-level sequence remains evidence-first:
+Current high-level sequence is Product-completion-first while preserving empirical unknowns:
 
 ```text
-Bootstrap
--> complete canonical Product content / acceptance contract
--> Issue #36 problem / ICP evidence
--> bounded fake-data mechanism experiment
--> longitudinal monitoring-relinquishment proof
--> only then broaden credible client shell as evidence requires
--> Responsibility persistence when justified and executable gate passes
--> one real provider read path
--> real contextual send path when justified
--> deterministic Responsibility / Temporal Contract runtime
--> AI behind validated contracts/evals
--> search/context quality
--> second provider
--> beta hardening
+Phase-0 runtime foundation
+-> Issue #55 UI/UX implementation readiness
+-> implementation graph / dependency + safety partitioning
+-> required Responsibility executable/persistence gates
+-> one-provider source/read path
+-> deterministic Responsibility + attention/Temporal Contract loop
+-> Home / Needs You / Managed / Review / Moment / Source
+-> contextual Reply/Reply All + explicit Send + reconciliation where required
+-> bounded AI interpretation behind trusted contracts/evals
+-> failure/reconnect/integrity + attachment-source-access closure
+-> end-to-end Minimum Complete Delegation Loop
+-> beta/early-access hardening
+-> Issue #36 / longitudinal empirical validation and evidence-driven scope expansion
 ```
 
-Product Content COMPLETE does **not** authorize Issue #28, L3 migrations, broad provider integration, full-client parity, or Issue #36 conclusions.
+**Implementation authorization and empirical-claim authorization are separate.** A task may implement accepted Product behavior while ICP/PMF/WTP/retention/reliability remain UNKNOWN.
+
+Product Content COMPLETE by itself still does not authorize arbitrary implementation breadth, weaken Responsibility/provider/security gates, or manufacture Issue #36 conclusions. Current implementation authorization comes from the live owner/task routing and accepted implementation plan.
 
 ---
 
-# 5. Product-discovery authority after Product-content closure
+# 5. Product Discovery — open empirical gate, deferred in execution order
 
-GitHub **Issue #36 — Validate the first ICP and real communication-monitoring burden** remains the next highest-priority empirical Product gate after Issue #45 Product-content completion.
+GitHub **Issue #36 — Validate the first ICP and real communication-monitoring burden** remains the highest-priority empirical Product gate.
 
-It tests recent concrete workflows and real alternatives. It must be allowed to revise/falsify the Product wedge or recruitment prior.
+It is **not passed, closed, or obsolete**. It tests recent concrete workflows and real alternatives and must be allowed to revise/falsify the Product wedge or recruitment prior.
 
-Downstream:
+Current owner-directed sequencing deliberately differs from empirical-priority ordering:
+
+- #36 is not a prerequisite for beginning the current Product-completion lane;
+- later fieldwork may use a usable Product where helpful;
+- implementation completion cannot satisfy #36;
+- ICP/PMF/WTP/market-validity claims remain unauthorized until actual evidence supports them.
+
+Related lanes:
 
 - Issue #26 — mechanism evidence only;
-- Issue #28 — write-heavy prototype remains gated;
-- Issue #32 / PR #34 — bounded scenario-oracle lane, not Product critical path;
+- Issue #28 — its bounded comparative fake-data prototype remains separately gated and is **not** silently broadened into the Product-completion lane;
+- Issue #32 / PR #34 — bounded scenario-oracle lane unless explicitly reconciled into a current task;
 - Responsibility L2 proof — technical evidence, not Product validation.
 
 Always query live GitHub state before acting on task-specific status.
@@ -241,7 +253,8 @@ Read `PRODUCT.md` and `PRODUCT-CONTENT.md` for full wording. Key invariants incl
 - class-scoped monitoring cannot bypass admission/No Responsibility;
 - cross-thread similarity is not merge authority and cross-account semantic merge remains prohibited initially;
 - full-client replacement is earned by use;
-- differentiation is comparative behavioral evidence.
+- differentiation is comparative behavioral evidence;
+- implementation completion != Product/market validation.
 
 This README is a router, not a substitute for the owning Product/design/domain documents.
 
@@ -265,17 +278,12 @@ A decision may be superseded by stronger evidence, but rationale/consequences sh
 
 ---
 
-# 8. Task execution rule
+# 8. Task execution and durable-update rule
 
 Implementation/research handoff is **Issue-driven**.
 
 Use the current GitHub Issue for task-specific Goal / Why / Scope / Acceptance / Verification. Use repository documents for durable constraints.
 
-Do not infer implementation authorization from:
+Do not infer implementation authorization from a candidate document, visual-reference completeness, schema readiness, branch existence, or `agent:review-ready` without independent review evidence.
 
-- Product Content COMPLETE;
-- a candidate document;
-- visual reference completeness;
-- technical schema readiness;
-- branch existence;
-- `agent:review-ready` without independent review evidence.
+Do not leave a material accepted priority, behavior, dependency, blocker, or completion state only in chat. Update the owning Issue/docs in the same workstream when omission would cause a future agent to act incorrectly; avoid repository churn for tentative brainstorming or ordinary conversation.

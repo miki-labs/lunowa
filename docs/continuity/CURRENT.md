@@ -6,7 +6,9 @@ This is a compact mutable bootstrap/router. It is **not** Product, design, domai
 
 - Last reconciled: `2026-08-27`
 - Continuity schema version: `0.1`
-- Canonical Product authority: `docs/product/PRODUCT.md`
+- Canonical highest-level Product authority: `docs/product/PRODUCT.md`
+- Canonical detailed Product operating contract: `docs/product/PRODUCT-CONTENT.md`
+- Canonical Product-level acceptance bank: `docs/product/GOLDEN-SCENARIO-BANK.md` (subordinate to Responsibility semantic oracles)
 - Canonical Product design: `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md`
 - Canonical Responsibility semantics: `docs/product/responsibility/`
 - Historical Product synthesis candidates under `docs/product/*CANDIDATE.md`: **noncanonical rationale/history after consolidation**
@@ -16,9 +18,7 @@ This is a compact mutable bootstrap/router. It is **not** Product, design, domai
 
 ## Current Product direction
 
-Canonical Product content is reconciled through 2026-08-27.
-
-Highest-level direction:
+Canonical Product content is reconciled through 2026-08-27 around one behavioral thesis:
 
 - core user value: **Attention Delegation**;
 - strongest current problem/wedge: **Open-loop Monitoring Offload**;
@@ -29,15 +29,37 @@ Highest-level direction:
 - continuous monitoring / episodic human attention;
 - monitoring autonomy is separate from consequential action authority;
 - mailbox/source provider state is separate from accepted Responsibility state;
-- Product content being coherent does **not** mean ICP/PMF/WTP/reliability are validated.
+- detailed control/failure/lifecycle/Settings/edge/Managed/Review/zero behavior and final scope matrix live in `docs/product/PRODUCT-CONTENT.md`;
+- Product-level regression behavior lives in `docs/product/GOLDEN-SCENARIO-BANK.md` and never overrides Responsibility semantic truth;
+- Product Content COMPLETE means specification closure only; it does **not** mean ICP/PMF/WTP/reliability/usability/legal/privacy/runtime feasibility are validated.
 
-For details, read `docs/product/PRODUCT.md` rather than this checkpoint.
+For details, read the owning canonical Product authorities rather than this checkpoint.
 
 ---
 
-## Highest Product priority — Issue #36
+## Product-content closure — Issue #45
 
-GitHub **Issue #36 — `[Product Discovery]: Validate the first ICP and real communication-monitoring burden`** remains the highest-priority Product-learning gate.
+GitHub **Issue #45 — `[Product]: Complete remaining canonical Product content`** owns the acceptance contract for the final Product-content closure.
+
+Its completion requires a full acceptance audit of the entire cumulative candidate, batched correction of material blockers, canonical routing, exact-head verification/CI, and merge. It does not authorize implementation or manufacture empirical conclusions.
+
+The accepted Product-content domains include:
+
+- User Control / Correction / Escalation;
+- failure/degraded/recovery behavior;
+- account lifecycle and permission-scope consequences;
+- capability-conditional Settings;
+- communication edge cases;
+- complete Managed / Review semantics;
+- zero / unknown / unavailable states;
+- final Feature Matrix;
+- Product-level Golden Scenario Bank.
+
+---
+
+## Next empirical Product priority — Issue #36
+
+After Issue #45 Product-content closure, GitHub **Issue #36 — `[Product Discovery]: Validate the first ICP and real communication-monitoring burden`** remains the highest-priority empirical Product-learning gate.
 
 It must test recent concrete workflows and real alternatives, not validate Lunowa terminology or feature preference.
 
@@ -48,7 +70,7 @@ Exact ICP remains unknown. Independent / small-firm B2B professionals remain a r
 ## Downstream Product-learning lanes
 
 - **Issue #26** — downstream Responsibility/Moment mechanism validation; does not establish ICP, longitudinal relinquishment, WTP, or PMF.
-- **Issue #28** — write-heavy prototype implementation remains gated; Product/design consolidation does not authorize it.
+- **Issue #28** — write-heavy prototype implementation remains gated; Product-content closure does not authorize it.
 - **Issue #32 / PR #34** — bounded scenario-oracle lane; not Product critical path and requires reconciliation against current authority before use if assumptions drifted.
 - **Responsibility L2 proof** — technical evidence, not Product validation.
 
@@ -80,12 +102,13 @@ Technical proof must not be misclassified as Product evidence or used to skip Pr
 - attainable material false-negative vs unnecessary Review/resurfacing trade-off;
 - reliability threshold at which users truly stop parallel checking;
 - exact delivery/digest/quiet-hours policy;
-- whether current five-surface IA wins real use;
+- whether current Home/Needs You/Managed/Review/Source IA wins real use;
 - whether companion/hybrid remains superior after mature adoption;
 - Product-critical need for generic native compose/calendar/multi-account breadth;
 - pricing/WTP/packaging;
 - acquisition/distribution;
 - retention/continued delegated monitoring;
+- exact legal/privacy retention/deletion/export/billing commitments required for shipped Product-account deletion;
 - whether Responsibility remains the simplest sufficient internal mechanism after real data.
 
 ---
@@ -98,12 +121,13 @@ Lunowa must outperform the user's **real current workflow** on delegated monitor
 
 ---
 
-## Current implementation sequence
+## Current implementation / evidence sequence
 
 Use `docs/product/IMPLEMENTATION-PLAN.md` + live Issue state.
 
 ```text
 Bootstrap
+-> canonical Product content closure / Issue #45 acceptance
 -> Issue #36 problem / ICP evidence
 -> bounded mechanism experiment
 -> longitudinal monitoring-relinquishment proof
@@ -117,7 +141,9 @@ Do not restore the older “build broad fake full-client shell first” sequence
 
 ## Deep links
 
-- `docs/product/PRODUCT.md` — canonical Product contract.
+- `docs/product/PRODUCT.md` — canonical highest-level Product contract.
+- `docs/product/PRODUCT-CONTENT.md` — canonical detailed Product operating contract and final Feature Matrix.
+- `docs/product/GOLDEN-SCENARIO-BANK.md` — canonical Product-level acceptance bank, subordinate to Responsibility semantic oracles.
 - `docs/product/README.md` — Product/engineering authority map.
 - `docs/design/DESIGN.md` — canonical Product design.
 - `docs/design/INTERACTIONS.md` — canonical interactions.
@@ -126,6 +152,7 @@ Do not restore the older “build broad fake full-client shell first” sequence
 - `docs/product/responsibility/README.md` + `DECISIONS.md` — canonical Responsibility semantics/status.
 - ADR 0002 — AI interpretation vs trusted state/authority.
 - ADR 0003 — durable Temporal Contract and attention/notification separation.
-- Issue #36 — current problem/ICP discovery authority; query live.
+- Issue #45 — Product-content completion acceptance contract; query live.
+- Issue #36 — next empirical problem/ICP discovery authority after content closure; query live.
 
 If this checkpoint conflicts with canonical Product/design/domain sources, executable evidence, or live GitHub task state, the authoritative/current source wins. Repair this router rather than treating stale checkpoint prose as authority.

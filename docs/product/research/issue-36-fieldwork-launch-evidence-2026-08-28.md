@@ -122,30 +122,52 @@ wave-1 participant data in Drive = NOT APPROVED
 
 # 4. Windows encrypted-local storage evidence
 
-## BitLocker status command
+## Device Encryption vs BitLocker Drive Encryption
 
-Official source:
+Official Microsoft source:
+- https://support.microsoft.com/en-us/Windows/Security/encryption/device-encryption-in-windows
+
+Microsoft distinguishes:
+
+- **Device Encryption** — available on a wider range of compatible devices, including Windows Home; and
+- **BitLocker Drive Encryption** — advanced/manual management available on Pro/Enterprise/Education.
+
+Microsoft documents the Device Encryption UI at:
+
+```text
+Settings
+-> Privacy & security
+-> Device encryption
+```
+
+If the Device Encryption setting is unavailable, Microsoft recommends checking `Automatic Device Encryption Support` / `Device Encryption Support` in System Information run as administrator to understand device support.
+
+Operational implication: lack of a BitLocker Control Panel item or PowerShell module is not by itself evidence that a Home device is unencrypted.
+
+## `manage-bde` status — edition-agnostic machine-readable path
+
+Official Microsoft Learn source:
+- https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/manage-bde-status
+
+Microsoft documents `manage-bde -status` for Windows 10/11. It reports whether drives are protected and includes conversion status, percentage encrypted, encryption method, protection status, lock status, and key protectors.
+
+Use locally:
+
+```powershell
+manage-bde -status C:
+```
+
+## `Get-BitLockerVolume` — additional path where available
+
+Official Microsoft Learn source:
 - https://learn.microsoft.com/en-us/powershell/module/bitlocker/get-bitlockervolume?view=windowsserver2025-ps
 
-Microsoft documents `Get-BitLockerVolume` as returning, among other attributes:
+The cmdlet exposes `VolumeStatus`, `EncryptionPercentage`, `ProtectionStatus`, and `EncryptionMethod`; Microsoft's protected-volume example shows `FullyEncrypted`, `EncryptionPercentage: 100`, and `ProtectionStatus: On`.
 
-- `VolumeStatus`;
-- `EncryptionPercentage`;
-- `ProtectionStatus`;
-- `EncryptionMethod`.
-
-The official example for a protected OS drive shows `FullyEncrypted`, `EncryptionPercentage: 100`, and `ProtectionStatus: On`.
-
-Local verification command:
+Use where the module is available:
 
 ```powershell
 Get-BitLockerVolume C: | Format-List MountPoint,VolumeStatus,ProtectionStatus,EncryptionPercentage,EncryptionMethod
-```
-
-Fallback Windows command:
-
-```powershell
-manage-bde -status C:\
 ```
 
 ## Recovery key / management
@@ -153,11 +175,11 @@ manage-bde -status C:\
 Official source:
 - https://support.microsoft.com/en-us/windows/security/encryption/bitlocker-drive-encryption
 
-Microsoft's current BitLocker guidance requires backing up the recovery key when encryption is enabled. The key must not be copied into GitHub/chat/research evidence.
+Microsoft's current guidance requires/recommends a recoverable recovery-key path when encryption is configured. The recovery key itself must never be copied into GitHub/chat/research evidence.
 
 Operational consequence:
 
-Encrypted local storage is the preferred wave-1 path because it avoids the unresolved current Drive processor/account-tier dependency, **but it remains BLOCKED until the actual research Windows device, backup/sync path, R1/R2 separation, and deletion behavior are verified.**
+Encrypted local storage remains the preferred wave-1 path because it avoids the unresolved current Drive processor/account-tier dependency, **but it remains BLOCKED until actual protection state, OS-account security, R1/R2 separation, backup/sync path, recovery-key safety, and deletion behavior are verified.**
 
 ---
 
@@ -237,7 +259,8 @@ Still required before launch:
 
 - purchaser/account setup and terms review;
 - real purchase/payment test/path;
-- secure participant delivery procedure;
+- secure bearer-URL delivery to the intended participant;
+- handling of misdelivery/nonreceipt;
 - accounting/tax/payment-record retention outside R1;
 - participant notice matches the actual delivery workflow.
 
@@ -281,7 +304,7 @@ The evidence above does **not** establish:
 - the Lunowa ICP or problem prevalence;
 - PMF, WTP, retention, production reliability, or optimal interview count;
 - actual Google Meet organizer capture defaults;
-- actual Windows encryption/backup/deletion state;
+- actual Windows Device Encryption/BitLocker protection, backup, or deletion state on the research machine;
 - a participant-facing privacy contact;
 - completed QUO Card Pay purchaser/payment/accounting workflow;
 - exact incidence or quality of a named panel for the final refined Japan cohort.

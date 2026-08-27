@@ -2,48 +2,51 @@
 
 ## Status
 
-Dated external/repository evidence for Issue #58. This file is **evidence and rationale, not timeless Product truth**. Re-check volatile vendor facts at the activation/release gate that depends on them.
+Dated external/repository evidence for Issue #58. **Evidence/rationale, not timeless Product truth.** Volatile facts must be rechecked when the activation/release gate actually executes.
 
-## Repository implementation fact
+## 1. Repository implementation fact
 
-Baseline inspected after PR #57 merge: `9869d7cdee2559b00d73203dec40d92bc90f537f`.
+Baseline after PR #57: `9869d7cdee2559b00d73203dec40d92bc90f537f`.
 
-Current production dependencies are still the bootstrap set: Next.js / React / next-intl. Better Auth, Drizzle/PostgreSQL driver, Trigger.dev, Gmail provider libraries and OpenAI SDK are not yet activated. The app remains a bootstrap route/component with bootstrap-focused tests. Therefore package/ADR presence must never be reported as an implemented Product capability.
+Current production dependencies remain bootstrap-only: Next.js / React / next-intl. Better Auth, Drizzle/PostgreSQL production persistence, Gmail integration, Trigger.dev and OpenAI SDK are not activated. The app is still a bootstrap route/component with bootstrap-focused tests.
 
-## Current external evidence
+Therefore:
 
-### Next.js
+```text
+accepted docs/ADR
+!= installed package
+!= configured integration
+!= implemented Product behavior
+```
 
-Checked: 2026-08-28.
+## 2. Next.js
+
+Checked 2026-08-28.
 
 Primary source:
 - https://nextjs.org/blog
 
 Observed:
-- Next.js published its August 2026 security release on 2026-08-25.
-- Active-LTS 16.3 users are directed to upgrade to `16.3.3` for two Critical-severity vulnerabilities.
-- Repository baseline currently pins `next@16.3.0`.
+- 2026-08-25 security release;
+- Active-LTS 16.3 users directed to `16.3.3` for two Critical-severity fixes;
+- repo currently pins `16.3.0`.
 
-Decision consequence:
-- Issue #58 does not mix a dependency update into a planning candidate.
-- A **PRE-WAVE SERIAL security-baseline task** must update the patched 16.3 line and rerun the full bootstrap CI before production-feature branches fan out.
+Consequence:
+- G00 is a narrow PRE-WAVE serial security update + existing verification before write-heavy production-feature fanout.
+- #58 planning branch does not mix in the dependency patch itself.
 
-### Node.js
-
-Checked: 2026-08-28.
+## 3. Node.js
 
 Primary source:
 - https://nodejs.org/en/about/previous-releases
 
 Observed:
-- Node.js 24 remains an LTS line.
+- Node 24 remains LTS.
 
-Decision consequence:
-- retain Node 24 baseline; normal security/patch refresh still applies.
+Consequence:
+- retain Node 24, normal patch/security maintenance applies.
 
-### Better Auth
-
-Checked: 2026-08-28.
+## 4. Better Auth
 
 Primary sources:
 - https://better-auth.com/changelog
@@ -51,50 +54,62 @@ Primary sources:
 - https://better-auth.com/docs/concepts/database
 
 Observed:
-- current stable release is `1.7.1` (2026-08-18);
+- stable `1.7.1` released 2026-08-18;
 - 1.7 includes storage/identity changes that can require regenerated schema;
-- current database docs explicitly support `advanced.database.generateId: "uuid"`; PostgreSQL can use a UUID database column/generation path.
+- current DB docs support `advanced.database.generateId: "uuid"` and PostgreSQL UUID handling.
 
-Decision consequence:
-- the old 1.6-family validation snapshot is stale evidence;
-- Issue #14 must pin an exact current stable Better Auth version and prove actual PostgreSQL UUID behavior + generated schema, not infer it from TypeScript/docs.
+Consequence:
+- historical v1.6 validation is stale evidence;
+- P14 pins current stable at execution, explicitly configures UUID, inspects generated schema/real PostgreSQL rather than inferring from docs/types.
 
-### PostgreSQL
-
-Checked: 2026-08-28.
+## 5. PostgreSQL
 
 Primary source:
 - https://www.postgresql.org/docs/18/
 
 Observed:
-- PostgreSQL 18 remains the accepted major line; current supported point release is 18.6.
+- major 18 remains supported/accepted; current point-release evidence is 18.6.
 
-Decision consequence:
-- retain PostgreSQL 18 as the executable Responsibility proof target;
-- exact server version must be recorded in proof evidence.
+Consequence:
+- executable Responsibility/Auth proof stays on real PostgreSQL 18 and records exact server version.
 
-### Drizzle ORM / Drizzle Kit
+## 6. Drizzle ORM / Kit
 
-Checked: 2026-08-28.
-
-Primary/near-primary evidence:
+Evidence:
 - https://github.com/drizzle-team/drizzle-orm/releases
-- https://github.com/drizzle-team/drizzle-orm/issues/6114
-- https://github.com/drizzle-team/drizzle-orm/issues/6079
-- https://github.com/drizzle-team/drizzle-orm/issues/6166
+- recent issue evidence including transaction/migration/introspection defects.
 
 Observed:
-- stable `latest` remains on the 0.45.x line; `drizzle-orm 0.45.2` is current stable evidence while 1.0 remains RC/pre-release;
-- recent open issues include node-postgres transaction/client handling and migration/introspection defects across stable/RC paths.
+- stable evidence remains 0.45.x (`0.45.2`); 1.0 remains RC/pre-release;
+- current issues reinforce that ORM/API intent is not DB proof.
 
-Decision consequence:
-- do not adopt the RC merely because it is newer;
-- Issues #13/#14 must pin exact ORM/Kit/driver versions, inspect generated SQL, and exercise real PostgreSQL 18 behavior;
-- committed SQL migrations remain the production path; no production `push` shortcut.
+Consequence:
+- no automatic RC adoption;
+- P13/P14 pin exact stable ORM/Kit/driver, inspect generated SQL and execute against real PostgreSQL 18;
+- production changes use committed migrations, not `push` as final process.
 
-### Gmail API — push / reconciliation
+## 7. Responsibility L2 upstream prerequisites
 
-Checked: 2026-08-28.
+Repository source:
+- `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` v0.4.
+
+Current candidate explicitly requires broader Source schema invariants including:
+
+```sql
+connected_accounts UNIQUE (id, user_id)
+conversations UNIQUE (id, connected_account_id)
+messages UNIQUE (id, connected_account_id)
+```
+
+and a monotonic non-negative `Conversation.semantic_evidence_revision`.
+
+Consequence:
+- G10 must not independently freeze Source production schema before this prerequisite proof;
+- P13 proves current prerequisite behavior;
+- after P13 PASS, G20 is the single writer for production ConnectedAccount/ProviderSyncState/Conversation/Message/Attachment schema conforming to those prerequisites;
+- P15 still gates Responsibility-owned production tables.
+
+## 8. Gmail push / history reconciliation
 
 Primary sources:
 - https://developers.google.com/workspace/gmail/api/guides/push
@@ -102,50 +117,63 @@ Primary sources:
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list
 
 Observed:
-- `users.watch` must be renewed at least every 7 days; Google recommends daily renewal;
-- each watched Gmail user has a max notification rate of one event/second and excess notifications may be dropped;
-- notifications can be delayed/dropped, and Google recommends fallback reconciliation such as `history.list`;
-- stale/invalid `startHistoryId` typically returns HTTP 404 and requires full sync;
-- a watch response includes `historyId` and `expiration`.
+- `users.watch` must be renewed at least every 7 days; Google recommends daily;
+- watched user notification limit is one event/sec/user and excess may be dropped;
+- notifications may be delayed/dropped, so fallback reconciliation is required;
+- stale/invalid `startHistoryId` typically yields HTTP 404 and requires full sync;
+- watch response includes `historyId` and `expiration`.
 
-Decision consequence:
-- Gmail push is a reconciliation **signal**, never mailbox/domain truth;
-- the provider task must prove watch renewal, periodic safety reconciliation, cursor durability ordering and 404/full-sync recovery.
+Consequence:
+- push = reconciliation signal, not truth;
+- G20 must prove renewal, periodic safety reconciliation, cursor commit ordering, duplicate/drop tolerance and 404/full-sync recovery.
 
-### Google OAuth — offline access / scope minimization
+## 9. Google OAuth offline access / token handling
 
-Checked: 2026-08-28.
-
-Primary sources:
+Primary sources checked 2026-08-28:
+- https://developers.google.com/identity/protocols/oauth2
 - https://developers.google.com/identity/protocols/oauth2/web-server
-- https://developers.google.com/identity/protocols/oauth2/scopes
-- https://support.google.com/cloud/answer/13464321?hl=en
-- https://support.google.com/cloud/answer/13465431?hl=en
+- https://developers.google.com/identity/protocols/oauth2/resources/best-practices
+- https://developers.google.com/identity/protocols/oauth2/policies
 
 Observed:
-- server/background access needs offline authorization/refresh-token handling;
-- Google explicitly requires the narrowest scopes needed by implemented behavior;
-- restricted-scope apps face additional verification/security-assessment requirements, including annual assessment/re-verification requirements where applicable.
+- background access beyond an access-token lifetime uses refresh-token/offline authorization;
+- Google says refresh tokens belong in secure long-term/persistent storage;
+- OAuth best practices require secure token storage and no plaintext transmission;
+- server-side apps storing user tokens should encrypt them at rest;
+- OAuth policy (last modified 2026-08-05) says tokens should always be stored encrypted at rest and revoked/deleted when no longer needed.
 
-Decision consequence:
-- request only scopes required by the accepted one-provider vertical slice;
-- keep **local/private Product proof** separate from **public-beta OAuth/security compliance readiness** so compliance is neither ignored nor made a blocker to all local implementation.
+Consequence:
+- secure token-at-rest handling is required **before first durable persistence of a real token**, not merely before public beta;
+- a bounded non-persistent local protocol spike can avoid storing a long-lived token;
+- ownership-scoped lookup, no token logging and revoke/delete behavior are part of G20 minimum security;
+- R90 owns further production key rotation/operational hardening.
 
-### Cloud Pub/Sub push authentication
+## 10. OAuth scope minimization / public verification
 
-Checked: 2026-08-28.
+Primary sources:
+- Google OAuth web-server/scopes/verification/security-assessment guidance.
+
+Observed:
+- request narrowest scopes needed by implemented features;
+- users may grant only a subset and corresponding unsupported capabilities must stay disabled;
+- sensitive/restricted scopes can require OAuth verification; server-side restricted-data use can require security assessment/reverification depending on actual deployment/scope.
+
+Consequence:
+- minimum scopes in G20;
+- local/private complete-loop proof and public-beta compliance are separate gates;
+- R90 owns actual public-release verification/security work where required.
+
+## 11. Cloud Pub/Sub authenticated push
 
 Primary source:
 - https://cloud.google.com/pubsub/docs/authenticate-push-subscriptions
 
-Decision consequence:
-- production push ingress must authenticate the push request and validate its expected audience/identity claims as applicable;
-- webhook receipt must acknowledge quickly and move non-trivial reconciliation to durable work;
-- notification body never directly mutates Responsibility state.
+Consequence:
+- production push ingress authenticates/validates expected audience/identity as applicable;
+- valid request acknowledged quickly and non-trivial work deferred;
+- notification payload never directly mutates Responsibility.
 
-### Trigger.dev
-
-Checked: 2026-08-28.
+## 12. Trigger.dev
 
 Primary sources:
 - https://trigger.dev/docs/idempotency
@@ -153,45 +181,60 @@ Primary sources:
 - https://trigger.dev/product
 
 Observed:
-- Trigger.dev provides durable/checkpointed execution and idempotency keys;
-- raw-string idempotency keys default to `run` scope starting in v4.3.1 (previously global);
-- even `global` keys remain task/environment scoped;
-- idempotency keys expire by default after 30 days unless configured otherwise;
-- a failed run automatically clears its idempotency key.
+- durable/checkpointed execution and idempotency facilities exist;
+- raw string idempotency defaults to `run` scope from v4.3.1 (previously global);
+- global remains task/environment scoped;
+- default key retention/TTL is finite (30-day current evidence);
+- failed runs clear their idempotency key.
 
-Decision consequence:
-- Trigger.dev remains an execution substrate, not semantic/external-effect authority;
-- PostgreSQL/domain invariants must own provider-message uniqueness, Responsibility application idempotency, Temporal-trigger currentness, and SendOperation duplicate prevention;
-- any Trigger key used for efficiency must have explicit scope/key/version/TTL semantics and must not be the only durable promise.
+Consequence:
+- Trigger.dev remains execution infrastructure;
+- PostgreSQL/domain owns provider uniqueness, Responsibility application idempotency, Temporal currentness and Send duplicate prevention;
+- Trigger keys require explicit composition/scope/TTL and cannot be the only durable promise.
 
-### OpenAI Responses API / data controls
-
-Checked: 2026-08-28.
+## 13. OpenAI Responses / data controls
 
 Primary source:
 - https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
 
 Observed:
-- API data is not used for model training by default unless the customer opts in;
+- API data is not used for training by default unless opted in;
 - abuse-monitoring logs are generally retained up to 30 days by default;
-- eligible organizations can receive Modified Abuse Monitoring / Zero Data Retention controls;
-- `/v1/responses` is ZDR-eligible, but `store: false` is not itself proof that an organization has ZDR;
-- Responses application-state/data-retention behavior has feature-specific exceptions (for example background mode).
+- eligible organizations can use Modified Abuse Monitoring / Zero Data Retention;
+- `/v1/responses` is ZDR-eligible, but `store:false` is not itself proof that the organization has ZDR;
+- Responses/data-retention behavior has feature-specific exceptions.
 
-Decision consequence:
-- AI activation requires a current data-control review, minimum authorized context, no raw mail logging by default, `store: false` where appropriate, and explicit understanding of the project/org retention mode;
-- AI stays downstream of trusted source/domain contracts and is not required for initial Source/Auth/UI foundation.
+Consequence:
+- Responses + Structured Outputs remains viable for bounded candidate generation;
+- production AI activation requires current org/project data-control review, minimum context, appropriate `store:false`, no indiscriminate raw logging and separate layered eval/holdout.
 
-## Architecture conclusions supported by evidence
+## 14. Product Feature Matrix coverage findings
 
-The evidence does **not** require a new Product architecture. It reinforces the existing durable boundaries:
+Canonical `PRODUCT-CONTENT.md` marks as V1 CORE / CORE target:
+- exact Source search;
+- contextual Reply/Reply All;
+- bounded contextual AI draft;
+- explicit user Send;
+- send reconciliation;
+- source attachment evidence access;
+- Responsibility/attention/Temporal/Integrity surfaces.
+
+Consequence:
+- exact Source search is mandatory G21 scope, not optional;
+- contextual AI draft must have an owning AI contract/node distinct from manual composer and distinct from Responsibility interpretation;
+- manual composer remains mandatory AI-unavailable fallback.
+
+## 15. Architecture conclusions
+
+No new Product architecture is required. Current evidence strengthens these boundaries:
 
 ```text
-External notification != source truth
-Provider fact != Responsibility truth
-AI output != accepted state
-Task-run idempotency != domain idempotency
-Send request != provider acceptance != Responsibility closure
+notification != source truth
+provider fact != Responsibility truth
+AI output != accepted state or Send authority
+task-run idempotency != domain idempotency
+Send request != provider acceptance != operational closure
+frozen interface availability != live adapter completion
 ```
 
-The material correction is execution/dependency freshness: current Product/UI scope and current vendor behavior must be propagated into a dependency DAG before production-feature tasks multiply.
+The key Issue #58 correction is dependency ownership: parallelize against frozen interfaces, serialize only actual shared authority/schema/external-effect collision zones.

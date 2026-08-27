@@ -561,6 +561,23 @@ Re-evaluate whether the intended communication effect occurred; return user atte
 - preview failure alone uses local/open-external fallback;
 - return attention/Review only when material action/judgment actually exists.
 
+### 6.9.1 Attachment evidence access vs rich native preview
+
+The v1 **CORE Product obligation is authorized access to attachment evidence**, not universal native rendering.
+
+CORE means, where provider/security/runtime capability permits:
+
+- surface that an attachment/provider-file observation exists and preserve its provenance/context;
+- let the user reach the evidence through a supported safe path such as open, download, or provider-native fallback;
+- preserve the surrounding Conversation/Moment so checking evidence does not destroy context;
+- represent unavailable/blocked state truthfully.
+
+A **rich native in-app preview** for PDFs/images/documents is a **V1 STRONG CANDIDATE** because it can reduce context switching, but file-type-complete native rendering is not required to prove the Minimum Complete Delegation Loop.
+
+Higher-level Product/Design shorthand such as `relevant attachment preview/open` is interpreted under this detailed scope: the CORE requirement is **attachment evidence access**; native preview is one possible realization, not a universal guarantee.
+
+Security/provider restrictions are authoritative capability boundaries. Lunowa must not bypass a provider/platform block on unsafe or unsupported attachment content merely to satisfy a preview/open feature. If inability to access attachment evidence materially breaks an already-delegated monitoring promise, apply the ordinary affected-scope integrity/recovery contract rather than pretending the evidence was inspected.
+
 ## 6.10 Conflicting / revised dates, amounts, terms
 
 Use semantic chronology, provenance, field authority, and explicit supersession/correction. Ingestion order or newest model run does not decide truth.
@@ -869,7 +886,8 @@ Status meanings:
 | send reconciliation / ambiguity handling | V1 CORE | send click != provider outcome |
 | exact Source search | V1 CORE | deterministic retrieval/trust |
 | operational retrieval sufficient for validated cases | V1 CORE target | state restoration, not generic chat |
-| basic attachment open/preview fallback | V1 STRONG CANDIDATE | common evidence path |
+| authorized attachment evidence access (open/download/provider fallback) | V1 CORE | source/provenance trust path; honor provider/security restrictions |
+| rich native in-app attachment preview | V1 STRONG CANDIDATE | context-switch reduction; universal rendering not core-loop requirement |
 | basic reply attachment add | V1 STRONG CANDIDATE | required by some active loops |
 | natural-language operational/source search | V1 STRONG CANDIDATE | frontier feature; value/cost must be validated |
 | basic person context | V1 STRONG CANDIDATE | reconstruction aid, not CRM |
@@ -934,7 +952,8 @@ These detailed invariants apply when this file is canonical, without replacing t
 21. True reversibility is distinct from decorative Undo.
 22. v1 does not silently queue offline consequential external effects without a separately accepted delayed-action contract.
 23. Cross-thread identity remains conservative-split/related-context until canonical semantics decide otherwise.
-24. Product Content COMPLETE is specification closure, not empirical/legal/technical validation or implementation permission.
+24. Authorized attachment evidence access is core; universal/rich native preview is not. Provider/security blocks are never bypassed for parity.
+25. Product Content COMPLETE is specification closure, not empirical/legal/technical validation or implementation permission.
 
 ---
 
@@ -954,6 +973,7 @@ These are evidence targets, not documentation defects:
 - mature companion/hybrid/replacement-client form;
 - generic native Compose necessity;
 - operational retrieval/attachment understanding depth;
+- exact native attachment-preview file types/platform behavior/security sandboxing;
 - second-provider/multi-account incremental value;
 - pricing/WTP/packaging;
 - acquisition/distribution;

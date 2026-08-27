@@ -6,11 +6,13 @@
 
 This plan sequences implementation to reduce Product and technical risk without activating production infrastructure or feature breadth before the core user problem, interaction, and domain model are sufficiently supported.
 
-It is a living execution artifact. Durable Product truth belongs in `PRODUCT.md`; Responsibility semantics belong in `responsibility/`; detailed design/architecture/contracts remain in their owning sources.
+It is a living execution artifact. Durable Product truth belongs in `PRODUCT.md` and `PRODUCT-CONTENT.md`; Product-level regression consequences live in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics belong in `responsibility/`; detailed design/architecture/contracts remain in their owning sources.
 
 Related sources:
 
 - `PRODUCT.md`;
+- `PRODUCT-CONTENT.md`;
+- `GOLDEN-SCENARIO-BANK.md`;
 - `research/communication-monitoring-evidence-2026-08.md`;
 - `../design/DESIGN.md`;
 - `../design/INTERACTIONS.md`;
@@ -24,6 +26,8 @@ Related sources:
 - `ARCHITECTURE.md`;
 - `DATA-MODEL.md`;
 - `CONTRACTS.md`.
+
+Current Product scope authorities constrain this plan. A phase may sequence a capability only after that capability is accepted for the relevant Product/task scope; a broader capability example here is never permission to override `PRODUCT.md`, `PRODUCT-CONTENT.md`, or the live Issue contract.
 
 ---
 
@@ -43,11 +47,11 @@ Bootstrap
   -> only then broaden the credible-client shell as Product evidence requires
   -> Responsibility persistence foundation when its Product/runtime use is justified
   -> One real provider read path
-  -> Real compose/send path when client ownership is justified
+  -> Real contextual reply/send path when client ownership is justified
   -> Deterministic Responsibility reduction + Temporal Contract
   -> AI interpretation behind validated domain contracts/evals
   -> Search/context quality
-  -> Second provider
+  -> Second provider only when demand/evidence promotes it
   -> Beta hardening
 ```
 
@@ -144,7 +148,7 @@ parallel obligation-leg behavior where material
 follow-up as a MY_TURN reason/action
 ```
 
-Scenario evidence and expected outcomes must be deterministic enough for a fair baseline-vs-Lunowa comparison. Do not let the implementation agent invent the experimental oracle.
+Scenario evidence and expected outcomes must be deterministic enough for a fair baseline-vs-Lunowa comparison. Do not let the implementation agent invent the experimental oracle. Product-level consequences should also be checked against `GOLDEN-SCENARIO-BANK.md` where the scenario falls within that bank; Responsibility semantic truth remains owned by Responsibility oracles.
 
 #### Minimum interaction surface
 
@@ -397,22 +401,25 @@ A real Gmail mailbox can be read through normalized evidence/domain boundaries w
 
 ---
 
-## 6. Phase 4 — Real compose/reply/send
+## 6. Phase 4 — Real contextual reply/send
 
 ### Goal
 
-Provide real compose/send only when the chosen Product form requires Lunowa to own that client behavior.
+Provide the real communication path needed to complete an active Attention loop only when the chosen Product form and accepted task scope require Lunowa to own that client behavior.
 
 ### Required behavior when this phase is authorized
 
-- compose/reply/reply-all/forward;
-- explicit sender account;
-- recipients/subject/body/attachments;
-- draft autosave;
-- durable SendOperation as needed;
+- Moment/Conversation-bound Reply and Reply All for the accepted flow;
+- explicit effective sender account;
+- recipients/content and supported attachments visible/inspectable before Send;
+- draft preservation/autosave sufficient for the accepted flow;
+- durable SendOperation where required by the accepted contracts;
+- explicit user Send under current v1 authority posture;
 - provider send result + reconciliation;
 - send failure/ambiguity preserves draft/context;
 - retries/double-submit do not duplicate.
+
+Arbitrary fresh Compose and Forward parity are **not Phase-4 exit gates** unless a later accepted Product/task contract explicitly promotes them. Provider fallback remains valid for non-core communication jobs.
 
 ### Canonical send invariant
 
@@ -422,19 +429,27 @@ send attempt != reconciled provider acceptance
 
 Even reconciled acceptance closes a Responsibility only when sending is sufficient for that operational closure condition.
 
-### Undo / Send Later
+### Undo Send / Send Later / delayed execution
 
-Undo Send uses real pre-provider delay semantics. Send Later reuses durable scheduling principles rather than creating a second unreliable scheduler.
+Undo Send and Send Later parity are **not current Phase-4 requirements**.
+
+If a future accepted Product/task contract adds delayed consequential send behavior:
+
+- the delay must be a real pre-provider/durable execution contract, not decorative UI;
+- authority over later execution must be explicit and revocable as required;
+- idempotency/cancel/reconcile/recovery semantics must be defined;
+- do not infer permission merely because Temporal Contract infrastructure exists;
+- current v1 offline behavior must not silently queue a consequential effect for later execution.
 
 ### Exit criteria
 
-If a client/hybrid form is selected:
+If a client/hybrid communication path is selected for the accepted scope:
 
 ```text
-read -> compose/reply -> attach -> send -> reconcile result
+read -> contextual reply/reply-all -> explicit send -> reconcile result
 ```
 
-works without AI.
+works without AI. Attachment add is an exit criterion only when the accepted Product/test scenario requires it; source attachment access remains governed by Product scope.
 
 ---
 
@@ -645,7 +660,9 @@ Do not let these delay core validation:
 - team/shared mailbox collaboration without demand;
 - custom search infrastructure before need;
 - full provider parity;
-- full-client surface completeness before client form is justified.
+- full-client surface completeness before client form is justified;
+- arbitrary fresh Compose / Forward parity;
+- Undo Send / Send Later parity unless separately accepted.
 
 ---
 
@@ -664,6 +681,8 @@ Each non-trivial slice should specify:
 - acceptance criteria;
 - verification;
 - stop/escalation conditions.
+
+Product-behavior tasks must include the relevant current `PRODUCT.md` / `PRODUCT-CONTENT.md` contract and Product Golden Scenario(s) without using Product scenarios to redefine Responsibility semantics.
 
 Responsibility-domain tasks must explicitly point to:
 

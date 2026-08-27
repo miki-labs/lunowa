@@ -611,7 +611,8 @@ Otherwise prefer provider fallback or defer.
 | --- | --- |
 | browse Source Conversation | **CORE NATIVE target** |
 | exact/search retrieval | **CORE NATIVE target** |
-| relevant attachment preview/open | **CORE NATIVE target** |
+| authorized attachment evidence access via safe open/download/provider fallback | **CORE Product target** |
+| rich native in-app attachment preview | **STRONG v1 candidate** |
 | Moment-bound Reply | **CORE NATIVE target** |
 | Reply All with explicit recipients | **CORE NATIVE target** |
 | bounded contextual draft | **CORE NATIVE target** |
@@ -636,6 +637,8 @@ Otherwise prefer provider fallback or defer.
 | calendar create/modify | **DEFER; approval boundary** |
 | generic automation builder | **OUT** |
 | autonomous email Send by default | **NO** |
+
+Attachment access must preserve provider/platform security restrictions; `CORE` does not authorize Lunowa to bypass unsafe/unsupported attachment blocks.
 
 ## 11.4 Mailbox state is not Responsibility state
 
@@ -800,6 +803,7 @@ Any safety-driven narrowing of previously granted scope should be disclosed. Rep
 - contextual reply/draft/send + provider reconciliation;
 - exact source search;
 - Responsibility-aware operational retrieval sufficient for validated cases;
+- authorized attachment evidence access sufficient to inspect material source evidence while preserving provider/security restrictions;
 - monitoring-integrity UX;
 - safe fallback when intelligence is degraded.
 
@@ -808,7 +812,7 @@ The detailed final `V1 CORE / V1 STRONG CANDIDATE / POST-V1 / DEFERRED / OUT` ma
 ## 14.2 Strong v1 candidates
 
 - natural-language operational/source search;
-- basic attachment preview and reply attachment upload;
+- rich/basic native attachment preview and reply attachment upload;
 - basic person context with current open loops + recent material history;
 - optional awareness/digest behavior;
 - simple quiet-hours/delivery preferences.
@@ -977,6 +981,7 @@ Do not silently convert these into facts:
 - whether/when native generic compose becomes Product-critical;
 - natural-language Operational Retrieval v1 criticality;
 - attachment-content understanding depth;
+- exact native attachment-preview formats/platform behavior/security sandboxing;
 - calendar integration timing;
 - second-provider/multi-account incremental value;
 - pricing/WTP/packaging;
@@ -1019,6 +1024,7 @@ Provider/API/platform/legal facts are time-sensitive and must be rechecked when 
 25. **Full-client replacement is earned by usage, not assumed by roadmap.**
 26. **Differentiation is a comparative behavioral outcome, not a feature/ontology claim.**
 27. **Detailed control/failure/lifecycle/Settings/Managed/Review/zero behavior and the final feature matrix are owned by `PRODUCT-CONTENT.md`; Product Golden scenarios remain subordinate to Responsibility semantic authority.**
+28. **Authorized attachment evidence access is core; universal/rich native attachment preview is not. Provider/platform security blocks are never bypassed for feature parity.**
 
 ---
 

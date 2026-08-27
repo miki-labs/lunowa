@@ -377,6 +377,7 @@ Prove one real mailbox can authorize, sync, normalize, persist evidence, and ren
 - bounded initial sync + incremental/reconciliation path;
 - Conversation/Message normalization;
 - attachment metadata/provider observations;
+- **authorized attachment evidence access sufficient for the accepted Product scope through a supported safe open/download/provider-native fallback path**;
 - account-specific sync state;
 - real Conversations render in current UI;
 - manual refresh/reconnect;
@@ -386,7 +387,8 @@ Prove one real mailbox can authorize, sync, normalize, persist evidence, and ren
 
 - credentials server-side;
 - authorization every read;
-- HTML/message content untrusted;
+- HTML/message/attachment content untrusted;
+- provider/platform unsafe or unsupported attachment restrictions are preserved; feature parity never bypasses those protections;
 - duplicate changes idempotent;
 - invalid cursor/reconnect/rate-limit/transient failures handled;
 - semantic chronology preserved when observed order differs.
@@ -395,9 +397,18 @@ Prove one real mailbox can authorize, sync, normalize, persist evidence, and ren
 
 Do not automatically activate every old apparent open loop as My Turn. Historical Responsibility activation policy remains conservative/open until validated with real inbox distributions.
 
+### Attachment scope gate
+
+Phase 3 must prove the **CORE source-evidence-access job**, not universal native rendering.
+
+- a user can reach authorized attachment evidence through the accepted safe path while retaining the relevant source/context;
+- blocked/unsafe/unsupported provider content is represented truthfully rather than bypassed;
+- **rich native in-app attachment preview is not a Phase-3 exit gate**;
+- exact native preview formats, sandboxing, and platform behavior remain separate Product/security/usability work.
+
 ### Exit criteria
 
-A real Gmail mailbox can be read through normalized evidence/domain boundaries without AI.
+A real Gmail mailbox can be read through normalized evidence/domain boundaries without AI, and authorized source attachment evidence can be reached through the accepted safe access path without requiring rich native preview or weakening provider security restrictions.
 
 ---
 

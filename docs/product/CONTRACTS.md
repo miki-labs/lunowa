@@ -2,9 +2,9 @@
 
 ## Status
 
-**Accepted logical module contracts, reconciled 2026-08-28 for the current one-provider Minimum Complete Delegation Loop.**
+**Accepted logical module contracts, reconciled 2026-08-28 for the one-provider Minimum Complete Delegation Loop and Issue #58 dependency ownership.**
 
-These contracts isolate provider/model/job/UI implementation from Product/domain authority. Concrete API/SDK syntax remains implementation-open. Current activation order is `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
+These contracts isolate provider/model/job/UI implementation from Product/domain authority. Concrete API/SDK syntax remains implementation-open. Current activation/dependency authority is `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
 Responsibility semantics remain owned by `responsibility/`.
 
@@ -16,27 +16,22 @@ Responsibility semantics remain owned by `responsibility/`.
 4. Background work reloads/re-authorizes/revalidates current state before effects.
 5. External effects define durable idempotency/reconciliation at the application/domain boundary.
 6. Stale evidence/model/job results cannot win because they finish last.
-7. Search/read models resolve back to current authorized records.
+7. Search/read models resolve to current authorized sources.
 8. Current v1 activates only contracts required by the one-provider complete loop.
 
-## 2. Provider capabilities
+## 2. Application session contract
 
-Conceptual capability description:
+Application identity/session is independent from mailbox authorization.
 
 ```text
-ProviderCapabilities {
-  incremental_sync
-  thread_identity
-  attachment_fetch
-  message_send
-  mark_read? archive? trash? spam?
-  draft_sync?
-  schedule_send_native?
-  contact_lookup?
+AppSession {
+  user_id
+  session_id
+  expires_at
 }
 ```
 
-Capability presence does not activate a Product feature. Current v1 requires Gmail source read, attachment evidence access and contextual immediate send. Forward/Send Later/etc remain inactive unless separately accepted.
+Server-side BFF/route handling revalidates session/authorization for protected reads/writes. App sign-out does not disconnect a mailbox or resolve/stop Responsibilities.
 
 ## 3. Connected-account contract
 
@@ -57,15 +52,43 @@ initial_sync_hint?
 
 Requirements:
 - verify provider identity from provider evidence;
-- credentials server-side;
-- normalize account identity;
-- distinguish app session from mailbox authorization;
+- keep mailbox credentials server-side and outside normal browser APIs;
+- mailbox credential authority is Lunowa-owned, not auth-library social-account authority;
 - distinguish reconnect-required from transient failure;
-- do not use auth-library social-account rows as mailbox-sync authority.
+- capability absence only disables corresponding capability.
 
-## 4. Gmail synchronization contract
+### Credential persistence
 
-### 4.1 Initial / incremental fetch
+Before a real Google token is durably stored:
+- secure/encrypt it at rest/application boundary appropriate to the server architecture;
+- do not store encryption key/secret with ordinary application data/repository;
+- never log token values;
+- lookup/use requires current authenticated user + ConnectedAccount ownership;
+- revoke/delete when intentionally removed where supported;
+- handle invalidation/revocation as an explicit integrity/reconnect event.
+
+A non-persistent protocol spike may avoid durable token storage. Plaintext durable storage is never an accepted transitional contract.
+
+## 4. Provider capability contract
+
+```text
+ProviderCapabilities {
+  incremental_sync
+  thread_identity
+  attachment_fetch
+  message_send
+  mark_read? archive? trash? spam?
+  draft_sync?
+  schedule_send_native?
+  contact_lookup?
+}
+```
+
+Capability presence does not activate a Product feature. Current v1 requires Source read, attachment evidence access and contextual immediate Send. Forward/Send Later/etc remain inactive unless separately accepted.
+
+## 5. Gmail synchronization contract
+
+### 5.1 Sync
 
 ```text
 syncAccount(connected_account_id, reason) -> SyncResult
@@ -93,47 +116,51 @@ ProviderChangeBatch {
 }
 ```
 
-### 4.2 Required sequence
+Required sequence:
 
 ```text
-authorize ConnectedAccount
+authorize account
 -> fetch provider changes
 -> normalize untrusted payload
--> upsert Message/Conversation/Attachment metadata idempotently
--> commit local evidence/evidence revision
--> enqueue downstream reconsideration as needed
--> advance provider cursor only after required durability
+-> idempotent Source upsert
+-> commit source/evidence revision
+-> enqueue downstream reconsideration
+-> advance provider cursor after required local durability
 ```
 
 At minimum `(connected_account_id, provider_message_id)` is unique.
 
-### 4.3 Push ingress
+### 5.2 Source persistence prerequisites
 
-Gmail `users.watch` / PubSub notification is a **signal to reconcile**, never domain truth.
+Production Source persistence must satisfy the current proven upstream L2 prerequisites, including as applicable:
+- `connected_accounts UNIQUE (id, user_id)`;
+- `conversations UNIQUE (id, connected_account_id)`;
+- `messages UNIQUE (id, connected_account_id)`;
+- monotonic `Conversation.semantic_evidence_revision` with non-negative invariant.
 
-Ingress requirements:
-- authenticate production PubSub push as applicable;
-- validate expected audience/identity claims;
-- acknowledge valid push quickly;
+G20 is the single production writer for ConnectedAccount / ProviderSyncState / Conversation / Message / Attachment metadata schema. Responsibility-owned tables remain gated separately.
+
+### 5.3 Push ingress
+
+Gmail `users.watch` / PubSub notification is a reconciliation signal, not mailbox/domain truth.
+
+Production ingress:
+- authenticate push and validate expected audience/identity claims as applicable;
+- acknowledge valid request quickly;
 - defer non-trivial work to durable execution;
-- duplicate/delayed/dropped notifications converge through reconciliation;
-- one-event/sec/user provider limit is tolerated;
+- tolerate duplicate/delayed/dropped notifications;
 - periodic reconciliation works even with no push;
-- renew watch before expiration (at least every 7 days; daily current provider recommendation).
+- renew watch before expiration under current provider requirements.
 
-### 4.4 Stale history recovery
+### 5.4 Stale history recovery
 
-If current `history.list` start history is stale/invalid and provider returns 404, enter explicit full-sync reconciliation. Never convert invalid cursor into empty/current truth.
+Invalid/stale `startHistoryId` / provider 404 enters explicit full-sync recovery. It never becomes empty/current truth.
 
-### 4.5 Semantic chronology
+### 5.5 Semantic chronology / history activation
 
-Worker/ingestion order is not semantic chronology. Preserve source timestamps/relation evidence; old late evidence may not overwrite a later authoritative correction solely because processed later.
+Worker order is not semantic chronology. Preserve source semantic time/relation evidence. Initial historical source ingestion never automatically activates every unresolved-looking thread as live work.
 
-### 4.6 Historical activation
-
-Initial historical source ingestion never automatically turns every apparently unfinished thread into a live Responsibility.
-
-## 5. Normalized source contract
+## 6. Normalized Source contract
 
 ```text
 NormalizedProviderMessage {
@@ -153,26 +180,38 @@ NormalizedProviderMessage {
 }
 ```
 
-Provider HTML/body/attachment bytes are untrusted.
+Provider HTML/body/attachment bytes are untrusted. Source remains readable without Responsibility/Moment.
 
-Source remains readable without a Responsibility/Moment.
+This normalized contract is frozen enough for deterministic Responsibility fixture work. G31 consumes this interface and therefore does not require live G20/G21 completion.
 
-## 6. Attachment evidence access
+## 7. Attachment evidence access
 
-Current CORE contract:
-- preserve provider attachment existence/metadata/provenance;
+Current CORE:
+- preserve attachment existence/metadata/provenance;
 - authorize every access;
-- fetch/stream/open/download/provider-fallback safely;
+- safe fetch/stream/open/download/provider fallback;
 - distinguish provider/security restriction from local preview failure;
-- preserve return to Source/Moment context.
+- preserve Source/Moment context.
 
-Native rich preview and reply attachment-add remain conditional.
+Rich native preview and reply attachment-add remain conditional. Access/preview is not completion evidence.
 
-Attachment access/preview is not completion evidence.
+## 8. Exact Source search
 
-## 7. AI interpretation contract
+```text
+searchSource(user_id, request) -> SearchResultPage
+```
 
-### 7.1 Input
+Requirements:
+- V1 CORE exact/deterministic retrieval over authorized Source;
+- explicit current account/scope authorization;
+- no-match is truthful and preserves enough query/scope context to revise;
+- stale derived index may reduce recall but never leak inaccessible data;
+- semantic/NL Q&A is advertised only when separately active;
+- similarity never authorizes Responsibility identity merge.
+
+## 9. AI Responsibility-interpretation contract
+
+### Input
 
 Only current authorized normalized context:
 
@@ -190,11 +229,11 @@ InterpretationInput {
 }
 ```
 
-Never include provider credentials/unrelated accounts/unrestricted DB access.
+No provider credentials, unrelated accounts or unrestricted DB access.
 
-### 7.2 Output
+### Output
 
-AI returns structured **candidate interpretation**, for example:
+Structured **candidate interpretation**, e.g.:
 
 ```text
 InterpretationOutput {
@@ -210,28 +249,68 @@ InterpretationOutput {
 
 Material candidate values carry source IDs/locators where practical.
 
-AI output is not authoritative for auth, account ownership, send permission, provider facts, Responsibility admission/identity/effects, tracking/defer, Temporal effects, or high-impact external authorization.
+AI is not authoritative for auth, provider facts, admission, identity/effects, tracking/defer, Temporal effects, send permission or external actions.
 
-### 7.3 Validation
+### Validation
 
-Before candidate use validate:
-- runtime schema;
-- current user/account authorization;
-- referenced message/participant existence;
-- provider-observed facts where deterministic;
-- source locators/material values where practical;
-- cross-account boundaries;
-- evidence revision freshness.
+Validate runtime schema, current authorization, source IDs/participants, deterministic provider facts, material values/source locators where practical, cross-account boundaries and evidence-revision freshness.
 
-Matching basis revision is necessary but not sufficient for acceptance.
+Matching basis revision is necessary, not sufficient.
 
-### 7.4 Data-control activation
+## 10. Contextual AI draft contract
 
-Production email interpretation must record current provider retention/data-control posture. `store: false` may be used where appropriate but must not be represented as equivalent to organization-level Zero Data Retention.
+V1 CORE-target assistance is separate from Responsibility interpretation.
 
-## 8. Responsibility reduction contract
+```text
+requestContextualDraft(DraftAssistInput) -> DraftCandidate
+```
 
-Conceptual boundary:
+Input:
+
+```text
+DraftAssistInput {
+  schema_version
+  user_id
+  connected_account_id
+  conversation_id
+  in_reply_to_message_id?
+  authorized_source_context
+  current_responsibility_context?
+  intended_reply_goal?
+}
+```
+
+Output:
+
+```text
+DraftCandidate {
+  schema_version
+  body
+  optional_subject_suggestion?
+  basis_source_ids[]
+  warnings[]?
+}
+```
+
+Authority rules:
+- candidate body is editable text, not a send command;
+- effective sender/recipient authority comes from trusted application/provider context, not model output;
+- model cannot add hidden recipients or execute tools/provider actions;
+- user explicitly reviews/commits Send;
+- manual composer remains baseline if assistance fails;
+- drafting and interpretation use separate schemas/evals even if they share transport/runtime.
+
+## 11. AI data-control contract
+
+Before production email AI use:
+- record current project/org retention/data-control mode;
+- minimize authorized context;
+- use `store:false` where appropriate;
+- do not describe `store:false` as equivalent to Zero Data Retention;
+- avoid indiscriminate raw mail/prompt/output logging;
+- if ZDR is required, verify actual eligibility/settings/endpoint-feature compatibility.
+
+## 12. Responsibility reduction contract
 
 ```text
 reduceResponsibilityEvidence(
@@ -239,6 +318,14 @@ reduceResponsibilityEvidence(
   evidence_event,
   policy_context
 ) -> ResponsibilityDecision
+```
+
+Admission:
+
+```text
+TRACK
+DO_NOT_TRACK
+NEEDS_REVIEW
 ```
 
 Effects:
@@ -253,27 +340,17 @@ INVALIDATE
 NO_OP
 ```
 
-Admission:
+One evidence event may produce multiple effects. Reducer preserves canonical orthogonal dimensions, field-scoped authority and provenance. The obsolete single lifecycle enum never returns as truth.
 
-```text
-TRACK
-DO_NOT_TRACK
-NEEDS_REVIEW
-```
+Historical evidence-relative OPEN does not imply live tracking.
 
-One evidence event may emit multiple effects.
-
-Reducer preserves canonical orthogonal dimensions and field-scoped authority/provenance. It never restores the obsolete one-enum lifecycle.
-
-Historical evidence-relative OPEN does not imply current live tracking.
-
-## 9. Conversation/product projection
+## 13. Product projection contract
 
 ```text
 projectConversationAttention(responsibilities[]) -> ConversationAttention
 ```
 
-Projection may expose:
+Possible UI projection:
 
 ```text
 MY_TURN
@@ -284,107 +361,79 @@ REVIEW
 NONE
 ```
 
-Rules:
-- only appropriate live Responsibilities participate in current-work projection;
-- unresolved work cannot disappear because another Responsibility resolved;
-- current actionable USER work may outrank waiting work;
-- newest message is not status authority;
-- projection is deterministic/rebuildable.
+Only appropriate live Responsibilities participate in current-work projection. Newest message is not status authority. Projection is deterministic/rebuildable.
 
-## 10. Temporal Contract
+## 14. Temporal Contract
 
 Persisted contract/trigger is durable intent; scheduler/job run is execution.
 
-### Create/update
-
 ```text
 upsertTemporalContract(responsibility_id, spec, actor)
-```
-
-Current trigger types may include TIME / REPLY_RECEIVED / DEADLINE where accepted.
-
-### Fire
-
-```text
 processTemporalTrigger(trigger_id)
 ```
 
-Required:
+On fire:
 1. load current trigger/contract/Responsibility/evidence;
 2. verify active/current version;
-3. claim via domain/DB idempotency;
+3. claim through domain/DB idempotency;
 4. re-evaluate current evidence;
-5. persist resulting attention/domain/audit changes;
-6. mark/cancel/supersede trigger state;
-7. reconcile stale sibling triggers as required.
+5. persist domain/attention/audit effects;
+6. fire/cancel/supersede trigger state;
+7. reconcile stale sibling triggers.
 
-A trigger does not itself mean notification or MY_TURN.
+Trigger fire != notification/MY_TURN automatically.
 
-### Trigger.dev execution contract
+### Trigger.dev adapter
 
-If Trigger.dev is used:
-- explicit key composition/scope/TTL where keys are used;
-- vendor key is not sole domain guarantee;
-- failed-run key clearing and finite TTL cannot allow duplicate semantic/external effects;
+If used:
+- key composition/scope/TTL explicit;
+- vendor key is not the sole guarantee;
+- finite TTL/failed-run clearing cannot permit duplicate semantic/external effects;
 - every run rechecks DB/domain currentness.
 
-## 11. Attention contract
+## 15. Product read-model contract
 
-User-facing surfacing strength remains separate from operational state:
-
-```text
-NONE
-QUIET_STATE_UPDATE
-LIST_VISIBILITY
-ATTENTION_LIST
-NOTIFICATION
-```
-
-Intentional defer/LATER needs a return condition. Waiting on another actor/event is ordinarily WAITING, not LATER.
-
-## 12. Product read-model contract
-
-Implementation read models must distinguish at least:
+Read models distinguish:
 - app session/auth;
-- ConnectedAccount capability/auth;
+- mailbox connection/capability;
 - sync/integrity/data-through;
 - accepted Responsibility projection;
 - pending/failed/ambiguous mutation/effect;
 - Source/provenance.
 
-True zero requires canonical Product zero conditions; partial/degraded/untrusted coverage cannot be simplified to zero.
+Partial/degraded/untrusted coverage cannot become true zero. UI components/read models never create domain authority.
 
-UI components/read models do not create domain authority.
+## 16. Draft contract
 
-## 13. Draft contract
-
-Current v1 baseline is contextual reply.
+G50 owns current contextual Draft persistence.
 
 ```text
 saveDraft(draft_id?, expected_version?, payload) -> Draft
 ```
 
-Payload includes current sending account, reply context, recipients, subject/body and conditional attachments.
+Payload includes sending account, reply context, recipients, subject/body and conditional accepted attachments.
 
 Requirements:
 - authorize sender/account;
 - validate recipients/attachments;
 - version/conflict handling or equivalent;
 - idempotent autosave where used;
-- preserve draft across navigation/layout/auth-recovery where architecture permits;
-- explicit discard distinct from closing a pane.
+- preserve draft across relevant navigation/layout/re-auth recovery;
+- explicit discard distinct from pane close.
 
-## 14. Send contract — current activation
+## 17. Immediate SendOperation contract
 
-Current v1 request:
+G50 owns minimal request/pending schema; G51 owns provider dispatch/reconciliation transitions.
 
 ```text
 requestImmediateSend(draft_id) -> SendOperation
 ```
 
-`SendOperation` must represent request/pending/dispatch/provider-unknown/provider-accepted/failed/reconciled states sufficient for truth.
+`SendOperation` represents states sufficient to distinguish request/pending/dispatch/provider-unknown/provider-accepted/failed/reconciled truth.
 
-### Provider dispatch
+G50 establishes durable operation identity/idempotency and intended draft snapshot. No delayed-send scheduling schema is implied.
+
+### G51 provider dispatch
 
 ```text
 dispatchSendOperation(operation_id)
@@ -392,12 +441,12 @@ dispatchSendOperation(operation_id)
 
 Required:
 1. claim through application/domain idempotency;
-2. re-authorize current user/account capability;
-3. freeze/validate intended draft snapshot;
+2. re-authorize current account capability;
+3. validate intended draft snapshot;
 4. call provider adapter;
-5. record unambiguous or ambiguous provider result;
-6. reconcile provider sent evidence when required;
-7. feed accepted evidence into Responsibility reducer.
+5. record unambiguous/ambiguous result;
+6. reconcile sent evidence where required;
+7. feed sufficient provider/source evidence to Responsibility reducer.
 
 Invariant:
 
@@ -405,62 +454,23 @@ Invariant:
 Send request != provider acceptance != operational closure
 ```
 
-Timeout/unknown acceptance never permits blind duplicate retry.
+Timeout/unknown acceptance forbids blind duplicate retry.
 
-### Reserved/deferred send capabilities
+### Reserved capabilities
 
-These contract shapes may be designed later but are **not current activation authority**:
-- Forward parity;
-- Send Later / SCHEDULED;
-- generic Undo Send/recall window;
-- silent offline queued Send.
+Forward, Send Later/SCHEDULED, generic Undo/recall and silent offline queued Send are not current activation authority. Any future activation needs separate durable permission/temporal/idempotency contract.
 
-If later activated, each needs a separately accepted durable permission/temporal/idempotency contract.
+## 18. Settings/lifecycle mutations
 
-## 15. Gmail provider send adapter
+Reconnect, disconnect, Stop Tracking, Return Attention, defer and supported Settings distinguish request/pending/accepted/failure.
 
-Conceptual:
+Consequential disconnect shows exact account/monitoring consequence and affected-items path. App sign-out != mailbox disconnect. Reconnect after unintended auth loss restores reassurance only after missing-interval reconciliation. Re-add after intentional disconnect never silently reactivates old delegation.
 
-```text
-sendMessage(account, ProviderSendRequest) -> ProviderSendResult
-```
+## 19. Integrity contract
 
-Request includes operation ID, explicit sender/account context, reply mode, recipients/body and accepted attachments.
-
-Result carries provider acceptance state and provider IDs/request evidence where available.
-
-Provider acceptance is communication evidence only; it cannot independently resolve an unrelated operational outcome.
-
-## 16. Search
-
-```text
-search(user_id, SearchRequest) -> SearchResultPage
-```
-
-Rules:
-- current authorization predicates always applied;
-- exact/basic Source search may be current CORE;
-- semantic/NL search advertised only when capability active;
-- stale derived index may reduce recall, never leak data;
-- search similarity never authorizes Responsibility merge.
-
-## 17. Settings / lifecycle mutations
-
-For reconnect, disconnect, Stop Tracking, Return Attention, defer and supported settings:
-- request/pending/accepted/failure state distinct;
-- UI never displays requested value as accepted before authoritative commit;
-- consequential disconnect shows affected account/monitoring consequences;
-- app sign-out != mailbox disconnect;
-- reconnect after unintended auth loss preserves monitoring intent only after missing-interval reconciliation;
-- re-adding after intentional disconnect does not silently reactivate old delegation.
-
-## 18. Integrity contract
-
-Integrity is orthogonal to Responsibility state.
-
-A material degraded state should expose as applicable:
+Material degraded state exposes as applicable:
 - affected account/capability/scope;
-- what is no longer trustworthy;
+- what is not trustworthy;
 - last trustworthy observation/data-through;
 - affected live delegation scope/count;
 - what remains safe/usable;
@@ -468,27 +478,16 @@ A material degraded state should expose as applicable:
 
 Do not restore healthy Managed reassurance before reconciliation completes.
 
-## 19. Audit / observability contract
+## 20. Audit/observability
 
-Keep enough structured evidence to explain:
-- state/field changes;
-- resurfacing;
-- send/sync/trigger pending/reconciliation;
-- account/provider involvement;
-- evidence revision/model/config basis;
-- degraded intervals.
+Keep structured evidence sufficient to explain state changes, resurfacing, sync/send/trigger pending/reconciliation, account/provider identity, evidence revision/model/config basis and degraded intervals.
 
-Never use logs as canonical state and do not log secrets/full sensitive mail indiscriminately.
+Logs are not canonical state. Never indiscriminately log secrets/full sensitive mail/model payloads.
 
-## 20. Public-release contract boundary
+## 21. Public-release boundary
 
 Local/private complete-loop proof and public release are separate gates.
 
-Public release may additionally require:
-- Google OAuth verification/security assessment for actual scopes/deployment;
-- privacy/retention/deletion commitments;
-- production credential encryption/rotation/revocation;
-- operational recovery/backup/monitoring;
-- current AI data-control posture.
+Public release may additionally require Google OAuth verification/security assessment, exact privacy/retention/deletion commitments, production credential rotation/recovery operations, current AI data controls and operational hardening.
 
-These obligations are not Product-discovery evidence and do not convert implementation into PMF.
+Those release obligations do not establish Product-market evidence.

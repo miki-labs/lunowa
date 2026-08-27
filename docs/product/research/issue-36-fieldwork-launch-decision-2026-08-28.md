@@ -29,7 +29,9 @@ FIRST REAL PARTICIPANT COLLECTION = BLOCKED
 
 The study is blocked on a small number of **real-environment verification values**, not on Product theory or interview methodology.
 
-The first participant may be recruited only when every `MUST VERIFY` / `MUST RESOLVE` item in section 11 is closed with actual evidence.
+The first participant may be recruited only when every `MUST VERIFY` / `MUST RESOLVE` launch item in section 11 is closed with actual evidence.
+
+The independent recruitment path is a **pre-positive-disposition gate**, not a first-participant launch gate; selecting it prematurely would conflict with adaptive sampling because first-batch learning may materially change the screener.
 
 ---
 
@@ -105,6 +107,8 @@ Before a positive Issue #36 disposition, obtain materially independent recruitme
 - a specialist Japanese research recruiter/panel.
 
 Treat source differences as evidence/limitations rather than statistical representativeness.
+
+**Do not require a specific independent vendor before the first participant.** First-batch learning may materially change the cohort definition/screener; the independent path must be selected and used before positive disposition, not before adaptive discovery begins.
 
 ## 3.4 Paid panel candidates — DEFERRED UNTIL AFTER FIRST BATCH
 
@@ -282,9 +286,9 @@ FIELDWORK START = BLOCKED
 
 # 7. Retention/deletion decision
 
-## 7.1 R1 — DECIDED AS EVENT-BASED POLICY
+## 7.1 R1 — DECIDED AS EVENT-BASED + PERIODIC-MINIMIZATION POLICY
 
-Retain detailed R1 working evidence only through:
+Target end-of-study retention:
 
 ```text
 Issue #36 final disposition
@@ -292,7 +296,18 @@ Issue #36 final disposition
 + 30 calendar days for correction/reproducibility cleanup
 ```
 
-Then:
+But an open Issue is **not** permission for indefinite row-level retention.
+
+While Issue #36 remains open, every **90 calendar days from the first participant** perform and document an R1 necessity review:
+
+- is each retained field/case still necessary for the active Issue #36 decision?
+- can identifying/contextual granularity be reduced?
+- can completed administrative or invalid-case detail be deleted?
+- is continued row-level retention justified by an active analysis/review need?
+
+Delete detail that is no longer necessary even if Issue #36 is still open. Continued row-level retention beyond each review point requires an explicit documented reason.
+
+After final disposition/review + 30 days:
 
 - delete unnecessary row-level detail;
 - retain only the minimum research evidence needed to support durable aggregate conclusions;
@@ -308,13 +323,19 @@ compensation complete
 + 30 calendar days for payment/admin correction
 ```
 
-except records that must be retained for legitimate accounting/tax/payment administration; those records must remain outside the analytical research dataset and follow the applicable administrative retention basis.
+For wave 1, any optional research follow-up window must be **time-bounded to no more than 90 days from the interview** unless the participant later provides a separate explicit extension/re-contact permission.
+
+Except records that must be retained for legitimate accounting/tax/payment administration; those records must remain outside the analytical research dataset and follow the applicable administrative retention basis.
 
 ## 7.3 R3
 
 Not applicable in wave 1 because R3 is not collected.
 
-## 7.4 Incident preservation exception
+## 7.4 Participant deletion/minimization request
+
+If a participant asks for deletion or reduced use before the scheduled retention endpoint, assess and action the request promptly to the extent applicable/feasible, while preserving only information that must legitimately remain for payment/accounting, dispute, security, or other documented obligations. Do not use the scheduled maximum as a reason to retain unnecessary research detail.
+
+## 7.5 Incident preservation exception
 
 If a security/privacy/payment dispute requires temporary evidence preservation, document the reason, scope, access, and revised deletion trigger. Do not silently convert this into indefinite retention.
 
@@ -460,10 +481,11 @@ P-FROST is a method reference, not a validated fraud detector.
 - [x] direct-network first recruitment path;
 - [x] Google Meet preferred interview path;
 - [x] ¥10,000 standard incentive planning default;
-- [x] event-based R1/R2 deletion policy;
+- [x] event-based + 90-day periodic-minimization R1 policy;
+- [x] time-bounded R2 follow-up policy;
 - [x] independent recruitment-path requirement before positive Issue #36 disposition.
 
-## MUST VERIFY — real account/device/service evidence required
+## MUST VERIFY — real account/device/service evidence required before first participant
 
 - [ ] Google Meet organizer account has recording OFF by default;
 - [ ] transcription OFF by default;
@@ -475,15 +497,23 @@ P-FROST is a method reference, not a validated fraud detector.
 - [ ] deletion can be executed under the chosen storage path;
 - [ ] actual cloud/vendor processor terms are reviewed where used.
 
-## MUST RESOLVE MANUALLY — cannot be inferred safely
+## MUST RESOLVE MANUALLY — before first participant
 
 - [ ] research/privacy contact channel;
 - [ ] exact R1 storage location/provider;
 - [ ] exact R2 storage location/provider;
 - [ ] actual authorized reviewer/access list;
 - [ ] exact direct-recruit payment method;
-- [ ] any accounting/tax retention path for payment records;
-- [ ] first independent recruitment network/panel planned for cross-check after initial learning.
+- [ ] any accounting/tax retention path for payment records.
+
+## POST-WAVE-1 / PRE-POSITIVE-DISPOSITION GATE
+
+These do **not** block the first direct-recruit participant. They block `SUPPORTED FOR NEXT TEST` until satisfied:
+
+- [ ] choose a materially independent recruitment network/panel based on the refined cohort/screener;
+- [ ] collect valid evidence through that independent path;
+- [ ] compare whether the key monitoring-burden explanation survives recruitment-source differences;
+- [ ] document source-specific limitations/fraud/selection effects.
 
 ## NOT USED — wave 1
 
@@ -502,12 +532,14 @@ P-FROST is a method reference, not a validated fraud detector.
 `FIELDWORK START = GO` only when:
 
 ```text
-all MUST VERIFY items = evidenced PASS
-AND all MUST RESOLVE MANUALLY items = concrete values
+all pre-first-participant MUST VERIFY items = evidenced PASS
+AND all pre-first-participant MUST RESOLVE MANUALLY items = concrete values
 AND participant notice reflects those real values
 AND compensation promise matches the real delivery path
 AND no new material privacy/method blocker is open
 ```
+
+The post-wave-1 independent recruitment gate is intentionally excluded from this launch oracle and instead constrains any positive final Issue #36 disposition.
 
 Otherwise:
 
@@ -554,5 +586,6 @@ Next operational task is only to close the remaining launch blockers with actual
 3. schedule 4–6 valid human-moderated interviews adaptively;
 4. analyze after each session and formally after the first batch;
 5. recruit the highest-information contradiction next;
-6. use a materially independent recruitment path before any `SUPPORTED FOR NEXT TEST` disposition;
-7. keep Issue #36 open until actual evidence supports one final disposition.
+6. only then select the most informative materially independent recruitment path using the refined cohort/screener;
+7. do not return `SUPPORTED FOR NEXT TEST` until valid independent-path evidence is included;
+8. keep Issue #36 open until actual evidence supports one final disposition.

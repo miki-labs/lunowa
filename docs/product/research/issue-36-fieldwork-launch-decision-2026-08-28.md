@@ -4,7 +4,7 @@
 
 **NONCANONICAL RESEARCH-OPERATIONS DECISION under Issue #49.**
 
-This is the current cumulative launch decision for Issue #36. It incorporates the audited Issue #48 control plane, PR #51 launch audit, and post-merge real-environment verification performed on 2026-08-28.
+This is the current cumulative launch decision for Issue #36. It incorporates the audited Issue #48 control plane, PR #51 launch audit, post-merge real-environment verification, and the full verification audit recorded on 2026-08-28.
 
 Current repository baseline for this reconciliation: `main` @ `9c024909c73bffeedd28b04e4534d0763d4cac5d`.
 
@@ -195,33 +195,53 @@ This structure is **not approved for participant data** and must remain empty un
 
 A limited Gmail search did not find billing/subscription evidence sufficient to establish an applicable paid Workspace/DPA tier. Absence of such mail is not proof that no contract exists; generic Workspace marketing mail is not DPA evidence.
 
-## 6.3 Local-storage PASS oracle — BLOCKING
+## 6.3 Edition-agnostic local encryption PASS oracle — BLOCKING
 
-On the actual Windows research device, verify locally. Never publish/paste the BitLocker recovery key.
+The acceptance condition is the **actual encryption/protection state**, not availability of one Windows edition-specific UI or cmdlet.
 
-Preferred command:
+### Machine-readable status — preferred where available
+
+Run locally:
+
+```powershell
+manage-bde -status C:
+```
+
+Microsoft documents `manage-bde -status` for Windows 10/11 and it reports conversion/encryption percentage, method, and protection status.
+
+Additional PowerShell path where the BitLocker module is available:
 
 ```powershell
 Get-BitLockerVolume C: | Format-List MountPoint,VolumeStatus,ProtectionStatus,EncryptionPercentage,EncryptionMethod
 ```
 
-Fallback:
+### Device Encryption UI — explicit Windows Home-compatible verification path
 
-```powershell
-manage-bde -status C:\
+Microsoft documents **Device Encryption** as available on a wider set of devices, including Windows Home.
+
+Check:
+
+```text
+Settings
+-> Privacy & security
+-> Device encryption
 ```
 
-PASS requires:
+If `Device encryption` is unavailable, use Windows System Information as administrator and inspect `Automatic Device Encryption Support` / `Device Encryption Support` to understand why; do not infer encryption state solely from a missing BitLocker Control Panel/cmdlet.
 
-- the volume storing R1/R2 is fully encrypted / 100%;
-- BitLocker/Device Encryption protection is ON;
+### PASS requires
+
+- the volume storing R1/R2 is actually protected by Windows Device Encryption/BitLocker;
+- status evidence shows protection ON and the volume encrypted (target 100% / fully encrypted for the selected research storage volume before first participant data are placed there);
 - the OS account uses strong authentication;
-- a recovery key exists in a separate safe location;
-- the recovery key is not stored in GitHub, chat, R1, or R2;
+- a recovery key is backed up/retrievable from a separate safe location;
+- the recovery key is never pasted into GitHub, chat, R1, or R2;
 - R1 and R2 use separate local directories/containers;
 - backup/sync destinations are known and approved;
 - unapproved cloud sync does not silently copy R1/R2;
 - deletion and backup cleanup can be executed under the retention policy.
+
+A missing `Get-BitLockerVolume` command or BitLocker Control Panel entry **is not by itself a FAIL** if Windows Device Encryption is available and its actual protection state is verified through supported status/UI paths.
 
 Until this passes:
 
@@ -327,7 +347,7 @@ Current official capability evidence supports the data-minimization rationale:
 
 - recipient receives a unique URL;
 - no dedicated app is required;
-- recipient registration of personal information is not required for ordinary receipt/use;
+- ordinary recipient use does not require personal-information registration;
 - URL can be delivered electronically;
 - one code can support the planned incentive range;
 - current issuance/processing fee is an operational purchaser cost and does not change the participant incentive face value.
@@ -340,7 +360,7 @@ Before an invitation promises this delivery method, verify:
 
 - purchaser/account setup and applicable terms;
 - real purchase/payment path;
-- secure delivery procedure to the intended participant;
+- secure bearer-URL delivery to the intended participant and handling of misdelivery/nonreceipt;
 - accounting/tax/payment-record retention outside R1;
 - participant-facing compensation wording matches the real process.
 
@@ -406,7 +426,8 @@ Legitimate eligible completed sessions are paid regardless of finding direction.
 - [ ] no third-party meeting bot auto-joins.
 
 ### Local storage
-- [ ] BitLocker/Device Encryption fully protects the R1/R2 storage volume;
+- [ ] Windows Device Encryption/BitLocker actually protects the selected R1/R2 volume;
+- [ ] encryption/protection status verified through `manage-bde`, `Get-BitLockerVolume` where available, and/or the supported Device Encryption UI as appropriate to the Windows edition;
 - [ ] OS account strong authentication confirmed;
 - [ ] separate R1/R2 local paths selected;
 - [ ] backup/sync behavior mapped and approved;
@@ -417,6 +438,7 @@ Legitimate eligible completed sessions are paid regardless of finding direction.
 - [ ] real monitored research/privacy contact channel selected;
 - [ ] actual authorized research/reviewer access list fixed;
 - [ ] QUO Card Pay purchaser/setup/real delivery path verified;
+- [ ] bearer-URL delivery/misdelivery/nonreceipt procedure fixed;
 - [ ] accounting/tax/payment-record retention path fixed outside R1.
 
 ## POST-WAVE-1 / PRE-`SUPPORTED FOR NEXT TEST`
@@ -455,7 +477,7 @@ Current launch decisions use up-to-date evidence including:
 - Japan PPC June-2026 Personal Information Protection guidelines and related pseudonymization/cloud guidance;
 - Google Meet current capture controls;
 - Google consumer Drive privacy/processing disclosures and current Drive access-control capabilities;
-- Microsoft current BitLocker/Device Encryption verification guidance;
+- Microsoft current Device Encryption, BitLocker, `manage-bde`, and `Get-BitLockerVolume` guidance;
 - current User Interviews / Respondent / Japanese panel vendor capability claims;
 - Macromill 2026 incentive guidance;
 - QUO Card Pay current official distribution/recipient/fee documentation;
@@ -472,10 +494,10 @@ Do **not** recruit yet.
 
 Close only these real-environment blockers:
 
-1. verify the actual Windows encryption/backup/deletion state;
+1. verify the actual Windows Device Encryption/BitLocker + backup/deletion state through an edition-appropriate supported path;
 2. verify the actual Google Meet capture/AI-note defaults;
 3. select a real participant-facing research/privacy contact;
-4. verify QUO Card Pay purchaser/payment/accounting workflow.
+4. verify QUO Card Pay purchaser/payment/delivery/accounting workflow.
 
 Once the GO oracle passes:
 

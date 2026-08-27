@@ -2,209 +2,288 @@
 
 ## Status
 
-**NONCANONICAL EXTERNAL-EVIDENCE TRACE.**
+**NONCANONICAL EXTERNAL + REAL-ENVIRONMENT EVIDENCE TRACE.**
 
-Supports Issue #49 launch decisions. External facts are time-sensitive and must be rechecked when materially used.
+Supports Issue #49. External facts are time-sensitive; real-environment observations are scoped to the connected account/folders actually checked. None is Product/ICP evidence.
 
 ---
 
-## 1. Japan privacy / data handling
+# 1. Japan privacy / data handling
 
-### Personal Information Protection Commission — General Guidelines
+## PPC General Guidelines
 
 Source:
 - https://www.ppc.go.jp/personalinfo/legal/guidelines_tsusoku/
 
-Current page identifies the General Guidelines as partially revised in **June 2026**.
+Current page identifies partial revision in **June 2026**.
 
-Material implications for fieldwork operations:
+Material operational categories include:
 
-- purpose notification/publication is a real requirement category when personal information is acquired;
-- appropriate security controls are required for personal data;
-- processor/contractor supervision is a material duty category;
-- incident response/reporting/participant notification duties may apply depending on the event.
+- purpose notification/publication;
+- appropriate security controls for personal data;
+- supervision of processors/contractors;
+- incident-response/reporting/notification obligations where applicable.
 
-Do not turn this repository note into case-specific legal advice.
+This trace is not case-specific legal advice.
 
-### PPC — pseudonymized / anonymized information
+## Pseudonymization / anonymization
 
 Sources:
 - https://www.ppc.go.jp/personalinfo/legal/guidelines_anonymous/
 - https://www.ppc.go.jp/all_faq_index/faq1-q14-2/
 
-Material implication:
+Removing names/emails does not automatically make a research row anonymous. If data remain readily linkable to information that identifies the person, they may remain personal information.
 
-Removing a name/email does **not** automatically make a participant record anonymous. If the holder can readily link pseudonymized material to other information and identify the person, it can remain personal information.
+Operational consequence: R1 pseudonymous working evidence is not automatically safe for public GitHub.
 
-Therefore R1 pseudonymous working evidence is not automatically safe for public GitHub.
-
-### PPC — foreign processors / outsourced handling
+## Cloud / foreign processor boundary
 
 Source:
 - https://www.ppc.go.jp/personalinfo/legal/guidelines_offshore/
 
-Material implication:
+PPC cloud guidance makes actual handling/contract conditions material; the presence of data in cloud storage alone does not settle the treatment. Data minimization and appropriate oversight remain relevant where a processor handles personal data.
 
-Where a processor handles personal data, minimize data to what is necessary and review/supervise the processor appropriately for the real handling context. Generic cloud availability is not sufficient approval evidence.
+Operational consequence: generic cloud-product capability is not launch approval for the actual research account.
 
 ---
 
-## 2. Google Meet capture controls
+# 2. Google Meet capture controls
 
-### Google Meet recording
-
-Source:
+Official sources:
 - https://support.google.com/meet/answer/9308681?hl=ja
-
-Current help states that recording is a host/permission-controlled meeting feature. Google also supports an administrator setting that can require explicit participant agreement before features such as recording, transcription, or AI note-taking are used.
-
-### Google Meet transcripts
-
-Source:
 - https://support.google.com/meet/answer/12849897
 
-Current help documents separate controls for recording, transcription, and note-taking, including automatic-start settings that organizers/admins may configure.
+Current Google help treats recording, transcription, and note-taking as separately controlled capture/intelligence features. Automatic-start/admin configuration can exist.
 
-Operational implication:
+Operational consequence:
 
-Wave 1 can use ordinary Meet while keeping all capture/intelligence features OFF, but the **actual organizer account must be checked** because generic product capability does not prove the account's defaults.
+- ordinary Meet can support the human-led wave with capture features OFF;
+- generic docs do not prove the actual organizer account defaults;
+- real account/session verification remains a pre-first-participant gate.
 
 ---
 
-## 3. Google Drive / Workspace storage
+# 3. Google Drive — generic evidence and live account observations
 
-### Drive limited access
+## Generic access-control capability
 
 Source:
 - https://support.google.com/drive/answer/14254362?hl=ja
 
-Current Drive help states that limited-access folders can restrict opening to permitted users and recommends limited-access subfolders for sensitive files.
+Drive supports limited/restricted access structures.
 
-Operational implication:
+## Consumer content processing
 
-This is a useful access-control capability for a possible R1/R2 store. It does not establish that the connected account is under the correct contract or that the actual folder is private.
+Current Google consumer privacy/help materials describe processing Drive content for product functions including search, spam/malware protection, reliability/troubleshooting, and abuse prevention. Private content is not thereby public to other users, but this does not establish a `provider does not handle the data` contract for the connected research account.
 
-### Workspace privacy / data-processing terms
+Operational consequence: owner-only sharing state is necessary but not sufficient to approve an unknown-tier consumer Drive as R1/R2 research storage.
+
+## Workspace contractual context
 
 Sources:
 - https://knowledge.workspace.google.com/admin/compliance/privacy-compliance-and-records-for-google-workspace-and-cloud-identity
 - https://workspace.google.com/terms/workspace-personal-terms/
 
-Current 2026 documentation describes data-processing commitments for supported Google Workspace / Workspace Personal contractual contexts.
+Google publishes data-processing commitments in supported Workspace contractual contexts. Do not infer that a generic Google account has a particular Workspace/DPA arrangement without evidence of the actual tier/agreement.
 
-Operational implication:
+## Real connected-account verification — 2026-08-28
 
-Do **not** infer that a generic personal Google Drive account is automatically covered by a particular business DPA. Verify the actual account/service tier and applicable agreement before approving Drive as R1/R2.
+Read-only metadata was checked for the user's existing Lunowa Drive hierarchy and newly prepared research folders.
+
+Observed:
+
+- existing Lunowa folder: `shared=false`, owner-only permission;
+- parent My Drive: `shared=false`, owner-only permission;
+- prepared R1 folder: `shared=false`, owner-only permission;
+- prepared R2 folder: `shared=false`, owner-only permission;
+- R1 folder contents: empty;
+- R2 folder contents: empty.
+
+A preparation parent was created and then renamed to:
+
+```text
+BLOCKED - Lunowa Research - Private - NO PARTICIPANT DATA
+```
+
+No participant data have been written there.
+
+A narrowly scoped Gmail search for Google One / Workspace billing/subscription evidence did not yield evidence sufficient to establish an applicable paid Workspace/DPA tier. Absence of billing mail is **not** proof of no contract; generic Workspace product/marketing mail is not contract evidence.
+
+Disposition:
+
+```text
+Drive sharing/access structure = VERIFIED OWNER-ONLY
+Drive research folders = VERIFIED EMPTY
+actual account/DPA/processor acceptance = NOT ESTABLISHED
+wave-1 participant data in Drive = NOT APPROVED
+```
 
 ---
 
-## 4. Recruitment panel capabilities
+# 4. Windows encrypted-local storage evidence
 
-### User Interviews
+## BitLocker status command
+
+Official source:
+- https://learn.microsoft.com/en-us/powershell/module/bitlocker/get-bitlockervolume?view=windowsserver2025-ps
+
+Microsoft documents `Get-BitLockerVolume` as returning, among other attributes:
+
+- `VolumeStatus`;
+- `EncryptionPercentage`;
+- `ProtectionStatus`;
+- `EncryptionMethod`.
+
+The official example for a protected OS drive shows `FullyEncrypted`, `EncryptionPercentage: 100`, and `ProtectionStatus: On`.
+
+Local verification command:
+
+```powershell
+Get-BitLockerVolume C: | Format-List MountPoint,VolumeStatus,ProtectionStatus,EncryptionPercentage,EncryptionMethod
+```
+
+Fallback Windows command:
+
+```powershell
+manage-bde -status C:\
+```
+
+## Recovery key / management
+
+Official source:
+- https://support.microsoft.com/en-us/windows/security/encryption/bitlocker-drive-encryption
+
+Microsoft's current BitLocker guidance requires backing up the recovery key when encryption is enabled. The key must not be copied into GitHub/chat/research evidence.
+
+Operational consequence:
+
+Encrypted local storage is the preferred wave-1 path because it avoids the unresolved current Drive processor/account-tier dependency, **but it remains BLOCKED until the actual research Windows device, backup/sync path, R1/R2 separation, and deletion behavior are verified.**
+
+---
+
+# 5. Recruitment panel capabilities
+
+## User Interviews
 
 Source:
 - https://www.userinterviews.com/our-research-panel
 
-Current vendor page claims approximately **3.2M professionals** and professional targeting by occupation, industry, seniority, and company size; it also states that nearly half of applications arrive with LinkedIn or work-email verification.
+Current vendor page claims a large professional panel and professional targeting/verification capabilities.
 
 Classification: **VENDOR CLAIM / CAPABILITY EVIDENCE**.
 
-Do not infer Japan incidence for the exact Lunowa cohort or research quality from the panel total.
+Do not infer exact Japan cohort incidence, representativeness, or participant validity from headline panel size.
 
-### Respondent
+## Respondent
 
 Source:
 - https://www.respondent.io/browse-panel
 
-Current vendor page claims approximately:
-
-- 4.3M verified participants;
-- 3.1M professionals;
-- coverage across 150+ countries.
+Current vendor page claims millions of verified/professional participants across many countries.
 
 Classification: **VENDOR CLAIM / CAPABILITY EVIDENCE**.
 
-Do not infer cohort incidence, representativeness, or fraud-free performance from the headline numbers.
+## Japanese options
 
-### Macromill Interview Zero
+Macromill Interview Zero and ASMARQ remain domestic recruitment candidates. Exact Issue #36 cohort incidence/performance is unknown until tested.
 
-Source:
-- https://www.macromill.com/press/release/20240822.html
-
-Macromill describes Interview Zero as a self-service online interview platform using its Japanese proprietary panel.
-
-Classification: domestic vendor capability evidence; panel/recruiting performance for the exact Issue #36 cohort remains unknown until tested.
+Operational consequence: do not purchase/select the independent panel before first-batch evidence sharpens the cohort unless direct recruitment cannot fill the block. Independent recruitment evidence is required before a positive final disposition, not before first participant launch.
 
 ---
 
-## 5. Incentive reference
+# 6. Incentive level
 
-### Macromill 2026 incentive guidance
-
-Source:
+Macromill source:
 - https://www.macromill.com/service/words/interview-reward/
 
 Published February 20, 2026.
 
-The article gives broad reference ranges:
-
-- 60–90 minute 1:1 depth interview: roughly **¥3,000–¥15,000**;
-- specialist/decision-maker participants can require materially higher incentives.
+The article gives broad market-research reference ranges, including approximately ¥3,000–¥15,000 for 60–90 minute 1:1 depth interviews and potentially higher incentives for specialist/decision-maker participants.
 
 Operational inference:
 
-A **¥10,000 default for a 45-minute independent/small-firm B2B professional** is a reasonable recruitment starting point, not a scientific optimum. Adjust based on actual fill/eligibility/participant opportunity cost without paying for supportive answers.
+```text
+45-minute eligible B2B professional = ¥10,000 default
+scarce/high-opportunity-cost case = up to ¥15,000 if decided before the session
+```
+
+This is a practical starting parameter, not Product evidence or a scientifically optimal price.
 
 ---
 
-## 6. Online qualitative participant fraud
+# 7. QUO Card Pay — preferred direct-recruit payment mechanism
 
-### P-FROST / Qualitative Health Research
+Official sources:
+- https://www.quocard.com/pay.html
+- https://www.quocard.com/business/faq/
+- https://www.quocard.com/individual/product/quopay/
+- https://www.quocard.com/payec/terms/
 
-Sources:
+Current official documentation supports:
+
+- recipient receives/opens a unique URL;
+- dedicated app is not required;
+- ordinary recipient use does not require personal-information registration;
+- URLs can be distributed electronically, including email;
+- code face value can be set from ¥50 to ¥100,000 in ¥1 increments;
+- issuance fee is currently 6% of face value, with consumption tax on that fee;
+- purchaser-side payment/account setup remains an administrative process.
+
+Operational consequence:
+
+QUO Card Pay is the preferred wave-1 direct-recruit mechanism because it avoids collecting participant bank-account details solely for an ordinary interview honorarium.
+
+Still required before launch:
+
+- purchaser/account setup and terms review;
+- real purchase/payment test/path;
+- secure participant delivery procedure;
+- accounting/tax/payment-record retention outside R1;
+- participant notice matches the actual delivery workflow.
+
+---
+
+# 8. Online qualitative participant fraud
+
+P-FROST / Qualitative Health Research sources:
 - https://pubmed.ncbi.nlm.nih.gov/39548877/
 - https://doi.org/10.1177/10497323241288181
 
-Published in volume 36(7), 2026; first published online in 2024.
+The work describes online qualitative fraudulent-participant risk and layered mitigation recommendations.
 
-The paper describes fraudulent participation as an increased risk in online qualitative research, especially with monetary incentives, and proposes layered recommendations across study setup, incentives/recruitment, data collection, and analysis/reporting.
+Operational consequence:
 
-Operational implication:
-
-Use layered validity controls and documented adjudication. Do not treat one red flag as a validated fraud classifier and do not relabel disconfirming evidence as fraud.
+Use multiple signals and documented adjudication; no single red flag is a validated fraud detector, and disconfirming evidence must not be relabeled fraud because it weakens the Product hypothesis.
 
 ---
 
-## 7. AI interviewer mode risk
+# 9. AI interviewer measurement-mode risk
 
-### Scientific Reports 2026
-
-Source:
+Scientific Reports 2026:
 - https://www.nature.com/articles/s41598-026-46517-7
-- DOI: https://doi.org/10.1038/s41598-026-46517-7
+- https://doi.org/10.1038/s41598-026-46517-7
 
-Published April 4, 2026; version of record July 2, 2026.
+The evaluation reports material cross-model differences in follow-up necessity, context awareness, openness/non-leadingness, style/empathy, latency, questioning intensity, and protocol robustness.
 
-The controlled evaluation reports meaningful cross-model differences in follow-up necessity, context awareness, openness/non-leadingness, empathy/style, latency, questioning intensity, and protocol robustness.
+Operational consequence:
 
-Operational implication:
-
-- there is no generic `AI interviewer` equivalence class;
-- changing model/orchestration can change the measurement instrument;
-- first-wave human moderation remains justified for unstable exploratory discovery;
-- any later AI-moderated stream requires explicit bridge/compatibility evidence before pooling with human-moderated Issue #36 evidence.
+- there is no generic interchangeable `AI interviewer` measurement instrument;
+- changing model/orchestration can change collected evidence;
+- human moderation remains appropriate for the unstable first exploratory wave;
+- later AI-mode evidence needs an explicit bridge/compatibility decision before pooling with human-moderated Issue #36 evidence.
 
 ---
 
-## 8. Evidence limits
+# 10. Evidence limits / unresolved real-environment facts
 
-None of the sources above establish:
+The evidence above does **not** establish:
 
-- the Lunowa ICP;
-- prevalence of communication-monitoring burden;
-- the optimal interview count;
-- a legal conclusion for a not-yet-selected storage/vendor stack;
-- the empirical reliability threshold required for monitoring delegation;
-- that a named panel will successfully recruit the exact target cohort in Japan.
+- the Lunowa ICP or problem prevalence;
+- PMF, WTP, retention, production reliability, or optimal interview count;
+- actual Google Meet organizer capture defaults;
+- actual Windows encryption/backup/deletion state;
+- a participant-facing privacy contact;
+- completed QUO Card Pay purchaser/payment/accounting workflow;
+- exact incidence or quality of a named panel for the final refined Japan cohort.
 
-Those remain Issue #36 or launch-environment evidence targets.
+Those unresolved items remain explicit launch or Issue #36 evidence targets rather than assumptions.

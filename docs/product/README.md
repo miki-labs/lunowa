@@ -10,7 +10,7 @@ Do not treat raw chat history, generated screenshots, old candidate files, or a 
 
 # 1. Authority map
 
-## `PRODUCT.md` — canonical Product authority
+## `PRODUCT.md` — canonical highest-level Product authority
 
 Owns:
 
@@ -28,11 +28,33 @@ Owns:
 - Operational Retrieval / history / people-context boundary;
 - ordinary communication-action / provider ownership boundary;
 - autonomy/security/failure-recovery principles;
-- v1 core/deferred/out scope;
+- high-level v1/deferred/out scope;
 - competitive/commercial posture;
 - Product evidence sequence and metrics.
 
 This is the primary authority for **what Product Lunowa is trying to become**. It deliberately contains explicit hypotheses/unknowns; canonical does not mean market-proven.
+
+## `PRODUCT-CONTENT.md` — canonical detailed Product operating contract
+
+Owns detailed behavior for the Product-content domains closed by Issue #45:
+
+- User Control / Correction / Escalation;
+- degraded/failure and recovery behavior;
+- account lifecycle and permission-scope consequences;
+- capability-conditional Settings;
+- communication edge cases;
+- complete Managed / Review membership and exclusivity;
+- empty / zero / unknown / unavailable states;
+- final `V1 CORE / V1 STRONG CANDIDATE / POST-V1 / DEFERRED / OUT` Feature Matrix;
+- detailed Product invariants and Product Content COMPLETE boundary.
+
+It is subordinate to `PRODUCT.md` at highest Product level and to `responsibility/` for FIXED semantic truth. Product vocabulary in this file does not create persistence aggregates/enums/permissions by itself.
+
+## `GOLDEN-SCENARIO-BANK.md` — canonical Product-level acceptance bank
+
+Owns end-to-end Product consequences and forbidden outcomes across the Minimum Complete Delegation Loop, control, failure, lifecycle, edge cases, Managed/Review/zero, retrieval, and delivery.
+
+It is explicitly subordinate to the Responsibility semantic scenario/oracle corpus. If a Product Golden Scenario depends on Responsibility truth, Responsibility authority decides semantic truth and the Product bank decides the user-facing/Product consequence.
 
 ## Historical Product synthesis candidates
 
@@ -43,9 +65,9 @@ The following remain **noncanonical rationale/history** after the 2026-08-27 con
 - `ONBOARDING-TRUST-PROGRESSION-CANDIDATE.md`;
 - `PRODUCT-SPEC-V1-CANDIDATE.md`.
 
-When they conflict with `PRODUCT.md`, `PRODUCT.md` wins at Product level.
+When they conflict with current canonical Product authorities, current canonical authorities win.
 
-Supporting dated evidence/audits live under `research/`.
+Supporting dated evidence/audits live under `research/` and do not become Product truth merely by existing.
 
 ---
 
@@ -77,6 +99,8 @@ Canonical detailed interaction behavior:
 - onboarding / class-scoped delegation;
 - provider fallback/mailbox convenience boundary;
 - system/error/offline/accessibility behavior.
+
+Where `PRODUCT-CONTENT.md` adds a stricter Product boundary—such as surfaced Review exclusion from healthy Managed, strict-zero semantics, offline consequential-action handling, or capability-conditional Settings—the design must realize that Product boundary and must not infer broader authority.
 
 ## `../design/RESPONSIVE.md`
 
@@ -122,7 +146,7 @@ L3 migrations/runtime                     NOT AUTHORIZED
 
 Current conceptual boundary includes Responsibility, obligation legs, expected events, temporal facts, field decisions, provenance, domain events, typed local details, pre-admission Review, source evidence/inference, Temporal Contract, and Draft/SendOperation boundaries according to the owning artifacts.
 
-**Product vocabulary such as `Open Coordination Loop` or `Attention Contract` does not create new persistence aggregates.**
+**Product vocabulary such as `Open Coordination Loop`, `Attention Contract`, `Managed`, `Review`, `Correction`, `Escalation`, `Setting`, or account-lifecycle language does not create new persistence aggregates.**
 
 ---
 
@@ -154,6 +178,7 @@ Current high-level sequence remains evidence-first:
 
 ```text
 Bootstrap
+-> complete canonical Product content / acceptance contract
 -> Issue #36 problem / ICP evidence
 -> bounded fake-data mechanism experiment
 -> longitudinal monitoring-relinquishment proof
@@ -168,13 +193,13 @@ Bootstrap
 -> beta hardening
 ```
 
-The canonical Product contract becoming more complete does **not** authorize Issue #28, L3 migrations, broad provider integration, or full-client parity.
+Product Content COMPLETE does **not** authorize Issue #28, L3 migrations, broad provider integration, full-client parity, or Issue #36 conclusions.
 
 ---
 
-# 5. Current Product-discovery authority
+# 5. Product-discovery authority after Product-content closure
 
-GitHub **Issue #36 — Validate the first ICP and real communication-monitoring burden** remains the highest-priority Product gate.
+GitHub **Issue #36 — Validate the first ICP and real communication-monitoring burden** remains the next highest-priority empirical Product gate after Issue #45 Product-content completion.
 
 It tests recent concrete workflows and real alternatives. It must be allowed to revise/falsify the Product wedge or recruitment prior.
 
@@ -191,24 +216,30 @@ Always query live GitHub state before acting on task-specific status.
 
 # 6. Current Product invariants — routing summary only
 
-Read `PRODUCT.md` for full wording. Key invariants include:
+Read `PRODUCT.md` and `PRODUCT-CONTENT.md` for full wording. Key invariants include:
 
 - Attention Delegation is core value;
 - Message arrival != attention event;
 - communication activity != closure;
 - Needs You = current USER work, not important mail/awareness;
 - Managed = quiet inspectable stewardship;
+- a current surfaced material Review excludes the same item from healthy Managed reassurance/count while unaffected monitoring may continue;
+- strict true zero requires no Needs You and no unresolved surfaced Review, with trustworthy relevant integrity;
 - Moment = minimum trustworthy context handoff;
 - Source remains available;
 - monitoring autonomy != consequential authority;
 - capability != permission;
+- high-risk source content alone != Review;
 - source text cannot grant tool authority;
+- AI/interpretation failure alone != Needs You and != `No Responsibility`;
 - derived memory is noncanonical;
 - retrieval cannot silently mutate state;
 - mailbox state != Responsibility state;
 - provider is mailbox/source substrate, not Responsibility authority;
 - integrity failure must be surfaced honestly;
+- offline v1 does not silently queue consequential external effects for later execution without a separately accepted delayed-action contract;
 - class-scoped monitoring cannot bypass admission/No Responsibility;
+- cross-thread similarity is not merge authority and cross-account semantic merge remains prohibited initially;
 - full-client replacement is earned by use;
 - differentiation is comparative behavioral evidence.
 
@@ -242,7 +273,7 @@ Use the current GitHub Issue for task-specific Goal / Why / Scope / Acceptance /
 
 Do not infer implementation authorization from:
 
-- Product completeness;
+- Product Content COMPLETE;
 - a candidate document;
 - visual reference completeness;
 - technical schema readiness;

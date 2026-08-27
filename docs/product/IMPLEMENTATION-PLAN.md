@@ -2,9 +2,9 @@
 
 ## Status
 
-**Active initial execution plan, reconciled with the current Product thesis and Responsibility v0.1 / L2 executable-proof gate.**
+**Active execution plan, reconciled 2026-08-28 for the owner-directed Product-completion priority.**
 
-This plan sequences implementation to reduce Product and technical risk without activating production infrastructure or feature breadth before the core user problem, interaction, and domain model are sufficiently supported.
+This plan sequences implementation toward a **usable Minimum Complete Delegation Loop** while preserving unvalidated Product/market assumptions as explicit unknowns.
 
 It is a living execution artifact. Durable Product truth belongs in `PRODUCT.md` and `PRODUCT-CONTENT.md`; Product-level regression consequences live in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics belong in `responsibility/`; detailed design/architecture/contracts remain in their owning sources.
 
@@ -13,7 +13,6 @@ Related sources:
 - `PRODUCT.md`;
 - `PRODUCT-CONTENT.md`;
 - `GOLDEN-SCENARIO-BANK.md`;
-- `research/communication-monitoring-evidence-2026-08.md`;
 - `../design/DESIGN.md`;
 - `../design/INTERACTIONS.md`;
 - `../design/RESPONSIVE.md`;
@@ -25,227 +24,266 @@ Related sources:
 - `responsibility/L2-EXECUTABLE-PROOF-GATE.md`;
 - `ARCHITECTURE.md`;
 - `DATA-MODEL.md`;
-- `CONTRACTS.md`.
+- `CONTRACTS.md`;
+- `TECH-STACK.md`;
+- current live GitHub Issue/task graph.
 
-Current Product scope authorities constrain this plan. A phase may sequence a capability only after that capability is accepted for the relevant Product/task scope; a broader capability example here is never permission to override `PRODUCT.md`, `PRODUCT-CONTENT.md`, or the live Issue contract.
+Current Product scope authorities constrain this plan. A phase may sequence a capability only after that capability is accepted for the relevant Product/task scope; a broader capability example here is never permission to override `PRODUCT.md`, `PRODUCT-CONTENT.md`, Responsibility authority, or a live Issue contract.
 
 ---
 
-## 1. Execution principle
+# 1. Execution doctrine
 
-Build the smallest evidence-producing vertical slice that can falsify the highest-impact current assumption.
+## 1.1 Current owner priority
 
-Do not implement every provider, AI feature, mailbox action, scheduler feature, design reference, and responsive edge case merely because the eventual Product may need them.
+The current owner priority is:
 
-Current high-level sequence:
+> **Complete Lunowa as a usable Product first, then return to formal empirical Product Discovery with the real Product available where useful.**
+
+This is an **execution-order decision**, not empirical evidence.
+
+Therefore implementation may proceed against accepted Product hypotheses without waiting for Issue #36 to validate ICP/problem severity first.
+
+The following remain explicitly **UNKNOWN** until measured:
+
+- exact ICP / first segment;
+- problem prevalence/severity;
+- switching behavior;
+- WTP/pricing;
+- retention;
+- PMF;
+- reliability threshold required for users to stop parallel checking;
+- whether users actually relinquish monitoring;
+- mature Product-form preference.
+
+Implementation completion must never be used as evidence that these are true.
+
+## 1.2 Optimize for one complete vertical loop
+
+Do **not** build Lunowa horizontally by completing every inbox, settings, provider, search, AI, and compose feature independently.
+
+Build the smallest end-to-end path that realizes the accepted Product promise:
 
 ```text
-Bootstrap
-  -> Problem / ICP evidence for communication-monitoring burden
-  -> Minimal comparative fake-data wedge prototype
-  -> Longitudinal safe-forgetting / monitoring-relinquishment proof
-  -> only then broaden the credible-client shell as Product evidence requires
-  -> Responsibility persistence foundation when its Product/runtime use is justified
-  -> One real provider read path
-  -> Real contextual reply/send path when client ownership is justified
-  -> Deterministic Responsibility reduction + Temporal Contract
-  -> AI interpretation behind validated domain contracts/evals
-  -> Search/context quality
-  -> Second provider only when demand/evidence promotes it
-  -> Beta hardening
+provider/source evidence
+-> normalize + persist trustworthy source state
+-> interpret/admit/update Responsibility through trusted boundaries
+-> decide attention / Managed / Review / Needs You
+-> preserve durable temporal monitoring where needed
+-> surface the right Moment with source-grounded context
+-> let the user inspect/correct/defer/stop tracking
+-> contextual Reply/Reply All + explicit Send when required
+-> reconcile provider outcome
+-> continue monitoring or close only when evidence supports closure
 ```
 
-These are evidence/implementation gates, not a requirement that all research work be serialized. Bounded technical spikes may run ahead when they retire a costly-to-reverse uncertainty without activating production infrastructure. The current Responsibility L2 executable proof is such a spike; it does **not** authorize production persistence or broad client implementation before Product evidence warrants it.
+The target is **Minimum Complete Delegation Loop**, not broad provider/client parity.
 
-Key rules:
+## 1.3 Two separate authorization questions
 
-> **Prove the real user problem and smallest differentiated behavior before integration or client breadth.**
+Keep these distinct:
 
-> **A polished full shell is not a substitute for evidence that users delegate monitoring and reduce self-checking.**
+### Implementation authorization
 
----
+May we build an accepted Product behavior safely against the current canonical specification?
 
-## 2. Phase 0 — Bootstrap and stack decision
+### Empirical-claim authorization
 
-### Goal
+May we claim that the behavior solves a frequent market problem, wins an ICP, changes user behavior, retains users, or supports a price?
 
-Create the smallest reproducible runtime/repository foundation supporting Product experiments and later durable background work.
+The first may be YES while the second remains UNKNOWN.
 
-### Required work
+## 1.4 Avoid both stale extremes
 
-- inspect `AGENTS.md`, relevant reusable engineering docs, Product/design docs;
-- choose stack deliberately;
-- prefer framework/platform defaults + mature official SDKs;
-- establish install/run/typecheck/lint/test/build/verify paths;
-- establish environment/secrets pattern;
-- establish browser/runtime inspection;
-- activate persistence only when a later accepted phase requires it.
+Do not revert to:
 
-### Non-goals
+1. **broad fake full-client shell first** — lots of UI, no complete real delegation loop; or
+2. **indefinite research/specification first** — no usable Product exists because every implementation step waits for perfect validation.
 
-No microservices, Kubernetes, vector DB, search cluster, multi-provider AI, Gmail/AI activation, or broad mail-client implementation merely because the stack supports them.
-
-### Exit criteria
-
-- app boots from documented command;
-- verification path exists;
-- trivial route renders;
-- secrets/environment handling documented;
-- material stack choices recorded in `TECH-STACK.md`/ADRs;
-- no production credentials needed for ordinary Product experimentation.
-
-Current repository status indicates the mechanical Phase-0 foundation already exists; repository/branch protection is a separate safety follow-up.
+Current strategy is a complete, safety-bounded vertical Product followed by empirical correction.
 
 ---
 
-## 3. Phase 1 — Product-learning before broad client construction
+# 2. Phase 0 — Mechanical foundation
 
-### 3.1 Phase 1A — Problem / ICP evidence
+## Status
 
-#### Goal
+**Mechanically established.**
 
-Determine whether communication open-loop monitoring is frequent and painful enough in a reachable segment to justify a Product wedge.
+Existing repository foundation includes:
 
-#### Evidence to collect
+- Node.js 24 / pnpm;
+- strict TypeScript;
+- Next.js 16 / React 19;
+- next-intl;
+- Tailwind CSS 4;
+- lint/typecheck/test/build/verify;
+- Playwright E2E smoke;
+- CI Verify + E2E Smoke;
+- environment/secrets pattern;
+- bootstrap route/component.
 
-Use recent real-workflow observation/interview rather than abstract preference questions. Look for:
+This phase does not mean the Product runtime exists. Current app UI remains essentially a bootstrap proof.
 
-- concurrent unresolved communication loops;
-- external/interpersonal dependency;
-- waiting duration and irregularity;
-- repeated Inbox/Sent/thread self-checking;
-- flags/stars/snooze/reminders/task/calendar/note workarounds;
-- missed/late follow-up consequences;
-- whether CRM/ATS/ticketing/project software already solves the problem;
-- adoption autonomy and current switching constraints.
+---
 
-#### Exit / stop logic
+# 3. Phase 1 — UI/UX implementation readiness
 
-Do not freeze an ICP from job title or email volume alone.
+## Current authority
 
-If repeated monitoring burden is weak, rare, already solved, or insufficiently costly in the candidate segment, narrow or reject the wedge before broad implementation.
+GitHub **Issue #55 — `[Design]: Make Lunowa v1 UI/UX implementation-ready`**.
 
-### 3.2 Phase 1B — Minimal comparative fake-data wedge prototype
+## Goal
 
-#### Goal
+Convert the accepted Product/design contract into a complete implementation specification before broad write-heavy UI coding.
 
-Test whether the current Responsibility/Moment candidate mechanism produces immediate comparative value on realistic communication scenarios without provider/AI/database breadth.
+The implementation agent must not need to invent material Product behavior.
 
-This is the implementation purpose of the current Product-validation path (#26/#28 and their live prerequisite/review state). Re-query GitHub before execution.
+## Required outputs
 
-#### Required scenario coverage
+### 3.1 Screen inventory
 
-Use a bounded set of domain-shaped fake scenarios sufficient to test the current hypotheses, including:
+Account for current v1 CORE surfaces, at minimum:
+
+- Home / Landing;
+- Needs You;
+- Managed;
+- Review;
+- Moment;
+- Source Conversation;
+- contextual Reply / Reply All / explicit Send path;
+- one-provider connect/reconnect/onboarding surfaces required by the loop;
+- capability-conditional Settings required by current Product scope;
+- integrity/degraded/recovery surfaces.
+
+### 3.2 State inventory
+
+For every implementation-significant screen define material variants, including as applicable:
+
+- healthy/populated;
+- true zero/empty;
+- initial loading/sync;
+- partial/unknown;
+- provider disconnected/auth lost;
+- AI unavailable;
+- monitoring integrity degraded;
+- material Review;
+- send pending/succeeded/failed/ambiguous;
+- attachment unavailable/blocked/provider fallback.
+
+### 3.3 Interaction contract
+
+Decision-complete behavior for:
+
+- Moment vs Source navigation;
+- Managed inspection;
+- Review/correction;
+- Return Attention Now;
+- Stop Tracking;
+- Later/defer/return;
+- contextual Reply/Reply All;
+- explicit Send + reconciliation feedback;
+- source attachment evidence access;
+- reconnect/recovery;
+- keyboard/focus behavior.
+
+### 3.4 Responsive contract
+
+One Product model across desktop/tablet/mobile/compact widths. Define what collapses, moves, becomes a detail route/sheet/drawer, and what remains always reachable.
+
+### 3.5 Visual implementation contract
+
+Resolve material typography, spacing, hierarchy, projection/status treatment, trust/provenance/integrity affordances, density, non-color redundancy, and motion behavior.
+
+### 3.6 Accessibility
+
+Make keyboard, focus, semantic labeling, contrast, reduced motion, and async status feedback testable.
+
+### 3.7 Component + data contract map
+
+For each material component identify:
 
 ```text
-MY_TURN
-WAITING
-LATER
-DONE
-REVIEW
-multiple Responsibilities
-parallel obligation-leg behavior where material
-follow-up as a MY_TURN reason/action
+owning Product/domain projection
+minimum inputs
+loading/error/unknown form
+source/provenance requirement
+user events/actions emitted
+provider evidence vs accepted state vs derived projection vs transient UI state
 ```
 
-Scenario evidence and expected outcomes must be deterministic enough for a fair baseline-vs-Lunowa comparison. Do not let the implementation agent invent the experimental oracle. Product-level consequences should also be checked against `GOLDEN-SCENARIO-BANK.md` where the scenario falls within that bank; Responsibility semantic truth remains owned by Responsibility oracles.
+Component convenience must not create domain/schema authority.
 
-#### Minimum interaction surface
+## Exit criteria
 
-Implement only the surfaces needed to compare the wedge credibly:
-
-- a conventional baseline inbox condition using the same underlying synthetic evidence;
-- a Lunowa condition with the minimum list/conversation/Moment behavior needed by the accepted scenario oracle;
-- enough source/provenance/account identity to test trust and fairness;
-- desktop primary viewport plus only the compact sanity coverage required by the accepted experiment contract.
-
-Do **not** require the full visual reference set or broad client completeness for this experiment.
-
-#### What is specifically deferred from this gate
-
-Unless a live accepted experiment contract requires it, do not make Phase 1B depend on:
-
-- full compose feature completeness;
-- production search;
-- person-history/context product;
-- account onboarding/settings breadth;
-- attachment feature breadth beyond scenario evidence;
-- tablet/mobile pixel fidelity;
-- Gmail/Microsoft integration;
-- production persistence;
-- production AI;
-- real send.
-
-Existing visual references remain design direction; they are not a mandate to build all surfaces before wedge evidence.
-
-#### Measures this phase can support
-
-Examples:
-
-- time-to-next-meaningful-action/state;
-- navigation/decision count;
-- reread/reconstruction behavior;
-- immediate source rechecks;
-- state/safe-action correctness;
-- comprehension of Waiting/Later/Review;
-- provenance/account identity errors;
-- qualitative control/trust reactions after the timed task.
-
-#### What this phase cannot prove
-
-A single-session prototype cannot establish:
-
-- safe forgetting over days/weeks;
-- monitoring relinquishment;
-- longitudinal reliability;
-- switching/retention;
-- willingness to pay;
-- necessity of a full mail client.
-
-### 3.3 Phase 1C — Longitudinal monitoring-offload proof
-
-#### Goal
-
-Test the North-Star mechanism: whether a user actually stops parallel self-monitoring when Lunowa is responsible for bringing an unresolved loop back at the right time.
-
-#### Preferred scope
-
-Use the smallest real or concierge setup that can observe actual waiting periods without requiring broad client implementation.
-
-Possible candidate measures—not frozen metrics—include:
-
-- `N_self_check` before Lunowa resurfacing;
-- source-inbox fallback frequency;
-- parallel manual reminder/task creation;
-- correct resurfacing rate;
-- material false-negative rate;
-- unnecessary Review/resurfacing burden;
-- context-restoration time after waiting;
-- continued delegated monitoring across days/weeks.
-
-#### Exit / stop logic
-
-If users keep checking the original inbox “just in case,” the core offloading promise is not proven even if the immediate prototype is fast.
-
-If reliability can only be achieved by forcing large Review/notification burden, the wedge must be revised rather than hidden behind model accuracy metrics.
-
-### 3.4 Phase 1D — Credible client breadth only after evidence
-
-The broader full-client design may be implemented after the wedge and Product form justify it.
-
-Potential later surfaces include the existing 3-pane shell, compose/reply/search/context/preview/onboarding/settings/system states/responsive layouts from `docs/design/` and visual references `00`–`19`.
-
-Do not assume all are required if a companion/overlay or hybrid proves to be the better Product form.
+Issue #55 receives a full cumulative acceptance audit and exact-head verification. Only then should broad implementation tasks be decomposed.
 
 ---
 
-## 4. Phase 2 — Responsibility physical model + persistence foundation
+# 4. Phase 2 — Implementation graph and safe parallelization
 
-### Goal
+## Goal
 
-Implement the **smallest physical model** that satisfies validated Responsibility semantics and core Product ownership without building a generic workflow engine.
+Transform the implementation-ready UI/UX + architecture/domain/provider contracts into an explicit dependency graph before launching many coding agents.
 
-### Current design/proof state
+Do not give an agent `build Lunowa`.
+
+## Required graph properties
+
+Each node must specify:
+
+- Goal / Why;
+- exact owning sources;
+- dependencies/preconditions;
+- Scope / Non-goals;
+- invariants;
+- required fixtures/oracles;
+- acceptance criteria;
+- verification;
+- failure/stop conditions;
+- merge/integration boundary.
+
+## Parallelization doctrine
+
+Parallelize only tasks with genuinely separable write/runtime boundaries.
+
+Good parallel candidates may include, after contracts are stable:
+
+- UI component primitives independent from runtime authority;
+- provider adapter spike vs deterministic domain reducer tests;
+- accessibility/visual acceptance harness;
+- independent executable L2 proof work;
+- failure-state UI fixtures;
+- read-only provider normalization tests.
+
+Avoid parallel branches that independently redefine:
+
+- Responsibility semantics;
+- shared schema;
+- provider contract;
+- send authority;
+- Temporal Contract semantics;
+- canonical Product state.
+
+Every parallel wave needs an integration owner/oracle.
+
+## Exit criteria
+
+- dependency DAG exists;
+- critical path is explicit;
+- merge order is explicit;
+- high-conflict/shared-authority tasks are serialized;
+- first implementation wave is small enough for full independent audit.
+
+---
+
+# 5. Phase 3 — Responsibility executable persistence gate
+
+## Goal
+
+Activate only the physical persistence required for the complete loop, without weakening accepted Responsibility semantics.
+
+## Current proof state
 
 ```text
 L0 semantic model                         FROZEN v0.1
@@ -253,29 +291,27 @@ L1 logical persistence boundary           FROZEN v0.1
 L2 exact PostgreSQL/Drizzle candidate      v0.4 STATIC REVIEW COMPLETE
 L2 executable proof                        PENDING
 L2 final freeze                            BLOCKED
-L3 production migrations/runtime           NOT AUTHORIZED
+L3 production migrations/runtime           NOT AUTHORIZED until L2 gate passes
 ```
 
-All 44 Tier-0 base cases are fully layered and all 20 mandatory transition traces are designed. Three exact-DDL static adversarial audits have already been incorporated into v0.4.
+## Required pre-migration proof
 
-The remaining pre-migration uncertainty is executable PostgreSQL/Drizzle/Auth behavior, not more speculative semantic-table design.
+Before production Responsibility migrations are accepted:
 
-### Current pre-implementation proof gate
+1. complete Issue #13 against real PostgreSQL 18;
+2. complete Issue #14 for Better Auth UUID persistence prerequisite;
+3. complete Issue #15 independent combined review;
+4. account for required acceptance IDs in `responsibility/L2-EXECUTABLE-PROOF-GATE.md`;
+5. inspect actual Drizzle-generated/reviewed SQL;
+6. leave no unresolved CRITICAL/HIGH integrity blocker;
+7. update canonical DDL if executable evidence falsifies it;
+8. record explicit L2 PASS/FREEZE before L3 migration integration.
 
-Before a production Responsibility migration is accepted:
+Product-completion priority does **not** waive this gate.
 
-1. complete GitHub Issue #13 against real PostgreSQL 18 for the Drizzle/schema acceptance matrix;
-2. complete GitHub Issue #14 for the Better Auth UUID persistence prerequisite;
-3. run GitHub Issue #15 as an independent combined review;
-4. account for all acceptance IDs `01–60` under `responsibility/L2-EXECUTABLE-PROOF-GATE.md`;
-5. inspect actual Drizzle-generated/reviewed SQL rather than trusting TypeScript types;
-6. leave no unresolved CRITICAL/HIGH schema-integrity finding;
-7. if executable evidence changes v0.4, update the canonical DDL design and rerun all affected tests;
-8. record an explicit L2 PASS/FREEZE decision before any production migration task.
+## Minimum persistence responsibilities when activated
 
-The L2 spike may run before Phase-1 Product evidence because it is an isolated falsification experiment. **Production persistence activation remains a separate Product/implementation decision and must not silently reorder the evidence sequence.**
-
-### Minimum broader entities when production persistence activates
+Only what the vertical loop requires, potentially including:
 
 - User;
 - Scope / ScopeAccount;
@@ -284,438 +320,431 @@ The L2 spike may run before Phase-1 Product evidence because it is an isolated f
 - Message;
 - Attachment metadata;
 - Responsibility;
-- provenance/correction mechanism;
+- provenance/correction evidence;
 - TemporalContract / TemporalTrigger skeleton;
-- Pin;
 - Draft;
 - SendOperation skeleton.
 
-### Responsibility semantic requirements
-
-The physical representation must support, only as needed by validated scenarios:
-
-```text
-resolution status/reason
-live tracking activation
-attention/defer
-obligation legs/actionability/conditions
-expected events
-completion criteria
-constraints
-pending proposals/agreed facts
-temporal facts
-field-level uncertainty/risk
-provenance/evidence revision
-composite effects where one event touches multiple Responsibilities
-AdmissionReview before Responsibility existence is accepted
-```
-
-Do not assume each bullet requires a table. L1 already freezes the accepted hybrid boundary; a new table/aggregate now requires executable/production evidence that falsifies it.
-
-### Required database/runtime proof
-
-The exact schema/protocol must demonstrate at minimum:
-
-- one Conversation -> zero/one/many Responsibilities;
-- zero Responsibility valid;
-- multiple obligation legs where required;
-- historical evidence-relative OPEN != live tracking activation;
-- Pin independent;
-- provider IDs unique per account;
-- field-scoped correction/authority without whole-item freeze;
-- derived Conversation projection rebuildable;
-- Responsibility mutations through domain/reducer boundary;
-- Conversation semantic-evidence revision guards admission/matching freshness;
-- stale evidence/AI basis cannot create or overwrite accepted state;
-- global semantic application/effect idempotency prevents duplicate CREATE even with different generated target UUIDs;
-- cross-account semantic auto-merge prohibited;
-- same-user/account/Responsibility references are mechanically constrained where PostgreSQL can cheaply enforce them;
-- conflict temporal candidates coexist while duplicate accepted-current facts are rejected;
-- delete/privacy order is proven against the actual FK graph.
-
-### Exit criteria
-
-For the L2 design-proof substage:
-
-- Issues #13/#14 provide direct executable evidence;
-- Issue #15 independently records PASS/FREEZE or FAIL/REVISE;
-- generated SQL and actual PostgreSQL behavior are reviewed;
-- exact schema has no unresolved required acceptance failure;
-- L3 remains a separate later task.
-
-For the production Phase-2 implementation itself:
-
-- UI domain interfaces can be backed by DB repositories without semantic rewrite;
-- reproducible reviewed migrations exist;
-- ownership/uniqueness constraints are enforced;
-- representative reducer/domain tests are built from canonical oracles;
-- no old lifecycle model is introduced as canonical truth;
-- no provider integration bypasses the domain boundary.
-
-### Stop conditions
-
-Do not create/accept production migrations if:
-
-- the L2 executable gate has not passed;
-- Better Auth actual ID type conflicts with the DDL assumption;
-- Drizzle emission weakens a required PostgreSQL invariant without an explicitly accepted fallback;
-- a failing executable test reveals an unresolved L1 falsifier;
-- passing requires production credentials or irreversible external state.
+Do not build a generic workflow engine.
 
 ---
 
-## 5. Phase 3 — Gmail read-only vertical slice
+# 6. Phase 4 — One-provider Gmail source/read vertical slice
 
-### Goal
+## Goal
 
-Prove one real mailbox can authorize, sync, normalize, persist evidence, and render through Lunowa without AI/write breadth **after Product evidence justifies a real-inbox path**.
+Prove one real mailbox can authorize, sync, normalize, persist trustworthy evidence, and render Source Conversations.
 
-### Required behavior
+Issue #36 is **not** a prerequisite for this phase under the current owner-directed product-completion plan.
 
-- current official Google authorization guidance/scopes;
+## Required behavior
+
+- current official Google authorization/scopes rechecked at implementation time;
 - ConnectedAccount creation;
-- bounded initial sync + incremental/reconciliation path;
+- bounded initial sync;
+- incremental/history reconciliation;
 - Conversation/Message normalization;
 - attachment metadata/provider observations;
-- **authorized attachment evidence access sufficient for the accepted Product scope through a supported safe open/download/provider-native fallback path**;
+- authorized source attachment evidence access through a supported safe open/download/provider-native fallback path;
 - account-specific sync state;
-- real Conversations render in current UI;
+- duplicate/out-of-order ingestion safety;
 - manual refresh/reconnect;
-- duplicate/out-of-order ingestion safe.
+- real source rendering.
 
-### Security/reliability
+## Security/reliability invariants
 
 - credentials server-side;
-- authorization every read;
-- HTML/message/attachment content untrusted;
-- provider/platform unsafe or unsupported attachment restrictions are preserved; feature parity never bypasses those protections;
+- authorization on reads;
+- provider payloads/HTML/attachments untrusted;
+- provider/platform unsafe-content restrictions preserved;
 - duplicate changes idempotent;
-- invalid cursor/reconnect/rate-limit/transient failures handled;
-- semantic chronology preserved when observed order differs.
+- invalid cursor/reconnect/rate-limit/transient failure handled;
+- source chronology/evidence preserved truthfully.
 
-### Historical initial sync
+## Historical activation boundary
 
-Do not automatically activate every old apparent open loop as My Turn. Historical Responsibility activation policy remains conservative/open until validated with real inbox distributions.
+Initial sync must not automatically convert every old message/thread into a live Responsibility merely because it looks unfinished.
 
-### Attachment scope gate
+## Exit criteria
 
-Phase 3 must prove the **CORE source-evidence-access job**, not universal native rendering.
-
-- a user can reach authorized attachment evidence through the accepted safe path while retaining the relevant source/context;
-- blocked/unsafe/unsupported provider content is represented truthfully rather than bypassed;
-- **rich native in-app attachment preview is not a Phase-3 exit gate**;
-- exact native preview formats, sandboxing, and platform behavior remain separate Product/security/usability work.
-
-### Exit criteria
-
-A real Gmail mailbox can be read through normalized evidence/domain boundaries without AI, and authorized source attachment evidence can be reached through the accepted safe access path without requiring rich native preview or weakening provider security restrictions.
+A real Gmail mailbox can be read through accepted provider/evidence boundaries and source attachment evidence can be reached safely without requiring rich native preview.
 
 ---
 
-## 6. Phase 4 — Real contextual reply/send
+# 7. Phase 5 — Deterministic Responsibility + attention + Temporal Contract runtime
 
-### Goal
+## Goal
 
-Provide the real communication path needed to complete an active Attention loop only when the chosen Product form and accepted task scope require Lunowa to own that client behavior.
+Make the differentiated monitoring loop work deterministically before AI interpretation becomes a dependency.
 
-### Required behavior when this phase is authorized
+## Required behavior
 
-- Moment/Conversation-bound Reply and Reply All for the accepted flow;
-- explicit effective sender account;
-- recipients/content and supported attachments visible/inspectable before Send;
-- draft preservation/autosave sufficient for the accepted flow;
-- durable SendOperation where required by the accepted contracts;
-- explicit user Send under current v1 authority posture;
-- provider send result + reconciliation;
-- send failure/ambiguity preserves draft/context;
-- retries/double-submit do not duplicate.
-
-Arbitrary fresh Compose and Forward parity are **not Phase-4 exit gates** unless a later accepted Product/task contract explicitly promotes them. Provider fallback remains valid for non-core communication jobs.
-
-### Canonical send invariant
-
-```text
-send attempt != reconciled provider acceptance
-```
-
-Even reconciled acceptance closes a Responsibility only when sending is sufficient for that operational closure condition.
-
-### Undo Send / Send Later / delayed execution
-
-Undo Send and Send Later parity are **not current Phase-4 requirements**.
-
-If a future accepted Product/task contract adds delayed consequential send behavior:
-
-- the delay must be a real pre-provider/durable execution contract, not decorative UI;
-- authority over later execution must be explicit and revocable as required;
-- idempotency/cancel/reconcile/recovery semantics must be defined;
-- do not infer permission merely because Temporal Contract infrastructure exists;
-- current v1 offline behavior must not silently queue a consequential effect for later execution.
-
-### Exit criteria
-
-If a client/hybrid communication path is selected for the accepted scope:
-
-```text
-read -> contextual reply/reply-all -> explicit send -> reconcile result
-```
-
-works without AI. Attachment add is an exit criterion only when the accepted Product/test scenario requires it; source attachment access remains governed by Product scope.
-
----
-
-## 7. Phase 5 — Deterministic Responsibility reducer + Temporal Contract
-
-### Goal
-
-Implement differentiated domain behavior using deterministic/manual fixtures before AI quality becomes a dependency.
-
-### Required behavior
-
-- Responsibility admission/identity/effects reducer;
+- Responsibility admission/identity/effects boundary;
+- `TRACK / DO_NOT_TRACK / NEEDS_REVIEW` behavior where applicable;
+- zero Responsibility valid;
 - canonical orthogonal state dimensions;
-- Conversation aggregate projection;
-- field-scoped user correction;
-- intentional defer -> `LATER` + durable TemporalContract;
-- passive Waiting after user leg completion when other work remains;
-- follow-up trigger -> actionable USER follow-up within same Responsibility;
-- hold vs defer vs cancellation distinction;
-- conditional activation relation;
+- field-scoped correction;
+- live tracking separate from resolution;
+- Needs You / Managed / Review / Later / Done projection rules;
+- intentional defer -> durable Temporal Contract;
+- passive Waiting after user leg completion where another dependency remains;
+- expected events;
+- follow-up return;
 - completion criteria;
 - REOPEN vs new episode;
-- supersede old + create replacement effect set;
-- historical live activation behavior;
-- durable TIME/reply/deadline triggers as included;
-- overdue reconciliation/idempotent fire;
-- audit/provenance;
-- `今の要点` derived from actual domain projection.
+- historical live-activation policy;
+- durable time/reply/deadline triggers where included;
+- trigger reconciliation/idempotency;
+- provenance/evidence revision;
+- source-grounded Moment projection.
 
-### Required failure/transition tests
+## Mandatory verification
 
-Use `responsibility/TRANSITION-ORACLES.md` as semantic truth, including:
+Use canonical Responsibility transition/scenario oracles, including races/restarts/stale triggers/parallel obligations/out-of-order evidence where applicable.
 
-- restart before/after trigger;
-- duplicate trigger;
-- contract version race;
-- reply/time race;
-- stale trigger;
-- send ambiguity/reconciliation;
-- out-of-order ingestion;
-- stale AI basis placeholder path;
-- parallel obligations;
-- conditional activation;
-- historical activation.
+## Exit criteria
 
-### Exit criteria
-
-A real persisted promise such as:
-
-> `8月27日 9:00に戻します。返信が先に来れば、その時点で再確認します。`
-
-can be demonstrated end-to-end with evidence explaining why projection changed.
-
-### Stop condition
-
-Do not activate AI-powered automatic attention/hiding before deterministic reduction + Temporal Contract reliability is proven.
-
----
-
-## 8. Phase 6 — AI interpretation behind validated domain contracts
-
-### Goal
-
-Reduce interpretation/monitoring burden without giving the model state/authorization authority.
-
-### Required work
-
-- versioned structured interpretation schema based on `CONTRACTS.md`;
-- authorized context builder;
-- one initial evaluated model/provider;
-- schema/runtime/source/provenance validation;
-- `basis_evidence_revision` handling;
-- communication acts/claims/temporal expressions/uncertainty extraction;
-- deterministic admission/identity/reducer consumes validated candidates;
-- high-risk safety/actionability boundary;
-- no privileged provider action from model output;
-- core fallback when AI unavailable.
-
-### Eval corpus
-
-Do **not** replace the canonical responsibility corpus with a tiny happy-path list.
-
-Use:
-
-- Tier-0 base/critical oracles;
-- 20 transition oracles at the owning test layer;
-- mandatory contrasts;
-- semantic mutants;
-- typo/IME metamorphic variants;
-- high-harm forbidden outcomes;
-- ambiguity/user-dependent cases;
-- sealed holdout and later organic/production regressions.
-
-Track layered metrics rather than one accuracy number:
+A deterministic fixture or trusted manually admitted real case can be:
 
 ```text
-zoning
-communication-act/claim extraction
-admission
-identity/effects
-obligation/actionability
-temporal facts
-resolution safety
-provenance
-safe-action policy
-projection
-run stability
-metamorphic invariance/sensitivity
+tracked
+-> safely Managed
+-> returned at an expected event/time/material change
+-> surfaced as Needs You/Review when justified
+-> explained by source-grounded Moment
+-> corrected/deferred/stopped by the user
 ```
 
-### Automation policy
-
-Initial rollout remains conservative:
-
-- AI interprets/proposes;
-- accepted state changes go through trusted reducer/safety policy;
-- user correction remains available;
-- active material obligations are not hidden from unsupported inference;
-- passive waiting automation may be expanded only with evidence;
-- model confidence/consensus never alone authorizes high-impact action.
-
-### Exit criteria
-
-AI measurably reduces interpretation/monitoring burden on canonical + holdout cases without violating critical forbidden outcomes, and core mail remains usable with AI disabled.
+without AI authority.
 
 ---
 
-## 9. Phase 7 — Search/context quality
+# 8. Phase 6 — Product surfaces on the real domain loop
 
-Start with lexical/full-text authorized search across Conversation/Message/Person/File and exact source jump/highlight **only when real usage shows it is required by the selected Product form**.
+## Goal
 
-Default current Scope; explicit All broadening.
+Implement the Issue #55 accepted UI/UX against real domain interfaces rather than static lifecycle-shaped mock state.
 
-Add semantic/vector retrieval only after real queries show meaningful incremental value. Similarity remains retrieval, never Responsibility merge authority.
+## Core surfaces
 
-Person Context uses participant identity, recent Conversations, active/live Responsibilities, files, and evidence-backed remembered facts; do not make CRM.
+- Home / Landing;
+- Needs You;
+- Managed;
+- Review;
+- Moment;
+- Source Conversation;
+- required onboarding/reconnect/settings/integrity states.
+
+## Critical semantics
+
+- Needs You means current USER work;
+- Managed means healthy quiet monitoring;
+- current surfaced Review is excluded from healthy Managed reassurance/count;
+- true zero requires no Needs You + no surfaced unresolved Review + trustworthy relevant integrity;
+- Source remains available and does not require Moment;
+- mailbox unread/archive state does not redefine Responsibility state;
+- failure/integrity is not a fake Responsibility state.
+
+## Verification
+
+Map UI consequences to `GOLDEN-SCENARIO-BANK.md` and relevant Responsibility oracles. Add design-specific tests without creating new domain truth.
 
 ---
 
-## 10. Phase 8 — Microsoft/Outlook adapter
+# 9. Phase 7 — Contextual Reply / Reply All + explicit Send
 
-Goal: prove provider boundary without rewriting domain/UI once second-provider demand is justified.
+## Goal
 
-Required when authorized:
+Provide the communication path required to complete an active attention loop.
 
-- current official Microsoft authorization;
-- normalization to existing contracts;
-- sync/read/send/reply/attachments for supported behavior;
-- reconnect/failure semantics;
-- capability differences behind adapter boundary;
-- mixed Gmail + Outlook accounts/Scopes if Product evidence requires them;
-- explicit sender-account safety;
-- cross-account semantic lookalikes remain separate Responsibilities initially.
+## Current v1 scope
 
-Success: mostly adapter/provider-contract work, not duplicate Responsibility/search/UI implementation.
+Required when the accepted vertical loop needs it:
+
+- Moment/Conversation-bound Reply and Reply All;
+- explicit effective sender account;
+- visible/inspectable recipients/content;
+- supported reply attachment add only where current Product scope/test requires it;
+- draft preservation/autosave sufficient for the flow;
+- explicit user Send;
+- durable SendOperation where required;
+- provider result + reconciliation;
+- ambiguous/failure state preserves draft/context;
+- retry/double-submit idempotency.
+
+Not current exit gates unless separately promoted:
+
+- arbitrary fresh Compose parity;
+- Forward parity;
+- Undo Send parity;
+- Send Later parity.
+
+## Canonical invariant
+
+```text
+send attempt != provider-reconciled acceptance
+```
+
+Even provider-reconciled acceptance closes a Responsibility only when it actually proves its completion condition.
+
+## Offline boundary
+
+v1 must not silently queue a consequential external effect for later execution without a separately accepted durable delayed-action contract.
 
 ---
 
-## 11. Phase 9 — Beta hardening
+# 10. Phase 8 — Bounded AI interpretation
 
-Required categories, to the extent activated by the accepted Product form:
+## Goal
+
+Reduce interpretation burden while keeping model output outside state/authorization authority.
+
+## Required behavior
+
+- versioned structured interpretation contract;
+- authorized context builder;
+- one initial evaluated model/provider;
+- Structured Outputs/application validation;
+- evidence revision/basis handling;
+- communication act/claim/temporal/uncertainty extraction as accepted;
+- trusted admission/identity/reducer consumes validated candidate output;
+- no privileged provider action directly from model output;
+- fallback/source usability with AI unavailable.
+
+## Eval requirements
+
+Use canonical Responsibility corpus + transition/contrast/mutant/metamorphic/high-harm/ambiguity/holdout cases at the appropriate layer.
+
+Track layered correctness rather than one aggregate accuracy score.
+
+## Exit criteria
+
+AI reduces manual interpretation on the accepted loop without violating forbidden outcomes or becoming necessary for basic source access/manual communication.
+
+---
+
+# 11. Phase 9 — Failure, reconnect, integrity, recovery closure
+
+## Goal
+
+Make the complete loop trustworthy when dependencies fail.
+
+## Must cover
+
+- provider auth loss;
+- provider sync lag/failure;
+- reconnect/resync;
+- partial/unknown state;
+- AI unavailable;
+- scheduler/Temporal trigger failure/overdue recovery;
+- send failure/ambiguity/reconciliation;
+- source attachment blocked/unavailable/fallback;
+- monitoring-integrity degradation;
+- stale evidence/revision races;
+- user correction after automation/model error.
+
+No failure should create fake Needs You, fake `No Responsibility`, or false healthy reassurance.
+
+---
+
+# 12. Phase 10 — Minimum Complete Delegation Loop acceptance
+
+## Goal
+
+Prove the Product works as one coherent system, not a pile of separately completed features.
+
+## Required end-to-end acceptance shape
+
+At least representative cases must demonstrate:
+
+```text
+real provider evidence
+-> accepted/inspectable Responsibility decision
+-> quiet Managed monitoring
+-> durable wait/expected event where applicable
+-> material change/time/reply
+-> correct return to user
+-> source-grounded Moment
+-> safe user action/correction/defer/stop
+-> contextual communication when required
+-> send/provider reconciliation
+-> continued monitoring or evidence-supported closure
+-> recoverable degraded behavior
+```
+
+Also prove negative/control cases:
+
+- `No Responsibility`;
+- high-risk source content that does not automatically become Review;
+- reply that does not satisfy awaited outcome;
+- source available while AI is down;
+- provider/integrity failure that prevents false all-clear;
+- blocked attachment access that is represented truthfully;
+- ambiguous send that does not duplicate or falsely close;
+- cross-account lookalikes remain separate.
+
+## Completion definition
+
+The loop is not complete because code exists, tests are green, or screenshots look good.
+
+Require the accepted combination of:
+
+- unit/domain tests;
+- database/runtime tests where applicable;
+- provider integration evidence;
+- browser/E2E verification;
+- failure injection;
+- accessibility checks;
+- persisted-state/log inspection;
+- exact-head CI;
+- full cumulative independent acceptance audit.
+
+---
+
+# 13. Phase 11 — Beta / early-access hardening
+
+Required categories to the extent activated by the accepted Product form:
 
 - OAuth/token/storage security;
-- account deletion/removal;
+- account disconnect/deletion behavior;
 - sync reconciliation/health;
 - scheduler health/overdue recovery;
 - send idempotency/ambiguous reconciliation;
-- migrations/backups/restore for Lunowa state;
+- migrations/backups/restore;
 - support/audit evidence;
 - AI regression pipeline;
 - cost/usage bounds;
 - privacy/retention;
 - responsive/browser/accessibility verification;
-- analytics for Product hypotheses;
-- incident-safe disable/degraded mode for AI/automation.
+- analytics needed for later Product hypotheses;
+- incident-safe disable/degraded mode.
 
-Candidate Product measures:
-
-- `N_self_check` / Re-check Rate;
-- source-inbox fallback;
-- parallel manual memory/reminder actions;
-- correct resurfacing rate and latency;
-- false-negative material obligation rate;
-- unnecessary Attention/Review rate;
-- context-restoration time + correctness;
-- correction/undo rate;
-- missed communication rate;
-- Temporal Contract success/latency;
-- delegated-monitoring retention/reliance across days/weeks;
-- Communication Management Burden per completed outcome where measurable.
-
-Do not optimize DAU/open frequency at the expense of the North Star; a successful offloading Product may intentionally reduce unnecessary opens.
+Do not expand provider/client breadth merely to look complete.
 
 ---
 
-## 12. Feature deferrals
+# 14. Empirical Product validation lane — deferred in execution order, not removed
 
-Do not let these delay core validation:
+GitHub Issue #36 remains open.
+
+Once a usable Product exists—or sooner if the owner explicitly reprioritizes fieldwork—run empirical Product Discovery without promoting implementation facts into market facts.
+
+Later evidence should test at minimum:
+
+- actual repeated monitoring burden;
+- real current alternatives/workarounds;
+- whether users delegate monitoring;
+- `N_self_check` / source fallback after delegation;
+- material false negatives;
+- unnecessary Review/attention burden;
+- context-restoration cost;
+- willingness to continue/pay;
+- retention;
+- acquisition/segment reachability.
+
+If valid evidence weakens/falsifies the wedge, change the Product even if implementation already exists.
+
+Issue #26/#28 may still be useful as bounded mechanism experiments, but they are not automatically the current Product-completion critical path.
+
+---
+
+# 15. Deferred breadth
+
+Do not let these delay the complete loop unless separately accepted evidence/task scope promotes them:
 
 - graph/tree conversation visualization;
-- complex calendar product;
+- complex calendar Product;
 - CRM pipelines;
 - generic automation/workflow builder;
 - multi-agent user-facing architecture;
 - multiple AI provider fallback;
 - native apps;
 - advanced analytics dashboard;
-- team/shared mailbox collaboration without demand;
+- team/shared mailbox collaboration;
 - custom search infrastructure before need;
 - full provider parity;
-- full-client surface completeness before client form is justified;
+- full-client surface completeness;
 - arbitrary fresh Compose / Forward parity;
-- Undo Send / Send Later parity unless separately accepted.
+- Undo Send / Send Later parity;
+- second provider before the first provider loop is complete;
+- full attachment-content semantic understanding;
+- rich native preview parity across all formats.
 
 ---
 
-## 13. Codex task slicing
+# 16. Search/context expansion
 
-Do not give Codex `build Lunowa`.
+Start with exact/source navigation and authorized PostgreSQL lexical/full-text capabilities only when the complete loop needs them.
 
-Each non-trivial slice should specify:
+Add semantic/vector retrieval only after actual use demonstrates incremental value. Similarity remains retrieval, never Responsibility identity/merge/permission authority.
+
+Person/context views must not silently become CRM/product-domain ownership.
+
+---
+
+# 17. Second provider
+
+Microsoft/Outlook comes only after the one-provider loop is genuinely complete and current demand/evidence or explicit owner scope justifies it.
+
+Success means adapter/provider-contract work, not a duplicate Responsibility/UI implementation.
+
+Cross-account semantic lookalikes remain separate Responsibilities initially.
+
+---
+
+# 18. Codex / agent task slicing
+
+Never issue `build Lunowa` as one task.
+
+Each non-trivial task must include:
 
 - Goal / Why;
-- current Source of Truth;
-- exact relevant visual refs only when required by the slice;
+- current task contract;
+- exact owning sources;
+- dependencies;
 - Scope / Non-goals;
 - invariants;
-- reuse requirements;
+- required reuse;
+- fixtures/oracles;
 - acceptance criteria;
 - verification;
-- stop/escalation conditions.
+- stop/escalation conditions;
+- durable completion evidence.
 
-Product-behavior tasks must include the relevant current `PRODUCT.md` / `PRODUCT-CONTENT.md` contract and Product Golden Scenario(s) without using Product scenarios to redefine Responsibility semantics.
+Product-behavior tasks must reference relevant `PRODUCT.md` / `PRODUCT-CONTENT.md` + Product Golden Scenario consequences without using Product UI scenarios to redefine Responsibility semantics.
 
-Responsibility-domain tasks must explicitly point to:
+Responsibility-domain tasks must route to Responsibility canonical authorities and executable oracles.
 
-```text
-docs/product/responsibility/README.md
-DECISIONS.md
-CONSISTENCY-AUDIT.md
-relevant SCENARIO/TRANSITION oracles
-```
-
-and must not infer a lifecycle enum from legacy visual filenames.
-
-Complex/high-risk tasks should use the Issue-driven handoff plus a repository-local artifact only when that artifact materially reduces guessing. The current L2 proof uses Issues #13/#14/#15 and `responsibility/L2-EXECUTABLE-PROOF-GATE.md`.
+UI tasks must route to the accepted Issue #55 outputs; implementation agents must not invent material screen/state behavior ad hoc.
 
 ---
 
-## 14. Completion definition per phase
+# 19. Repository update timing
 
-A phase is not complete because code exists/build passes/tests are green.
+This plan is a living execution artifact. Update it—or the more specific owning Issue/router—when a material accepted change occurs to:
 
-Exercise intended behavior with the required combination of Product evidence, browser/runtime inspection, screenshot comparison, unit/domain tests, integration/provider tests, failure injection, accessibility checks, persisted-state/log inspection, and database/concurrency proof where applicable.
+- critical path/owner priority;
+- phase ordering/dependencies;
+- implementation scope/non-goals;
+- a technical gate;
+- a blocker/unblocker;
+- Product scope relevant to sequencing;
+- integration/completion evidence.
+
+Do not rewrite this file for tentative brainstorming or ordinary chat. The test is whether a future execution agent would act incorrectly if the durable update were omitted.
+
+---
+
+# 20. Universal completion discipline
+
+A phase is not complete because code exists, build passes, or tests are green.
+
+Independent review must audit the **current task contract + entire final cumulative candidate**, not only the latest patch.
+
+On FAIL, finish the audit and batch all known material blockers before correction except immediate security/data-loss/destructive-risk cases.
+
+On repeated correction failure, analyze preventable gaps in specification, test oracle, architecture, task decomposition, or verification process before another patch loop.
 
 Never claim provider/scheduler/send/security/database behavior verified when only mocked.
 
-Never claim safe forgetting / monitoring relinquishment verified from a single-session fake-data usability result.
+Never claim monitoring relinquishment, ICP, WTP, retention, or PMF from implementation completion alone.

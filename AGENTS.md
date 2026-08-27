@@ -12,9 +12,12 @@ This file is a **task router**, not the handbook. Read only the owning source re
 
 - Phase-0 application/runtime/verification foundation is mechanically established.
 - Canonical Product content is reconciled through 2026-08-27; **Product Content COMPLETE is specification closure, not Product-market validation**.
-- GitHub **Issue #36** remains the next highest-priority empirical Product-discovery gate after Product-content closure.
-- Broad Product UI/provider/client implementation is not authorized merely because Product/design specs are complete.
-- Responsibility L0/L1 are accepted versioned baselines; exact L2 v0.4 is static-review complete but executable proof remains pending; L3 migrations/runtime remain unauthorized.
+- Current owner-directed critical path is **Product completion first**: make UI/UX implementation-ready, build an explicit implementation graph, then complete the Minimum Complete Delegation Loop.
+- GitHub **Issue #55** is the next critical-path task after the Issue #54 routing reconciliation.
+- GitHub **Issue #36** remains open as the highest-priority empirical problem/ICP validation gate, but it is currently **deferred in execution order** and is no longer a prerequisite for beginning the owner-directed product-completion lane.
+- Implementation progress must never be reported as ICP/PMF/WTP/retention/reliability validation.
+- Issue #28 remains its bounded comparative fake-data prototype lane unless explicitly reconciled/superseded; do not silently turn it into the new product-completion implementation lane.
+- Responsibility L0/L1 are accepted versioned baselines; exact L2 v0.4 is static-review complete but executable proof remains pending; any production persistence that depends on L2 must still pass its own executable/freeze gates.
 
 Current bounded Responsibility proof routing:
 
@@ -24,7 +27,7 @@ Issue #14 -> Better Auth UUID persistence proof
 Issue #15 -> independent combined review + L2 freeze decision
 ```
 
-The L2 proof is a bounded technical falsification spike, not Product validation or authorization to skip Issue #36.
+The L2 proof is technical evidence, not Product validation. Product-completion priority does not waive schema/provider/security/send/domain acceptance gates.
 
 Task-specific intent is **Issue-driven**. Use the current Issue for Goal/Why/Scope/Acceptance/Verification and repository docs for durable constraints. Do not invent task intent from old chat, screenshots, branches, or a stale plan.
 
@@ -51,7 +54,8 @@ Product vocabulary does not create schema/aggregate/enum/permission authority. I
 - `docs/design/DESIGN.md` — canonical IA/visual/Product-design guardrails;
 - `docs/design/INTERACTIONS.md` — canonical behavior for Home/Needs You/Moment/Managed/Review/Source, Temporal Contract, contextual communication, retrieval, onboarding, failure/integrity;
 - `docs/design/RESPONSIVE.md` — same Product model across viewport widths;
-- `docs/design/references/README.md` + image refs — visual references only under current Markdown authority.
+- `docs/design/references/README.md` + image refs — visual references only under current Markdown authority;
+- GitHub Issue #55 — current task contract for making these authorities **implementation-ready**.
 
 Where detailed Product behavior is stricter than an older design example, `PRODUCT.md` / `PRODUCT-CONTENT.md` define the Product requirement and design must realize it without expanding authority.
 
@@ -76,35 +80,44 @@ Do not derive canonical semantics from Product UI vocabulary or legacy screensho
 - `DATA-MODEL.md` — conceptual durable model;
 - `CONTRACTS.md` — logical module contracts;
 - `TECH-STACK.md` — accepted stack/activation policy;
-- `IMPLEMENTATION-PLAN.md` — active evidence/implementation sequence, constrained by current Product scope authorities;
+- `IMPLEMENTATION-PLAN.md` — active execution sequence, constrained by current Product scope authorities;
 - current GitHub Issue — task-specific authority;
 - `docs/decisions/` — durable architecture rationale.
 
 ---
 
-# Current Product execution sequence
+# Current Product-completion execution sequence
 
-Follow `PRODUCT.md` + `PRODUCT-CONTENT.md` for Product scope, `IMPLEMENTATION-PLAN.md` for sequencing, and live Issue state for current task authority.
+Follow `PRODUCT.md` + `PRODUCT-CONTENT.md` for Product scope, `IMPLEMENTATION-PLAN.md` for sequencing, `docs/design/` for UX realization, and live Issue state for current task authority.
 
 ```text
-Bootstrap/runtime foundation
--> Issue #36 problem / ICP evidence
--> bounded comparative fake-data mechanism experiment
--> longitudinal monitoring-relinquishment proof
--> only then broaden credible client shell as Product evidence requires
--> Responsibility persistence/runtime when accepted gates justify it
--> one real provider read path
--> real contextual send path when justified
--> deterministic Responsibility / Temporal Contract runtime
--> AI behind canonical contracts/evals
--> search/context quality
--> second provider only when demand/evidence promotes it
--> beta hardening
+Phase-0 runtime foundation
+-> Issue #55 UI/UX implementation-readiness full audit + completion
+-> implementation graph / dependency and safety partitioning
+-> required Responsibility executable/persistence gates
+-> one-provider source/read path
+-> deterministic Responsibility + attention/Temporal Contract loop
+-> Home / Needs You / Managed / Review / Moment / Source implementation
+-> contextual Reply / Reply All + explicit Send + reconciliation where required
+-> bounded AI interpretation behind trusted contracts/evals
+-> failure/reconnect/integrity + source attachment-access closure
+-> end-to-end Minimum Complete Delegation Loop
+-> beta/early-access hardening
+-> Issue #36 / longitudinal empirical validation and evidence-driven scope expansion
 ```
 
-Do **not** revert to the older assumption that the first Product phase is a broad full-client high-fidelity shell.
+Key execution doctrine:
 
-Issue #26 is downstream mechanism evidence. Issue #28 write-heavy implementation is not authorized merely because design docs are ready. Issue #32/PR #34 is bounded oracle work, not Product critical path.
+> **Build one complete vertical delegation loop before broad provider/client parity.**
+
+> **Implementation is allowed to proceed against accepted Product hypotheses; implementation does not promote those hypotheses to validated market facts.**
+
+Do not revert to either stale extreme:
+
+- broad fake full-client shell first; or
+- indefinite research/specification that prevents a usable Product from existing.
+
+Issue #26 remains downstream mechanism evidence. Issue #28 remains a bounded experiment. Issue #32/PR #34 remains bounded oracle work unless explicitly reconciled into a current implementation task.
 
 ---
 
@@ -132,7 +145,7 @@ Technology selection does not authorize Product breadth.
 
 Do not change these casually. Stronger evidence requires durable reconciliation in the same accepted change.
 
-1. **Attention Delegation is the core Product value; Product success means reduced parallel self-monitoring.**
+1. **Attention Delegation is the core Product value; eventual Product success means reduced parallel self-monitoring.**
 2. **Conversation may contain zero/one/many Responsibilities; `No Responsibility` is valid.**
 3. **Needs You / Waiting / Later / Done are projections; Review is a Product projection family with explicit internal subject type.**
 4. **Resolution, live tracking, and attention/defer are orthogonal.**
@@ -163,8 +176,9 @@ Do not change these casually. Stronger evidence requires durable reconciliation 
 29. **AI/processing failure alone must not create fake Needs You or `No Responsibility`; basic authorized Source/manual communication remains available where runtime supports it.**
 30. **Class-scoped monitoring never bypasses `TRACK / DO_NOT_TRACK / NEEDS_REVIEW` or `No Responsibility`.**
 31. **Temporal Contracts are durable/reconcilable promises when activated; transient timers are insufficient.**
-32. **Full-client replacement is earned by Product evidence/usage, not assumed by roadmap.**
+32. **Full-client replacement is earned by evidence/usage, not assumed by roadmap.**
 33. **Static DDL review is not executable PostgreSQL/Drizzle/Auth proof.**
+34. **Implementation completion != Product/market validation.**
 
 ---
 
@@ -176,6 +190,7 @@ Do not change these casually. Stronger evidence requires durable reconciliation 
 - For Product-level behavior, use `GOLDEN-SCENARIO-BANK.md` as the Product consequence bank without overriding Responsibility semantic oracles.
 - For L2 proof, use the real DB/runtime evidence required by the gate; mocks/types/builders are not substitutes.
 - For frontend work, inspect relevant visual refs **and** current Product/Design/Interaction authority; images do not define Product breadth.
+- Before broad frontend implementation, require an implementation-ready screen/state/interaction/component/data contract; do not let implementation agents invent material UX behavior ad hoc.
 - Prefer existing repository/framework/platform/official SDK/mature dependencies before custom infrastructure for non-differentiating concerns.
 - Keep provider SDK shapes inside adapters.
 - Keep authorization, Responsibility invariants, Temporal Contract guarantees, send idempotency, and privileged effects outside prompts.
@@ -185,6 +200,25 @@ Do not change these casually. Stronger evidence requires durable reconciliation 
 - Update all affected owning durable docs together when accepted Product/semantic/architecture behavior changes.
 - Do not silently resolve spec/code/provider conflicts; determine authority and reconcile/escalate.
 - State exactly what was verified; mocks do not prove provider/scheduler/security/migration/send/database behavior.
+
+## Durable repository update timing
+
+Do not leave material accepted project state only in chat.
+
+Update the owning GitHub Issue/docs in the **same workstream** when a material change occurs to:
+
+- owner/project priority or critical path;
+- accepted Product/UX/domain/architecture behavior;
+- implementation sequence/dependencies;
+- task scope/non-goals/acceptance criteria;
+- blocker/unblocker state;
+- external evidence that changes an accepted decision;
+- final review/CI/merge/completion state;
+- a canonical/router statement that has become misleading.
+
+Do **not** create repository churn for tentative brainstorming, ordinary questions, or every conversational turn. The trigger is whether a future agent would act incorrectly if the update were omitted.
+
+When execution priority changes but Product truth does not, update routing/Issue/plan authorities rather than rewriting canonical Product semantics.
 
 ---
 

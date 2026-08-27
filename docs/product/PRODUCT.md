@@ -2,7 +2,7 @@
 
 ## Status
 
-**Canonical Product authority for Lunowa, reconciled through 2026-08-27.**
+**Canonical Product authority for Lunowa, reconciled through 2026-08-28.**
 
 This document owns the highest-level Product contract:
 
@@ -49,7 +49,7 @@ Within this file's accepted scope, `PRODUCT-CONTENT.md` owns the detailed curren
 - **DEFERRED** — intentionally later;
 - **OUT** — outside current core responsibility.
 
-A canonical Product contract may contain explicit hypotheses. **Canonical does not mean empirically proven.** GitHub Issue #36 remains the highest-priority problem/ICP discovery gate.
+A canonical Product contract may contain explicit hypotheses. **Canonical does not mean empirically proven.** GitHub Issue #36 remains the highest-priority empirical problem/ICP discovery gate. The owner-directed implementation order may differ; current execution sequencing belongs to `IMPLEMENTATION-PLAN.md` + live GitHub task state and does not count as Product-discovery evidence.
 
 ---
 
@@ -898,13 +898,17 @@ Do not treat hypothetical WTP before credible value exposure as strong evidence.
 
 # 16. Validation and metrics
 
-## 16.1 Current highest-priority gate
+## 16.1 Current highest-priority empirical gate
 
-**ACCEPTED CURRENT SEQUENCE:** GitHub **Issue #36** remains the highest-priority Product-discovery gate.
+**ACCEPTED EMPIRICAL PRIORITY:** GitHub **Issue #36** remains the highest-priority Product-discovery gate.
 
-It tests whether a reachable segment has recurring, costly, currently under-served communication-monitoring burden. This canonical Product consolidation does **not** authorize write-heavy Issue #28, production persistence, or provider/client breadth.
+It tests whether a reachable segment has recurring, costly, currently under-served communication-monitoring burden. It remains open and must not be treated as passed, obsolete, or satisfied by implementation progress.
 
-Issue #26 remains downstream mechanism evidence. Responsibility L2 proof remains separate technical evidence.
+**CURRENT EXECUTION ORDER:** the owner-directed Product-completion lane may proceed before #36 under `IMPLEMENTATION-PLAN.md` + live GitHub task authority. This sequencing decision does not convert any ICP/PMF/WTP/reliability hypothesis into evidence.
+
+This canonical Product consolidation by itself does **not** authorize arbitrary implementation breadth. Current implementation authorization comes from the accepted implementation plan/live task contract and remains constrained by Product scope, Responsibility semantics, and technical/provider/security/send gates.
+
+Issue #28 remains its separately gated bounded mechanism experiment unless explicitly reconciled. Issue #26 remains downstream mechanism evidence. Responsibility L2 proof remains separate technical evidence.
 
 ## 16.2 Evidence ladder
 

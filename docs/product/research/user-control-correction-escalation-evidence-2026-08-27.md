@@ -102,11 +102,11 @@ Sources:
 
 **INFERENCE from canonical Lunowa semantics + external evidence:** a generic `Undo` or `Fix` control is too ambiguous because several different user intents exist:
 
-1. **Correct interpretation** — `この期限は月曜`, `待っているのは見積書`; changes accepted interpretation/state through authorized user input while preserving source/history.
+1. **Correct interpretation** — `この期限は月曜`, `待っているのは見積書`; changes only the material field(s) supported by authorized user input while preserving source/history. Canonical user authority remains field-scoped; correcting one field must not freeze unrelated fields.
 2. **Return attention now** — user wants an otherwise Managed/Later Responsibility back in active attention; does not claim the world changed.
 3. **Modify return condition** — change when/under what event Lunowa should reconsider attention; does not change outcome truth.
 4. **Stop tracking** — user ends Lunowa monitoring; does not assert successful external outcome unless separately supported.
-5. **Confirm outcome/closure evidence** — user supplies authoritative information that the outcome is actually satisfied/cancelled/etc.; reducer/domain rules still determine the semantic effect.
+5. **Confirm outcome/closure evidence** — user supplies authoritative information relevant to the outcome; existing reducer/domain authority still determines the semantic effect.
 6. **Approve external action** — grants only the displayed/bounded action authority; does not grant monitoring/state authority generally.
 
 **PRODUCT HYPOTHESIS:** surface these meanings explicitly enough that users cannot accidentally convert “stop reminding me” into “the external outcome succeeded.”
@@ -115,7 +115,7 @@ Sources:
 
 ## 3.2 Correction should preserve evidence and history
 
-**INFERENCE:** source communication remains immutable evidence. A user correction should not rewrite the original email or erase the system's prior accepted state/history. The corrected state should be reconstructable as `old interpretation -> user correction -> new accepted state` where audit/history matters.
+**INFERENCE:** source communication remains immutable evidence. A user correction should not rewrite the original email or erase the system's prior accepted state/history. The corrected state should be reconstructable as `old interpretation -> field-scoped user correction -> new accepted state` where audit/history matters.
 
 **PRODUCT HYPOTHESIS:** ordinary UX can stay concise, but source/provenance/history should remain inspectable for material changes.
 
@@ -125,15 +125,18 @@ Sources:
 
 **INFERENCE:** current Lunowa already separates `Operational State`, `Attention Need`, `Delivery Urgency`, and `Authority`. Escalation should therefore be triggered by material inability to maintain a safe Product contract, not merely by low model confidence.
 
-Candidate escalation triggers:
+Candidate semantic Review triggers:
 
 - ambiguity changes whether a Responsibility exists;
 - ambiguity changes current owner/actionability materially;
 - ambiguity changes a material deadline/expected event;
 - evidence conflicts about closure/satisfaction;
 - the requested external action has consequential/irreversible/security/financial implications;
-- account/recipient/attachment ambiguity materially changes what will be sent;
-- monitoring integrity is degraded enough that Lunowa cannot honor its promise.
+- account/recipient/attachment ambiguity materially changes what will be sent.
+
+Separate system/degraded-state escalation:
+
+- monitoring integrity is degraded enough that Lunowa cannot honor its delegated promise → route to **Integrity Alert / recovery UX**, not semantic Responsibility Review merely because infrastructure failed.
 
 Non-escalation examples:
 
@@ -149,6 +152,8 @@ Non-escalation examples:
 **PRODUCT HYPOTHESIS:** repeated material corrections in one class of situations are evidence that current automatic handling is insufficient. Lunowa may narrow that class to confirmation/Review or reduce automatic admission/action behavior, with the change disclosed to the user.
 
 Repeated successful corrections or later good performance should **not** silently grant broader external-action permissions. Permission expansion remains a separate explicit user choice.
+
+Correction history also does **not** by itself create a standing instruction, generic preference memory, or new policy object. Canonical Responsibility semantics currently leave standing communication-instruction memory/preference modeling open.
 
 ---
 
@@ -171,12 +176,15 @@ Supporting principles:
 - **Control is not the same as constant confirmation.**
 - **Review is a safety valve, not an uncertainty inbox.**
 - **The user corrects the decision, not the model's internal reasoning.**
+- **Corrections are field-scoped unless canonical semantics explicitly justify a broader effect.**
 - **Stop tracking != successful completion.**
 - **Return now != world-state change.**
 - **Monitoring delegation != external-action authority.**
+- **Integrity failure != semantic Review by default.**
 - **Low-effort structured choice > making the user co-debug the AI.**
 - **Failure repair must restore state/integrity, not merely apologize.**
 - **Repeated material errors should narrow delegation locally before broader automation is trusted.**
+- **Correction history does not silently create standing policy or permission.**
 - **True reversibility must be distinguished from apparent Undo.**
 
 ---
@@ -189,6 +197,7 @@ This evidence review does **not** establish:
 - exact Review thresholds;
 - a numeric confidence threshold for escalation;
 - automatic permission expansion from correction history;
+- automatic standing preference/policy creation from correction history;
 - a universal trust score;
 - production-safe autonomous sending;
 - an SLA for recovery after monitoring failure;

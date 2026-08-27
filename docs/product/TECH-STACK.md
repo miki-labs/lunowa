@@ -2,609 +2,259 @@
 
 ## Status
 
-**Accepted for initial implementation.**
+**Accepted initial implementation stack; activation/version evidence refreshed 2026-08-28 for Issue #58.**
 
-**Last externally verified:** 2026-08-19
+This document selects replaceable infrastructure for Lunowa. It is **not** proof that a dependency is installed or a capability is active. Exact installed versions live in `package.json` / `pnpm-lock.yaml`; current activation order lives in `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
-This document records the initial implementation stack for Lunowa. It is deliberately conservative: choose mature, legible, replaceable technology for non-differentiating concerns and spend custom engineering on Lunowa's product-specific **Responsibility interpretation/reduction, attention, trust, and communication experience**.
+Responsibility semantics remain owned by `responsibility/`.
 
-This is not permission to install every listed dependency on day one. The activation phase for each item matters.
+Related:
+- `ARCHITECTURE.md`;
+- `CONTRACTS.md`;
+- `IMPLEMENTATION-PLAN.md`;
+- `IMPLEMENTATION-GRAPH.md`;
+- ADRs 0004–0009;
+- `research/issue-58-implementation-graph-evidence-2026-08-28.md`.
 
-Responsibility semantics are not defined by technology choices. For that scope use `responsibility/` and ADR 0008.
+## 1. Current repository fact
 
-Related sources:
+As of baseline `9869d7cdee2559b00d73203dec40d92bc90f537f`, production dependencies are still bootstrap-only: Next.js, React and next-intl. Better Auth, Drizzle/PostgreSQL driver, Gmail provider libraries, Trigger.dev and OpenAI SDK are **not activated yet**.
 
-- `ARCHITECTURE.md` — product boundaries and invariants;
-- `DATA-MODEL.md` — durable data concepts;
-- `CONTRACTS.md` — logical provider/AI/Responsibility/scheduler/search/send contracts;
-- `IMPLEMENTATION-PLAN.md` — staged execution;
-- `responsibility/README.md` — Responsibility semantic source map;
-- `../decisions/0004-web-runtime-and-ui-stack.md`;
-- `../decisions/0005-auth-and-persistence-stack.md`;
-- `../decisions/0006-provider-sync-and-background-runtime.md`;
-- `../decisions/0007-initial-ai-runtime.md`;
-- `../decisions/0008-responsibility-state-is-orthogonal.md`.
+Do not report accepted stack choices as implemented Product capability.
 
----
+## 2. Accepted stack at a glance
 
-## 1. Accepted stack at a glance
-
-| Concern | Initial choice | Activation |
+| Concern | Initial choice | Current activation rule |
 | --- | --- | --- |
-| Runtime | Node.js 24 LTS | Phase 0 |
-| Package manager | pnpm | Phase 0 |
-| Language | TypeScript, strict mode | Phase 0 |
-| Web framework | Next.js 16.x, App Router | Phase 0 |
-| UI runtime | React 19.x as supported by chosen Next.js release | Phase 0 |
-| Styling | Tailwind CSS 4 | Phase 0/1 |
-| Reusable UI | shadcn/ui primitives/components + Lucide icons | Phase 1 |
-| Internationalization | next-intl | Phase 0/1 |
-| Client server-state | TanStack Query v5, selectively | Phase 1/2 |
-| Runtime validation | Zod | Phase 1/2 |
-| App authentication/session | Better Auth stable line, initially v1.6 family | Phase 2/3; spike first |
-| Database | PostgreSQL 18 | Phase 2 |
-| Hosted PostgreSQL | Neon | Phase 2; local Postgres remains supported |
-| ORM/query layer | Drizzle ORM | Phase 2 |
-| Migrations | Drizzle Kit + committed SQL migrations | Phase 2 |
-| Web/API hosting | Vercel | Phase 0/1 preview; production later |
-| Durable jobs/scheduling | Trigger.dev Cloud initially | Phase 3; Temporal Contracts in Phase 5 |
-| Gmail | Gmail API + Cloud Pub/Sub + `history.list` reconciliation | Phase 3 |
-| Microsoft | Microsoft Graph v1.0 + change notifications + delta queries | Phase 8 |
-| AI transport | Official OpenAI SDK + Responses API | Phase 6 |
-| AI output contract | Structured Outputs / JSON Schema + application validation | Phase 6 |
-| Search v1 | PostgreSQL full-text search + `pg_trgm` where useful | Phase 7 |
-| Unit/domain tests | Vitest | Phase 0 onward |
-| React component tests | React Testing Library | Phase 1 onward |
-| Browser/E2E/visual tests | Playwright | Phase 1 onward |
-| Observability | structured server logs first; add tooling only when justified | Phase 3+ |
+| Runtime | Node.js 24 LTS | active bootstrap; keep patched |
+| Package manager | pnpm | active bootstrap |
+| Language | strict TypeScript | active bootstrap |
+| Web framework | Next.js 16.x App Router | active; patched 16.3 security baseline required before feature fan-out |
+| UI | React 19.x | active with Next line |
+| Styling | Tailwind CSS 4 | active bootstrap; semantic Lunowa tokens in UI implementation |
+| UI primitives | shadcn/ui + Lucide where useful | activate only for accepted UI components |
+| i18n | next-intl | active bootstrap |
+| Client server-state | TanStack Query v5 selectively | activate when real async mutations/cache justify it |
+| Runtime validation | Zod or equivalent | activate at untrusted boundaries; exact choice task-scoped |
+| App session/auth | Better Auth current stable | P14 proof first; then G10 |
+| Database | PostgreSQL 18 | executable proof + production foundation |
+| Hosted DB | Neon initially | hosted environments only; standard PostgreSQL semantics |
+| ORM/query | Drizzle ORM stable line | exact version pinned/proven before production use |
+| Migrations | Drizzle Kit + committed SQL | no production `push` shortcut |
+| Web/API hosting | Vercel initially | preview early; production later |
+| Durable jobs | Trigger.dev Cloud | execution substrate only; activate when sync/Temporal work needs it |
+| First provider | Gmail API + Cloud Pub/Sub + `history.list` | one-provider v1 path |
+| Second provider | Microsoft Graph | **not current v1 critical path** |
+| AI | official OpenAI SDK + Responses API | downstream bounded interpretation only |
+| AI output | Structured Outputs / JSON Schema + app validation | candidate interpretation only |
+| Search | PostgreSQL exact/full-text + `pg_trgm` as needed | exact Source search first; NL search conditional |
+| Unit/domain tests | Vitest | active |
+| Component tests | React Testing Library | active |
+| Browser/E2E | Playwright | active |
+| Observability | structured logs first | add tooling from concrete need |
 
----
+## 3. Version policy
 
-## 2. Version policy
+1. Prefer supported stable/LTS lines over Current/preview/RC novelty.
+2. Security patches in the accepted line are preconditions for production-feature work.
+3. Do not freeze vendor patch versions into Product semantics; exact resolutions belong in lockfiles/evidence.
+4. Re-check time-sensitive provider/library behavior at activation/release gates.
 
-### 2.1 Do not freeze stale patch versions in durable docs
+### 3.1 Current dated evidence — 2026-08-28
 
-Record major/support lines rather than a permanent patch. Bootstrap installs the latest stable, security-patched release inside the accepted line and commits exact resolution in `pnpm-lock.yaml`.
+- **Node 24** remains LTS.
+- **Next.js:** repository pins 16.3.0, but the 2026-08-25 security release directs Active-LTS 16.3 users to **16.3.3** for two Critical-severity fixes. G00 must patch the base before write-heavy production fan-out.
+- **Better Auth:** current stable evidence is **1.7.1**. The old v1.6 snapshot is no longer proof. P14 must pin the then-current stable version and inspect actual generated PostgreSQL schema.
+- **PostgreSQL:** retain major 18; current point-release evidence is 18.6.
+- **Drizzle:** stable evidence remains 0.45.x (`0.45.2`); 1.0 remains RC/pre-release. Do not adopt RC merely because newer examples use it.
 
-Examples from the 2026-08-19 validation snapshot:
+Dated source detail lives in the Issue #58 evidence artifact.
 
-- Node: use **24 LTS**, not Node 26 Current for production bootstrap;
-- Next.js: use the current patched **16.x** stable line rather than freezing an old patch;
-- Better Auth: use the current stable line rather than a beta merely because it is newer.
-
-Security-relevant framework/provider SDK updates should be evaluated promptly.
-
-### 2.2 Runtime compatibility beats novelty
-
-Do not upgrade a major runtime/framework simply because a newer Current/preview release exists. Prefer supported LTS/stable combinations unless a measured product requirement says otherwise.
-
----
-
-## 3. Web/runtime decision
-
-### 3.1 Node.js 24 LTS
-
-Use Node.js 24 LTS as the server baseline. This was externally validated on 2026-08-19; re-check current support/security status when implementation/release materially depends on it.
-
-### 3.2 Next.js 16.x App Router
+## 4. Web/runtime
 
 Use one Next.js application as the initial modular-monolith web/API runtime.
 
-Why:
+Rules:
+- server components where useful, not dogmatically;
+- interactive mail workspace may use client state where required;
+- Route Handlers/BFF own server authorization/provider boundaries;
+- provider credentials never move to browser JS;
+- strict TypeScript is not runtime validation.
 
-- strong fit for responsive interactive workspace + server routes;
-- Vercel deployment path;
-- Node-compatible Route Handlers for OAuth/webhooks/provider APIs;
-- React 19.x support in accepted line;
-- avoids separate frontend/backend deployment before evidence requires it.
+### Security pre-wave
 
-Use Server Components where they reduce work, but do not force server rendering into highly interactive mail-workspace state.
-
-### 3.3 TypeScript strict
-
-Use strict TypeScript. Provider payloads, webhook bodies, AI outputs, URL/query inputs, and persistence boundaries remain untrusted at runtime and require validation; TypeScript is not runtime validation.
-
-### 3.4 pnpm
-
-Use pnpm and commit `pnpm-lock.yaml`.
-
-Do not introduce a monorepo during Phase 0 without a demonstrated package-boundary need.
-
----
-
-## 4. UI and design implementation
-
-### 4.1 Tailwind CSS 4
-
-Use Tailwind CSS 4 for implementation of the committed visual system.
-
-Default Tailwind tokens are not Lunowa's design system. Expose repeated brand/projection/spacing decisions through semantic CSS variables/tokens.
-
-### 4.2 shadcn/ui as reusable implementation material
-
-Use shadcn/ui components/primitives where they fit, e.g. buttons, dialogs/sheets, menus, tooltips, tabs, popovers, selects, resizable panes, scroll areas, form controls.
-
-Treat copied components as owned implementation code and adapt to Lunowa design. Do not let default shadcn appearance redefine the product.
-
-Use Lucide-compatible iconography unless a bespoke brand asset is required.
-
-### 4.3 Rich-text composer
-
-Do not build a full rich-text editor from raw `contenteditable` by default.
-
-The exact editor library is a Phase-1 implementation spike. Evaluate a mature option (for example Tiptap or Lexical) against:
-
-- Japanese IME correctness;
-- paste from Gmail/Office/web;
-- email-suitable HTML serialization;
-- selection/keyboard behavior;
-- only required formatting;
-- accessibility;
-- bundle/maintenance cost.
-
-Choose the smallest mature option that passes actual composer tests.
-
-### 4.4 next-intl from the beginning
-
-Use next-intl so Lunowa-owned UI strings are not hard-coded Japanese throughout components.
-
-Do not translate provider/user mail content. Internationalization applies to Lunowa UI copy, formatting, dates, accessibility labels.
-
-### 4.5 TanStack Query selectively
-
-Use TanStack Query where caching, mutation state, invalidation, optimistic interaction, or background refresh materially helps. Do not wrap every server read automatically.
-
-### 4.6 No global-state framework by default
-
-Start with URL/search params, React state/context, and TanStack Query. Add another global store only after concrete cross-tree state pain appears.
-
-### 4.7 Responsibility projection guardrail
-
-UI fixtures/components may represent:
+Before any production-feature branch fans out:
 
 ```text
-MY_TURN
-WAITING
-LATER
-DONE
-REVIEW
-NONE
+patch accepted Next 16.3 line
+-> update directly coupled package resolution as needed
+-> pnpm verify
+-> Playwright smoke
+-> exact-head CI
 ```
 
-but these are deterministic projections. Do not create a client-side canonical seven-state lifecycle just because it is convenient for rendering.
+No unrelated upgrade sweep belongs in that gate.
 
----
+## 5. UI implementation
 
-## 5. Authentication and mailbox authorization
+Tailwind default tokens are not Lunowa design authority. Repeated choices become semantic CSS/design tokens.
 
-### 5.1 Separate Lunowa identity from mailbox authorization
+Use shadcn/ui primitives only where they fit the accepted design; copied components are owned code and must be adapted.
 
-Do not collapse:
+Do not add a global state library by default. Start with URL/search params, React state/context and selective query/mutation state.
 
-1. application authentication — who is signed in?;
-2. connected mailbox authorization — which mailbox granted which mail capabilities?
+### Composer
 
-Use Better Auth for Lunowa sessions/identity, while Gmail/Microsoft credentials remain in Lunowa-owned `ConnectedAccount`/provider boundaries.
+The current v1 CORE path is contextual text Reply / Reply All + explicit immediate Send.
 
-This supports multiple accounts, independent revocation/reconnect, provider-specific sync state, and safer credential handling.
+Any rich-text editor choice is a focused implementation spike and must pass:
+- Japanese IME behavior;
+- email-appropriate serialization/paste;
+- keyboard/accessibility;
+- minimal necessary formatting;
+- maintenance/bundle cost.
 
-### 5.2 Better Auth usage
+Do not let editor selection pull Forward/Send Later/full Compose parity into scope.
 
-Use the current stable Better Auth line with Drizzle, subject to a focused spike before production dependence.
+## 6. Authentication and mailbox authorization
 
-Required behavior includes server-side session validation, explicit account-linking semantics, avoiding unnecessary provider-token persistence for auth-only flows, and never using the auth library's provider-account table as authoritative mailbox credential state.
+Keep two systems separate:
 
-The 2026-08-19 validation found Better Auth's then-current docs did not imply mailbox-token encryption should be assumed. Re-check current official behavior at implementation time.
+```text
+Lunowa application session
+!=
+Connected mailbox authorization
+```
 
-### 5.3 Mailbox OAuth flow
+Use Better Auth for application identity/session only after P14 proves the current UUID/PostgreSQL contract.
 
-Provider mailbox authorization is server-side/application-owned behind provider/credential services.
-
-Google/Microsoft flows should use provider-supported authorization libraries/flows; request background/offline access only when product capability requires it.
-
-### 5.4 OAuth token protection
+Mailbox credentials belong to Lunowa `ConnectedAccount` provider/credential services, not to Better Auth's social-account table as provider-sync authority.
 
 Before real-account beta:
-
-- refresh tokens never exposed to browser JS;
-- long-lived token material encrypted at application boundary before DB persistence;
-- encryption key separate from DB/repo;
-- key/version metadata supports rotation;
-- removal revokes/deletes credentials where supported;
+- refresh tokens server-side only;
+- encrypt long-lived token material at the application boundary before durable storage;
+- keys separated from DB/repository;
+- credential version/rotation path;
 - no token logging;
-- token lookup scoped by authenticated user + ConnectedAccount ownership.
+- user + ConnectedAccount ownership rechecked for lookup/use;
+- reconnect/revoke/delete semantics explicit.
 
-### 5.5 Google restricted-scope launch risk
+## 7. Persistence
 
-The 2026-08-19 validation identified Gmail restricted-scope verification/security-assessment planning as a material launch dependency for a server-side full mail client.
+Use PostgreSQL 18 as the durable application store.
 
-Re-check current official Google requirements, timelines, test-user rules, and costs before public beta. Request the smallest scopes consistent with validated product needs.
+Use Drizzle ORM + Drizzle Kit with these rules:
+- exact ORM/Kit/driver versions pinned by the task;
+- inspect generated SQL;
+- committed SQL migrations for production;
+- real DB constraints for ownership/uniqueness/referential integrity;
+- transactions where invariants require them;
+- production Responsibility migrations blocked until P15 L2 freeze.
 
----
+Recent Drizzle defects reinforce executable proof; they do not by themselves require abandoning Drizzle.
 
-## 6. Persistence
+No Redis at bootstrap. Add another store only from measured need.
 
-### 6.1 PostgreSQL 18
+## 8. Durable jobs / Trigger.dev
 
-Use PostgreSQL as Lunowa's durable system of record.
+Trigger.dev remains the initial managed durable execution runtime when required.
 
-Strong fit for:
+It owns **execution attempts**, not Product/domain truth.
 
-- user/account/scope ownership;
-- provider identifiers/uniqueness;
-- Conversation/Message/Responsibility relationships;
-- Responsibility transition/provenance/evidence-revision state;
-- transactional changes;
-- Temporal Contracts;
-- draft/send idempotency;
-- initial full-text search.
+PostgreSQL/domain owns:
+- provider-message uniqueness and sync cursor truth;
+- Responsibility application idempotency;
+- Temporal Contract/trigger current version and cancellation;
+- accepted state/evidence revision;
+- SendOperation duplicate prevention/reconciliation.
 
-Use PostgreSQL 18 for new environments under the accepted stack; re-check managed-host support when provisioning.
+Current Trigger.dev v4 evidence matters:
+- raw string idempotency keys default to `run` scope from v4.3.1;
+- `global` keys are still task/environment scoped;
+- keys expire by default after 30 days unless configured;
+- failed runs clear their idempotency key.
 
-### 6.2 Neon as initial hosted PostgreSQL
+Therefore an idempotency key is optimization/execution coordination, not the only durable promise. Any use must specify key composition, scope, TTL and stale/current validation.
 
-Use Neon for managed development/preview/initial hosted environments while preserving ordinary PostgreSQL portability and local/Docker Postgres support.
+## 9. Gmail first-provider stack
 
-Do not couple Lunowa to Neon Auth or proprietary data-model semantics.
+Use Gmail API rather than IMAP for the first vertical slice.
 
-### 6.3 Drizzle ORM + Drizzle Kit
+Pattern:
 
-Use Drizzle as TypeScript SQL/query/schema layer and Drizzle Kit for migrations.
+```text
+OAuth ConnectedAccount
+-> bounded initial sync
+-> users.watch / Cloud Pub/Sub signal
+-> authenticate + acknowledge push quickly
+-> durable reconciliation
+-> history.list from persisted current cursor
+-> normalize/upsert idempotently
+-> commit evidence
+-> advance cursor only after required local durability
+```
+
+Current provider oracles:
+- renew `watch` before expiration; Google requires at least every 7 days and recommends daily;
+- notifications may be delayed/dropped and have a one-event/second/user max rate;
+- periodic safety reconciliation is mandatory;
+- stale `startHistoryId` / HTTP 404 enters full-sync recovery;
+- background access requires offline OAuth/refresh-token handling;
+- push payload is never direct Responsibility authority.
+
+Request only the narrowest scopes required by implemented behavior.
+
+### Public release boundary
+
+Google OAuth verification/restricted-scope security assessment is a **release gate**, not a reason to block local/private complete-loop implementation. It must still be completed before public release where the actual chosen scopes/deployment require it.
+
+## 10. Microsoft
+
+Microsoft Graph remains a future provider boundary. It is not a current Minimum Complete Delegation Loop prerequisite and must not enter the initial implementation graph without a separate scope decision.
+
+## 11. AI runtime
+
+Use official OpenAI SDK + Responses API + Structured Outputs for bounded candidate interpretation after deterministic source/reducer contracts exist.
 
 Rules:
+- one provider initially;
+- current model selected by eval evidence, not architecture permanence;
+- minimum authorized context;
+- application/source/provenance/evidence-revision validation after structured output;
+- model output never owns auth, provider facts, admission, identity/effects, tracking/defer, send permission or Temporal effects;
+- Source/manual communication works when AI is unavailable.
 
-- committed migrations for production schema changes;
-- no ad-hoc `push` as production migration process;
-- database constraints for real uniqueness/referential invariants;
-- transactions for justified multi-row invariants;
-- ORM calls remain behind appropriate repository/domain boundaries.
+### Data control activation gate
 
-Responsibility schema design must follow ADR 0008 and canonical oracles. Drizzle convenience is not permission to collapse the model to one enum/owner/deadline.
+`store: false` is not equivalent to Zero Data Retention.
 
-### 6.4 No Redis at bootstrap
+Before production email interpretation:
+- re-read current OpenAI data controls;
+- know the organization/project retention mode;
+- use `store: false` where appropriate;
+- avoid raw mail/prompt/output logging by default;
+- avoid ZDR-incompatible features if ZDR is required;
+- record exact model/config/data-control basis in evidence.
 
-Use PostgreSQL + existing framework/session/runtime primitives first. Add Redis only after measured coordination/cache/rate-limit needs justify another data service.
+## 12. Search
 
----
+Start with authorized PostgreSQL exact/full-text search and `pg_trgm` where useful.
 
-## 7. Hosting and deployment
+No vector database initially. Semantic retrieval, if later justified, remains retrieval only and never Responsibility identity authority.
 
-### 7.1 Vercel for web/API
+Exact Source search is current CORE. Natural-language Q&A/search remains conditional until separately activated.
 
-Use Vercel initially for Next.js web/API and provider/webhook HTTP endpoints.
+## 13. Testing / release verification
 
-Keep durable/long-running orchestration outside request-bound Functions; function duration is not Temporal Contract reliability.
+Every implementation task should choose from:
+- Vitest unit/domain;
+- React Testing Library;
+- Playwright browser/E2E;
+- real PostgreSQL 18 integration tests;
+- provider contract/integration evidence;
+- generated SQL inspection;
+- exact-head CI.
 
-### 7.2 Region/data locality
+For user-visible async operations, test request/pending/accepted/failure/ambiguous/reconciliation states rather than only happy-path outputs.
 
-Choose web/database regions intentionally when real data activates. Do not hard-code a region before current provider availability and target-user latency/privacy needs are checked.
-
-### 7.3 Cost posture
-
-Early hosted costs can begin low, but free tiers/pricing are not permanent architecture facts. Re-check Vercel/Neon/Trigger.dev plans before launch or any decision dependent on a limit/price.
-
----
-
-## 8. Durable jobs and Temporal Contracts
-
-### 8.1 Trigger.dev initial choice
-
-Use Trigger.dev Cloud as the initial durable job runtime when background work activates.
-
-Activation:
-
-- Phase 1 fake UI: absent;
-- Phase 3 Gmail: bounded sync/reconciliation where beneficial;
-- Phase 5: durable waits/scheduling for Temporal Contracts.
-
-The 2026-08-19 selection was based on durable waits/idempotency/TypeScript fit and avoiding a custom queue/scheduler. Re-check current product/runtime/pricing behavior before production activation.
-
-### 8.2 Trigger.dev is execution, not authority
-
-The database/trusted domain remains authoritative for:
-
-- current Temporal Contract/trigger state;
-- current evidence revision;
-- accepted Responsibility state;
-- supersession/cancellation;
-- attention/resurfacing evidence.
-
-A Trigger.dev run is an execution attempt. Before effects it reloads/re-authorizes/revalidates current state and rejects stale work.
-
-Do not model `lifecycle state` as a job-system-owned field.
-
-### 8.3 Reconciliation remains required
-
-Periodically reconcile:
-
-- overdue Temporal Contracts;
-- provider sync gaps;
-- expired/missing provider watches/subscriptions;
-- ambiguous/failed send operations where relevant.
-
-Durable execution does not remove reconciliation.
-
----
-
-## 9. Provider integrations
-
-### 9.1 Gmail first
-
-Use Gmail API, not IMAP, for the first real-provider vertical slice.
-
-Pattern:
-
-```text
-Gmail mailbox
- -> users.watch / Pub/Sub signal
- -> webhook acknowledge
- -> durable sync
- -> history.list from stored cursor
- -> normalize/upsert idempotently
- -> persist evidence + new sync cursor
-```
-
-Notifications are reconciliation signals, not authoritative Responsibility events.
-
-The 2026-08-19 snapshot recorded watch/history/offline-access constraints. Re-check current official Google guidance at implementation time.
-
-### 9.2 Microsoft Graph second
-
-Use Microsoft Graph production APIs behind the same provider contract.
-
-Pattern:
-
-```text
-Microsoft mailbox
- -> change notification
- -> webhook validate/ack
- -> durable sync
- -> delta query using saved token
- -> normalize idempotently
- -> persist evidence + delta state
-```
-
-Use current lifecycle/missed-notification recovery mechanisms where supported. Here “lifecycle notification” is Microsoft subscription terminology, not Lunowa Responsibility lifecycle semantics.
-
-### 9.3 Provider SDK policy
-
-Use current official/provider-supported SDKs where they reduce protocol/auth/error work. Keep SDK types inside adapters.
-
----
-
-## 10. AI runtime
-
-### 10.1 Initial provider/runtime
-
-Use official OpenAI SDK + Responses API for the initial AI interpretation runtime under ADR 0007.
-
-Do not add a generic multi-provider AI framework during Phase 6. A thin application-owned interpretation interface is sufficient.
-
-### 10.2 Structured Outputs
-
-Use Structured Outputs / JSON Schema for the bounded candidate interpretation contract in `CONTRACTS.md`, followed by trusted application/source/provenance validation.
-
-Schema-conformant output is not accepted Responsibility state.
-
-### 10.3 Model selection is eval-driven
-
-Do not hard-code a permanent model name into architecture.
-
-At Phase 6:
-
-1. choose a small set of current viable cost/quality candidates;
-2. run canonical Responsibility extraction/interpretation evals + holdout;
-3. select the lowest-cost candidate satisfying accepted quality/safety/latency gates;
-4. keep model/config identifiers observable/configurable;
-5. rerun relevant evals before material model/prompt/schema changes.
-
-The eval target is not an old `extraction/lifecycle` label set. Use layered canonical views such as zoning, acts/claims, obligation-bearer, temporal extraction, provenance, uncertainty, robustness, then downstream admission/identity/safety/projection tests at their owning layer.
-
-### 10.4 Sensitive email data / retention
-
-The accepted initial ADR uses `store: false` for interpretation requests where supported/appropriate. Provider data-control behavior is time-sensitive: verify current official OpenAI retention/data-control documentation immediately before production activation and do not rely permanently on the 2026-08-19 snapshot.
-
-Lunowa-owned accepted state/provenance remains product source of truth.
-
-### 10.5 AI authority remains bounded
-
-The model does not own:
-
-- authentication/authorization;
-- mailbox/account scope;
-- provider-observed facts;
-- accepted Responsibility admission/identity/effects;
-- live tracking/defer/hiding;
-- Temporal Contract firing;
-- send permission;
-- destructive/high-impact provider actions.
-
-> **AI understands; trusted rules decide accepted Responsibility state.**
-
----
-
-## 11. Search
-
-### 11.1 Start with PostgreSQL
-
-Initial search uses authorized PostgreSQL data with ordinary indexes, full-text search, `pg_trgm` where useful, and explicit user/account/scope predicates.
-
-Result types remain product-shaped: Conversation, Message, Person, File, and intentionally designed Responsibility/action results when needed.
-
-### 11.2 No vector database initially
-
-Do not add vector/search-cluster infrastructure before real queries demonstrate a gap.
-
-If semantic retrieval later proves useful, `pgvector` is the first low-operations candidate when performance/scale suffices. Embeddings are retrieval indexes, not Responsibility identity authority or source of truth.
-
----
-
-## 12. Testing and visual verification
-
-### 12.1 Vitest
-
-Use Vitest for fast unit/domain tests, especially:
-
-- Responsibility admission/identity/effect reducer;
-- deterministic Conversation projection;
-- obligation/actionability/partial-completion rules;
-- Temporal Contract guards;
-- provider normalization/semantic chronology helpers;
-- AI schema/source validation;
-- send idempotency/reconciliation helpers.
-
-Canonical truth comes from `docs/product/responsibility/` scenarios/transitions, not from a hand-written old lifecycle state machine.
-
-### 12.2 React Testing Library
-
-Use component tests when behavior is clearer below browser level. Avoid overspecifying implementation details.
-
-### 12.3 Playwright
-
-Use Playwright for core browser flows, responsive interaction, compose/draft preservation, row vs status-chip behavior, projection-specific Moment flows, search/context/preview, keyboard/accessibility, and approved visual regression baselines.
-
-Generated design images are design input, not pixel-perfect semantic goldens.
-
-### 12.4 Canonical verification path
-
-```text
-pnpm dev
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm verify
-```
-
-Recommended `verify`: typecheck + lint + unit/component tests + production build. Keep targeted browser/E2E/visual verification explicit based on runtime cost and change type.
-
----
-
-## 13. Validation dependencies before expensive implementation
-
-### 13.1 Auth spike
-
-Before production Better Auth dependence, verify current Next.js/session behavior, Drizzle integration, account linking/token persistence, logout/revocation, protected server authorization.
-
-Do not contort mailbox authorization/domain ownership to fit the session library.
-
-### 13.2 Phase-1 rich-text/IME spike
-
-Verify Japanese IME, paste, formatting, serialization, keyboard behavior before committing to an editor dependency.
-
-### 13.3 Google public-beta verification plan
-
-Before public beta uses Gmail restricted scopes, verify current OAuth verification/security-assessment requirements, timeline, test-user limits, privacy/domain requirements, expected cost.
-
-### 13.4 Phase-2 Responsibility schema gate
-
-Before migrations:
-
-- read ADR 0008 + Responsibility decisions/audit/oracles;
-- map the proposed schema to fixed semantic dimensions;
-- prove parallel/conditional/historical/partial-completion cases;
-- prove source due vs user target/resurface separation;
-- prove stale evidence and composite effects can be represented;
-- reject designs that recreate the old single lifecycle model or generic workflow engine.
-
----
-
-## 14. Deliberately rejected/deferred choices
-
-| Choice | Current decision |
-| --- | --- |
-| Microservices | Reject initially; modular monolith is cheaper/sufficient. |
-| Separate Node API service | Reject initially; Next.js handles HTTP boundaries until evidence requires separation. |
-| Node Current release as production baseline | Reject; use accepted LTS line. |
-| Preview/experimental ORM track | Reject without need. |
-| Supabase as all-in-one platform | Not selected; current explicit auth/jobs/provider boundaries are cleaner. |
-| Supabase Queues/Cron as Temporal Contract runtime | Deferred; selected durable runtime currently fits better. |
-| Redis | Deferred until measured need. |
-| Elasticsearch/OpenSearch/Algolia | Deferred until PostgreSQL search is insufficient. |
-| Vector DB | Deferred until semantic search is validated. |
-| Multi-provider AI abstraction/fallback | Deferred until reliability/cost evidence justifies it. |
-| Native mobile app | Deferred; responsive web first. |
-| Custom OAuth protocol implementation without provider libraries | Reject where official libraries fit. |
-| Custom queue/scheduler | Reject initially; Temporal Contract reliability is too important for ad-hoc timers. |
-| Generic Responsibility/workflow engine | Reject; scenario-driven minimal domain representation only. |
-
----
-
-## 15. Current cost/operational envelope
-
-The stack is intended to start cheaply while preserving escape paths.
-
-Do not optimize pennies of infrastructure while ignoring OAuth/compliance, trust, distribution, or product-validation risk.
-
-Free-tier/pricing/provider-retention claims are time-sensitive. Re-check them before a decision depends on them.
-
----
-
-## 16. Primary external sources checked
-
-These were evidence for the 2026-08-19 stack snapshot and must be rechecked when they materially affect implementation/release.
-
-### Runtime / web / UI
-
-- Node.js releases: https://nodejs.org/en/about/previous-releases
-- Node.js v24 archive/LTS: https://nodejs.org/en/download/archive/v24
-- Next.js blog/releases/security: https://nextjs.org/blog
-- shadcn/ui Next.js installation: https://ui.shadcn.com/docs/installation/next
-- Tailwind CSS docs: https://tailwindcss.com/docs/installation
-- TanStack Query v5: https://tanstack.com/query/v5/docs/framework/react/overview
-- next-intl App Router setup: https://next-intl.dev/docs/getting-started/app-router
-
-### Authentication / persistence / jobs
-
-- Better Auth Next.js integration: https://better-auth.com/docs/integrations/next
-- Better Auth users/accounts/token storage/linking: https://better-auth.com/docs/concepts/users-accounts
-- Better Auth OAuth: https://better-auth.com/docs/concepts/oauth
-- Better Auth Drizzle adapter: https://better-auth.com/docs/adapters/drizzle
-- Drizzle migrations: https://orm.drizzle.team/docs/migrations
-- Drizzle Kit migrations: https://orm.drizzle.team/docs/kit-overview
-- Neon pricing: https://neon.com/pricing
-- Neon branching: https://neon.com/docs/get-started-with-neon/workflow-primer
-- Neon connection pooling: https://neon.com/docs/connect/connection-pooling
-- Neon changelog / Postgres support: https://neon.com/docs/changelog
-- Trigger.dev wait-until: https://trigger.dev/docs/wait-until
-- Trigger.dev idempotency: https://trigger.dev/docs/idempotency
-- Trigger.dev pricing: https://trigger.dev/pricing
-
-### Gmail / Microsoft
-
-- Google OAuth web-server flow/offline access: https://developers.google.com/identity/protocols/oauth2/web-server
-- Google OAuth best practices: https://developers.google.com/identity/protocols/oauth2/resources/best-practices
-- Gmail scopes: https://developers.google.com/workspace/gmail/api/auth/scopes
-- Gmail push notifications/watch: https://developers.google.com/workspace/gmail/api/guides/push
-- Microsoft OAuth authorization-code flow: https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow
-- Microsoft scopes / `offline_access`: https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc
-- Microsoft Graph change notifications: https://learn.microsoft.com/en-us/graph/change-notifications-overview
-- Microsoft Graph message delta: https://learn.microsoft.com/en-us/graph/api/message-delta?view=graph-rest-1.0
-- Microsoft Graph lifecycle notifications: https://learn.microsoft.com/en-us/graph/change-notifications-lifecycle-events
-
-### AI / testing / hosting
-
-- OpenAI API quickstart / Responses: https://platform.openai.com/docs/quickstart
-- OpenAI data controls: https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
-- OpenAI API model/Structured Outputs docs: https://developers.openai.com/api/docs/models
-- Playwright visual comparisons: https://playwright.dev/docs/test-snapshots
-- Vercel Node.js runtime: https://vercel.com/docs/functions/runtimes/node-js
-- Vercel Function limits: https://vercel.com/docs/functions/limitations
-- Vercel plans/pricing: https://vercel.com/docs/plans
-
----
-
-## 17. Rule for future changes
-
-Change the stack only when stronger product/runtime evidence justifies it.
-
-A stack change states:
-
-- what requirement/failure changed;
-- why current option is insufficient;
-- migration/operational cost;
-- security/privacy impact;
-- whether a smaller adapter/configuration change solves it first.
-
-A Responsibility semantic change is **not** a technology-stack change; update the Responsibility source/ADR first, then adapt implementation technology if necessary.
+Visual references remain subordinate to textual Product/UI authority.

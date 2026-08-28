@@ -30,7 +30,7 @@ Historical `*CANDIDATE.md` files remain rationale/history only.
 - `../design/INTERACTIONS.md` — detailed surface and interaction behavior.
 - `../design/RESPONSIVE.md` — same Product ontology across viewports.
 - `../design/V1-UI-IMPLEMENTATION-CONTRACT.md` — accepted implementation-facing contract completed by Issue #55 / PR #57.
-- `../design/references/` — visual references only; textual Product/UI authority wins.
+- `../design/references/` — accepted minimal five-reference visual set; visual references only, textual Product/UI authority wins.
 
 Issue #55 is **complete**, not the current execution gate.
 
@@ -75,34 +75,42 @@ High-level owner-directed execution sequence.
 
 ### `IMPLEMENTATION-GRAPH.md`
 
-**Issue #58 candidate; after accepted merge it becomes the exact dependency/parallelization/single-writer/FK-topology authority together with live GitHub Issues.**
+**Accepted exact dependency/parallelization/single-writer/FK-topology authority together with live GitHub Issues after Issue #58 / PR #59 completion.**
 
-Until #58 merges, treat it as candidate and check live Issue #58 state.
+Volatile provider/dependency facts remain execution-time evidence and must be rechecked where the graph/task contract requires it.
 
 ## 5. Current execution routing
 
-Issue #55 / PR #57 completed UI/UX implementation-readiness.
-
-Current gate:
+Completed gates:
 
 ```text
-Issue #58 implementation graph
--> full cumulative audit
--> exact-head CI
--> merge
+#55 / PR #57  UI implementation contract
+#58 / PR #59  implementation graph / architecture topology
+#61 / PR #76  minimal five-reference visual freeze
 ```
 
-After accepted #58 merge:
+Current runtime gate:
 
 ```text
-G00 framework security baseline
-+ V01 final visual-reference pass (parallel-safe)
--> proof/auth/evidence/UI waves according to IMPLEMENTATION-GRAPH.md
--> one-provider Minimum Complete Delegation Loop
--> R90 public-beta readiness
+#60 / G00 framework security baseline
+-> clean frozen install
+-> pnpm verify + Playwright smoke
+-> exact-head GitHub CI
+-> full cumulative acceptance audit
+-> merge only on PASS
 ```
 
-Do not duplicate the detailed DAG here.
+After G00 PASS/merge, the first safe parallel execution wave is:
+
+```text
+P13 / #13  Responsibility PostgreSQL/Drizzle executable proof
+P14 / #14  Better Auth UUID persistence proof
+G11 / #63  structural UI/read-model/accessibility harness
+```
+
+Parallel execution does not imply parallel merge. Root dependency/lock assets remain serialized when touched concurrently.
+
+Do not duplicate the detailed DAG here. Use `IMPLEMENTATION-GRAPH.md` + live task contracts for exact edges and ownership.
 
 The core implementation doctrine is:
 

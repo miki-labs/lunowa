@@ -148,6 +148,8 @@ An ownerless current CORE capability is a graph FAIL.
 
 Conditional/strong-candidate/post-v1 Product scenarios remain explicit regression boundaries but do not become critical-path implementation merely because they exist in the canonical Golden bank.
 
+Stable IDs owned by canonical authorities are reference keys, not labels this graph may reinterpret. Any mapping using a stable Product/UI/Responsibility ID must preserve the owning artifact's exact meaning; cross-cutting requirements are referenced by section/name instead of borrowing an unrelated stable ID.
+
 ## 7. Dependency DAG
 
 ```text
@@ -544,39 +546,46 @@ Named sources avoid ambiguous “relevant oracle” wording:
 
 ## 10.3 UI implementation acceptance mapping
 
-The accepted UI contract IDs are mapped as follows:
+`docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` owns the stable UI-01..UI-20 meanings. This graph **must not rename or reinterpret those IDs**. Cross-cutting keyboard/focus/IME/accessibility/status requirements are owned by UI-contract Sections 25–26 and 34, not by an invented UI screen ID.
 
-| UI contract IDs | Owner(s) |
-|---|---|
-| UI-01 baseline accessibility/IME/status harness | G11 |
-| UI-02 Home | G40 |
-| UI-03 Needs You | G40 |
-| UI-04 Managed | G40/G60 |
-| UI-05 Review | G31/G40 |
-| UI-06 Moment | G40 |
-| UI-07 Review correction flow | G31/G40 |
-| UI-08 Source list | G21 |
-| UI-09 Source detail | G21 |
-| UI-10 contextual Reply / Reply All / explicit Send states | G50/G51 |
-| UI-11 exact Search | G21 |
-| UI-12 attachment access/fallback | G21/G60 |
-| UI-13 reconnect/integrity recovery | G60 |
-| UI-14 app auth required | G10/G11/G40 |
-| UI-15 first delegation/onboarding loop | G40 |
-| UI-16 partial initial sync | G20/G21/G40/G60 |
-| UI-17 new evidence updates state | G31/G32/G40 |
-| UI-18 notification delivery unavailable | G32/G60 |
-| UI-19 Settings + sign-out boundary | G10/G40/G60 |
-| UI-20 disconnect confirmation/consequence | G40/G60 |
+| Canonical UI ID | Canonical surface | Primary implementation owner(s) |
+|---|---|---|
+| UI-01 | App sign-in / session | G10 + G11/G40 presentation |
+| UI-02 | Home | G40; G60 supplies integrity state |
+| UI-03 | Needs You | G40 |
+| UI-04 | Moment | G40 |
+| UI-05 | Managed summary/list | G40; G60 supplies integrity state |
+| UI-06 | Managed detail | G32/G40; G60 supplies integrity state |
+| UI-07 | Review | G31/G40 |
+| UI-08 | Source list | G21 |
+| UI-09 | Source Conversation | G21 |
+| UI-10 | Contextual Reply / Reply All / Send | G50/G51; G70 supplies optional bounded draft candidate |
+| UI-11 | Search / retrieval | G21 |
+| UI-12 | Attachment evidence access | G20/G21; G60 handles degraded/security boundary |
+| UI-13 | Connect mailbox | G20 + G40 presentation |
+| UI-14 | Initial sync | G20/G21 + G40 presentation; G60 for degraded failure |
+| UI-15 | First delegation | G31/G32/G40; G70 interpretation candidate where activated |
+| UI-16 | Integrity / reconnect | G20/G32/G40/G60 |
+| UI-17 | Settings | G40/G60; G10 for app-session action semantics |
+| UI-18 | Intentional disconnect | G20/G31/G32/G40/G60 |
+| UI-19 | Product-account deletion | G40/G60 boundary + R90 release commitments |
+| UI-20 | Scoped system/fallback presentation | G21/G32/G40/G50/G60/G70 as the affected capability requires |
 
 V01 supplies visual references only; it does not replace any UI-ID behavioral acceptance.
 
+Cross-cutting UI acceptance additionally binds all affected owners to:
+
+- UI contract Sections 25–26: keyboard, focus, IME, WCAG 2.2 AA;
+- Section 31: material state matrix;
+- Section 33: Product Golden routing;
+- Section 34: static/component, interaction, keyboard/accessibility, responsive and visual verification.
+
 ## 10.4 Provider/auth/integrity acceptance
 
-- G10: signed-out/signed-in/expiry/re-auth isolation; PG-39/UI-14/UI-19.
-- G20: token storage/revocation, initial sync, watch/history renewal/recovery, permission split; PG-20/21/31/33..36/44/51/61/65 as applicable.
-- G51: real Gmail MIME/threading/send response, unknown acceptance/no blind retry, sent Source reconciliation; PG-01/25/44 + UI-10.
-- G60: affected-scope degradation/reconnect/backfill/no-false-zero/no-false-healthy; PG-20..30, PG-32..36, PG-40, PG-61/62/65 + UI-13/16/18/20.
+- G10: signed-out/signed-in/expiry/re-auth isolation and app sign-out != monitoring stop; PG-39 + UI-01/UI-17.
+- G20: mailbox connect/token security, initial sync, watch/history renewal/recovery, reconnect/disconnect provider effects and permission split; PG-20/21/31/32/33/34/35/36/44/51/61/65 as applicable + UI-13/UI-14/UI-16/UI-18.
+- G51: real Gmail MIME/threading/send response, unknown acceptance/no blind retry and sent-Source reconciliation; PG-01/25/44 + UI-10.
+- G60: affected-scope degradation/reconnect/backfill/no-false-zero/no-false-healthy plus lifecycle failure integration; PG-20..30, PG-32..36, PG-40, PG-61/62/65 + UI-02/UI-05/UI-06/UI-12/UI-14/UI-16/UI-18/UI-19/UI-20 as applicable.
 - G80: cross-boundary evidence verifies component claims still compose correctly on the exact candidate.
 
 ---
@@ -610,10 +619,12 @@ Issue #58 may pass only if all are true:
 7. P13/P14/P15 gates are not waived;
 8. every node has purpose/scope/boundary, prerequisites, acceptance, external/live evidence, non-goals, parallel class and merge/unblock condition;
 9. Product Golden / Responsibility / UI/provider/integrity mappings are explicit;
-10. shared root manifest/lockfile parallel-merge collisions are controlled;
-11. vendor evidence coverage includes both Gmail sync **and Send/threading** and is date-scoped;
-12. provider/AI/scheduler capabilities do not become authority or activate deferred features;
-13. no second-provider/full-client scope is smuggled in;
-14. all current routing/ADRs/live pre-existing proof Issues materially affected by this graph are reconciled;
-15. final candidate receives a full cumulative acceptance audit;
-16. exact-head Verify/E2E CI passes before merge.
+10. every stable canonical ID used by the graph preserves the exact meaning in its owning artifact; cross-cutting requirements do not hijack unrelated IDs;
+11. shared root manifest/lockfile parallel-merge collisions are controlled;
+12. vendor evidence coverage includes both Gmail sync **and Send/threading** and is date-scoped;
+13. provider/AI/scheduler capabilities do not become authority or activate deferred features;
+14. conceptual capability-superset documents explicitly distinguish deferred/future capability from current graph activation where ambiguity could create work;
+15. no second-provider/full-client scope is smuggled in;
+16. all current routing/ADRs/live pre-existing proof Issues materially affected by this graph are reconciled;
+17. final candidate receives a full cumulative acceptance audit;
+18. exact-head Verify/E2E CI passes before merge.

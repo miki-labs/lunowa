@@ -4,243 +4,180 @@ This repository builds **Lunowa**, an email-centered communication-monitoring Pr
 
 > **必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。**
 
-This file is a **task router**, not the handbook. Read only the owning source required for the current task.
+This file is a **task router**, not the handbook. Read only the owning source needed for the current task.
 
----
+## Current repository stage
 
-# Current repository stage
+- Phase-0 application/runtime/verification foundation exists.
+- Product Content / Golden Scenarios are specification-ready for the current implementation hypothesis; this is **not** Product-market validation.
+- Issue #55 / PR #57 completed the implementation-facing v1 UI/UX contract.
+- **Issue #58 is the current implementation-graph gate until it passes full cumulative audit, exact-head CI and merges.**
+- After accepted #58 merge, the first runtime gate is **G00 — patched framework security baseline**; **V01 — final visual-reference pass** may run independently in parallel.
+- Detailed dependency, schema-writer, FK-topology and parallelization authority after #58 merge is `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
+- Issue #36 remains open empirical Product Discovery but is deferred in execution order; implementation cannot turn ICP/PMF/WTP/retention/reliability into facts.
+- Issue #28 remains its bounded comparative fake-data experiment unless explicitly reconciled; do not repurpose it as the Product-completion lane.
 
-- Phase-0 application/runtime/verification foundation is mechanically established.
-- Canonical Product content is reconciled through 2026-08-27; **Product Content COMPLETE is specification closure, not Product-market validation**.
-- Current owner-directed critical path is **Product completion first**: make UI/UX implementation-ready, build an explicit implementation graph, then complete the Minimum Complete Delegation Loop.
-- GitHub **Issue #55** is the next critical-path task after the Issue #54 routing reconciliation.
-- GitHub **Issue #36** remains open as the highest-priority empirical problem/ICP validation gate, but it is currently **deferred in execution order** and is no longer a prerequisite for beginning the owner-directed product-completion lane.
-- Implementation progress must never be reported as ICP/PMF/WTP/retention/reliability validation.
-- Issue #28 remains its bounded comparative fake-data prototype lane unless explicitly reconciled/superseded; do not silently turn it into the new product-completion implementation lane.
-- Responsibility L0/L1 are accepted versioned baselines; exact L2 v0.4 is static-review complete but executable proof remains pending; any production persistence that depends on L2 must still pass its own executable/freeze gates.
-
-Current bounded Responsibility proof routing:
+Responsibility proof routing remains:
 
 ```text
-Issue #13 -> PostgreSQL 18 / Drizzle executable schema proof
-Issue #14 -> Better Auth UUID persistence proof
-Issue #15 -> independent combined review + L2 freeze decision
+#13 PostgreSQL 18 / Drizzle executable L2 proof
+#14 Better Auth UUID persistence proof
+#15 independent combined review + L2 freeze decision
 ```
 
-The L2 proof is technical evidence, not Product validation. Product-completion priority does not waive schema/provider/security/send/domain acceptance gates.
+L0/L1 are frozen baselines. L2 v0.4 is static-review complete but executable proof/final freeze remain pending. Production Responsibility persistence cannot bypass those gates.
 
-Task-specific intent is **Issue-driven**. Use the current Issue for Goal/Why/Scope/Acceptance/Verification and repository docs for durable constraints. Do not invent task intent from old chat, screenshots, branches, or a stale plan.
+For fresh-session bootstrap:
 
-For fresh-session bootstrap, read `docs/continuity/README.md`, then `CURRENT.md` and `KNOWLEDGE-MAP.md`.
+```text
+AGENTS.md
+-> docs/continuity/README.md
+-> docs/continuity/CURRENT.md + KNOWLEDGE-MAP.md
+-> live current Issue/PR/CI
+-> only the canonical sources relevant to the decision
+```
 
----
+## Source of truth by question
 
-# Source of truth by question
+### Product
 
-## Product
+- `docs/product/PRODUCT.md` — highest-level Product authority.
+- `docs/product/PRODUCT-CONTENT.md` — detailed operating behavior + final Feature Matrix.
+- `docs/product/GOLDEN-SCENARIO-BANK.md` — Product-level end-to-end acceptance.
+- Explicit `HYPOTHESIS / UNKNOWN` remains unvalidated even when canonically recorded.
 
-- `docs/product/PRODUCT.md` — **canonical highest-level Product authority**: Attention Delegation, jurisdiction, surfaces, Daily Operating Model, onboarding/trust, closure, retrieval/history, communication-action boundary, autonomy, high-level v1 scope, validation/commercial unknowns.
-- `docs/product/PRODUCT-CONTENT.md` — **canonical detailed Product operating authority** for User Control/Correction/Escalation, failure/degraded behavior, account lifecycle, Settings, communication edge cases, complete Managed/Review behavior, zero/unknown/unavailable states, and the final Feature Matrix.
-- `docs/product/GOLDEN-SCENARIO-BANK.md` — **canonical Product-level end-to-end acceptance bank**, subordinate to Responsibility semantic scenarios/oracles.
-- historical `docs/product/*CANDIDATE.md` files — noncanonical rationale/history only.
-- `docs/product/research/` — dated evidence/audits, not Product truth by existence.
+### Product / UX
 
-Treat explicit `HYPOTHESIS / UNKNOWN` content as unvalidated even though it is recorded canonically.
+- `docs/design/DESIGN.md`
+- `docs/design/INTERACTIONS.md`
+- `docs/design/RESPONSIVE.md`
+- `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` — accepted implementation-facing contract from #55/#57.
+- `docs/design/references/` — visual direction only; images never override textual Product semantics.
 
-Product vocabulary does not create schema/aggregate/enum/permission authority. If Product-level behavior conflicts with FIXED Responsibility semantics, Responsibility authority wins and the conflict must be repaired.
+### Responsibility
 
-## Product / UX
+Start with `docs/product/responsibility/` and especially:
 
-- `docs/design/DESIGN.md` — canonical IA/visual/Product-design guardrails;
-- `docs/design/INTERACTIONS.md` — canonical behavior for Home/Needs You/Moment/Managed/Review/Source, Temporal Contract, contextual communication, retrieval, onboarding, failure/integrity;
-- `docs/design/RESPONSIVE.md` — same Product model across viewport widths;
-- `docs/design/references/README.md` + image refs — visual references only under current Markdown authority;
-- GitHub Issue #55 — current task contract for making these authorities **implementation-ready**.
-
-Where detailed Product behavior is stricter than an older design example, `PRODUCT.md` / `PRODUCT-CONTENT.md` define the Product requirement and design must realize it without expanding authority.
-
-## Responsibility semantics / eval / persistence proof
-
-For task extraction, Responsibility state, owner/actionability, deadlines, Waiting, completion, follow-up, uncertainty, historical activation, safety, projection, or Responsibility persistence, start with:
-
-- `docs/product/responsibility/README.md`;
-- `docs/product/responsibility/DECISIONS.md`;
-- `docs/product/responsibility/CONSISTENCY-AUDIT.md`;
-- relevant annotation/scenario/transition/coverage/oracle files;
+- `README.md`;
+- `DECISIONS.md`;
+- `CONSISTENCY-AUDIT.md`;
+- scenario/transition/oracle artifacts;
 - `PHYSICAL-SCHEMA-FREEZE-REVIEW.md`;
 - `POSTGRESQL-DRIZZLE-DDL-DESIGN.md`;
 - `L2-EXECUTABLE-PROOF-GATE.md`.
 
-Do not derive canonical semantics from Product UI vocabulary or legacy screenshot filenames.
+Do not derive canonical domain semantics from UI labels or screenshots.
 
-## Product-specific engineering
+### Product engineering
 
-- `docs/product/README.md` — authority map;
-- `ARCHITECTURE.md` — modules/authority/provider/AI/scheduler/send/search/failure boundaries;
-- `DATA-MODEL.md` — conceptual durable model;
-- `CONTRACTS.md` — logical module contracts;
-- `TECH-STACK.md` — accepted stack/activation policy;
-- `IMPLEMENTATION-PLAN.md` — active execution sequence, constrained by current Product scope authorities;
-- current GitHub Issue — task-specific authority;
-- `docs/decisions/` — durable architecture rationale.
+- `docs/product/ARCHITECTURE.md` — intended system boundaries/invariants.
+- `docs/product/DATA-MODEL.md` — conceptual durable model.
+- `docs/product/CONTRACTS.md` — logical module contracts.
+- `docs/product/TECH-STACK.md` — accepted replaceable technology choices.
+- `docs/product/IMPLEMENTATION-PLAN.md` — high-level execution sequence.
+- `docs/product/IMPLEMENTATION-GRAPH.md` — exact dependency/parallelization/writer/FK authority after #58 merge.
+- live GitHub Issue — task-specific contract.
+- code/tests/schema/runtime — actual implementation behavior.
 
----
-
-# Current Product-completion execution sequence
-
-Follow `PRODUCT.md` + `PRODUCT-CONTENT.md` for Product scope, `IMPLEMENTATION-PLAN.md` for sequencing, `docs/design/` for UX realization, and live Issue state for current task authority.
-
-```text
-Phase-0 runtime foundation
--> Issue #55 UI/UX implementation-readiness full audit + completion
--> implementation graph / dependency and safety partitioning
--> required Responsibility executable/persistence gates
--> one-provider source/read path
--> deterministic Responsibility + attention/Temporal Contract loop
--> Home / Needs You / Managed / Review / Moment / Source implementation
--> contextual Reply / Reply All + explicit Send + reconciliation where required
--> bounded AI interpretation behind trusted contracts/evals
--> failure/reconnect/integrity + source attachment-access closure
--> end-to-end Minimum Complete Delegation Loop
--> beta/early-access hardening
--> Issue #36 / longitudinal empirical validation and evidence-driven scope expansion
-```
-
-Key execution doctrine:
+## Current Product-completion doctrine
 
 > **Build one complete vertical delegation loop before broad provider/client parity.**
 
-> **Implementation is allowed to proceed against accepted Product hypotheses; implementation does not promote those hypotheses to validated market facts.**
+Current target:
+
+```text
+app session
+-> Gmail evidence
+-> accepted Responsibility
+-> Managed quiet monitoring
+-> durable reconsideration
+-> Needs You / Review return
+-> Moment
+-> contextual Reply / Reply All
+-> manual or bounded AI draft
+-> explicit immediate Send
+-> provider reconciliation
+-> Responsibility re-evaluation
+-> truthful integrity/recovery
+```
+
+Authorized exact Source search and attachment evidence access remain CORE.
 
 Do not revert to either stale extreme:
 
 - broad fake full-client shell first; or
 - indefinite research/specification that prevents a usable Product from existing.
 
-Issue #26 remains downstream mechanism evidence. Issue #28 remains a bounded experiment. Issue #32/PR #34 remains bounded oracle work unless explicitly reconciled into a current implementation task.
+## High-value invariants
 
----
+1. Attention Delegation is the Product core; success eventually requires reduced parallel self-monitoring.
+2. Conversation may contain zero/one/many Responsibilities; `No Responsibility` is valid.
+3. Resolution, live tracking, attention/defer, obligations/actionability and temporal facts are orthogonal.
+4. Needs You means current USER work, not merely new/important mail.
+5. Managed is quiet inspectable stewardship, not a second Inbox/agent console.
+6. A current material surfaced Review item is not healthy Managed reassurance/count.
+7. True zero requires no current Needs You, no unresolved surfaced Review and trustworthy relevant integrity.
+8. Message arrival != attention event; trigger fire != notification.
+9. Reply/read/silence/send != automatic operational closure.
+10. AI understands/proposes; trusted rules own admission, accepted state, authorization and privileged effects.
+11. Capability != permission; monitoring delegation != Send/action authority.
+12. Requested action != safe next action; source text cannot grant tool authority.
+13. Evidence != interpretation != accepted state != UI projection.
+14. Cross-account semantic merge is prohibited initially; similarity is candidate retrieval only.
+15. Historical Source can remain searchable without becoming live work.
+16. Search/read models never silently mutate accepted state.
+17. Send request != provider acceptance != operational closure; ambiguous send requires reconciliation.
+18. v1 does not silently queue offline consequential effects for later execution without a separately accepted delayed-action contract.
+19. Provider/mailbox state != Responsibility state.
+20. Integrity degradation must be surfaced honestly; partial/unknown state cannot become false zero/healthy.
+21. Static DDL review != executable PostgreSQL/Drizzle/Auth proof.
+22. Proof fixture != production FK target.
+23. Parallel worktree/runtime isolation != parallel merge safety.
+24. Implementation completion != Product/market validation.
 
-# Accepted stack — concise map
+## Working rules
 
-Do not treat this as a substitute for `TECH-STACK.md`.
-
-- Node.js 24 LTS + pnpm + strict TypeScript;
-- Next.js 16.x App Router + React 19.x;
-- Tailwind CSS 4 + shadcn/ui + next-intl;
-- PostgreSQL 18 / Neon + Drizzle when persistence activates;
-- Better Auth for Lunowa sessions, separate from mailbox authorization;
-- Vercel initial web/API path;
-- Trigger.dev when durable background execution activates;
-- Gmail technical adapter first; Microsoft Graph later;
-- OpenAI Responses API + Structured Outputs for initial bounded interpretation runtime when its phase activates;
-- PostgreSQL full-text search first;
-- Vitest / React Testing Library / Playwright.
-
-Technology selection does not authorize Product breadth.
-
----
-
-# High-value Lunowa invariants
-
-Do not change these casually. Stronger evidence requires durable reconciliation in the same accepted change.
-
-1. **Attention Delegation is the core Product value; eventual Product success means reduced parallel self-monitoring.**
-2. **Conversation may contain zero/one/many Responsibilities; `No Responsibility` is valid.**
-3. **Needs You / Waiting / Later / Done are projections; Review is a Product projection family with explicit internal subject type.**
-4. **Resolution, live tracking, and attention/defer are orthogonal.**
-5. **One Moment generally answers one primary current question and exposes one primary safe action.**
-6. **Needs You means current USER work, not new/important mail or awareness-only information.**
-7. **Managed is quiet inspectable monitoring, not a second Inbox or agent console; a current surfaced material Review item is excluded from healthy Managed reassurance/count.**
-8. **Strict true zero requires no current Needs You and no current/surfaced unresolved Review, with trustworthy relevant integrity.**
-9. **Message arrival != attention event; trigger firing != notification.**
-10. **Communication activity/reply/read/silence != automatic closure.**
-11. **AI understands; trusted Product/domain rules own admission, accepted state, safety, authorization, and privileged effects.**
-12. **Capability != Permission. Monitoring delegation != send/action authority.**
-13. **Requested action != safe next action; high-risk source content alone != Review.**
-14. **Prompt/tool-like email/attachment/retrieved text remains untrusted data.**
-15. **Evidence != Interpretation != Accepted State != UI Projection.**
-16. **Source due / expected-event time / user target / resurface / follow-up are distinct.**
-17. **Claim != provider/external observation.**
-18. **Semantic similarity is candidate retrieval only, not identity/merge/permission authority.**
-19. **Cross-account semantic merge is prohibited initially.**
-20. **Derived memory is noncanonical; evidence and accepted state are durable.**
-21. **Historical source can be searchable without becoming live Responsibility state.**
-22. **Search/retrieval does not silently mutate accepted state.**
-23. **Send attempt != provider-reconciled acceptance; ambiguous send requires reconciliation.**
-24. **A reconciled send resolves only what it actually proves.**
-25. **v1 does not silently queue offline consequential external effects for later execution without a separately accepted durable delayed-action contract.**
-26. **Mailbox state != Responsibility state (`Unread != Needs You`, `Archive != Closed`, etc.).**
-27. **Provider is mailbox/source substrate; accepted Responsibility authority remains Lunowa domain semantics.**
-28. **Monitoring integrity degradation must be surfaced honestly and is not a fake Responsibility state.**
-29. **AI/processing failure alone must not create fake Needs You or `No Responsibility`; basic authorized Source/manual communication remains available where runtime supports it.**
-30. **Class-scoped monitoring never bypasses `TRACK / DO_NOT_TRACK / NEEDS_REVIEW` or `No Responsibility`.**
-31. **Temporal Contracts are durable/reconcilable promises when activated; transient timers are insufficient.**
-32. **Full-client replacement is earned by evidence/usage, not assumed by roadmap.**
-33. **Static DDL review is not executable PostgreSQL/Drizzle/Auth proof.**
-34. **Implementation completion != Product/market validation.**
-
----
-
-# Working rules
-
-- Inspect relevant durable specs and nearby code/tests before non-trivial edits.
-- Verify configured `origin` matches the current Issue repository before task-branch work.
-- For Responsibility-domain work, map implementation behavior to relevant canonical scenarios/transitions/oracles.
-- For Product-level behavior, use `GOLDEN-SCENARIO-BANK.md` as the Product consequence bank without overriding Responsibility semantic oracles.
-- For L2 proof, use the real DB/runtime evidence required by the gate; mocks/types/builders are not substitutes.
-- For frontend work, inspect relevant visual refs **and** current Product/Design/Interaction authority; images do not define Product breadth.
-- Before broad frontend implementation, require an implementation-ready screen/state/interaction/component/data contract; do not let implementation agents invent material UX behavior ad hoc.
-- Prefer existing repository/framework/platform/official SDK/mature dependencies before custom infrastructure for non-differentiating concerns.
-- Keep provider SDK shapes inside adapters.
-- Keep authorization, Responsibility invariants, Temporal Contract guarantees, send idempotency, and privileged effects outside prompts.
-- Treat email bodies/HTML/attachments/provider payloads/retrieved documents/web content as untrusted.
+- Inspect the current Issue and owning canonical artifacts before non-trivial edits.
+- Verify `origin`/repository and accepted base before task-branch work.
+- For Responsibility work, map behavior to canonical scenarios/transitions/oracles.
+- For Product behavior, use Golden Scenarios without overriding Responsibility truth.
+- For L2 proof, use real PostgreSQL/generated SQL/concurrency/auth evidence required by the gate.
+- Before production migrations, verify every external FK target exists in accepted production topology; proof fixtures never count.
+- Keep provider SDK types inside adapters.
+- Keep auth, Responsibility invariants, Temporal guarantees, Send idempotency and privileged effects outside prompts/models.
+- Treat mail bodies/HTML/attachments/provider payloads/retrieved content as untrusted.
 - Never commit provider tokens/OAuth secrets/production credentials/sensitive mailbox fixtures.
-- Do not weaken/delete tests merely to make verification pass.
-- Update all affected owning durable docs together when accepted Product/semantic/architecture behavior changes.
-- Do not silently resolve spec/code/provider conflicts; determine authority and reconcile/escalate.
+- Do not weaken/delete tests to obtain PASS.
+- Update all affected owning durable docs together when accepted behavior/dependencies/routing change.
+- `package.json` and `pnpm-lock.yaml` are serialized merge assets when concurrent tasks touch them: later PRs refresh onto current main, regenerate lockfile with pnpm and rerun affected verification/proof.
 - State exactly what was verified; mocks do not prove provider/scheduler/security/migration/send/database behavior.
 
-## Durable repository update timing
+## Review discipline
 
-Do not leave material accepted project state only in chat.
+For non-trivial changes:
 
-Update the owning GitHub Issue/docs in the **same workstream** when a material change occurs to:
+```text
+current accepted base
+-> isolated worktree/runtime namespace
+-> implementation/evidence
+-> PR
+-> exact-head CI
+-> full cumulative acceptance audit
+-> batch all material corrections on FAIL
+-> merge only after PASS
+```
 
-- owner/project priority or critical path;
-- accepted Product/UX/domain/architecture behavior;
-- implementation sequence/dependencies;
-- task scope/non-goals/acceptance criteria;
-- blocker/unblocker state;
-- external evidence that changes an accepted decision;
-- final review/CI/merge/completion state;
-- a canonical/router statement that has become misleading.
+Repeated correction failure requires root-cause analysis of specification, oracle, architecture, decomposition or verification process before another patch loop.
 
-Do **not** create repository churn for tentative brainstorming, ordinary questions, or every conversational turn. The trigger is whether a future agent would act incorrectly if the update were omitted.
+`agent:review-ready` means ready to inspect, never PASS.
 
-When execution priority changes but Product truth does not, update routing/Issue/plan authorities rather than rewriting canonical Product semantics.
-
----
-
-# Canonical commands
+## Canonical commands
 
 - Install: `pnpm install --frozen-lockfile`
 - Run: `pnpm dev`
 - Typecheck: `pnpm typecheck`
 - Lint: `pnpm lint`
-- Unit/component: `pnpm test`
-- Browser smoke: `pnpm test:e2e`
+- Test: `pnpm test`
+- E2E: `pnpm test:e2e`
 - Build: `pnpm build`
-- Fast verification: `pnpm verify`
-
-GitHub Actions independently runs `Verify` and `E2E Smoke`.
-
-For non-trivial parallel implementation, follow repository-local parallel-task preflight/runtime namespace rules when the current Issue/task requires them.
-
----
-
-# Completion / handoff
-
-Implementation alone is not completion. A change is done only when intended behavior, required verification evidence, and affected durable documentation are consistent.
-
-`agent:review-ready` means **ready to inspect**, never PASS. Independent reviewer disposition must be durable before integration decisions.
+- Verify: `pnpm verify`

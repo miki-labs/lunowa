@@ -48,7 +48,9 @@ Primary purpose:
 - semantic foreground/background state treatment;
 - overall calm premium productivity tone.
 
-Use this as the strongest visual foundation reference. Do not infer Product behavior from decorative examples inside the board.
+Use this as the strongest **visual** foundation reference. Do not infer Product behavior from decorative examples inside the board.
+
+**Exact token values are never read back from pixels or image text.** Generated hex strings, font-stack text, measurements and sample labels can contain image-generation corruption. Exact colors, typography behavior, target sizes, focus behavior and accessibility constraints come from `V1-UI-IMPLEMENTATION-CONTRACT.md` and executable tokens/tests.
 
 ## `01-component-system.png`
 
@@ -63,29 +65,32 @@ Primary purpose:
 - focus/disabled/target-size direction;
 - reusable component density.
 
-Component examples do not authorize features that textual Product scope defers.
+Component examples do not authorize features that textual Product scope defers. The board's note that Waiting/Later/Done are filter/projection treatments rather than global destinations is directionally consistent with the textual design contract, but literal copy, status names, shortcut hints and example control behavior still remain non-normative.
 
 ## `02-desktop-core-workspace.png`
 
 Primary purpose:
 
-- desktop three-pane workspace grammar;
-- scope/account switcher direction;
-- left navigation hierarchy;
+- desktop three-pane workspace proportions;
+- sidebar / list / detail spatial relationship;
 - middle-pane information density;
 - right-side conversation/action workspace;
 - surface/background hierarchy and overall density.
 
-This image is a **workspace grammar**, not a canonical Inbox taxonomy. `Home`, `Needs You`, `Managed`, `Review`, `Source` and Search keep their textual semantics even when they reuse this shell.
+This image is a **workspace grammar**, not a canonical Inbox taxonomy or navigation specification.
+
+**Do not copy its left rail literally.** In particular, generated destinations/filters such as `すべて`, `待ち`, `あとで`, `ピン留め` or a prominent generic `新規メール` action do not override the current navigation or v1 scope. The current textual navigation contract and, where a visual example is useful, the main-destination hierarchy shown in `03-moment-conversation-reply.png`, take precedence.
+
+Likewise, multiple-account examples and account/scope controls in this image illustrate layout capacity only. They do not promote broad multi-account/second-provider UX into the current one-provider critical path.
 
 ## `03-moment-conversation-reply.png`
 
 Primary purpose:
 
+- current desktop main-destination hierarchy direction (`Home` / `Needs You` / `Managed` / conditional `Review` / `Source Conversations` / Search);
 - Moment / minimum-context restoration;
 - one recommended primary next action;
 - source-grounded conversation history;
-- lightweight People Context inside communication restoration;
 - contextual reply composer;
 - evidence-first trust hierarchy.
 
@@ -93,9 +98,13 @@ Important boundaries:
 
 - one Moment generally has one primary question/action;
 - AI assists but is not the dominant interaction metaphor;
-- People Context must not become CRM/personality scoring;
 - recommended action must not bypass permission, safe-action or explicit-send boundaries;
-- Source remains inspectable.
+- Source remains inspectable;
+- Waiting/Later/Done/Pin examples are projection/filter styling, not authority to create permanent global destinations or activate deferred Pin behavior;
+- People Context / history shown beside the communication flow is **visual direction for a conditional/strong-candidate communication-restoration aid**, not a current CORE CRM/person-surface requirement and must not block the Minimum Complete Delegation Loop;
+- multiple-account samples are layout examples, not current second-provider/multi-account implementation authorization;
+- generated send-menu arrows, keyboard-send hints or secondary send modes do not authorize Send Later, generic Undo, implicit send or a shortcut that conflicts with Japanese IME / explicit-Send rules;
+- `あとで` must resolve through the accepted defer/return-condition semantics rather than acting as an opaque hide action.
 
 ## `04-mobile-core-flow.png`
 
@@ -108,6 +117,25 @@ Primary purpose:
 - mobile density and primary-action placement.
 
 Do not create a different mobile Product model. `RESPONSIVE.md` and the v1 UI contract own adaptation semantics.
+
+The image's account selector, status filters, People/History controls, AI draft affordance and send-menu arrow are **capability/layout illustrations only**. They do not promote broad multi-account, People/CRM, deferred filter destinations or additional send modes into current v1 CORE. Home/true-zero/integrity wording must be driven by trustworthy runtime state, not copied from sample counts or timestamps in the image.
+
+---
+
+# Cross-reference conflict rules
+
+When two current images appear to disagree, use this order for the **visual region at issue**, after applying textual authority first:
+
+| Visual question | Strongest current image guidance | Required guardrail |
+|---|---|---|
+| logo / brand relationship / overall tone | `00` | exact token/code values come from text/code, never OCR/pixels |
+| reusable component appearance | `01` | behavior/accessibility comes from UI contract/tests |
+| desktop pane proportions / density / surfaces | `02` | do not copy its old-style left-rail taxonomy |
+| desktop primary navigation hierarchy | `03` | textual navigation contract wins; optional filters are not global destinations |
+| Moment / recommended action / conversation / reply | `03` | one safe primary action; explicit send; evidence remains inspectable |
+| compact/mobile adaptation | `04` | same ontology; preserve place/state across adaptive transitions |
+
+No image can resolve a Product/domain contradiction. Route a real contradiction to the owning textual authority instead.
 
 ---
 
@@ -152,13 +180,16 @@ Do **not** treat literal generated-image details as authority for:
 
 - sample names, dates, counts, amounts or email addresses;
 - exact copy when canonical copy differs;
+- exact color/font/measurement tokens printed inside an image;
 - Product scope;
 - Responsibility state/identity semantics;
 - provider permissions/capabilities;
 - external-action authority;
 - AI confidence or reasoning;
 - legal/privacy commitments;
-- exact runtime behavior.
+- exact runtime behavior;
+- keyboard shortcuts or send modes;
+- whether a conditional/strong-candidate feature belongs to the current critical path.
 
 Generated-image artifacts, typos and accidental feature suggestions must be ignored when textual authority disagrees.
 
@@ -171,12 +202,13 @@ Before pixel-sensitive frontend work:
 1. read the current Product/UI task contract;
 2. read the relevant textual Product/design/domain authority;
 3. inspect `00` and `01` for global visual grammar;
-4. inspect `02` for desktop workspace work, `03` for Moment/conversation/reply work, and `04` for compact/mobile work;
-5. identify image/spec conflicts before coding;
-6. implement reusable tokens/components rather than screenshot-specific duplication;
-7. run the real app with realistic data;
-8. audit responsive behavior, keyboard/focus, Japanese IME, loading/error/integrity states and WCAG 2.2 AA requirements;
-9. tune spacing/density/hierarchy in the executable Product;
-10. update visual references only when doing so materially reduces future ambiguity.
+4. inspect `02` for desktop pane/density work, `03` for current desktop navigation + Moment/conversation/reply work, and `04` for compact/mobile work;
+5. classify every image-only capability as current CORE / conditional / deferred using textual Product authority before coding it;
+6. identify image/spec conflicts before coding;
+7. implement reusable tokens/components rather than screenshot-specific duplication;
+8. run the real app with realistic data;
+9. audit responsive behavior, keyboard/focus, Japanese IME, loading/error/integrity states and WCAG 2.2 AA requirements;
+10. tune spacing/density/hierarchy in the executable Product;
+11. update visual references only when doing so materially reduces future ambiguity.
 
 Target: **one coherent Product implemented from canonical semantics, guided by a small visual system—not a collection of screenshot replicas.**

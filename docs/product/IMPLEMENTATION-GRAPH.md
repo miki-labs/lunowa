@@ -4,6 +4,8 @@
 
 **Issue #58 final-candidate dependency and activation authority. Reconciled 2026-08-28 after repeated full acceptance audits.**
 
+V01 execution wording was reconciled on 2026-08-29 by Issue #61 to a minimal five-reference pre-implementation freeze plus runtime visual audit. This changes no dependency, Product scope, implementation owner, or activation gate.
+
 This graph translates accepted Product / Responsibility / UI / architecture contracts into executable work. It does **not** redefine Product semantics, Responsibility semantics, empirical Product claims, or provider facts.
 
 After accepted merge, this file + live GitHub Issues own implementation dependency, parallelization, single-writer and production-FK topology questions.
@@ -204,13 +206,23 @@ Purpose/scope: update current accepted Next 16.3 line to the current patched sec
 
 Acceptance: current security fixes present; `pnpm verify`; E2E smoke; exact-head CI; no bootstrap regression.
 
-## V01 — Final current visual-reference pass
+## V01 — Minimal canonical visual-reference freeze
 
 Class: `PARALLEL_SAFE` after #58 merge.
 
-Purpose/scope: current CORE Home / Needs You / Managed / Review / Moment / Source plus lifecycle/integrity visual references across representative widths.
+Purpose/scope: freeze the smallest pre-implementation visual grammar as exactly five active references:
 
-Acceptance: each reference maps to textual Product/UI state; no image invents behavior; textual authority wins.
+```text
+00-foundation-visual-system.png
+01-component-system.png
+02-desktop-core-workspace.png
+03-moment-conversation-reply.png
+04-mobile-core-flow.png
+```
+
+The set is representative, not screen/state exhaustive. Home / Needs You / Managed / Review / Moment / Source and lifecycle/integrity behavior remain fully governed by textual Product/UI authority. A missing dedicated screenshot does not authorize semantic invention. State-specific and responsive fidelity is completed through runtime/browser visual and accessibility audit after structural implementation exists.
+
+Acceptance: exactly five active canonical images plus the mapping README; old 00–19 explorations absent from the active directory but preserved in Git history; each image bound to textual authority; image-only features do not activate deferred/conditional scope; mobile preserves the same Product ontology; generated token/copy artifacts are non-authoritative; textual authority wins; final pixel-sensitive implementation is audited in the running Product.
 
 ## P13 — Responsibility L2 PostgreSQL/Drizzle executable proof
 
@@ -461,7 +473,7 @@ This matrix is normative together with Section 8. A node is not implementation-r
 | Node | Owned repository/runtime boundary | Required external/live evidence | Non-goals | Merge / unblock condition |
 |---|---|---|---|---|
 | G00 | root Next dependency/config/lock only | current official Next security guidance | Product features; unrelated upgrade sweep; major migration | exact-head Verify+E2E PASS -> P13/P14/G11 |
-| V01 | `docs/design/references/` + mapping docs only | no volatile vendor evidence required | Product/domain semantics; runtime code | textual mapping review PASS -> final pixel fidelity only |
+| V01 | exactly five active refs under `docs/design/references/` + mapping README | current visual/accessibility primary-source recheck as needed; no runtime vendor dependency | Product/domain semantics; runtime code; one static image per UI screen/state | five-reference full audit PASS -> final pixel fidelity; state-specific fidelity completes through runtime/browser audit |
 | P13 | task-specific proof harness/tests; root deps only if proof needs them; isolated PostgreSQL namespace | current stable Drizzle/Kit/driver + real PostgreSQL 18 | production schema/routes/provider/UI; production ownership | final refreshed proof PASS -> G19 prerequisite conformance + P15 |
 | P14 | task-specific auth proof/tests; root deps only if proof needs them; isolated PostgreSQL namespace | execution-time stable Better Auth + exact Drizzle/driver + real PostgreSQL 18 | production auth; Gmail OAuth; general auth UX | final refreshed 47–49 PASS -> G10 + P15 |
 | P15 | review/evidence/freeze artifacts only | direct final P13/P14 evidence and exact versions | implementation; production migrations | independent PASS/FREEZE -> G30 |

@@ -6,6 +6,10 @@
 
 This document defines durable data concepts, ownership, relationships, and invariants that should constrain implementation. Table names, child-table choices, SQL types, indexes, ORM syntax, and exact enums may change during schema design as long as the accepted semantics remain intact.
 
+This is deliberately a **conceptual capability superset**, not implementation authorization. Current Product scope is owned by `PRODUCT.md` / `PRODUCT-CONTENT.md`; current activation, dependency and writer order are owned by `IMPLEMENTATION-GRAPH.md` + live GitHub Issues. A concept appearing below does not require its table/fields to exist in the current one-provider Minimum Complete Delegation Loop.
+
+In particular, current v1 does **not** activate broad Scope/multi-account UX, Pin, Person/CRM Product behavior, reply-attachment persistence, Send Later, generic Undo/recall, or another deferred capability merely because a conceptual shape exists here. Implement the smallest activated subset required by the accepted graph and executable oracles.
+
 Responsibility semantics and persistence boundaries are constrained by:
 
 - `responsibility/README.md`;
@@ -21,6 +25,7 @@ Related broader sources:
 
 - `ARCHITECTURE.md`;
 - `CONTRACTS.md`;
+- `IMPLEMENTATION-GRAPH.md`;
 - `../design/INTERACTIONS.md`.
 
 ---
@@ -31,7 +36,7 @@ Related broader sources:
 2. **Preserve evidence layers.** Original communication, provider/external observations, AI interpretation, accepted domain state, safe action, and UI projection are distinct.
 3. **Keep Responsibility dimensions orthogonal.** Resolution, live tracking, attention/defer, obligation/actionability, expected events, temporal facts, uncertainty, and risk are not one lifecycle enum.
 4. **Provider facts and Lunowa product state have distinct authorities.** Authority is field-specific, not one global trust ranking.
-5. **Persist durable promises.** Temporal Contracts/scheduled sends are durable records, not inferred UI state.
+5. **Persist activated durable promises.** Temporal Contracts are durable when activated by the current graph. A future scheduled-send/undo-delay capability would likewise require durable state and reconciliation, but current v1 does not activate those send modes.
 6. **Preserve provenance.** Decision-critical facts/state should resolve to source evidence/trusted observations.
 7. **Support idempotency/reconciliation.** Provider ingestion and sends tolerate retries/duplicates/ambiguous outcomes.
 8. **Derived projections are disposable.** Search indexes, summaries, conversation status, embeddings, and similar projections are rebuildable.
@@ -121,6 +126,8 @@ Rules:
 - one-account users need not understand scope UI;
 - `全体` may be a virtual aggregate rather than a row.
 
+Current one-provider v1 does not require Scope/ScopeAccount persistence or broad Scope UX unless a later accepted task explicitly promotes it.
+
 ---
 
 ## 5. ScopeAccount
@@ -134,6 +141,8 @@ ScopeAccount {
 ```
 
 Initial rule: an account normally belongs to one primary user-created Scope. Multi-membership requires later product evidence.
+
+This remains conceptual/future-capability modeling in the current one-provider graph.
 
 ---
 
@@ -299,7 +308,7 @@ ParticipantIdentity {
 }
 ```
 
-This is not a CRM deal/contact pipeline.
+This is not a CRM deal/contact pipeline. The current graph may require `ParticipantIdentity` as provider-neutral evidence/FK infrastructure without activating a Person/CRM Product surface.
 
 Message headers are communication evidence. AI-inferred organization/role facts are derived and require provenance/appropriate uncertainty when material.
 
@@ -618,6 +627,8 @@ Invariants:
 - model/config/schema/basis revision are traceable;
 - a stale basis revision may be retained for diagnostics but cannot mutate current state.
 
+Current production topology may create a minimal `AIInterpretationRun` provenance prerequisite before model runtime activation. Table existence is not model invocation or accepted-state authority; G70 owns actual AI runtime activation.
+
 ---
 
 ## 21. DomainEvent / Responsibility effect history
@@ -745,7 +756,7 @@ Pin {
 }
 ```
 
-Pin is orthogonal to Responsibility state and survives Responsibility changes until user removes it.
+Pin is orthogonal to Responsibility state and survives Responsibility changes until user removes it. It is a conceptual future/optional retrieval feature and is **not** a current Minimum Complete Delegation Loop schema or UI prerequisite.
 
 ---
 
@@ -775,6 +786,8 @@ Draft {
 
 Draft survives ordinary navigation. Sending account is explicit. Autosave must not silently overwrite a newer concurrent edit.
 
+Current v1 Draft is bounded to contextual Reply / Reply All needed by G50; this conceptual shape does not authorize generic fresh Compose/Forward parity.
+
 ---
 
 ## 27. DraftAttachment / Upload
@@ -792,11 +805,17 @@ DraftAttachment {
 }
 ```
 
-Abandoned uploads follow explicit retention cleanup.
+Abandoned uploads follow explicit retention cleanup when this capability exists.
+
+Basic reply attachment add is currently a **V1 STRONG CANDIDATE**, not a G50/G51 prerequisite. Do not create DraftAttachment/upload persistence in the current critical path unless a later accepted Product/task contract promotes it.
 
 ---
 
 ## 28. SendOperation
+
+`SendOperation` is the durable external-effect record for whichever send modes are actually activated. The current one-provider v1 graph activates **contextual explicit immediate Send only**.
+
+Current G50/G51 minimum conceptual shape:
 
 ```text
 SendOperation {
@@ -805,10 +824,8 @@ SendOperation {
   draft_id
   connected_account_id
   idempotency_key
-  kind                      // immediate | undo_delay | scheduled
-  status                    // pending | cancellable | dispatching | ambiguous | provider_accepted | reconciled | cancelled | failed
-  scheduled_for?
-  cancellable_until?
+  kind                      // IMMEDIATE in current v1
+  status                    // pending | dispatching | ambiguous | provider_accepted | reconciled | failed
   provider_result_id?
   provider_message_id?
   attempt_count
@@ -818,13 +835,25 @@ SendOperation {
 }
 ```
 
-Invariants:
+Current invariants:
 
 - idempotency prevents duplicate sends;
 - ambiguous provider acceptance is not blindly retried;
-- provider-reconciled send is distinct from send attempt;
+- provider-reconciled send is distinct from send request/attempt;
 - reconciliation closes a Responsibility only when successful sending is sufficient evidence for its operational closure condition;
-- sending identity remains explicit.
+- sending identity remains explicit;
+- current offline behavior never silently queues a later consequential send.
+
+A future separately accepted Send Later or true undo-delay feature may extend the concept with shapes such as:
+
+```text
+kind                      // undo_delay | scheduled
+scheduled_for?
+cancellable_until?
+status                    // cancellable | cancelled | ...
+```
+
+Those fields/modes are **not current G50/G51 schema requirements** and may not be implemented merely because they are listed as a future extension here. Future activation requires a separately accepted Product/task contract defining permission over time, edit/cancel semantics, durable scheduling, provider behavior, idempotency and reconciliation. Generic provider recall/Undo is not implied by a local cancellable window.
 
 ---
 
@@ -863,6 +892,8 @@ Must be rebuildable and never bypass current authorization.
 Non-critical preferences such as appearance, density, pane widths, default scope, localization, and exposed AI-assistance preferences.
 
 Do not put safety-critical Responsibility rules into an opaque generic preference blob.
+
+Only preferences supported by current Product capability are implementation authority; conceptual examples here do not create Settings sections automatically.
 
 ---
 
@@ -1035,9 +1066,9 @@ Before implementing the first real Responsibility schema:
 4. use native relational constraints for ownership/idempotency where appropriate;
 5. avoid generic polymorphic workflow/EAV structures merely for flexibility;
 6. JSON is acceptable for provider-specific opaque metadata and versioned AI candidate facts when appropriate, but not as an excuse to erase core constraints;
-7. index actual flows: account sync, conversation list/projection, active Responsibility work, temporal triggers, drafts, sends, search;
+7. index actual activated flows: account sync, conversation list/projection, active Responsibility work, temporal triggers, drafts, immediate sends, search;
 8. keep migrations staged/reversible once user data exists;
-9. add only the child structures proven necessary by scenario/transition evidence;
+9. add only the child structures proven necessary by scenario/transition evidence and current activation authority;
 10. do not accept production migrations until the L2 executable gate produces an explicit PASS/FREEZE through its owning review flow.
 
-An implementation change that removes a high-value invariant must trigger an explicit spec/decision update rather than silently changing the model.
+An implementation change that removes a high-value invariant or activates a deferred conceptual capability must trigger an explicit Product/task/decision update rather than silently changing the model.

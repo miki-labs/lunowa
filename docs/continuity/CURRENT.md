@@ -13,7 +13,7 @@ This is a compact mutable bootstrap/router, not Product/design/domain/architectu
 - Responsibility semantics: `docs/product/responsibility/`
 - Execution sequence: `docs/product/IMPLEMENTATION-PLAN.md`
 - Current dependency graph candidate: `docs/product/IMPLEMENTATION-GRAPH.md`
-- Current live critical-path task: GitHub Issue #58.
+- Current live critical-path task: GitHub Issue #58
 
 ## Product direction
 
@@ -29,30 +29,31 @@ Implementation milestones do not establish ICP, PMF, WTP, retention or real moni
 
 ## Completed specification work
 
-### Product Content
-Canonical Product content and Golden Scenarios are complete enough for the current implementation hypothesis.
+- Product Content / Golden Scenarios: complete enough for current implementation hypothesis.
+- Issue #55 / PR #57: UI/UX implementation-readiness COMPLETE after full audit + exact-head Verify/E2E Smoke.
+- Main baseline after #57: `9869d7cdee2559b00d73203dec40d92bc90f537f`.
+- UI implementation authority: `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` + canonical design files.
 
-### Issue #55 — COMPLETE
-PR #57 merged after full cumulative audit + exact-head Verify/E2E Smoke.
-
-Merge baseline:
-`9869d7cdee2559b00d73203dec40d92bc90f537f`
-
-Current UI implementation authority:
-`docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` + canonical design files.
-
-Runtime is still bootstrap-level; frozen UI contract != implemented UI.
+Runtime remains bootstrap-level; frozen contracts are not implemented Product behavior.
 
 ## Current task — Issue #58
 
-Issue #58 freezes architecture activation boundaries, current vendor evidence, single-writer schema ownership, dependency DAG, safe parallel waves and full-loop acceptance.
+Issue #58 freezes:
+
+- architecture activation boundaries;
+- current vendor evidence;
+- production FK/topological order;
+- single-writer schema ownership;
+- dependency DAG and safe parallel waves;
+- full-loop acceptance mapping.
 
 Candidate artifacts:
+
 - `docs/product/IMPLEMENTATION-GRAPH.md`;
 - reconciled `ARCHITECTURE.md`, `CONTRACTS.md`, `TECH-STACK.md`, `IMPLEMENTATION-PLAN.md`;
 - `docs/product/research/issue-58-implementation-graph-evidence-2026-08-28.md`.
 
-Do not launch broad production fanout until #58 itself passes full cumulative audit + exact-head CI.
+Do not launch broad production fanout until #58 passes full cumulative audit + exact-head CI and merges.
 
 ## Actual implementation state
 
@@ -62,7 +63,7 @@ Current production packages remain essentially bootstrap-only. Better Auth, prod
 accepted stack != installed capability != implemented Product
 ```
 
-## Corrected dependency shape
+## Current dependency shape
 
 ```text
 #58 merge
@@ -71,32 +72,42 @@ accepted stack != installed capability != implemented Product
   +-> V01 final visual-reference pass
 
 After G00:
-  P13 Responsibility PostgreSQL/Drizzle proof  ----+
-  P14 Better Auth UUID proof ----------------------+-> P15 L2 freeze
+  P13 Responsibility PostgreSQL/Drizzle proof ----+
+  P14 Better Auth UUID proof ---------------------+-> P15 L2 freeze
   G11 structural UI shell/read-model harness
 
-P14 PASS -> G10 app auth/session only
-P13 PASS + G10 -> G20 Gmail + Source production persistence/sync -> G21 Source + exact search
-P15 PASS -> G30 Responsibility L3 -> G31 deterministic reducer -> G32 attention/Temporal
+P14 PASS -> G10 app auth/session
+P13 PASS + G10 -> G19 provider-neutral Source persistence
 
-G20/G21 provider lane || G31/G32 deterministic domain lane || G11/V01 UI lane
-                         |
-                         v
-                       G40 Product surfaces
-                         |
-                       G50 Draft + contextual immediate Send request
-                         |
-                       G51 provider Send reconciliation
-                         |
-                       G60 integrity/recovery
+G19 -> G20 Gmail OAuth/watch/history/sync -> G21 Source + exact search
+  |
+  +-> P15 PASS -> G30 Responsibility L3 -> G31 reducer -> G32 attention/Temporal
 
-G20 + G31 -> G70 bounded AI interpretation + contextual AI draft (parallel once contracts freeze)
+G11 + G21 + G31/G32 -> G40 Product surfaces
+G31 + frozen Source contract -> G70 bounded AI lane
+G20 + G40 -> G50 Draft + immediate Send request
+G31 + G50 -> G51 provider Send reconciliation
+G20/G21 + G32 + G40 + G51 -> G60 integrity/recovery
 
 G21 + G31/G32 + G40 + G51 + G60 + G70 -> G80 complete-loop integration
 G80 -> R90 public-beta release readiness
 ```
 
 Exact edges/classes belong to `IMPLEMENTATION-GRAPH.md`.
+
+## Persistence writer / FK order
+
+```text
+G10: User/session
+  -> G19: ConnectedAccount / ProviderSyncState / Conversation / Message / Attachment
+      -> G30: Responsibility after P15
+          -> G32: Temporal intent/trigger persistence
+
+G50: Draft + initial SendOperation request schema
+G51: provider dispatch/reconciliation transitions
+```
+
+Production migrations may not reference proof-only fixture tables.
 
 ## Responsibility proof state
 
@@ -111,59 +122,63 @@ L3 Responsibility production runtime       NOT AUTHORIZED
 
 - #13: PostgreSQL/Drizzle proof;
 - #14: Better Auth UUID proof;
-- #15: independent combined freeze.
+- #15: independent combined freeze;
+- #16 execution-isolation harness: COMPLETE.
 
-#16 execution isolation harness is complete. #13/#14 must start from fresh post-#58/G00 base and isolated runtime namespaces.
+#13/#14 must execute from fresh post-#58/G00 base with isolated runtime namespaces and current exact stable dependencies.
 
 ## Security pre-wave
 
-Current repo pins Next.js 16.3.0. Current Aug-25 2026 security guidance moves accepted Active-LTS 16.3 baseline to 16.3.3 for two Critical fixes.
+Current repo pins Next.js 16.3.0. Official Aug-25 2026 guidance moves the Active-LTS 16.3 baseline to 16.3.3 for two Critical fixes. G00 is the first runtime task after #58.
 
-G00 is the first runtime task after #58.
+## Source / Gmail boundary
 
-## Gmail/source boundary
+**G19** is the single writer for provider-neutral Source production persistence after G10 + P13 PASS.
 
-G20 is single writer for ConnectedAccount / ProviderSyncState / Conversation / Message / Attachment production schema after P13 proves current upstream L2 prerequisites.
-
-Current source pattern:
+**G20** consumes that schema and owns live Gmail OAuth/watch/history/sync behavior.
 
 ```text
 Gmail watch/PubSub signal
 -> authenticate + acknowledge quickly
 -> durable reconciliation
 -> history.list / full-sync recovery
--> normalized Source evidence
+-> normalized Source commit through G19
 ```
 
-Push is not truth. Watch renewal, periodic safety reconciliation, duplicate/drop tolerance and 404/full-sync recovery are required.
+Push is not truth. Watch renewal, periodic safety reconciliation, duplicate/drop tolerance and stale-history 404/full-sync recovery are required.
 
-Before a real Google refresh/access token is durably persisted, store it securely/encrypted at rest/application boundary, never log it, scope lookup to user + ConnectedAccount, and revoke/delete when no longer needed where supported. Plaintext durable token storage is not an accepted interim state.
+Before a real Google token is durably persisted, store it securely/encrypted at rest, never log it, scope lookup to user + ConnectedAccount, and revoke/delete when no longer needed where supported. Plaintext durable token storage is not an accepted interim state.
 
-Public OAuth verification/restricted-scope assessment remains an R90 release gate rather than a blanket local implementation blocker.
+Public OAuth verification/restricted-scope assessment remains R90 release work rather than a blanket local implementation blocker.
 
-## Domain parallelism
+## Safe parallelism
 
-G31 deterministic Responsibility work no longer waits for live Gmail. Once G30 exists, it consumes the frozen normalized evidence contract with deterministic fixtures while G20/G21 proceeds independently.
+After G19 + P15:
 
-This is intentional safe parallelism; G40 is where real Source and real accepted domain projections integrate.
+```text
+provider lane:       G20 -> G21
+Responsibility lane: G30 -> G31 -> G32
+UI lane:             G11 + V01
+```
+
+G31 consumes frozen normalized Source fixtures and does not wait for live Gmail. G40 integrates real Source + real accepted domain projections.
 
 ## Search / AI coverage
 
-Authorized **exact Source search is V1 CORE** and belongs to G21. NL/semantic Q&A remains conditional.
+Authorized **exact Source search is V1 CORE** and belongs to G21. Natural-language/semantic Q&A remains conditional.
 
-G70 owns two separate bounded AI contracts:
+G70 owns two distinct bounded model contracts:
+
 1. Responsibility interpretation candidate;
 2. contextual editable AI draft candidate.
 
-AI never owns accepted state, recipients/sender authority, Send permission or provider actions. Manual Source/Reply remains available under AI failure.
+AI never owns accepted state, sender/recipient authority, Send permission or provider actions. Manual Source/Reply remains usable under AI failure.
 
-`store:false` is not synonymous with Zero Data Retention; production AI use requires current org/project data-control review.
+`store:false` is not synonymous with Zero Data Retention; production email AI requires current org/project data-control review.
 
 ## Send ownership
 
-G50 owns minimal Draft + initial SendOperation request/pending schema for contextual immediate Send.
-
-G51 serially owns provider dispatch/reconciliation transitions.
+G50 owns minimal Draft + initial SendOperation request/pending schema for contextual immediate Send. G51 serially owns provider dispatch/reconciliation transitions.
 
 ```text
 Send request != provider acceptance != operational closure
@@ -174,6 +189,7 @@ Forward, Send Later, generic Undo/recall and silent offline queued Send are not 
 ## Current v1 exclusions
 
 Not current critical-path prerequisites:
+
 - Microsoft;
 - broad multi-account Scope UX;
 - Person/CRM;
@@ -187,17 +203,15 @@ Not current critical-path prerequisites:
 
 ## Visual sequencing
 
-New final visual references are intentionally deferred until #58 textual implementation graph freezes. After #58 merge, V01 may run in parallel with backend proof and should complete before final pixel-sensitive UI fidelity. Textual authority wins over generated imagery.
+Final visual references remain deferred until #58 textual graph freezes. After #58 merge, V01 may run in parallel with backend proof and must complete before final pixel-sensitive fidelity. Textual authority wins over generated imagery.
 
 ## Empirical Product Discovery
 
-Issue #36 remains open/deferred in execution order, not passed.
-
-Implementation cannot authorize claims about ICP, market pain, monitoring relinquishment, PMF, WTP, retention or differentiation against users' real current workflows.
+Issue #36 remains open/deferred in execution order, not passed. Implementation cannot authorize claims about ICP, market pain, monitoring relinquishment, PMF, WTP, retention or differentiation against real workflows.
 
 ## Durable update rule
 
-Update owning GitHub/docs in the same workstream when owner priority, accepted contract, dependency graph, blocker/unblocker, material external evidence or final review/merge disposition changes. Do not commit every tentative conversation turn.
+Update owning GitHub/docs in the same workstream when owner priority, accepted contract, dependency graph, blocker/unblocker, material external evidence or final review/merge disposition changes. Do not commit every tentative discussion turn.
 
 ## Deep links
 

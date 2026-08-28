@@ -1,239 +1,192 @@
 # Current Project Checkpoint
 
-This is a compact mutable bootstrap/router. It is **not** Product, design, domain, architecture, research, or live-execution authority. Query the owning canonical artifact and live GitHub state when those questions matter.
+This is a compact mutable bootstrap/router, not Product/design/domain/architecture/research authority. Query owning canonical artifacts and live GitHub state when precision matters.
 
-## Checkpoint metadata
+## Metadata
 
 - Last reconciled: `2026-08-28`
-- Continuity schema version: `0.1`
-- Canonical highest-level Product authority: `docs/product/PRODUCT.md`
-- Canonical detailed Product operating contract: `docs/product/PRODUCT-CONTENT.md`
-- Canonical Product-level acceptance bank: `docs/product/GOLDEN-SCENARIO-BANK.md` (subordinate to Responsibility semantic oracles)
-- Canonical Product design: `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md`
-- Canonical Responsibility semantics: `docs/product/responsibility/`
-- Active execution plan: `docs/product/IMPLEMENTATION-PLAN.md`
-- Historical Product synthesis candidates under `docs/product/*CANDIDATE.md`: **noncanonical rationale/history after consolidation**
-- Current owner-directed execution-priority authority: GitHub Issue #54 and its accepted successor tasks.
+- Highest-level Product: `docs/product/PRODUCT.md`
+- Detailed Product scope: `docs/product/PRODUCT-CONTENT.md`
+- Product acceptance: `docs/product/GOLDEN-SCENARIO-BANK.md`
+- UI implementation authority: `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` + canonical design trio
+- Responsibility authority: `docs/product/responsibility/`
+- High-level execution: `docs/product/IMPLEMENTATION-PLAN.md`
+- Exact graph candidate: `docs/product/IMPLEMENTATION-GRAPH.md`
+- Current live gate until merge: GitHub Issue #58
 
----
+## Product direction
 
-## Current Product direction
+Lunowa remains an email-centered **Attention Delegation / Open-loop Monitoring Offload** Product.
 
-Canonical Product content is reconciled through 2026-08-27 around one behavioral thesis:
+> 必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。
 
-- core user value: **Attention Delegation**;
-- strongest current problem/wedge: **Open-loop Monitoring Offload**;
-- canonical tracked semantic concept: **Responsibility**;
-- v1 Product direction: **Minimum Complete Delegation Loop**, not provider feature parity;
-- current form hypothesis: **companion/hybrid + one-provider complete-loop proof** before broad client/provider breadth;
-- current Product surfaces: Home/Landing, Needs You, Moment, Managed, material Review, Source Conversations;
-- continuous monitoring / episodic human attention;
-- monitoring autonomy is separate from consequential action authority;
-- mailbox/source provider state is separate from accepted Responsibility state;
-- detailed control/failure/lifecycle/Settings/edge/Managed/Review/zero behavior and final scope matrix live in `docs/product/PRODUCT-CONTENT.md`;
-- Product-level regression behavior lives in `docs/product/GOLDEN-SCENARIO-BANK.md` and never overrides Responsibility semantic truth;
-- Product Content COMPLETE means specification closure only; it does **not** mean ICP/PMF/WTP/reliability/usability/legal/privacy/runtime feasibility are validated.
+v1 remains a one-provider **Minimum Complete Delegation Loop**, not broad provider/full-client parity.
 
-The current execution-priority change does **not** alter these Product truths or convert hypotheses/unknowns into facts.
+Implementation does not establish ICP, PMF, WTP, retention or real monitoring relinquishment.
 
----
+## Completed specification work
 
-## Current owner-directed critical path — Product completion first
+- Product Content / Golden Scenarios: complete enough for current implementation hypothesis.
+- Issue #55 / PR #57: implementation-facing UI/UX contract **COMPLETE** after full cumulative audit + exact-head Verify/E2E.
+- Main baseline after PR #57: `9869d7cdee2559b00d73203dec40d92bc90f537f`.
+- Runtime remains bootstrap-level; frozen contracts != implemented Product.
 
-The current owner priority is to make Lunowa a usable Product before returning to formal empirical Product Discovery.
+## Current gate — Issue #58
 
-Therefore the active execution critical path is:
+Issue #58 freezes:
 
-```text
-Product Content COMPLETE
--> Issue #55: UI/UX implementation-readiness full audit + completion
--> implementation graph / dependency decomposition
--> smallest safe parallel implementation wave
--> Minimum Complete Delegation Loop end-to-end
--> real one-provider source/read/monitor/return/contextual-action loop
--> hardening to a genuinely usable self-hosted/early-access Product
--> empirical Product Discovery / Issue #36 using real workflows and, where useful, the real Product
-```
+- implementation-state reconstruction;
+- current volatile vendor evidence;
+- architecture activation boundaries;
+- exhaustive production FK topology;
+- single-writer collision zones;
+- parallel execution vs serialized merge rules;
+- implementation DAG;
+- Product/Responsibility/UI/provider acceptance mapping.
 
-This is an **execution-order decision**, not empirical evidence.
+Do not launch broad production fanout until #58 passes full cumulative audit + exact-head CI and merges.
 
-Implementation may proceed against the accepted Product contract while the following remain explicitly UNKNOWN until measured:
-
-- exact ICP / first segment;
-- problem frequency/severity in a reachable market;
-- PMF;
-- WTP/pricing;
-- retention;
-- reliability threshold for monitoring relinquishment;
-- whether users stop parallel checking;
-- mature companion/hybrid/full-client preference.
-
-Do not report implementation completion as validation of any of those claims.
-
----
-
-## Immediate next task — Issue #55
-
-GitHub **Issue #55 — `[Design]: Make Lunowa v1 UI/UX implementation-ready`** is the next critical-path task after Issue #54 routing reconciliation.
-
-It must convert accepted Product/design semantics into an implementation-ready specification covering:
-
-- complete v1 CORE screen inventory;
-- state inventory per screen;
-- empty/loading/unknown/degraded/disconnected/error behavior;
-- interaction/navigation/action contracts;
-- desktop/tablet/mobile/compact responsive behavior;
-- visual-system decisions material to implementation;
-- accessibility requirements;
-- component -> Product/domain projection mapping;
-- minimum data/event contracts;
-- Product Golden Scenario / Responsibility oracle mapping.
-
-It must **not** invent broad full-client/provider parity or new Product semantics merely to make implementation convenient.
-
-After #55 passes, create/reconcile the implementation dependency graph from the final UI/UX + architecture/domain/provider contracts before broad parallel coding begins.
-
----
-
-## Empirical Product Discovery — Issue #36 remains open, currently deferred in execution priority
-
-GitHub **Issue #36 — `[Product Discovery]: Validate the first ICP and real communication-monitoring burden`** remains a valid empirical Product-learning gate and stays open.
-
-Current execution policy:
-
-- #36 is **not passed, falsified, or closed**;
-- #36 is no longer a prerequisite for beginning the current owner-directed product-completion lane;
-- its findings remain required before making strong ICP/PMF/WTP/market-validity claims;
-- later fieldwork may use the usable Product to improve ecological validity, while preserving the existing non-leading/recent-event evidence discipline;
-- if later #36 evidence materially falsifies the current wedge, the Product plan must change even if implementation already exists.
-
-This preserves epistemic honesty while allowing the owner to prioritize shipping a usable Product.
-
----
-
-## Existing experimental / technical lanes
-
-- **Issue #26** — bounded Responsibility/Moment mechanism evidence; still does not establish ICP, longitudinal relinquishment, WTP, or PMF.
-- **Issue #28** — existing comparative fake-data prototype lane. Do **not** silently broaden it into the new product-completion implementation lane; reconcile or supersede explicitly if later reused.
-- **Issue #32 / PR #34** — bounded scenario-oracle lane; not automatically the new implementation authority.
-- **Responsibility L2 proof** — technical evidence, not Product validation.
-
-The new product-completion implementation graph must reuse accepted evidence from these lanes where relevant without inheriting obsolete sequencing assumptions.
-
----
-
-## Responsibility technical evidence state
+If live GitHub shows #58 already merged/closed, this checkpoint's transition is:
 
 ```text
-L0 semantic model                         FROZEN v0.1
-L1 logical persistence boundary           FROZEN v0.1
-L2 exact PostgreSQL/Drizzle DDL            v0.4 STATIC REVIEW COMPLETE
-L2 executable proof                        PENDING
-L2 final freeze                            BLOCKED
-L3 migrations/runtime                     NOT AUTHORIZED until its own gate passes
+next runtime gate = G00 patched framework security baseline
+parallel-safe visual lane = V01 final visual-reference pass
+exact downstream order = IMPLEMENTATION-GRAPH.md + live Issues
 ```
 
-Issues #13/#14 provide bounded executable PostgreSQL/Drizzle/Auth evidence; Issue #15 is the independent combined review/freeze decision.
+## Actual implementation state
 
-Product-completion priority does **not** waive these technical acceptance gates. A production persistence implementation that depends on L2 must satisfy them before integration.
-
----
-
-## Current high-impact unknowns
-
-- exact ICP / first segment and problem frequency/severity;
-- real current-tool/workaround adequacy;
-- attainable material false-negative vs unnecessary Review/resurfacing trade-off;
-- reliability threshold at which users truly stop parallel checking;
-- exact delivery/digest/quiet-hours policy under real use;
-- whether current Home/Needs You/Managed/Review/Source IA wins real use;
-- whether companion/hybrid remains superior after mature adoption;
-- Product-critical need for generic native compose/calendar/multi-account breadth;
-- pricing/WTP/packaging;
-- acquisition/distribution;
-- retention/continued delegated monitoring;
-- exact legal/privacy retention/deletion/export/billing commitments required for shipped Product-account deletion;
-- whether Responsibility remains the simplest sufficient internal mechanism after real data.
-
-Implementation should expose these unknowns to later evidence, not erase them from documentation.
-
----
-
-## Current differentiation discipline
-
-Do not infer differentiation from feature/ontology novelty alone, including AI summary/draft/search, Waiting/My Turn, no-reply follow-up, commitment/outcome extraction, multiple Responsibilities, stateful tracking, companion form, or agent execution.
-
-Lunowa must eventually outperform the user's **real current workflow** on delegated monitoring while keeping misses, unnecessary attention, reconstruction, correction, and trust/control burden acceptably low.
-
-Current implementation work is building the instrument/Product needed to test and deliver that thesis; it is not proof that the thesis has won.
-
----
-
-## Current implementation sequence
-
-Use `docs/product/IMPLEMENTATION-PLAN.md` + live Issue state.
+Production capability is still mostly bootstrap-only. Better Auth production auth, Drizzle/PostgreSQL production persistence, Gmail integration, Trigger.dev runtime and OpenAI runtime are not activated.
 
 ```text
-Phase 0 foundation (already mechanical)
--> UI/UX implementation readiness / Issue #55
--> implementation graph + dependency/safety partitioning
--> Responsibility executable/persistence gates as required by the chosen vertical slice
--> one-provider source/read path
--> deterministic Responsibility + attention/temporal loop
--> Home / Needs You / Managed / Review / Moment / Source projection
--> contextual Reply/Reply All + explicit Send + reconciliation where required
--> bounded AI interpretation behind trusted contracts
--> failure/reconnect/integrity + attachment-source-access closure
--> end-to-end Minimum Complete Delegation Loop
--> beta/early-access hardening
--> empirical validation and scope expansion based on evidence
+accepted stack != installed capability != configured integration != implemented Product
 ```
 
-Do not replace this with either extreme:
+Current repo still pins Next.js 16.3.0; official Aug-25 2026 security guidance moves the accepted Active-LTS 16.3 baseline to 16.3.3. G00 owns that update after #58.
 
-- a broad fake full-client shell with no real loop; or
-- indefinite research/specification work that prevents a usable Product from existing.
+## Corrected dependency shape
 
-The target is a **vertical complete loop**.
+```text
+#58 merge
+  |
+  +-> G00 security baseline
+  +-> V01 visual-reference pass
 
----
+After G00:
+  P13 Drizzle/PostgreSQL proof ----+
+  P14 Better Auth UUID proof ------+-> P15 L2 independent freeze
+  G11 structural UI harness
 
-## Repository update timing — durable working rule
+P14 PASS -> G10 app User/session
+P13 PASS + G10 -> G19 provider-neutral evidence foundation
 
-Repository state must not lag materially behind accepted project state.
+G19 -> G20 Gmail -> G21 Source/exact search
+  |
+  +-> P15 PASS -> G30 production persistence -> G31 reducer -> G32 attention/Temporal
 
-Update the owning GitHub Issue/docs **in the same workstream** when any of these materially changes:
+G11 + G21 + G31/G32 -> G40 Product surfaces
+G31 + frozen evidence contract -> G70 bounded AI
+G20 + G40 -> G50 contextual Draft/immediate Send request
+G31 + G50 -> G51 provider Send reconciliation
+G20/G21 + G32 + G40 + G51 -> G60 integrity/recovery
 
-- owner/project priority or critical path;
-- accepted Product/UX/domain/architecture behavior;
-- implementation sequencing or dependency graph;
-- scope/non-goal/acceptance contract;
-- blocker/unblocker status;
-- durable external evidence that changes a decision;
-- final review/CI/merge/completion disposition;
-- a previous canonical/router statement becomes misleading.
+G21 + G31/G32 + G40 + G51 + G60 + G70 -> G80 complete loop
+G80 -> R90 public-beta readiness
+```
 
-Do **not** create noisy commits for ordinary discussion, tentative ideas, or every conversational turn. Durable updates are for decisions/evidence/state that a future agent must know to act correctly.
+## Exhaustive production FK closure
 
-When an owning canonical artifact should remain unchanged, update the router/live Issue instead of rewriting Product truth merely to reflect execution priority.
+Current Responsibility L2 v0.4 requires production targets for:
 
----
+```text
+User
+connected_accounts
+conversations
+participant_identities
+messages
+ai_interpretation_runs
+```
 
-## Deep links
+Ownership/order:
 
-- `docs/product/PRODUCT.md` — canonical highest-level Product contract.
-- `docs/product/PRODUCT-CONTENT.md` — canonical detailed Product operating contract and final Feature Matrix.
-- `docs/product/GOLDEN-SCENARIO-BANK.md` — canonical Product-level acceptance bank, subordinate to Responsibility semantic oracles.
-- `docs/product/README.md` — Product/engineering authority map.
-- `docs/design/DESIGN.md` — canonical Product design.
-- `docs/design/INTERACTIONS.md` — canonical interactions.
-- `docs/design/RESPONSIVE.md` — canonical responsive behavior.
-- `docs/product/IMPLEMENTATION-PLAN.md` — active execution sequence.
-- `docs/product/responsibility/README.md` + `DECISIONS.md` — canonical Responsibility semantics/status.
-- ADR 0002 — AI interpretation vs trusted state/authority.
-- ADR 0003 — durable Temporal Contract and attention/notification separation.
-- Issue #54 — current execution-priority reconciliation task.
-- Issue #55 — next UI/UX implementation-readiness task.
-- Issue #36 — deferred-but-open empirical Product Discovery authority.
+- G10: User/session;
+- G19: ConnectedAccount, Conversation, Message, ParticipantIdentity, ProviderSyncState, Attachment metadata and evidence revision;
+- G30 prelude: minimal AIInterpretationRun prerequisite before Responsibility tables;
+- G30 after P15: frozen Responsibility-owned tables.
 
-If this checkpoint conflicts with canonical Product/design/domain sources, executable evidence, or live GitHub task state, the authoritative/current source wins. Repair this router rather than treating stale checkpoint prose as authority.
+Creating ParticipantIdentity does not activate CRM/Person Product scope. Creating AIInterpretationRun does not activate model execution; G70 owns AI runtime.
+
+Proof fixture != production FK target.
+
+## Parallelism correction
+
+P13/P14/G11 can execute concurrently after G00 in isolated worktrees/runtime namespaces, but:
+
+```text
+parallel execution != parallel merge
+```
+
+`package.json` and `pnpm-lock.yaml` are serialized merge assets. Later concurrent PRs touching them refresh onto latest accepted main, regenerate the lockfile with pnpm, rerun repository verification, and rerun materially dependency-sensitive proof.
+
+## Responsibility proof state
+
+```text
+L0 semantics                          FROZEN v0.1
+L1 logical persistence                FROZEN v0.1
+L2 exact PostgreSQL/Drizzle candidate v0.4 STATIC REVIEW COMPLETE
+L2 executable proof                   PENDING (#13/#14)
+L2 final freeze                       BLOCKED (#15)
+L3 production Responsibility runtime  NOT AUTHORIZED
+```
+
+## Provider / security boundary
+
+G20 consumes G19 persistence for live Gmail OAuth/watch/history/sync.
+
+```text
+watch/PubSub signal
+-> authenticated quick acknowledgement
+-> durable reconciliation
+-> history.list / full-sync recovery
+-> normalized Source commit
+```
+
+Push is not truth. Stale `historyId`/404 requires full sync. Before first durable real Google token persistence, store encrypted at rest, keep key material separate, never log it, scope use by user+ConnectedAccount, and revoke/delete when intentionally no longer needed where supported.
+
+Public OAuth verification/restricted-scope assessment remains R90 release work where required.
+
+## AI / search / send boundaries
+
+- exact authorized Source search = V1 CORE, G21;
+- attachment evidence access = V1 CORE, G20/G21;
+- G70 owns separate bounded Responsibility-interpretation and contextual-draft schemas/evals;
+- AI never owns accepted state, sender/recipient authority, Send permission or provider actions;
+- `store:false` != proof of Zero Data Retention;
+- G50 owns Draft + initial immediate SendOperation request;
+- G51 owns dispatch/reconciliation;
+- Send request != provider acceptance != operational closure.
+
+## Current exclusions
+
+Not current critical-path prerequisites:
+
+- Microsoft;
+- broad multi-account Scope UX;
+- Person/CRM Product features;
+- Pin;
+- generic fresh Compose/Forward;
+- Send Later/generic Undo;
+- rich native attachment preview;
+- natural-language Search;
+- autonomous Send;
+- generic workflow/rule engine.
+
+## Empirical Product Discovery
+
+Issue #36 remains open/deferred in execution order, not passed. Implementation cannot authorize claims about ICP, market pain, monitoring relinquishment, PMF, WTP, retention or differentiation against real workflows.
+
+## Durable update rule
+
+Update owning GitHub/docs in the same workstream when owner priority, accepted contract, dependency graph, blocker/unblocker, material external evidence, authority routing or final review/merge disposition changes. Do not record every tentative discussion turn.
+
+If this router conflicts with canonical sources, executable evidence or live GitHub state, the authoritative/current source wins and this router should be repaired.

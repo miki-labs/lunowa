@@ -2,122 +2,205 @@
 
 ## Status
 
-**Accepted logical contracts, reconciled with Responsibility v0.1; concrete API/SDK syntax is not yet frozen.**
+**Accepted logical module contracts for the one-provider Minimum Complete Delegation Loop; reconciled 2026-08-28 for Issue #58 dependency/FK ownership.**
 
-This document defines contracts between Lunowa modules so provider details, model output, workers, or UI code cannot silently redefine domain behavior.
-
-Responsibility-specific semantics are constrained by:
-
-- `responsibility/README.md`;
-- `responsibility/DECISIONS.md`;
-- `responsibility/CONSISTENCY-AUDIT.md`;
-- `responsibility/SCENARIO-SCHEMA.md`;
-- `responsibility/TRANSITION-SCHEMA.md`.
-
-Related broader sources:
-
-- `ARCHITECTURE.md`;
-- `DATA-MODEL.md`;
-- `../design/INTERACTIONS.md`;
-- `../ai-product-runtime.md`.
-
----
+Concrete SDK/API syntax remains implementation-open. `IMPLEMENTATION-GRAPH.md` + live GitHub Issues own activation/dependency order. Responsibility semantics remain owned by `responsibility/`.
 
 ## 1. Contract principles
 
-1. External systems enter through validated adapters.
-2. Core contracts use Lunowa concepts, not Gmail/Microsoft SDK types.
-3. Evidence, interpretation, accepted Responsibility state, safe action, and UI projection remain distinct.
-4. AI returns structured candidate interpretation, not authoritative Responsibility state or authorization.
-5. Durable jobs reload/re-authorize/re-check current state before effects.
-6. External side effects define idempotency/reconciliation semantics explicitly.
-7. Search/AI projections resolve back to current authorized records.
-8. Contracts stay use-case-shaped; do not create generic workflow abstraction before required.
-9. One evidence event may produce multiple Responsibility effects.
-10. Stale evidence/model results cannot win merely because they complete later.
+1. External data enters through validated adapters.
+2. Core contracts use Lunowa concepts, not vendor SDK types.
+3. Evidence, interpretation, accepted state, safe action and UI projection remain distinct.
+4. Background work reloads/re-authorizes/revalidates current state before effects.
+5. External effects use application/domain idempotency + reconciliation.
+6. Stale evidence/model/job results cannot win because they finish last.
+7. Search/read models resolve only current authorized sources.
+8. Current v1 activates only the one-provider complete loop.
+9. Every production FK target must exist before a referencing production table is created; proof fixtures never satisfy production topology.
 
----
+## 2. Application session — G10
 
-## 2. Provider adapter contract
+```text
+AppSession {
+  user_id
+  session_id
+  expires_at
+}
+```
 
-Provider integrations expose normalized capabilities without forcing artificial feature parity.
+Application session != mailbox authorization.
 
-### 2.1 Capabilities
+G10 owns app-auth User/session production schema and protected BFF/session validation only. App sign-out does not disconnect a mailbox or resolve/stop Responsibilities.
+
+## 3. Provider-neutral evidence persistence — G19
+
+G19 is the single production writer for the provider-neutral evidence foundation after G10 + P13 PASS.
+
+Minimum durable ownership:
+
+```text
+ConnectedAccount
+ProviderSyncState
+Conversation
+Message
+Attachment metadata
+ParticipantIdentity
+```
+
+Required upstream invariants include:
+
+```sql
+connected_accounts UNIQUE (id, user_id);
+conversations UNIQUE (id, connected_account_id);
+participant_identities UNIQUE (id, user_id);
+messages UNIQUE (id, connected_account_id);
+```
+
+and monotonic non-negative `Conversation.semantic_evidence_revision`.
+
+At minimum `(connected_account_id, provider_message_id)` is unique.
+
+G19 repositories/fixtures are provider-neutral and usable without Gmail. G19 contains no Responsibility-owned table and no live Gmail OAuth/watch/history behavior. `ParticipantIdentity` here is evidence normalization/ownership infrastructure, not Person/CRM Product scope.
+
+## 4. AIInterpretationRun production prerequisite — G30 prelude / G70 runtime
+
+Frozen Responsibility L2 v0.4 references:
+
+```sql
+ai_interpretation_runs UNIQUE (id, user_id)
+```
+
+Therefore G30 must create the smallest accepted production `AIInterpretationRun` provenance/basis table **before** Responsibility tables that reference it.
+
+Minimum conceptual shape:
+
+```text
+AIInterpretationRun {
+  id
+  user_id
+  conversation_id?
+  message_id?
+  schema_version
+  model_config_version
+  provider_model_identifier?
+  basis_evidence_revision
+  status
+  created_at
+}
+```
+
+This prelude is evidence/provenance infrastructure only:
+
+```text
+creating table != calling model != accepting AI output
+```
+
+G70 owns actual model invocation, output schemas/evals and runtime use. Any later G70 schema evolution must preserve frozen Responsibility FK compatibility or use an explicit reviewed migration.
+
+## 5. Connected account / credential contract
+
+```text
+connectAccount(auth_result) -> ConnectedAccountConnection
+```
+
+Minimum result:
+
+```text
+provider_account_id
+email_address
+display_name?
+granted_capabilities
+credential_reference
+initial_sync_hint?
+```
+
+Requirements:
+
+- provider identity comes from provider evidence;
+- mailbox credentials stay server-side;
+- mailbox credential authority is Lunowa-owned, not Better Auth social-account authority;
+- reconnect-required and transient failures remain distinct;
+- capability absence disables only that capability.
+
+Before a real Google token is durably stored:
+
+- encrypt/store securely at rest;
+- keep cryptographic key/secret outside ordinary app DB/repository data;
+- never log token values;
+- require current authenticated user + ConnectedAccount ownership for lookup/use;
+- model invalidation/revocation as explicit integrity/reconnect state;
+- revoke/delete when intentionally removed where supported.
+
+A non-persistent protocol spike may avoid durable token storage. Plaintext durable token storage is never accepted.
+
+## 6. Provider capability contract
 
 ```text
 ProviderCapabilities {
   incremental_sync
   thread_identity
+  attachment_fetch
   message_send
+  mark_read? archive? trash? spam?
   draft_sync?
   schedule_send_native?
-  mark_read
-  archive
-  trash
-  spam
-  attachment_fetch
   contact_lookup?
 }
 ```
 
-### 2.2 Account connection
+Capability presence does not activate a Product feature. Current v1 requires Source read, attachment evidence access and contextual immediate Send. Forward/Send Later/etc remain inactive unless separately accepted.
+
+## 7. Gmail synchronization — G20
+
+G20 consumes G19 persistence and owns live Gmail OAuth/watch/history/provider behavior.
 
 ```text
-connectAccount(auth_result) -> ConnectedAccountConnection
-
-ConnectedAccountConnection {
-  provider_account_id
-  email_address
-  display_name?
-  granted_capabilities
-  credential_reference
-  initial_sync_hint?
-}
+syncAccount(connected_account_id, reason) -> SyncResult
 ```
 
-Requirements:
-
-- verify provider identity from provider evidence, not client-submitted email alone;
-- keep credentials server-side;
-- normalize account identity;
-- distinguish reconnect-required from transient failure.
-
-### 2.3 Incremental change fetch
+Reasons include:
 
 ```text
-fetchChanges(account, cursor?) -> ProviderChangeBatch
-
-ProviderChangeBatch {
-  changes[]
-  next_cursor?
-  cursor_valid
-  has_more
-}
+INITIAL_SYNC
+PUSH_SIGNAL
+PERIODIC_RECONCILIATION
+USER_REFRESH
+RECONNECT
+FULL_RESYNC
 ```
 
-Normalized change kinds may include:
+Required sequence:
 
 ```text
-MESSAGE_UPSERT
-MESSAGE_DELETE_OR_UNAVAILABLE
-THREAD_METADATA_CHANGED
-MAILBOX_STATE_CHANGED
+authorize account
+-> fetch provider changes
+-> normalize untrusted payload
+-> idempotent upsert through G19 repositories
+-> commit Source/evidence revision
+-> enqueue downstream reconsideration
+-> advance provider cursor after required local durability
 ```
 
-Duplicates are allowed at the boundary; ingestion is idempotent. Invalid cursor returns explicit resync/reconciliation state. Cursor advancement becomes locally authoritative only after the corresponding local changes are durable.
+### Push ingress
 
-### 2.4 Fetch normalized message/thread
+Gmail `users.watch` / Pub/Sub is a reconciliation signal, not mailbox/domain truth.
 
-```text
-fetchMessage(account, provider_message_id) -> NormalizedProviderMessage
-fetchConversationSeed(account, provider_thread_id) -> NormalizedProviderConversation
-```
+Production ingress must authenticate/validate expected push identity/audience as applicable, acknowledge valid requests quickly, defer non-trivial work, tolerate duplicate/delayed/dropped notifications, periodically reconcile without push, and renew watch before expiration.
+
+### Stale history
+
+Invalid/stale `startHistoryId` / HTTP 404 enters explicit full-sync recovery. It never becomes empty/current truth.
+
+### Historical ingestion
+
+Worker order is not semantic chronology. Historical source ingestion never automatically activates every unresolved-looking thread as current work.
+
+## 8. Normalized Source contract
 
 ```text
 NormalizedProviderMessage {
   provider_message_id
   provider_thread_id?
-  direction_hint?
   sender
   recipients[]
   cc[]
@@ -126,255 +209,87 @@ NormalizedProviderMessage {
   text_body?
   sanitized_html_source?
   timestamp
-  read_state?
   mailbox_state?
   attachments[]
   minimal_provider_metadata
 }
 ```
 
-Provider HTML/content remains untrusted.
+Provider HTML/body/attachment bytes remain untrusted. Source remains readable without Responsibility/Moment. G31 may consume deterministic normalized fixtures without live Gmail completion.
 
-### 2.5 Send message
+## 9. Attachment evidence access
 
-```text
-sendMessage(account, ProviderSendRequest) -> ProviderSendResult
-```
+Current CORE:
 
-```text
-ProviderSendRequest {
-  operation_id
-  idempotency_context
-  mode                  // new | reply | reply_all | forward
-  reply_to_provider_message_id?
-  recipients[]
-  cc[]
-  bcc[]
-  subject
-  body
-  body_format
-  attachments[]
-}
-```
+- preserve attachment existence/metadata/provenance;
+- authorize every access;
+- safe fetch/stream/open/download/provider fallback;
+- distinguish provider/security restriction from local preview failure;
+- preserve Source/Moment context.
+
+Rich native preview and reply attachment-add remain conditional. Access/preview is not completion evidence.
+
+## 10. Exact Source search
 
 ```text
-ProviderSendResult {
-  provider_acceptance_state
-  provider_message_id?
-  provider_thread_id?
-  provider_request_id?
-}
+searchSource(user_id, request) -> SearchResultPage
 ```
 
 Requirements:
 
-- ambiguous timeout/error states are distinct when provider may have accepted;
-- application reconciles ambiguous sends before blind retry;
-- provider retry cannot bypass Lunowa SendOperation idempotency;
-- provider acceptance is evidence of accepted send, not proof of unrelated external-world outcomes.
+- V1 CORE exact/deterministic retrieval over authorized Source;
+- current user/account/scope authorization;
+- truthful no-match retaining enough query/scope context to revise;
+- stale derived index may reduce recall but never leak inaccessible data;
+- semantic/NL Q&A only when separately active;
+- similarity never authorizes Responsibility identity merge.
 
-### 2.6 Mailbox mutations
+## 11. AI Responsibility interpretation — G70
 
-Expose narrow operations (`markRead`, `archive`, `trash`, `reportSpam`) rather than a generic arbitrary provider-mutation tool available to AI/UI.
+Input is only current authorized normalized context and evidence revision.
 
----
-
-## 3. Sync / ingestion contract
-
-```text
-syncAccount(connected_account_id, reason) -> SyncResult
-```
-
-Reasons may include:
-
-```text
-PUSH_NOTIFICATION
-POLL
-USER_REFRESH
-RECONNECT
-RECONCILIATION
-INITIAL_SYNC
-```
-
-```text
-SyncResult {
-  new_messages
-  updated_messages
-  deleted_or_unavailable_messages
-  cursor_advanced
-  downstream_work_enqueued
-  status
-}
-```
-
-### 3.1 Ingestion invariants
-
-For each provider message:
-
-1. authorize account ownership;
-2. normalize provider payload;
-3. upsert by `(connected_account_id, provider_message_id)`;
-4. attach to correct local Conversation;
-5. persist message/attachment metadata;
-6. commit local evidence;
-7. advance semantic evidence revision as appropriate;
-8. enqueue interpretation/index/re-evaluation idempotently;
-9. advance provider cursor only according to provider consistency semantics after required local durability.
-
-### 3.2 Semantic chronology
-
-Observed/worker order is not semantic authority.
-
-A late older message MUST NOT roll back a later explicit correction solely because it was ingested last.
-
-Normalization should preserve source sent/received time and explicit relation evidence needed by the reducer.
-
-### 3.3 Inbound observation event
-
-```text
-InboundMessageObserved {
-  message_id
-  conversation_id
-  connected_account_id
-  semantic_time
-  observed_at
-  evidence_revision
-}
-```
-
-Provider webhook payloads never directly mutate Responsibility attention/state.
-
----
-
-## 4. AI interpretation contract
-
-### 4.1 Input boundary
-
-The AI receives only context authorized for the current user/feature.
-
-Conceptual input:
-
-```text
-InterpretationInput {
-  schema_version
-  behavior_config_version
-  evidence_revision
-  locale
-  timezone
-
-  focal_message_id?
-
-  conversation_context {
-    conversation_id
-    connected_account_id
-    topic?
-    messages[] {
-      message_id
-      direction
-      sender
-      recipients
-      cc[]?
-      timestamp
-      subject
-      text_content
-      attachment_metadata[]?
-    }
-  }
-
-  existing_responsibility_context[]?
-  authorized_external_context[]?
-}
-```
-
-Do not pass provider credentials, unrelated accounts/scopes, or unrestricted database access.
-
-### 4.2 Output schema
-
-The model returns structured **candidate interpretation**, not state mutation.
-
-Conceptual output:
+Conceptual result:
 
 ```text
 InterpretationOutput {
   schema_version
   basis_evidence_revision
-
-  zoning_candidates[]?
-
-  communication_acts[] {
-    act_id
-    type                   // REQUEST | COMMITMENT | PROPOSAL | DECISION | CORRECTION | CANCELLATION | COMPLETION_SIGNAL | INFORMATION
-    speaker
-    obligation_bearer_candidate?
-    obligation_bearers_candidate[]?
-    assignment_shape_candidate?
-    action_or_event?
-    object?
-    modality?
-    obligation_strength?
-    polarity?
-    condition?
-    constraints[]?
-    temporal_expressions[]?
-    source_message_ids[]
-    source_locators[]?
-  }
-
+  communication_acts[]
   communicated_claims[]?
   proposed_terms[]?
-
   no_responsibility_signal?
-
-  uncertainty[] {
-    field
-    reason_code
-    source_message_ids[]?
-  }
+  uncertainty[]?
 }
 ```
 
-Exact production schema may evolve. The semantic distinctions are not optional.
+Output is a structured **candidate**, never accepted state.
 
-### 4.3 Explicit exclusions
+Validate runtime schema, current authorization, source IDs/participants, deterministic provider facts, material values/source locators where practical, cross-account boundaries and evidence-revision freshness.
 
-AI output is not authoritative for:
+AI is not authoritative for auth, provider facts, admission, Responsibility identity/effects, tracking/defer, Temporal effects, sender/recipient authority, send permission or external actions.
 
-- user authorization;
-- ConnectedAccount ownership;
-- send permission;
-- direct Responsibility mutation;
-- live activation/defer/hiding without product policy;
-- irreversible provider action;
-- provider-observed facts that should be deterministically read from provider data;
-- cost/usage limits;
-- scope membership;
-- high-risk compliance legitimacy.
-
-### 4.4 Abstention/uncertainty
-
-The schema supports uncertainty and no reliable Responsibility signal.
-
-Invalid output must not force a confident classification. However, model uncertainty alone also does not dictate product review; the reducer/safety layer considers source ambiguity, contradiction, risk, and deterministic observations.
-
-### 4.5 Provenance and freshness
-
-Material candidate fields include source message IDs/locators where practical.
-
-`basis_evidence_revision` is required wherever stale results could race newer evidence.
+## 12. Contextual AI draft — G70 with G50 manual baseline
 
 ```text
-basis_revision matches current revision
+requestContextualDraft(DraftAssistInput) -> DraftCandidate
 ```
 
-is necessary but not sufficient for application.
+Candidate body is editable text, not a Send command. Effective sender/recipient authority comes from trusted app/provider state. The model cannot add hidden recipients or execute provider actions. User explicitly reviews/commits Send. Manual composer remains baseline when AI fails.
 
----
+Drafting and Responsibility interpretation use separate schemas/evals.
 
-## 5. Responsibility reduction contract
+## 13. AI data-control contract
 
-The Responsibility reducer owns accepted evidence-relative domain effects from validated interpretation/trusted observations/user commands.
+Before production email AI use:
 
-Conceptual pure-ish contract:
+- record current org/project retention/data-control mode;
+- minimize authorized context;
+- use `store:false` where appropriate;
+- never describe `store:false` as equivalent to Zero Data Retention;
+- avoid indiscriminate raw mail/prompt/output logging;
+- if ZDR is required, verify actual eligibility/settings/endpoint-feature compatibility.
+
+## 14. Responsibility reduction — G31
 
 ```text
 reduceResponsibilityEvidence(
@@ -384,536 +299,156 @@ reduceResponsibilityEvidence(
 ) -> ResponsibilityDecision
 ```
 
-```text
-ResponsibilityDecision {
-  effects[] {
-    responsibility_ref?
-    operation              // CREATE | UPDATE | RESOLVE | REOPEN | SUPERSEDE | INVALIDATE | NO_OP
-    resolution_reason?
-    field_changes[]
-    reason_codes[]
-  }
-
-  field_decisions[]?
-  temporal_contract_changes[]?
-  attention_changes[]?
-  projection_invalidations[]?
-  audit_reasons[]
-  requires_user_confirmation?
-}
-```
-
-### 5.1 Why `effects[]`
-
-One focal message may supersede one Responsibility and create another. Do not force one scalar lifecycle/matching operation.
-
-`SUPERSEDE` is terminal on the old Responsibility and conceptually results in `RESOLVED/SUPERSEDED`; replacement creation is a separate `CREATE` effect.
-
-### 5.2 Canonical semantic dimensions
-
-Reduction preserves the orthogonal model:
+Admission:
 
 ```text
-resolution status/reason
-live tracking activation
-attention/defer
-obligation legs + actionability/conditions
-expected events
-completion criteria
-constraints
-pending proposals/agreed facts
-temporal facts
-field-level uncertainty/risk
-provenance
+TRACK
+DO_NOT_TRACK
+NEEDS_REVIEW
 ```
 
-The superseded seven-state lifecycle enum MUST NOT be restored as canonical state.
-
-### 5.3 Domain/evidence events
-
-Examples:
+Effects:
 
 ```text
-INTERPRETATION_ACCEPTED
-MESSAGE_OBSERVED
-USER_FIELD_CORRECTED
-USER_TRACKING_ACTIVATED
-USER_TRACKING_CLOSED
-USER_DEFERRED
-TEMPORAL_TRIGGER_FIRED
-SEND_RECONCILED
-PROVIDER_FACT_RECONCILED
-EXTERNAL_FACT_OBSERVED
-ACCOUNT_RESYNC_RECONCILED
+CREATE
+UPDATE
+RESOLVE
+REOPEN
+SUPERSEDE
+INVALIDATE
+NO_OP
 ```
 
-Event names remain implementation-open.
+One evidence event may produce multiple effects. Reducer preserves orthogonal dimensions, field-scoped authority and provenance. The obsolete single lifecycle enum never returns as truth. Historical evidence-relative OPEN does not imply live tracking.
 
-### 5.4 Core transition semantics
-
-- explicit user request may create an actionable USER obligation leg;
-- user send reconciliation may satisfy a send leg, but not necessarily the whole Responsibility;
-- remaining OTHER/EXTERNAL expected work projects `WAITING`;
-- follow-up trigger can create a current USER follow-up action in the same Responsibility;
-- hold adds/changes a constraint/expected resume event and is not cancellation;
-- cancellation resolves with a non-satisfaction reason;
-- same unsatisfied operational outcome can REOPEN;
-- genuinely closed earlier episode plus new work normally CREATEs a new Responsibility;
-- pending proposal does not become agreed fact before acceptance evidence;
-- field conflict preserves evidence and can project REVIEW without erasing a definitely tracked Responsibility;
-- historical evidence-relative open loop does not automatically activate live tracking.
-
-### 5.5 False-negative safety
-
-When material uncertainty could hide a real user obligation, prefer conservative visibility/review over unsupported `Done/Waiting/Later`.
-
-A system that sends everything to review is also a product failure. Review is reserved for decision-critical ambiguity/risk.
-
----
-
-## 6. Conversation aggregate contract
+## 15. Product projection
 
 ```text
 projectConversationAttention(responsibilities[]) -> ConversationAttention
 ```
 
-```text
-ConversationAttention {
-  primary_responsibility_id?
-  user_facing_state         // MY_TURN | WAITING | LATER | DONE | REVIEW | NONE or client mapping
-  attention_level?
-  nearest_relevant_time?
-  reason_code
-}
-```
-
-Rules:
-
-- only appropriate live Responsibilities participate in active-work projection;
-- unresolved/uncertain work must not disappear because another Responsibility resolves;
-- actionable critical/overdue USER obligation can outrank lower-risk work;
-- nearest meaningful due/blocker may affect ordering;
-- newest message is not the default authority for primary selection;
-- projection is deterministic/testable/rebuildable.
-
----
-
-## 7. Temporal Contract contract
-
-### 7.1 Create/update
+Possible projection:
 
 ```text
-upsertTemporalContract(responsibility_id, contract_spec, actor)
-  -> TemporalContract
-```
-
-```text
-TemporalContractSpec {
-  kind                    // active-obligation-defer | passive-waiting | other
-  triggers[] {
-    type                  // TIME | REPLY_RECEIVED | DEADLINE
-    at?
-    deadline_policy?
-  }
-  desired_attention_on_fire?
-  user_confirmed?
-}
-```
-
-Communication hold/pause is separate from attention defer.
-
-### 7.2 Schedule
-
-```text
-scheduleTrigger(trigger_id, trigger_at)
-```
-
-Scheduler is infrastructure; persisted contract/trigger is durable intent.
-
-### 7.3 Fire
-
-```text
-processTemporalTrigger(trigger_id) -> TriggerProcessingResult
-```
-
-Required sequence:
-
-1. load trigger + contract + current Responsibility/evidence;
-2. verify active/current version;
-3. claim idempotently;
-4. re-evaluate current evidence;
-5. persist resulting Responsibility/attention/resurfacing/audit effects;
-6. mark trigger fired/cancelled/superseded;
-7. cancel/update stale sibling triggers as rules require.
-
-A trigger does not itself imply notification.
-
-### 7.4 Reconciliation
-
-Overdue active triggers are discoverable/reprocessed idempotently after downtime.
-
-### 7.5 Reply matching
-
-Inbound normalized events are matched to relevant current Responsibility/contract state, not provider webhook payloads alone.
-
----
-
-## 8. Attention / resurfacing contract
-
-Conceptual surfacing strength:
-
-```text
+MY_TURN
+WAITING
+LATER
+DONE
+REVIEW
 NONE
-QUIET_STATE_UPDATE
-LIST_VISIBILITY
-ATTENTION_LIST
-NOTIFICATION
 ```
 
-Attention/defer is orthogonal to Responsibility resolution/live activation.
+Only appropriate live Responsibilities participate. Newest message is not status authority. Projection is deterministic/rebuildable.
 
-`LATER` requires intentional defer semantics and a return condition; a communication hold waiting on someone else ordinarily remains `WAITING`.
+## 16. Temporal contract — G32
 
----
+Persisted temporal intent/trigger is durable truth; scheduler/job run is execution.
 
-## 9. Draft contract
+```text
+upsertTemporalContract(responsibility_id, spec, actor)
+processTemporalTrigger(trigger_id)
+```
+
+On fire:
+
+1. load current trigger/contract/Responsibility/evidence;
+2. verify active/current version;
+3. claim via domain/DB idempotency;
+4. re-evaluate current evidence;
+5. persist accepted domain/attention/audit effects;
+6. fire/cancel/supersede trigger state;
+7. reconcile stale siblings.
+
+Trigger fire != notification/MY_TURN automatically.
+
+If Trigger.dev is used, key composition/scope/TTL is explicit and vendor idempotency is never the sole guarantee.
+
+## 17. Product read models — G11/G40
+
+Read models keep separate axes for:
+
+- app session/auth;
+- mailbox connection/capability;
+- sync/integrity/data-through;
+- accepted Responsibility projection;
+- pending/failed/ambiguous mutations/effects;
+- Source/provenance.
+
+Partial/degraded/untrusted coverage cannot become true zero. UI/read models never create domain authority.
+
+## 18. Draft — G50
 
 ```text
 saveDraft(draft_id?, expected_version?, payload) -> Draft
 ```
 
-```text
-DraftPayload {
-  connected_account_id
-  conversation_id?
-  mode
-  in_reply_to_message_id?
-  recipients[]
-  cc[]
-  bcc[]
-  subject
-  body
-  body_format
-  attachment_ids[]
-}
-```
+Requirements: authorize sender/account; validate recipients/accepted attachments; preserve version/conflict semantics; idempotent autosave where used; preserve draft across relevant navigation/layout/re-auth recovery; explicit discard distinct from pane close.
 
-Requirements:
+## 19. Immediate SendOperation — G50/G51
 
-- authorize sending account;
-- validate recipients/attachments;
-- optimistic conflict detection or equivalent;
-- autosave idempotent;
-- draft survives navigation/viewport changes.
-
-Explicit discard is distinct from closing a pane.
-
----
-
-## 10. Send operation contract
+G50 owns request/pending schema; G51 owns provider dispatch/reconciliation transitions.
 
 ```text
-requestSend(draft_id, mode, scheduled_for?) -> SendOperation
+requestImmediateSend(draft_id) -> SendOperation
 ```
 
-Modes:
+SendOperation distinguishes request/pending/dispatch/provider-unknown/provider-accepted/failed/reconciled truth. G50 establishes durable operation identity/idempotency and intended draft snapshot.
 
-```text
-IMMEDIATE
-UNDO_DELAY
-SCHEDULED
-```
+G51 sequence:
 
-API returns durable operation state, never fictional `sent=true` before provider evidence.
-
-### 10.1 Undo Send
-
-For Lunowa-controlled delay:
-
-```text
-PENDING/CANCELLABLE
- -> user cancels -> CANCELLED
- -> window expires -> DISPATCHING
-```
-
-After irreversible provider dispatch, generic Lunowa recall is unavailable unless separately implemented/provider-supported.
-
-### 10.2 Worker dispatch
-
-```text
-dispatchSendOperation(operation_id)
-```
-
-Required:
-
-1. claim idempotently;
-2. re-authorize account/user state;
-3. verify schedule/cancellation/current draft snapshot;
+1. claim application/domain idempotency;
+2. re-authorize account capability;
+3. validate intended draft snapshot;
 4. call provider adapter;
-5. record unambiguous or ambiguous result;
-6. reconcile sent message when necessary;
-7. apply Responsibility effect only after sufficient evidence for the specific closure condition.
+5. record unambiguous/ambiguous result;
+6. reconcile sent Source evidence;
+7. feed sufficient evidence to Responsibility reducer.
 
-### 10.3 Ambiguous provider result
-
-Timeout after dispatch may mean unknown acceptance.
-
-Never blindly retry as definitely unsent. Reconcile first or surface guarded unresolved state.
-
----
-
-## 11. Search contract
+Invariant:
 
 ```text
-search(user_id, SearchRequest) -> SearchResultPage
+Send request != provider acceptance != operational closure
 ```
 
-```text
-SearchRequest {
-  query
-  scope_id_or_all
-  result_types[]?
-  cursor?
-  limit
-}
-```
+Timeout/unknown acceptance forbids blind duplicate retry.
 
-Results resolve to current authorized sources.
+Forward, Send Later/SCHEDULED, generic Undo/recall and silent offline queued Send are not current activation authority.
 
-Rules:
+## 20. Settings/lifecycle mutations
 
-- default current Scope;
-- broadening to All is explicit;
-- stale projection may reduce recall but never leak inaccessible data;
-- semantic similarity/search is not Responsibility merge authority;
-- conversation/message result opens ordinary conversation unless intentionally represented as a Responsibility/action result.
+Reconnect, disconnect, Stop Tracking, Return Attention, defer and supported Settings distinguish request/pending/accepted/failure.
 
----
+App sign-out != mailbox disconnect. Reconnect after unintended auth loss restores reassurance only after missing-interval reconciliation. Re-add after intentional disconnect never silently reactivates old delegation.
 
-## 12. Person Context contract
+## 21. Integrity
 
-```text
-getPersonContext(participant_id, scope) -> PersonContext
-```
+Material degraded state exposes as applicable:
 
-```text
-PersonContext {
-  identity
-  organization?
-  recent_conversations[]
-  current_open_responsibilities[]
-  recent_files[]
-  remembered_facts[] {
-    value
-    uncertainty_or_confidence?
-    provenance
-  }
-}
-```
+- affected account/capability/scope;
+- what is not trustworthy;
+- last trustworthy observation/data-through;
+- affected live delegation scope/count;
+- what remains safe/usable;
+- recovery action.
 
-Respect authorization/scope. No CRM pipeline/deal semantics in v1.
+Do not restore healthy Managed reassurance before reconciliation completes.
 
----
+## 22. Audit/observability
 
-## 13. Attachment preview contract
+Keep structured evidence sufficient to explain state changes, resurfacing, sync/send/trigger pending/reconciliation, account/provider identity, evidence revision/model/config basis and degraded intervals.
 
-```text
-getAttachmentPreview(attachment_id) -> PreviewDescriptor
-```
+Logs are not canonical state. Never indiscriminately log secrets/full sensitive mail/model payloads.
 
-```text
-PreviewDescriptor {
-  mode
-  content_url_or_stream_reference
-  filename
-  mime_type
-  size_bytes?
-  expires_at?
-}
-```
+## 23. Repository merge contract
 
-Requirements:
+Parallel runtime/worktree isolation does not guarantee merge independence.
 
-- re-authorize ownership;
-- do not expose provider credentials in URLs;
-- use short-lived signed/streamed access as needed;
-- preserve conversation if preview fails;
-- sanitize/render supported types safely.
+`package.json` and `pnpm-lock.yaml` are serialized merge assets. Concurrent branches touching them may execute in parallel but merge one at a time; later branches refresh onto current accepted main, regenerate the lockfile with pnpm, rerun repository verification, and rerun task proof materially affected by dependency changes.
 
-Opening/previewing an attachment is not completion evidence by itself.
+## 24. Public-release boundary
 
----
+Local/private complete-loop proof and public release are separate gates.
 
-## 14. User correction contract
+Public release may additionally require Google OAuth verification/security assessment, exact privacy/retention/deletion commitments, production credential rotation/recovery, current AI data controls and operational hardening.
 
-User correction is field-scoped where practical.
-
-```text
-correctResponsibility(responsibility_id, correction, expected_evidence_revision?)
-  -> ResponsibilityResult
-```
-
-Potential corrections:
-
-- responsibility should/should-not be tracked;
-- obligation bearer/action;
-- source due interpretation;
-- user target/defer/return condition;
-- completion/resolution reason;
-- reopen;
-- Temporal Contract change/deactivation.
-
-Requirements:
-
-- persist user authority/provenance;
-- record meaningful domain transition/audit;
-- correction to one field does not freeze unrelated fields;
-- stale AI result cannot immediately overwrite the correction;
-- user target does not rewrite external source fact;
-- user tracking-close does not assert objective satisfaction.
-
----
-
-## 15. Client error contract
-
-Stable product categories may include:
-
-```text
-AUTH_REQUIRED
-ACCOUNT_RECONNECT_REQUIRED
-FORBIDDEN
-NOT_FOUND
-CONFLICT
-VALIDATION_ERROR
-PROVIDER_TEMPORARY_FAILURE
-PROVIDER_RATE_LIMITED
-PROVIDER_AMBIGUOUS_RESULT
-AI_UNAVAILABLE
-SEARCH_UNAVAILABLE
-ATTACHMENT_PREVIEW_UNAVAILABLE
-SCHEDULE_OPERATION_FAILED
-INTERNAL_RETRYABLE
-INTERNAL_FATAL
-```
-
-UI explains impact/recovery rather than raw technical exceptions.
-
----
-
-## 16. Job contract
-
-```text
-JobEnvelope {
-  job_id
-  job_type
-  entity_id
-  idempotency_key?
-  attempt
-  created_at
-  not_before?
-  correlation_id?
-  basis_evidence_revision?
-}
-```
-
-Workers:
-
-- load current authoritative state;
-- do not trust stale job payload for authorization/domain truth;
-- use bounded retry;
-- expose permanent failure;
-- make effects idempotent/reconcilable;
-- avoid putting full bodies/credentials in queue payloads when references suffice.
-
----
-
-## 17. Versioning contract
-
-Version material behavior inputs such as:
-
-- AI structured-output schema;
-- behavior/reducer config where mixed semantics require traceability;
-- model/prompt/config identifier;
-- evidence revision;
-- Temporal Contract version;
-- search projection version;
-- public/client API only when compatibility requires it.
-
-Do not version every internal function.
-
----
-
-## 18. Testing implications
-
-### Provider/sync
-
-- duplicate ingestion;
-- invalid cursor;
-- provider transient/rate-limit errors;
-- ambiguous send timeout;
-- normalization;
-- reconnect/resync;
-- out-of-order ingestion preserving semantic correction.
-
-### Responsibility/domain
-
-- zero/one/many Responsibilities in one Conversation;
-- request vs no-responsibility admission;
-- multiple obligation legs;
-- conditional activation;
-- partial completion criteria;
-- proposal/counterproposal/agreement;
-- hold vs cancellation vs defer;
-- send leg -> Waiting vs whole-outcome completion;
-- follow-up as action in same Responsibility;
-- REOPEN vs new episode;
-- supersede old + create replacement in one event;
-- field-scoped conflict/review;
-- historical open vs live activation;
-- user correction not overwritten by stale AI;
-- cross-account lookalikes not auto-merged.
-
-### Scheduler
-
-- duplicate trigger execution;
-- cancellation/version race;
-- downtime/overdue reconciliation;
-- reply before scheduled time;
-- stale sibling trigger ignored.
-
-### Send
-
-- client double-submit;
-- worker retry;
-- undo cancellation;
-- scheduled send after restart;
-- ambiguous provider acceptance;
-- reconciled send only closes appropriate operational outcome.
-
-### Authorization/safety
-
-- cross-user/account access rejected;
-- search/AI context respects scope;
-- attachment access re-authorized;
-- prompt-injection text cannot gain tool authority;
-- high-risk requested action is separated from safe next action.
-
-Canonical semantic truth for these tests is supplied by `responsibility/` scenarios/transition oracles; passing prompt eval alone is insufficient.
-
----
-
-## 19. Contract change rule
-
-A change is contract-significant when it changes:
-
-- authority/ownership;
-- Responsibility admission/identity/resolution/actionability/projection semantics;
-- provider normalization;
-- Temporal Contract guarantees;
-- send idempotency/irreversibility;
-- authorization/data exposure;
-- AI schema/decision boundary;
-- search scope;
-- user-visible error/recovery behavior.
-
-Such changes update this document and relevant Responsibility decisions/scenarios/tests in the same durable change.
+Those obligations do not establish Product-market evidence.

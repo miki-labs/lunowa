@@ -2,749 +2,471 @@
 
 ## Status
 
-**Active execution plan, reconciled 2026-08-28 for the owner-directed Product-completion priority.**
+**Active execution plan, reconciled 2026-08-28 after Issue #55 completion and Issue #58 full-audit Round 4.**
 
-This plan sequences implementation toward a **usable Minimum Complete Delegation Loop** while preserving unvalidated Product/market assumptions as explicit unknowns.
+This is sequencing authority, not Product truth. Product truth lives in `PRODUCT.md` / `PRODUCT-CONTENT.md`; Product regressions in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics/oracles in `responsibility/`; UI behavior in `../design/`; exact dependency/parallelization/writer detail in `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
-It is a living execution artifact. Durable Product truth belongs in `PRODUCT.md` and `PRODUCT-CONTENT.md`; Product-level regression consequences live in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics belong in `responsibility/`; detailed design/architecture/contracts remain in their owning sources.
+## 1. Objective
 
-Related sources:
-
-- `PRODUCT.md`;
-- `PRODUCT-CONTENT.md`;
-- `GOLDEN-SCENARIO-BANK.md`;
-- `../design/DESIGN.md`;
-- `../design/INTERACTIONS.md`;
-- `../design/RESPONSIVE.md`;
-- `responsibility/README.md`;
-- `responsibility/DECISIONS.md`;
-- `responsibility/CONSISTENCY-AUDIT.md`;
-- `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`;
-- `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md`;
-- `responsibility/L2-EXECUTABLE-PROOF-GATE.md`;
-- `ARCHITECTURE.md`;
-- `DATA-MODEL.md`;
-- `CONTRACTS.md`;
-- `TECH-STACK.md`;
-- current live GitHub Issue/task graph.
-
-Current Product scope authorities constrain this plan. A phase may sequence a capability only after that capability is accepted for the relevant Product/task scope; a broader capability example here is never permission to override `PRODUCT.md`, `PRODUCT-CONTENT.md`, Responsibility authority, or a live Issue contract.
-
----
-
-# 1. Execution doctrine
-
-## 1.1 Current owner priority
-
-The current owner priority is:
-
-> **Complete Lunowa as a usable Product first, then return to formal empirical Product Discovery with the real Product available where useful.**
-
-This is an **execution-order decision**, not empirical evidence.
-
-Therefore implementation may proceed against accepted Product hypotheses without waiting for Issue #36 to validate ICP/problem severity first.
-
-The following remain explicitly **UNKNOWN** until measured:
-
-- exact ICP / first segment;
-- problem prevalence/severity;
-- switching behavior;
-- WTP/pricing;
-- retention;
-- PMF;
-- reliability threshold required for users to stop parallel checking;
-- whether users actually relinquish monitoring;
-- mature Product-form preference.
-
-Implementation completion must never be used as evidence that these are true.
-
-## 1.2 Optimize for one complete vertical loop
-
-Do **not** build Lunowa horizontally by completing every inbox, settings, provider, search, AI, and compose feature independently.
-
-Build the smallest end-to-end path that realizes the accepted Product promise:
+Build one trustworthy **Minimum Complete Delegation Loop**:
 
 ```text
-provider/source evidence
--> normalize + persist trustworthy source state
--> interpret/admit/update Responsibility through trusted boundaries
--> decide attention / Managed / Review / Needs You
--> preserve durable temporal monitoring where needed
--> surface the right Moment with source-grounded context
--> let the user inspect/correct/defer/stop tracking
--> contextual Reply/Reply All + explicit Send when required
--> reconcile provider outcome
--> continue monitoring or close only when evidence supports closure
+real Gmail Source
+-> accepted Responsibility
+-> quiet Managed monitoring
+-> durable reconsideration
+-> correct Needs You / Review return
+-> source-grounded Moment
+-> contextual Reply / Reply All
+-> bounded contextual AI draft with manual fallback
+-> explicit immediate Send
+-> provider reconciliation
+-> continue monitoring or truthful closure
 ```
 
-The target is **Minimum Complete Delegation Loop**, not broad provider/client parity.
+Keep authorized exact Source search and attachment evidence access available.
 
-## 1.3 Two separate authorization questions
+Implementation completion does not prove ICP/PMF/WTP/retention/monitoring relinquishment. Issue #36 remains open.
 
-Keep these distinct:
+## 2. Completed specification gates
 
-### Implementation authorization
+- Product Content / Golden Scenarios: complete enough for current implementation hypothesis.
+- Issue #55 / PR #57: UI/UX implementation-readiness COMPLETE after full cumulative audit + exact-head CI.
+- Canonical implementation-facing UI input: `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md`.
+- Runtime remains bootstrap-level.
 
-May we build an accepted Product behavior safely against the current canonical specification?
+## 3. Current gate — Issue #58
 
-### Empirical-claim authorization
+Issue #58 freezes:
 
-May we claim that the behavior solves a frequent market problem, wins an ICP, changes user behavior, retains users, or supports a price?
+- actual implementation-state reconstruction;
+- current volatile vendor evidence;
+- architecture activation boundaries;
+- exhaustive production FK/topological order;
+- single-writer collision zones;
+- parallel execution vs serialized merge rules;
+- implementation DAG and safe waves;
+- Product/Responsibility/UI/provider acceptance mapping.
 
-The first may be YES while the second remains UNKNOWN.
+No broad production fanout before #58 full-audit PASS + exact-head CI + merge.
 
-## 1.4 Avoid both stale extremes
+After accepted #58 merge, `IMPLEMENTATION-GRAPH.md` becomes the exact dependency/parallelization authority.
 
-Do not revert to:
+## 4. G00 — framework security pre-wave
 
-1. **broad fake full-client shell first** — lots of UI, no complete real delegation loop; or
-2. **indefinite research/specification first** — no usable Product exists because every implementation step waits for perfect validation.
+First runtime gate after #58.
 
-Current strategy is a complete, safety-bounded vertical Product followed by empirical correction.
+Current repo `next@16.3.0` is below the official Aug-25 2026 Active-LTS 16.3 security baseline `16.3.3`.
 
----
+Scope:
 
-# 2. Phase 0 — Mechanical foundation
+- narrow Next.js security patch inside accepted line;
+- directly coupled resolution/config only as required;
+- `pnpm verify` + Playwright smoke + exact-head CI.
 
-## Status
+No unrelated upgrade sweep.
 
-**Mechanically established.**
+## 5. First execution wave after G00
 
-Existing repository foundation includes:
+The following may execute concurrently in isolated worktrees/runtime namespaces:
 
-- Node.js 24 / pnpm;
-- strict TypeScript;
-- Next.js 16 / React 19;
-- next-intl;
-- Tailwind CSS 4;
-- lint/typecheck/test/build/verify;
-- Playwright E2E smoke;
-- CI Verify + E2E Smoke;
-- environment/secrets pattern;
-- bootstrap route/component.
+### P13 — Responsibility L2 PostgreSQL/Drizzle proof
 
-This phase does not mean the Product runtime exists. Current app UI remains essentially a bootstrap proof.
+Existing Issue #13.
 
----
+- real PostgreSQL 18;
+- current exact stable Drizzle/Kit/driver pin;
+- generated SQL inspection;
+- acceptance 01–46 and 50–60 except 47–49;
+- prove all current upstream ownership/index/evidence prerequisites, including ParticipantIdentity prerequisites;
+- isolated proof only, no production migration.
 
-# 3. Phase 1 — UI/UX implementation readiness
+### P14 — Better Auth UUID proof
 
-## Current authority
+Existing Issue #14.
 
-GitHub **Issue #55 — `[Design]: Make Lunowa v1 UI/UX implementation-ready`**.
+- current stable Better Auth at execution;
+- explicit UUID configuration/generated schema;
+- real PostgreSQL 18;
+- acceptance 47–49;
+- no production OAuth/auth rollout.
 
-## Goal
+### G11 — structural UI shell/read-model harness
 
-Convert the accepted Product/design contract into a complete implementation specification before broad write-heavy UI coding.
+- shell/navigation/responsive structure;
+- semantic tokens/components;
+- typed fixture/read-model state axes;
+- accessibility/focus/IME harness;
+- no provider/domain authority.
 
-The implementation agent must not need to invent material Product behavior.
+### V01 — final visual-reference pass
 
-## Required outputs
+May run after #58 merge because textual Product/UI/architecture contracts are sufficiently frozen. It blocks final pixel-sensitive fidelity only, not backend/domain work.
 
-### 3.1 Screen inventory
+## 6. Parallel execution != parallel merge
 
-Account for current v1 CORE surfaces, at minimum:
+P13/P14/G11 may all need root dependency changes.
 
-- Home / Landing;
-- Needs You;
-- Managed;
-- Review;
-- Moment;
-- Source Conversation;
-- contextual Reply / Reply All / explicit Send path;
-- one-provider connect/reconnect/onboarding surfaces required by the loop;
-- capability-conditional Settings required by current Product scope;
-- integrity/degraded/recovery surfaces.
+`package.json` and `pnpm-lock.yaml` are serialized merge assets:
 
-### 3.2 State inventory
+1. work may execute concurrently;
+2. PRs touching these files merge one at a time;
+3. every later PR refreshes/rebases onto latest accepted main;
+4. regenerate lockfile using pnpm, never a blind manual lockfile merge;
+5. rerun repository verification;
+6. rerun task proof materially affected by changed dependency/version basis.
 
-For every implementation-significant screen define material variants, including as applicable:
+This preserves useful parallelism without treating worktree/runtime isolation as merge isolation.
 
-- healthy/populated;
-- true zero/empty;
-- initial loading/sync;
-- partial/unknown;
-- provider disconnected/auth lost;
-- AI unavailable;
-- monitoring integrity degraded;
-- material Review;
-- send pending/succeeded/failed/ambiguous;
-- attachment unavailable/blocked/provider fallback.
+## 7. P15 — Responsibility L2 independent freeze
 
-### 3.3 Interaction contract
+After P13 + P14 concrete evidence.
 
-Decision-complete behavior for:
+No production Responsibility-owned migrations/runtime before explicit P15 `PASS/FREEZE`.
 
-- Moment vs Source navigation;
-- Managed inspection;
-- Review/correction;
-- Return Attention Now;
-- Stop Tracking;
-- Later/defer/return;
-- contextual Reply/Reply All;
-- explicit Send + reconciliation feedback;
-- source attachment evidence access;
-- reconnect/recovery;
-- keyboard/focus behavior.
+## 8. G10 — application session/auth activation
 
-### 3.4 Responsive contract
+After G00 + P14 PASS.
 
-One Product model across desktop/tablet/mobile/compact widths. Define what collapses, moves, becomes a detail route/sheet/drawer, and what remains always reachable.
+Own only:
 
-### 3.5 Visual implementation contract
+- Better Auth application identity/session;
+- auth-owned User/session schema;
+- protected BFF/session validation;
+- committed auth migration;
+- expiry/re-auth/revoke/sign-out behavior.
 
-Resolve material typography, spacing, hierarchy, projection/status treatment, trust/provenance/integrity affordances, density, non-color redundancy, and motion behavior.
+Do not put ConnectedAccount/Conversation/Message/ParticipantIdentity/Responsibility/Draft/SendOperation into G10.
 
-### 3.6 Accessibility
+## 9. G19 — provider-neutral evidence foundation
 
-Make keyboard, focus, semantic labeling, contrast, reduced motion, and async status feedback testable.
+After:
 
-### 3.7 Component + data contract map
+- G10 production User/session schema;
+- P13 PASS for upstream L2 prerequisites.
 
-For each material component identify:
+G19 is the single production writer for:
 
-```text
-owning Product/domain projection
-minimum inputs
-loading/error/unknown form
-source/provenance requirement
-user events/actions emitted
-provider evidence vs accepted state vs derived projection vs transient UI state
-```
-
-Component convenience must not create domain/schema authority.
-
-## Exit criteria
-
-Issue #55 receives a full cumulative acceptance audit and exact-head verification. Only then should broad implementation tasks be decomposed.
-
----
-
-# 4. Phase 2 — Implementation graph and safe parallelization
-
-## Goal
-
-Transform the implementation-ready UI/UX + architecture/domain/provider contracts into an explicit dependency graph before launching many coding agents.
-
-Do not give an agent `build Lunowa`.
-
-## Required graph properties
-
-Each node must specify:
-
-- Goal / Why;
-- exact owning sources;
-- dependencies/preconditions;
-- Scope / Non-goals;
-- invariants;
-- required fixtures/oracles;
-- acceptance criteria;
-- verification;
-- failure/stop conditions;
-- merge/integration boundary.
-
-## Parallelization doctrine
-
-Parallelize only tasks with genuinely separable write/runtime boundaries.
-
-Good parallel candidates may include, after contracts are stable:
-
-- UI component primitives independent from runtime authority;
-- provider adapter spike vs deterministic domain reducer tests;
-- accessibility/visual acceptance harness;
-- independent executable L2 proof work;
-- failure-state UI fixtures;
-- read-only provider normalization tests.
-
-Avoid parallel branches that independently redefine:
-
-- Responsibility semantics;
-- shared schema;
-- provider contract;
-- send authority;
-- Temporal Contract semantics;
-- canonical Product state.
-
-Every parallel wave needs an integration owner/oracle.
-
-## Exit criteria
-
-- dependency DAG exists;
-- critical path is explicit;
-- merge order is explicit;
-- high-conflict/shared-authority tasks are serialized;
-- first implementation wave is small enough for full independent audit.
-
----
-
-# 5. Phase 3 — Responsibility executable persistence gate
-
-## Goal
-
-Activate only the physical persistence required for the complete loop, without weakening accepted Responsibility semantics.
-
-## Current proof state
-
-```text
-L0 semantic model                         FROZEN v0.1
-L1 logical persistence boundary           FROZEN v0.1
-L2 exact PostgreSQL/Drizzle candidate      v0.4 STATIC REVIEW COMPLETE
-L2 executable proof                        PENDING
-L2 final freeze                            BLOCKED
-L3 production migrations/runtime           NOT AUTHORIZED until L2 gate passes
-```
-
-## Required pre-migration proof
-
-Before production Responsibility migrations are accepted:
-
-1. complete Issue #13 against real PostgreSQL 18;
-2. complete Issue #14 for Better Auth UUID persistence prerequisite;
-3. complete Issue #15 independent combined review;
-4. account for required acceptance IDs in `responsibility/L2-EXECUTABLE-PROOF-GATE.md`;
-5. inspect actual Drizzle-generated/reviewed SQL;
-6. leave no unresolved CRITICAL/HIGH integrity blocker;
-7. update canonical DDL if executable evidence falsifies it;
-8. record explicit L2 PASS/FREEZE before L3 migration integration.
-
-Product-completion priority does **not** waive this gate.
-
-## Minimum persistence responsibilities when activated
-
-Only what the vertical loop requires, potentially including:
-
-- User;
-- Scope / ScopeAccount;
-- ConnectedAccount / ProviderSyncState;
+- ConnectedAccount;
+- ProviderSyncState;
 - Conversation;
 - Message;
 - Attachment metadata;
-- Responsibility;
-- provenance/correction evidence;
-- TemporalContract / TemporalTrigger skeleton;
-- Draft;
-- SendOperation skeleton.
+- ParticipantIdentity;
+- required ownership/uniqueness indexes;
+- monotonic non-negative `Conversation.semantic_evidence_revision`;
+- provider-neutral repositories/fixtures;
+- committed SQL migrations.
 
-Do not build a generic workflow engine.
-
----
-
-# 6. Phase 4 — One-provider Gmail source/read vertical slice
-
-## Goal
-
-Prove one real mailbox can authorize, sync, normalize, persist trustworthy evidence, and render Source Conversations.
-
-Issue #36 is **not** a prerequisite for this phase under the current owner-directed product-completion plan.
-
-## Required behavior
-
-- current official Google authorization/scopes rechecked at implementation time;
-- ConnectedAccount creation;
-- bounded initial sync;
-- incremental/history reconciliation;
-- Conversation/Message normalization;
-- attachment metadata/provider observations;
-- authorized source attachment evidence access through a supported safe open/download/provider-native fallback path;
-- account-specific sync state;
-- duplicate/out-of-order ingestion safety;
-- manual refresh/reconnect;
-- real source rendering.
-
-## Security/reliability invariants
-
-- credentials server-side;
-- authorization on reads;
-- provider payloads/HTML/attachments untrusted;
-- provider/platform unsafe-content restrictions preserved;
-- duplicate changes idempotent;
-- invalid cursor/reconnect/rate-limit/transient failure handled;
-- source chronology/evidence preserved truthfully.
-
-## Historical activation boundary
-
-Initial sync must not automatically convert every old message/thread into a live Responsibility merely because it looks unfinished.
-
-## Exit criteria
-
-A real Gmail mailbox can be read through accepted provider/evidence boundaries and source attachment evidence can be reached safely without requiring rich native preview.
-
----
-
-# 7. Phase 5 — Deterministic Responsibility + attention + Temporal Contract runtime
-
-## Goal
-
-Make the differentiated monitoring loop work deterministically before AI interpretation becomes a dependency.
-
-## Required behavior
-
-- Responsibility admission/identity/effects boundary;
-- `TRACK / DO_NOT_TRACK / NEEDS_REVIEW` behavior where applicable;
-- zero Responsibility valid;
-- canonical orthogonal state dimensions;
-- field-scoped correction;
-- live tracking separate from resolution;
-- Needs You / Managed / Review / Later / Done projection rules;
-- intentional defer -> durable Temporal Contract;
-- passive Waiting after user leg completion where another dependency remains;
-- expected events;
-- follow-up return;
-- completion criteria;
-- REOPEN vs new episode;
-- historical live-activation policy;
-- durable time/reply/deadline triggers where included;
-- trigger reconciliation/idempotency;
-- provenance/evidence revision;
-- source-grounded Moment projection.
-
-## Mandatory verification
-
-Use canonical Responsibility transition/scenario oracles, including races/restarts/stale triggers/parallel obligations/out-of-order evidence where applicable.
-
-## Exit criteria
-
-A deterministic fixture or trusted manually admitted real case can be:
+Required current L2 production keys include:
 
 ```text
-tracked
--> safely Managed
--> returned at an expected event/time/material change
--> surfaced as Needs You/Review when justified
--> explained by source-grounded Moment
--> corrected/deferred/stopped by the user
+connected_accounts UNIQUE(id,user_id)
+conversations UNIQUE(id,connected_account_id)
+participant_identities UNIQUE(id,user_id)
+messages UNIQUE(id,connected_account_id)
 ```
 
-without AI authority.
+G19 contains no live Gmail API behavior and no Responsibility-owned tables. `ParticipantIdentity` here is evidence infrastructure, not Person/CRM Product scope.
 
----
+Acceptance includes clean real PostgreSQL migration/rebuild, tenant/account/evidence FK/uniqueness tests and direct satisfaction of P13-proven upstream prerequisites.
 
-# 8. Phase 6 — Product surfaces on the real domain loop
+Fan-out:
 
-## Goal
+```text
+G19
+  +-> G20 live Gmail lane
+  +-> after P15, G30 production persistence lane
+```
 
-Implement the Issue #55 accepted UI/UX against real domain interfaces rather than static lifecycle-shaped mock state.
+## 10. G20 — Gmail OAuth / watch / history / sync
 
-## Core surfaces
+After G19 + G00.
 
-- Home / Landing;
+G20 consumes G19 persistence rather than owning that shared schema.
+
+Implement:
+
+- one Gmail account path;
+- minimum scopes;
+- offline OAuth when background access requires it;
+- initial sync;
+- authenticated Pub/Sub ingress;
+- quick acknowledgement + durable `history.list` reconciliation;
+- watch renewal;
+- periodic safety reconciliation;
+- stale-history HTTP 404/full-sync recovery;
+- idempotent normalization/upsert through G19;
+- attachment evidence access.
+
+Before first durable real Google token persistence:
+
+- encrypted at rest;
+- key/secret separate from ordinary DB/repository data;
+- no token logging;
+- user + ConnectedAccount-scoped lookup/use;
+- explicit invalidation/reconnect;
+- revoke/delete when intentionally no longer needed where supported.
+
+A bounded non-persistent OAuth spike may avoid durable storage. Plaintext durable token storage is never accepted.
+
+Public OAuth verification/restricted-scope assessment remains R90 release work where required.
+
+## 11. G21 — real Source + exact search
+
+After G20 + G11.
+
+Implement:
+
+- Source list/detail;
+- account/source provenance;
+- safe attachment open/download/provider fallback;
+- authorized exact Source search — **V1 CORE**;
+- truthful partial/sync/degraded/no-match states.
+
+Natural-language/semantic Q&A remains conditional.
+
+## 12. G30 — production persistence with complete external-FK closure
+
+After P15 PASS/FREEZE + G19.
+
+Current frozen L2 v0.4 references these external production targets:
+
+```text
+User
+connected_accounts
+conversations
+participant_identities
+messages
+ai_interpretation_runs
+```
+
+G10/G19 create the first five target families. G30 begins with a **minimal production AIInterpretationRun provenance/basis prerequisite** satisfying `UNIQUE(id,user_id)` and accepted User/Conversation/Message basis references, then creates Responsibility-owned tables in valid FK order.
+
+Important boundary:
+
+```text
+AIInterpretationRun table existence != model execution != accepted AI authority
+```
+
+G70 owns runtime AI activation.
+
+Acceptance:
+
+- clean production-shaped migration;
+- every external FK targets an accepted production table;
+- no proof-only fixture FK target;
+- migration ordering directly inspected/tested;
+- frozen L2 invariants preserved;
+- no AI runtime side effect.
+
+G30 does not wait for live Gmail completion.
+
+## 13. Parallel provider/domain lanes
+
+After G19 + P15:
+
+### Provider lane
+
+```text
+G20 Gmail -> G21 Source/read/search
+```
+
+### Deterministic domain lane
+
+```text
+G30 persistence
+-> G31 deterministic reducer
+-> G32 attention/Temporal runtime
+```
+
+G31 consumes frozen normalized evidence fixtures, not live Gmail completion.
+
+### G31 — deterministic Responsibility reducer
+
+Implement/test:
+
+- TRACK / DO_NOT_TRACK / NEEDS_REVIEW;
+- CREATE / UPDATE / RESOLVE / REOPEN / SUPERSEDE / INVALIDATE / NO_OP;
+- field correction/provenance;
+- orthogonal state;
+- historical activation policy;
+- canonical transition/high-harm oracles.
+
+### G32 — attention + Temporal runtime
+
+After G31:
+
+- Needs You/Managed/Review/Later/Done projection;
+- Return Attention without fake actionability;
+- durable defer/expected-event/time/reply reconsideration;
+- DB/domain currentness/idempotency;
+- Trigger.dev adapter if retained;
+- stale/overdue/restart reconciliation.
+
+G40 integrates provider/UI/domain lanes.
+
+## 14. G40 — Product surfaces on real state
+
+After G11 + G21 + G31 + G32.
+
+Connect real state to:
+
+- Home;
 - Needs You;
 - Managed;
 - Review;
 - Moment;
-- Source Conversation;
-- required onboarding/reconnect/settings/integrity states.
+- onboarding/first delegation;
+- supported Settings/integrity hooks.
 
-## Critical semantics
+Preserve strict zero, trustworthy Managed, bounded Review, source-grounded Moment and distinct session/provider/integrity/domain/mutation axes.
 
-- Needs You means current USER work;
-- Managed means healthy quiet monitoring;
-- current surfaced Review is excluded from healthy Managed reassurance/count;
-- true zero requires no Needs You + no surfaced unresolved Review + trustworthy relevant integrity;
-- Source remains available and does not require Moment;
-- mailbox unread/archive state does not redefine Responsibility state;
-- failure/integrity is not a fake Responsibility state.
+## 15. G50 — Draft + contextual immediate Send request
 
-## Verification
+After G20 + G40.
 
-Map UI consequences to `GOLDEN-SCENARIO-BANK.md` and relevant Responsibility oracles. Add design-specific tests without creating new domain truth.
+G50 is the single writer for minimal:
 
----
+- Draft persistence/version contract;
+- initial SendOperation schema/request/pending state;
+- operation idempotency identity.
 
-# 9. Phase 7 — Contextual Reply / Reply All + explicit Send
+User path:
 
-## Goal
+- contextual Reply / Reply All;
+- explicit sender;
+- inspectable recipients/body;
+- manual composer baseline;
+- explicit immediate Send request.
 
-Provide the communication path required to complete an active attention loop.
+Not current gates: Forward, Send Later, generic Undo/recall, silent offline queued Send.
 
-## Current v1 scope
+## 16. G51 — provider Send reconciliation
 
-Required when the accepted vertical loop needs it:
+After G50 + G31.
 
-- Moment/Conversation-bound Reply and Reply All;
-- explicit effective sender account;
-- visible/inspectable recipients/content;
-- supported reply attachment add only where current Product scope/test requires it;
-- draft preservation/autosave sufficient for the flow;
-- explicit user Send;
-- durable SendOperation where required;
-- provider result + reconciliation;
-- ambiguous/failure state preserves draft/context;
-- retry/double-submit idempotency.
+Implement:
 
-Not current exit gates unless separately promoted:
+- provider accepted/unknown/failed transitions;
+- ambiguous timeout reconciliation;
+- no blind duplicate retry;
+- sent-message Source reconciliation;
+- post-send Responsibility re-evaluation.
 
-- arbitrary fresh Compose parity;
-- Forward parity;
-- Undo Send parity;
-- Send Later parity.
-
-## Canonical invariant
+Invariant:
 
 ```text
-send attempt != provider-reconciled acceptance
+request/click != provider acceptance != operational closure
 ```
 
-Even provider-reconciled acceptance closes a Responsibility only when it actually proves its completion condition.
+## 17. G60 — integrity/reconnect/failure closure
 
-## Offline boundary
+After G20/G21 + G32 + G40 + G51.
 
-v1 must not silently queue a consequential external effect for later execution without a separately accepted durable delayed-action contract.
+Integrate:
 
----
+- provider auth loss/reconnect/missing interval;
+- sync lag/data-through;
+- notification delivery separation;
+- Temporal overdue recovery;
+- Send ambiguity;
+- attachment-access degradation;
+- mutation pending/failure;
+- intentional disconnect vs app sign-out;
+- Product-account deletion boundary routing.
 
-# 10. Phase 8 — Bounded AI interpretation
+No infrastructure failure may create fake Needs You, fake No Responsibility, false zero or healthy reassurance.
 
-## Goal
+## 18. G70 — bounded AI interpretation + contextual draft
 
-Reduce interpretation burden while keeping model output outside state/authorization authority.
+May start after G31 freezes trusted candidate/reducer boundaries and normalized evidence contract is available. It need not wait for live Gmail completion for fixture-based eval work.
 
-## Required behavior
+Own two separate model contracts:
 
-- versioned structured interpretation contract;
-- authorized context builder;
-- one initial evaluated model/provider;
-- Structured Outputs/application validation;
-- evidence revision/basis handling;
-- communication act/claim/temporal/uncertainty extraction as accepted;
-- trusted admission/identity/reducer consumes validated candidate output;
-- no privileged provider action directly from model output;
-- fallback/source usability with AI unavailable.
+1. Responsibility interpretation candidate;
+2. contextual editable draft candidate.
 
-## Eval requirements
+Use G30-created AIInterpretationRun provenance substrate. Any schema evolution must preserve frozen Responsibility FK compatibility or use an explicit reviewed migration.
 
-Use canonical Responsibility corpus + transition/contrast/mutant/metamorphic/high-harm/ambiguity/holdout cases at the appropriate layer.
+Require:
 
-Track layered correctness rather than one aggregate accuracy score.
+- official OpenAI SDK + Responses API;
+- Structured Outputs/JSON Schema where suitable;
+- strict runtime/source/currentness validation;
+- minimum authorized context;
+- current org/project data-control review;
+- `store:false` where appropriate without equating it to ZDR;
+- layered eval + holdout;
+- prompt-injection/high-harm cases;
+- manual fallback.
 
-## Exit criteria
+AI never gains Send or accepted-state authority.
 
-AI reduces manual interpretation on the accepted loop without violating forbidden outcomes or becoming necessary for basic source access/manual communication.
+## 19. G80 — complete-loop integration
 
----
+Depends on G21 + G31/G32 + G40 + G51 + G60 + G70.
 
-# 11. Phase 9 — Failure, reconnect, integrity, recovery closure
+Must prove representative real-provider loops including:
 
-## Goal
+- request/send -> Waiting/Managed;
+- progress reply stays quiet;
+- action reply returns to Needs You/Moment;
+- no-reply trigger re-evaluates current evidence;
+- contextual AI draft -> edit -> explicit Send -> reconciliation;
+- same communication path succeeds manually when AI unavailable;
+- auth/sync loss -> Integrity -> reconnect/backfill;
+- ambiguous Send -> no duplicate;
+- exact Source search + attachment fallback.
 
-Make the complete loop trustworthy when dependencies fail.
+Use Product Golden Scenarios, Responsibility oracles, Issue #55 UI cases, real provider evidence, exact-head CI/E2E and full cumulative independent audit.
 
-## Must cover
+## 20. R90 — public-beta release readiness
 
-- provider auth loss;
-- provider sync lag/failure;
-- reconnect/resync;
-- partial/unknown state;
-- AI unavailable;
-- scheduler/Temporal trigger failure/overdue recovery;
-- send failure/ambiguity/reconciliation;
-- source attachment blocked/unavailable/fallback;
-- monitoring-integrity degradation;
-- stale evidence/revision races;
-- user correction after automation/model error.
+Separate release gate; does not block local/private G80 proof.
 
-No failure should create fake Needs You, fake `No Responsibility`, or false healthy reassurance.
+Includes as applicable:
 
----
+- Google OAuth verification/restricted-scope assessment;
+- privacy/retention/deletion commitments;
+- production credential rotation/recovery beyond G20 minimum storage security;
+- production secrets/region/backup/restore/observability;
+- current OpenAI privacy/data-control posture;
+- release accessibility/device/browser matrix;
+- security/abuse/recovery/support runbooks.
 
-# 12. Phase 10 — Minimum Complete Delegation Loop acceptance
+## 21. Scope discipline
 
-## Goal
+Do not smuggle into the critical path:
 
-Prove the Product works as one coherent system, not a pile of separately completed features.
+- Microsoft;
+- Person/CRM Product features;
+- broad multi-account Scope UX;
+- Pin;
+- generic automation/rules;
+- full mail-client parity;
+- Forward/Send Later/Undo parity;
+- autonomous Send;
+- rich native attachment preview as CORE;
+- natural-language Search as CORE.
 
-## Required end-to-end acceptance shape
+## 22. Review discipline
 
-At least representative cases must demonstrate:
+Every write-heavy task follows:
 
 ```text
-real provider evidence
--> accepted/inspectable Responsibility decision
--> quiet Managed monitoring
--> durable wait/expected event where applicable
--> material change/time/reply
--> correct return to user
--> source-grounded Moment
--> safe user action/correction/defer/stop
--> contextual communication when required
--> send/provider reconciliation
--> continued monitoring or evidence-supported closure
--> recoverable degraded behavior
+current accepted base
+-> isolated worktree/runtime namespace
+-> implementation + executable evidence
+-> PR
+-> exact-head CI
+-> full cumulative acceptance audit
+-> batched corrections if FAIL
+-> merge
 ```
 
-Also prove negative/control cases:
+If repeated correction failure occurs, analyze specification/oracle/architecture/decomposition/verification gaps before another patch loop.
 
-- `No Responsibility`;
-- high-risk source content that does not automatically become Review;
-- reply that does not satisfy awaited outcome;
-- source available while AI is down;
-- provider/integrity failure that prevents false all-clear;
-- blocked attachment access that is represented truthfully;
-- ambiguous send that does not duplicate or falsely close;
-- cross-account lookalikes remain separate.
+## 23. Empirical boundary
 
-## Completion definition
-
-The loop is not complete because code exists, tests are green, or screenshots look good.
-
-Require the accepted combination of:
-
-- unit/domain tests;
-- database/runtime tests where applicable;
-- provider integration evidence;
-- browser/E2E verification;
-- failure injection;
-- accessibility checks;
-- persisted-state/log inspection;
-- exact-head CI;
-- full cumulative independent acceptance audit.
-
----
-
-# 13. Phase 11 — Beta / early-access hardening
-
-Required categories to the extent activated by the accepted Product form:
-
-- OAuth/token/storage security;
-- account disconnect/deletion behavior;
-- sync reconciliation/health;
-- scheduler health/overdue recovery;
-- send idempotency/ambiguous reconciliation;
-- migrations/backups/restore;
-- support/audit evidence;
-- AI regression pipeline;
-- cost/usage bounds;
-- privacy/retention;
-- responsive/browser/accessibility verification;
-- analytics needed for later Product hypotheses;
-- incident-safe disable/degraded mode.
-
-Do not expand provider/client breadth merely to look complete.
-
----
-
-# 14. Empirical Product validation lane — deferred in execution order, not removed
-
-GitHub Issue #36 remains open.
-
-Once a usable Product exists—or sooner if the owner explicitly reprioritizes fieldwork—run empirical Product Discovery without promoting implementation facts into market facts.
-
-Later evidence should test at minimum:
-
-- actual repeated monitoring burden;
-- real current alternatives/workarounds;
-- whether users delegate monitoring;
-- `N_self_check` / source fallback after delegation;
-- material false negatives;
-- unnecessary Review/attention burden;
-- context-restoration cost;
-- willingness to continue/pay;
-- retention;
-- acquisition/segment reachability.
-
-If valid evidence weakens/falsifies the wedge, change the Product even if implementation already exists.
-
-Issue #26/#28 may still be useful as bounded mechanism experiments, but they are not automatically the current Product-completion critical path.
-
----
-
-# 15. Deferred breadth
-
-Do not let these delay the complete loop unless separately accepted evidence/task scope promotes them:
-
-- graph/tree conversation visualization;
-- complex calendar Product;
-- CRM pipelines;
-- generic automation/workflow builder;
-- multi-agent user-facing architecture;
-- multiple AI provider fallback;
-- native apps;
-- advanced analytics dashboard;
-- team/shared mailbox collaboration;
-- custom search infrastructure before need;
-- full provider parity;
-- full-client surface completeness;
-- arbitrary fresh Compose / Forward parity;
-- Undo Send / Send Later parity;
-- second provider before the first provider loop is complete;
-- full attachment-content semantic understanding;
-- rich native preview parity across all formats.
-
----
-
-# 16. Search/context expansion
-
-Start with exact/source navigation and authorized PostgreSQL lexical/full-text capabilities only when the complete loop needs them.
-
-Add semantic/vector retrieval only after actual use demonstrates incremental value. Similarity remains retrieval, never Responsibility identity/merge/permission authority.
-
-Person/context views must not silently become CRM/product-domain ownership.
-
----
-
-# 17. Second provider
-
-Microsoft/Outlook comes only after the one-provider loop is genuinely complete and current demand/evidence or explicit owner scope justifies it.
-
-Success means adapter/provider-contract work, not a duplicate Responsibility/UI implementation.
-
-Cross-account semantic lookalikes remain separate Responsibilities initially.
-
----
-
-# 18. Codex / agent task slicing
-
-Never issue `build Lunowa` as one task.
-
-Each non-trivial task must include:
-
-- Goal / Why;
-- current task contract;
-- exact owning sources;
-- dependencies;
-- Scope / Non-goals;
-- invariants;
-- required reuse;
-- fixtures/oracles;
-- acceptance criteria;
-- verification;
-- stop/escalation conditions;
-- durable completion evidence.
-
-Product-behavior tasks must reference relevant `PRODUCT.md` / `PRODUCT-CONTENT.md` + Product Golden Scenario consequences without using Product UI scenarios to redefine Responsibility semantics.
-
-Responsibility-domain tasks must route to Responsibility canonical authorities and executable oracles.
-
-UI tasks must route to the accepted Issue #55 outputs; implementation agents must not invent material screen/state behavior ad hoc.
-
----
-
-# 19. Repository update timing
-
-This plan is a living execution artifact. Update it—or the more specific owning Issue/router—when a material accepted change occurs to:
-
-- critical path/owner priority;
-- phase ordering/dependencies;
-- implementation scope/non-goals;
-- a technical gate;
-- a blocker/unblocker;
-- Product scope relevant to sequencing;
-- integration/completion evidence.
-
-Do not rewrite this file for tentative brainstorming or ordinary chat. The test is whether a future execution agent would act incorrectly if the durable update were omitted.
-
----
-
-# 20. Universal completion discipline
-
-A phase is not complete because code exists, build passes, or tests are green.
-
-Independent review must audit the **current task contract + entire final cumulative candidate**, not only the latest patch.
-
-On FAIL, finish the audit and batch all known material blockers before correction except immediate security/data-loss/destructive-risk cases.
-
-On repeated correction failure, analyze preventable gaps in specification, test oracle, architecture, task decomposition, or verification process before another patch loop.
-
-Never claim provider/scheduler/send/security/database behavior verified when only mocked.
-
-Never claim monitoring relinquishment, ICP, WTP, retention, or PMF from implementation completion alone.
+Issue #36 remains open. Implementation cannot by itself authorize claims about ICP, market pain, monitoring relinquishment, PMF, WTP, retention or comparative differentiation.

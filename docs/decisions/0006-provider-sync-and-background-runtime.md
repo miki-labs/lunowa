@@ -2,40 +2,53 @@
 
 ## Status
 
-Accepted — 2026-08-19
-Terminology reconciled with Responsibility v0.1 — 2026-08-23
+Accepted — 2026-08-19  
+Terminology reconciled with Responsibility v0.1 — 2026-08-23  
+**Activation routing reconciled with current Product scope / Issue #58 — 2026-08-28**
+
+The durable architecture decision in this ADR remains accepted. Historical phase labels from the original 2026-08-19 roadmap are **not current activation authority**. Current activation order is `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues after Issue #58 merges.
 
 ## Context
 
-Lunowa must keep provider mailbox evidence synchronized while also executing durable product promises such as Temporal Contracts and Send Later.
+Lunowa must synchronize provider mailbox evidence and execute durable Product promises such as Temporal reconsideration while tolerating:
 
-The failure modes matter more than raw throughput:
+- delayed/duplicated/missed/reordered provider notifications;
+- expired provider cursors/subscriptions;
+- process/worker restarts;
+- races between new evidence and old scheduled work;
+- stale AI/job results;
+- retries that must not duplicate messages, Responsibility effects, external sends or user handoffs.
 
-- webhook/push notifications can be delayed, duplicated, missed, or reordered;
-- provider cursors/subscriptions can expire;
-- worker processes can restart;
-- one trigger can race with new communication/evidence;
-- a scheduled trigger can become stale after the user/evidence changes the Responsibility;
-- AI results/jobs can complete against an older evidence revision;
-- retries must not duplicate messages, sends, Responsibility effects, or resurfacing.
+A browser timer, request lifetime or in-memory scheduler cannot safely implement those promises.
 
-A browser timer, request lifetime, or in-memory scheduler cannot safely implement these promises.
-
-Responsibility v0.1 adds another critical requirement: **processing order is not semantic chronology**, and background runtime is execution infrastructure rather than Responsibility authority.
+Responsibility v0.1 adds a critical rule: **processing order is not semantic chronology**, and background runtime is execution infrastructure rather than Responsibility authority.
 
 ## Decision
 
 ### Background runtime
 
-Use Trigger.dev Cloud as the initial durable task/scheduling runtime once real background work begins.
+Use Trigger.dev Cloud as the initial managed durable execution substrate **when the accepted implementation graph actually requires durable background work**.
 
-Activation:
+PostgreSQL/trusted domain state remains authoritative. Trigger.dev executes attempts; it does not own Responsibility state, evidence authority, Temporal truth, semantic chronology, or external-effect idempotency.
 
-- Phase 1 fake UI: do not add it;
-- Phase 3 Gmail: use for bounded sync/reconciliation/background work where useful;
-- Phase 5: use durable scheduling/waits for Temporal Contracts and reuse the same durable execution boundary for Send Later when appropriate.
+Current Issue #58 routing:
 
-PostgreSQL/trusted domain state remains authoritative. Trigger.dev executes work; it does not own Responsibility state, evidence authority, Temporal Contract truth, or semantic chronology.
+- G20 may use durable execution for Gmail reconciliation/background work where it materially helps;
+- G32 may use Trigger.dev for Temporal execution after DB/domain currentness contracts exist;
+- G51 external Send reconciliation uses durable application/domain state and may use managed execution without granting the job system authority.
+
+### Historical Send Later activation is superseded
+
+The original ADR said a later phase could reuse this execution boundary for **Send Later**. Current canonical Product Feature Matrix now keeps Send Later **DEFERRED**, and Issue #58 does not place it on the Minimum Complete Delegation Loop critical path.
+
+Therefore:
+
+```text
+durable execution capability
+!= current Send Later Product activation
+```
+
+A future Send Later promotion requires a separately accepted Product/task contract covering durable permission, timing, edit/cancel semantics, idempotency and provider behavior. This ADR does not authorize it by itself.
 
 ### Gmail synchronization
 
@@ -45,30 +58,25 @@ Use Gmail API with:
 - Cloud Pub/Sub notifications;
 - persisted Gmail history cursor/state;
 - `history.list` reconciliation;
-- watch renewal and safety reconciliation.
+- watch renewal;
+- periodic/safety reconciliation;
+- stale-history full-sync recovery.
 
 Treat notifications as **signals to reconcile**, not complete/authoritative mailbox events.
 
 ### Microsoft synchronization
 
-Use Microsoft Graph production APIs with:
+Microsoft Graph remains an accepted future provider boundary using notification + delta reconciliation patterns where current Graph support warrants it. It is not a current one-provider v1 prerequisite.
 
-- change notifications/webhooks for near-real-time signals;
-- persisted delta state;
-- message delta queries for authoritative reconciliation;
-- lifecycle/missed-notification recovery where current Graph support warrants it.
-
-Treat notifications as signals, not the only source of mailbox truth.
-
-Provider-specific external details are time-sensitive and must be rechecked against current official documentation when implementation/release depends on them.
+Provider-specific details are time-sensitive and must be rechecked against current official documentation when implementation/release depends on them.
 
 ## Rationale
 
 ### Durable jobs are non-differentiating infrastructure
 
-Building a correct custom queue/scheduler/retry/checkpoint system would consume substantial solo-development/operational effort without differentiating Lunowa.
+Building a correct custom queue/scheduler/retry/checkpoint system would consume substantial solo-development and operational effort without differentiating Lunowa. A managed durable runtime fits TypeScript and Temporal execution while avoiding premature custom queue infrastructure.
 
-The selected durable runtime fits TypeScript and Temporal Contract execution while avoiding premature custom queue infrastructure. Revisit the vendor only from real reliability/cost/operability evidence.
+Revisit the vendor only from concrete reliability/cost/operability evidence.
 
 ### Notification + reconciliation is safer than notification-as-truth
 
@@ -76,127 +84,106 @@ Use the pattern:
 
 ```text
 push/webhook signal
-    -> validate / acknowledge quickly
-    -> durable sync task
-    -> fetch provider changes using current cursor/token
-    -> normalize/upsert idempotently
-    -> commit evidence + new cursor
-    -> advance evidence revision / enqueue relevant interpretation/reduction
+-> validate / acknowledge quickly
+-> durable reconciliation task
+-> fetch provider changes using current cursor/token
+-> normalize/upsert idempotently
+-> commit evidence
+-> advance cursor only after required durability
+-> enqueue relevant interpretation/reduction
 ```
 
-This tolerates duplicates, delivery gaps, process restarts, and provider ordering differences better than applying Responsibility changes directly from notification payloads.
+This tolerates duplicates, delivery gaps, restarts and provider ordering differences better than applying Responsibility changes directly from notification payloads.
 
 ### Semantic chronology survives observed-order differences
 
-A worker processing an event later does not make that evidence semantically newer.
+A worker processing evidence later does not make it semantically newer. Trusted reduction uses source semantic chronology and accepted evidence revision, not queue completion order.
 
-For example:
+### Temporal execution re-checks current truth
 
-```text
-10:00 Friday due
-10:05 explicit correction -> Monday
-```
+Before a scheduled trigger causes an effect, reload current:
 
-must remain Monday even if the 10:00 message is ingested after the correction.
-
-Background work therefore preserves source semantic time/relation evidence and lets trusted reduction determine current state.
-
-### Temporal Contract execution re-checks current truth
-
-Before a scheduled trigger causes an effect, reload:
-
-- contract version/status;
-- current Responsibility/evidence revision;
+- contract/version/status;
+- Responsibility/evidence revision;
 - live tracking/attention state where relevant;
-- trigger state;
+- trigger currentness;
 - supersession/cancellation;
-- relevant new provider/external evidence.
+- relevant provider/external evidence.
 
-A stale trigger becomes a no-op/audited result, not an authority that restores old state.
+A stale trigger becomes a no-op/audited result, not authority that restores old state.
 
 ### AI/background freshness
 
-A queued/running AI interpretation may finish after newer evidence arrives.
+A queued AI interpretation may finish after newer evidence arrives. A stale basis may be retained for diagnostics/eval but cannot mutate current Responsibility state.
 
-If:
-
-```text
-AIResult.basis_evidence_revision != current evidence revision
-```
-
-it may be retained for diagnostics/eval but cannot mutate current Responsibility state.
-
-Matching revision is necessary, not sufficient; normal validation/authority rules still apply.
+Matching evidence revision is necessary, not sufficient; normal authorization/provenance/semantic validation still applies.
 
 ## Required invariants
 
 1. Valid webhook endpoints acknowledge quickly and defer non-trivial work.
-2. Duplicate provider notifications do not duplicate Messages, Responsibilities, effects, triggers, or notifications.
+2. Duplicate provider notifications do not duplicate Messages, Responsibilities, effects, triggers or handoffs.
 3. Sync cursor/token advances only after corresponding local evidence is durably committed.
 4. Expired/invalid cursor enters explicit recovery/resync, not silent ignore.
-5. Task idempotency helps, but domain/database checks remain final guard.
-6. Stale/superseded Temporal Contract trigger is a no-op with audit evidence.
-7. SendOperation idempotency is separate from task-run idempotency; retries do not duplicate provider sends.
+5. Vendor task idempotency helps, but domain/database checks remain final guard.
+6. Stale/superseded Temporal trigger is a no-op with audit evidence.
+7. SendOperation idempotency is separate from task-run idempotency; retries do not blindly duplicate provider sends.
 8. Background failure cannot erase drafts or evidence/cursors needed for recovery.
 9. Observed/ingestion order never overrides semantic chronology by itself.
 10. Provider notification body never directly mutates accepted Responsibility state.
 11. Stale AI/job payload cannot roll back a newer evidence revision.
-12. A trigger firing does not automatically mean notification, `FOLLOW_UP`, or `MY_TURN`; current evidence is re-evaluated first.
-13. Cross-account processing never uses semantic similarity to merge Responsibilities across ConnectedAccounts automatically.
+12. Trigger fire does not automatically mean notification, `FOLLOW_UP`, or `MY_TURN`; current evidence is re-evaluated first.
+13. Cross-account semantic similarity never auto-merges Responsibilities.
+14. A durable execution capability does not activate a deferred Product feature.
 
 ## Provider-specific implementation notes
 
-When Gmail/Microsoft phases activate, follow current official provider guidance for watch/subscription expiration, offline authorization, delta/history reconciliation, retry/rate limits, and missed-notification recovery.
+When provider/background nodes activate, follow current official guidance for watch/subscription expiration, offline authorization, delta/history reconciliation, retry/rate limits, missed-notification recovery and external-effect semantics.
 
-Do not treat the provider details recorded in the 2026-08-19 decision snapshot as permanent. The durable architecture decision is the **notification-signal + authoritative reconciliation** pattern.
+Do not treat the provider/runtime details recorded at original acceptance as permanent. The durable architecture decision is:
+
+> **external signal + durable attempt + authoritative reconciliation + domain currentness**.
 
 ## Alternatives considered
 
 ### Vercel Cron + database polling only
 
-Not selected as primary Temporal Contract runtime. Periodic reconciliation can be a safety net, but custom per-user scheduling/retry/idempotency over cron adds orchestration work.
+Not selected as primary Temporal runtime. Periodic reconciliation remains useful as a safety net.
 
-### Supabase Queues/Cron
+### Supabase Queues/Cron / Inngest
 
-Viable but not selected initially. Revisit only on actual reliability/cost/operability evidence.
-
-### Inngest
-
-Viable. Not selected initially; do not operate multiple job systems without evidence.
+Viable alternatives, not selected initially. Do not operate multiple job systems without evidence.
 
 ### Custom worker + Redis/BullMQ
 
-Rejected initially. Adds Redis, worker hosting, queue operations, and custom scheduling before scale requires them.
+Rejected initially. Adds infrastructure/operations before measured need.
 
 ### Provider polling without push
 
-Not selected as normal path because latency/API usage is worse. Periodic polling/reconciliation remains a required safety mechanism, not sole architecture.
+Not selected as normal path; periodic reconciliation still remains required as safety recovery.
 
 ### Notification payload directly drives Responsibility state
 
-Rejected. Notifications can be duplicated, incomplete, missed, reordered, provider-specific, and stale relative to current product state.
+Rejected. Notifications can be duplicated, incomplete, missed, reordered, provider-specific and stale.
 
 ## Consequences
 
 Positive:
 
-- one durable background-execution model for sync/scheduling;
-- explicit recovery/reconciliation paths;
-- provider adapters remain thin/provider-specific;
-- Temporal Contract reliability is independent of browser/server request lifetime;
-- out-of-order/stale work is explicitly contained;
-- Responsibility authority remains in trusted persisted evidence/domain state.
+- one managed durable execution boundary when needed;
+- explicit recovery/reconciliation;
+- provider adapters remain provider-specific and domain-thin;
+- Temporal reliability is independent of browser/request lifetime;
+- stale work is explicitly contained;
+- deferred capabilities are not silently activated by infrastructure availability.
 
 Costs/risks:
 
-- another managed service once real background work activates;
-- service/price behavior is an external dependency;
-- provider webhook configuration adds operational work;
+- another managed service once activated;
+- service/price/behavior is external and changes;
+- provider webhook configuration adds operations;
 - reconciliation logic remains necessary;
-- durable tasks do not eliminate domain complexity or stale-result races automatically.
+- durable tasks do not remove domain complexity or stale-result races.
 
-## Evidence checked when originally accepted
+## Evidence posture
 
-Primary references included Trigger.dev durable waits/idempotency, Gmail push/history, Google offline OAuth, Microsoft Graph change notifications/delta/lifecycle notification guidance.
-
-Those external capabilities are time-sensitive. Re-check official documentation at the relevant implementation/release gate rather than treating the original snapshot as permanent.
+Original acceptance used then-current Trigger.dev, Gmail, Google OAuth and Microsoft Graph documentation. Those facts are time-sensitive. Issue #58 contains the current dated evidence snapshot; activation tasks recheck their own material vendor facts.

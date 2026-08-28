@@ -23,15 +23,15 @@ Issue #58 may pass only if every changing external dependency explicitly require
 
 | Required area | 2026-08-28 evidence | Graph consequence |
 |---|---|---|
-| Next.js / React runtime | Next 16.3.3 Active-LTS security release; Next 16 uses React 19.2 feature line; React docs latest major/minor 19.2 | G00 security patch; remain on accepted React 19.x |
-| Better Auth | latest stable changelog 1.7.2 on 2026-08-26; 1.7 requires regeneration for some schema changes; UUID DB strategy documented | P14 rechecks/pins exact current stable and generated schema |
+| Next.js / React runtime | Next 16.3.3 Active-LTS security release; Next 16 uses React 19.2 feature line; React docs latest family 19.2 | G00 security patch; remain on accepted React 19.x |
+| Better Auth | latest stable changelog 1.7.2 on 2026-08-26; 1.7 can require schema regeneration; UUID DB strategy documented | P14 rechecks/pins exact current stable and generated schema |
 | PostgreSQL / Drizzle | PostgreSQL 18.6 current supported 18 release; Drizzle GitHub Releases latest stable 0.45.2; current defects reinforce generated-SQL/real-DB proof | P13/P14 exact pins + real PostgreSQL 18; no RC/main-branch inference |
 | Gmail OAuth / watch / history | watch renewal, offline access, push-as-signal, stale-history 404/full-sync, scope/security requirements | G20 acceptance oracles + R90 public-release separation |
-| Trigger.dev | current 4.5 line; durable execution/idempotency facilities and version-changing defaults | G32 adapter only; DB/domain remains authority |
+| Trigger.dev | current 4.5 line; managed durable execution with changing runtime/idempotency details | G32 adapter only; DB/domain remains authority |
 | OpenAI | Responses + JSON Schema/Structured Outputs available; Responses retention/ZDR behavior is organization/feature dependent | G70 data-control + eval gate; `store:false` != ZDR |
-| Web accessibility | WCAG 2.2 remains W3C Recommendation/current conformance target with Focus Not Obscured, Target Size, Accessible Authentication, Status Messages relevant to current UI | G11 / release acceptance baseline |
+| Web accessibility | WCAG 2.2 remains W3C Recommendation/current target; Focus Not Obscured, Target Size, Accessible Authentication and Status Messages are relevant | G11 / release acceptance baseline |
 
-This table is an audit oracle: a future #58-like graph change that adds a volatile vendor without current evidence must fail rather than silently inherit an old snapshot.
+This table is an audit oracle: a future graph candidate that adds a volatile vendor without current evidence must fail rather than silently inherit an old snapshot.
 
 ## 3. Next.js / React
 
@@ -45,14 +45,14 @@ Observed:
 
 - 2026-08-25 Next.js security release directs Active-LTS 16.3 users to `16.3.3` for two Critical-severity fixes;
 - repo currently pins Next.js `16.3.0`;
-- Next.js 16 documents React 19.2 features in the App Router;
-- React docs identify 19.2 as the latest documented React version family; repo declares React/React DOM 19.2.7.
+- Next.js 16 documents React 19.2 features in App Router;
+- React docs identify 19.2 as the latest documented family; repo declares React/React DOM 19.2.7.
 
 Consequence:
 
-- G00 is a narrow PRE-WAVE serial Next.js security update + existing verification before write-heavy production-feature fanout;
-- no speculative React major change is required by current evidence;
-- runtime compatibility is proven again by exact-head build/E2E after G00.
+- G00 is a narrow PRE-WAVE serial Next.js security update + exact-head verification before write-heavy fanout;
+- no speculative React major change is justified;
+- runtime compatibility is reproven by build/E2E after G00.
 
 ## 4. Node.js
 
@@ -80,7 +80,7 @@ Observed:
 Consequence:
 
 - historical v1.6/v1.7.1 snapshots are dated evidence only;
-- P14 pins **current stable at execution**, explicitly configures the intended UUID strategy and inspects generated schema/real PostgreSQL rather than inferring from docs/types.
+- P14 pins **current stable at execution**, explicitly configures intended UUID behavior and inspects generated schema/real PostgreSQL rather than inferring from docs/types.
 
 ## 6. PostgreSQL
 
@@ -89,7 +89,7 @@ Primary source:
 
 Observed: PostgreSQL 18.6 released 2026-08-13 and major 18 remains current/supported.
 
-Consequence: executable Responsibility/Auth/Source proof stays on real PostgreSQL 18 and records the exact server version.
+Consequence: executable Responsibility/Auth/Source proof stays on real PostgreSQL 18 and records exact server version.
 
 ## 7. Drizzle ORM / Kit
 
@@ -100,7 +100,7 @@ Evidence:
 
 Observed:
 
-- GitHub Releases still identifies `0.45.2` as the latest stable release;
+- GitHub Releases still identifies `0.45.2` as latest stable release;
 - repository `main` may contain a higher package version and is **not** release evidence;
 - current defects reinforce that ORM/API intent is not database proof.
 
@@ -129,7 +129,7 @@ Consequence:
 
 - P13 proves these prerequisites in its isolated executable harness;
 - G10 creates the real app-auth User/session target;
-- **G19**, not G20, is the single writer for provider-neutral production ConnectedAccount/ProviderSyncState/Conversation/Message/Attachment persistence conforming to the proven prerequisites;
+- **G19**, not G20, is the single writer for provider-neutral production ConnectedAccount/ProviderSyncState/Conversation/Message/Attachment persistence conforming to proven prerequisites;
 - G20 consumes G19 for live Gmail integration;
 - P15 still gates Responsibility-owned production tables;
 - G30 may reference only accepted G19 production FK targets, never P13 proof fixtures.
@@ -172,7 +172,7 @@ Observed:
 Consequence:
 
 - secure token-at-rest handling is required **before first durable persistence of a real token**, not merely before public beta;
-- a bounded non-persistent protocol spike can avoid storing a long-lived token;
+- a bounded non-persistent protocol spike can avoid long-lived token storage;
 - ownership-scoped lookup, no token logging and revoke/delete behavior are part of G20 minimum security;
 - R90 owns broader production key-rotation/recovery hardening.
 
@@ -234,7 +234,7 @@ Observed:
 - Responses application-state retention is distinct from abuse-monitoring controls;
 - Zero Data Retention is an eligible organization/project control and changes endpoint behavior;
 - `store:false` by itself is not evidence that the organization has ZDR;
-- some features, such as background operation, have additional retention/ZDR compatibility implications.
+- some features, including background operation, have additional retention/ZDR implications.
 
 Consequence:
 
@@ -255,11 +255,11 @@ Observed:
 Consequence:
 
 - G11 keeps WCAG 2.2 AA as the implementation baseline already fixed by the UI contract;
-- responsive/focus/async-status/auth implementation is tested against those criteria rather than visual inspection alone.
+- responsive/focus/async-status/auth behavior is tested rather than accepted by visual inspection alone.
 
-## 16. Product Feature Matrix coverage
+## 16. Product Feature Matrix coverage oracle
 
-Canonical `PRODUCT-CONTENT.md` marks as V1 CORE / CORE target, with owning implementation nodes:
+Canonical `PRODUCT-CONTENT.md` current V1 CORE / CORE-target capabilities map as follows:
 
 | Capability | Owner |
 |---|---|
@@ -283,7 +283,21 @@ Canonical `PRODUCT-CONTENT.md` marks as V1 CORE / CORE target, with owning imple
 
 This mapping is a full-scope oracle: a future graph candidate that leaves a current CORE/CORE-target capability without an owner must fail.
 
-## 17. Architecture conclusions
+## 17. Persistence topological-order oracle
+
+```text
+G10 auth User/session
+ -> G19 provider-neutral Source/account tables
+    -> G30 Responsibility after P15
+       -> G32 Temporal persistence
+
+G50 Draft + initial SendOperation request schema
+ -> G51 provider dispatch/reconciliation transitions
+```
+
+A production FK/reference target must already exist as an accepted production table. Proof fixtures cannot satisfy production dependency order.
+
+## 18. Architecture conclusions
 
 No new Product architecture is required. Current evidence strengthens these boundaries:
 

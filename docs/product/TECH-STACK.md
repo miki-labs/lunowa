@@ -4,11 +4,12 @@
 
 **Accepted initial implementation stack; activation/version evidence refreshed 2026-08-28 for Issue #58.**
 
-This file selects replaceable infrastructure. It is not proof a dependency is installed or a capability is active. Exact installed versions live in `package.json` / `pnpm-lock.yaml`; current activation/dependency authority is `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
+This file selects replaceable infrastructure. It is not proof that a dependency is installed or a capability is active. Exact installed versions live in `package.json` / `pnpm-lock.yaml`; current activation/dependency authority is `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
 Responsibility semantics remain owned by `responsibility/`.
 
 Related:
+
 - `ARCHITECTURE.md`;
 - `CONTRACTS.md`;
 - `IMPLEMENTATION-PLAN.md`;
@@ -18,9 +19,11 @@ Related:
 
 ## 1. Current repository fact
 
-At baseline `9869d7cdee2559b00d73203dec40d92bc90f537f`, production dependencies remain bootstrap-only: Next.js, React and next-intl. Better Auth, Drizzle/PostgreSQL driver, Gmail provider libraries, Trigger.dev and OpenAI SDK are not activated.
+At baseline `9869d7cdee2559b00d73203dec40d92bc90f537f`, production dependencies remain bootstrap-only: Next.js, React and next-intl. Better Auth, Drizzle/PostgreSQL production persistence, Gmail integration, Trigger.dev and OpenAI SDK are not activated.
 
-Accepted stack != installed capability != configured integration != implemented Product behavior.
+```text
+accepted stack != installed capability != configured integration != implemented Product
+```
 
 ## 2. Accepted stack
 
@@ -30,7 +33,7 @@ Accepted stack != installed capability != configured integration != implemented 
 | Package manager | pnpm | active |
 | Language | strict TypeScript | active |
 | Web framework | Next.js 16.x App Router | G00 patches accepted 16.3 security baseline before feature fanout |
-| UI | React 19.x | active with Next line |
+| UI | React 19.x | active with chosen Next line |
 | Styling | Tailwind CSS 4 | active; Lunowa semantic tokens during UI implementation |
 | UI primitives | shadcn/ui + Lucide where useful | only for accepted components |
 | i18n | next-intl | active |
@@ -57,33 +60,27 @@ Accepted stack != installed capability != configured integration != implemented 
 
 1. Prefer supported stable/LTS lines over preview/RC novelty.
 2. Security patches inside the accepted line are prerequisites for production-feature work.
-3. Patch versions are operational evidence, not Product semantics.
+3. Patch versions are dated operational evidence, not Product semantics.
 4. Re-check volatile vendor behavior at activation/release gates.
+5. Do not infer a stable release from an unreleased repository `main` package version.
 
-### Current dated evidence
+### Current dated evidence — 2026-08-28
 
-As of 2026-08-28:
 - Node 24 remains LTS.
-- repo Next.js `16.3.0` is below the Aug-25 patched Active-LTS baseline `16.3.3`; G00 must patch first.
-- Better Auth stable evidence is `1.7.1`; the historical v1.6 snapshot is not proof.
-- PostgreSQL major 18 remains accepted; current point-release evidence is 18.6.
-- Drizzle stable evidence remains 0.45.x (`0.45.2`); 1.0 remains RC/pre-release. Current defects reinforce executable proof rather than automatic RC adoption.
+- repo Next.js `16.3.0` is below the Aug-25 Active-LTS security baseline `16.3.3`; G00 must patch first.
+- React remains on the React 19.x family used by the accepted Next line; repo currently uses 19.2.7.
+- Better Auth changelog latest stable is `1.7.2` (2026-08-26); P14 still rechecks/pins current stable at execution.
+- PostgreSQL major 18 remains accepted; current point release is 18.6.
+- Drizzle GitHub Releases still marks `0.45.2` as latest stable release; a higher package version on repository `main` is not release evidence. Recent open migration/introspection defects reinforce executable proof.
+- Trigger.dev current changelog is in the 4.5 line (`4.5.12` on 2026-08-20); it remains execution infrastructure, not Product/domain authority.
 
 Source detail lives in the dated Issue #58 evidence file.
 
-## 4. Web/runtime
+## 4. Web/runtime — G00
 
 Use one Next.js application as the initial modular-monolith web/API runtime.
 
-Rules:
-- server components where useful, not dogmatically;
-- Route Handlers/BFF own authenticated server/provider boundaries;
-- provider secrets never enter browser JS;
-- TypeScript is not runtime validation.
-
-### G00 security pre-wave
-
-Before write-heavy production feature branches fan out:
+Before write-heavy production-feature branches fan out:
 
 ```text
 patch accepted Next 16.3 line
@@ -93,56 +90,51 @@ patch accepted Next 16.3 line
 -> exact-head CI
 ```
 
+No unrelated dependency sweep or major framework migration in G00.
+
+Route Handlers/BFF own authenticated server/provider boundaries. Provider credentials never enter browser JavaScript. TypeScript does not replace runtime validation.
+
 ## 5. UI implementation
 
-Tailwind defaults are not Lunowa design authority. Repeated visual choices become semantic tokens.
+Tailwind defaults are not Lunowa design authority. Repeated Product visual decisions become semantic tokens.
 
-Use shadcn primitives only where they fit the frozen UI contract.
+Use shadcn primitives only where they fit the frozen UI contract. No global state framework by default; start with URL/search params, React state/context and selective query/mutation state.
 
-No global state framework by default. Start with URL/search params, React state/context and selective query/mutation state.
+Current composer path is contextual text Reply / Reply All + explicit immediate Send. Any editor choice must pass Japanese IME, email serialization/paste, keyboard/accessibility and maintenance/bundle tests without pulling Forward/Send Later/full Compose into scope.
 
-### Composer
+WCAG 2.2 AA is the implementation baseline owned by the UI contract; relevant current criteria include Focus Not Obscured (Minimum), Target Size (Minimum), Accessible Authentication (Minimum) and Status Messages.
 
-Current v1 path is contextual text Reply / Reply All + explicit immediate Send.
-
-Any editor choice must pass Japanese IME, email serialization/paste, keyboard/accessibility and maintenance/bundle tests. Editor selection must not pull Forward/Send Later/full Compose into scope.
-
-## 6. Authentication vs mailbox authorization
-
-Keep:
+## 6. App auth vs mailbox authorization
 
 ```text
-Lunowa application session
-!=
-Connected mailbox authorization
+Lunowa application session != Connected mailbox authorization
 ```
 
-Better Auth owns application identity/session after P14 proof. Mailbox OAuth/token authority stays in Lunowa `ConnectedAccount` provider/credential services, never Better Auth social-account rows.
+Better Auth owns application identity/session after P14 proof. Gmail OAuth/token authority stays in Lunowa ConnectedAccount/provider services, never Better Auth social-account rows.
 
-G10 owns auth/session schema only. G20 owns production ConnectedAccount/Source persistence after P13 proves current upstream L2 prerequisites.
+- G10 owns app-auth User/session schema only.
+- G19 owns provider-neutral Source/account persistence after G10 + P13 PASS.
+- G20 consumes G19 for live Gmail OAuth/watch/history/sync.
 
 ## 7. OAuth/token security
 
-For Google/Gmail user tokens, follow current Google policy/best practice.
+Before the **first durable persistence of a real Google token**:
 
-Before the **first durable persistence of a real refresh/access token**:
-- use secure server-side storage;
-- encrypt token material at rest/application boundary appropriate to the server architecture;
-- keep encryption keys/secrets outside the same repository/data store;
+- store it server-side and encrypted at rest;
+- keep cryptographic key/secret separate from ordinary DB/repository data;
 - never log token material;
-- scope token lookup/use by authenticated user + ConnectedAccount ownership;
-- handle invalidation/revocation;
+- scope lookup/use by authenticated user + ConnectedAccount ownership;
+- handle invalidation/revocation explicitly;
 - revoke and permanently delete tokens when no longer needed where supported.
 
-A bounded local OAuth protocol spike may keep credentials non-persistent. Plaintext durable token storage is not an accepted intermediate phase.
+A bounded non-persistent OAuth protocol spike may avoid durable token storage. Plaintext durable token storage is never an accepted intermediate phase.
 
-R90 later owns operational key rotation, production recovery and release hardening, not permission to defer basic secure token storage.
+R90 owns broader production key-rotation/recovery/release hardening, not permission to defer minimum secure storage.
 
 ## 8. Persistence / Drizzle
 
-Use PostgreSQL 18 as durable application store.
+Use PostgreSQL 18 as durable application store and Drizzle ORM + Drizzle Kit with:
 
-Use Drizzle ORM + Drizzle Kit with:
 - exact stable ORM/Kit/driver versions pinned by each proof/activation task;
 - generated SQL inspection;
 - committed SQL migrations;
@@ -150,38 +142,38 @@ Use Drizzle ORM + Drizzle Kit with:
 - transactions where invariants require;
 - no production Responsibility migration before P15 L2 freeze.
 
-Single-writer sequencing:
-- P14 -> G10 auth schema;
-- P13 PASS + G10 -> G20 Source schema;
-- P15 -> G30 Responsibility schema;
-- G32 Temporal schema;
-- G50 Draft/initial SendOperation schema;
-- G51 dispatch/reconciliation transitions.
+Single-writer / FK order:
 
-No Redis at bootstrap.
+```text
+P14 -> G10 auth User/session schema
+P13 PASS + G10 -> G19 provider-neutral Source schema
+P15 PASS + G19 -> G30 Responsibility schema
+G31 -> G32 Temporal persistence/runtime
+G20 + G40 -> G50 Draft/initial SendOperation request schema
+G50 + G31 -> G51 provider dispatch/reconciliation transitions
+```
+
+A production migration may not reference proof-only fixture tables. No Redis at bootstrap.
 
 ## 9. Durable jobs / Trigger.dev
 
 Trigger.dev is initial managed execution infrastructure when required, not authority.
 
 PostgreSQL/domain owns:
+
 - provider-message uniqueness/cursor truth;
 - Responsibility application idempotency;
 - Temporal contract/trigger version/currentness;
 - accepted evidence revision/state;
 - SendOperation duplicate prevention/reconciliation.
 
-Current v4 evidence:
-- raw-string idempotency defaults to `run` scope from v4.3.1;
-- `global` is still task/environment scoped;
-- default key TTL is finite (30 days current evidence);
-- failed runs clear their idempotency key.
-
-Any Trigger key therefore specifies key composition/scope/TTL and remains secondary to DB/domain currentness.
+Trigger.dev facilities/defaults can change. Any vendor idempotency key therefore has explicit composition/scope/TTL and remains secondary to DB/domain currentness. Current 4.x behavior around idempotency scope/retention/failed runs is an implementation oracle, not a timeless Product semantic.
 
 ## 10. Gmail first-provider stack
 
-Use Gmail API rather than IMAP for first vertical slice.
+Use Gmail API rather than IMAP for the first vertical slice.
+
+G19 provides provider-neutral Source repositories/schema. G20 provides live Gmail integration:
 
 ```text
 OAuth ConnectedAccount
@@ -190,65 +182,60 @@ OAuth ConnectedAccount
 -> authenticate + acknowledge quickly
 -> durable reconciliation
 -> history.list from current cursor
--> normalized idempotent Source commit
+-> normalized idempotent Source commit through G19
 -> cursor advance after required durability
 ```
 
 Provider oracles:
-- renew watch before expiration; current Google docs require at least every 7 days and recommend daily;
-- notifications may be delayed/dropped and are capped at one event/sec/user;
-- periodic safety reconciliation remains required;
-- stale `startHistoryId` / 404 enters full-sync recovery;
+
+- renew `watch` before returned expiration; current guidance requires renewal at least every 7 days and recommends daily;
+- notifications may be delayed/dropped, so periodic safety reconciliation remains required;
+- stale `startHistoryId` / HTTP 404 enters full-sync recovery;
 - background access requires offline OAuth/refresh-token handling;
-- push payload never directly changes Responsibility state.
+- push payload never directly changes Responsibility state;
+- request the narrowest scopes consistent with implemented capability.
 
-Request narrowest scopes consistent with implemented behavior.
+OAuth verification/restricted-scope security assessment is R90 release work where actual deployment/scopes require it. It is not a blanket blocker to local/private complete-loop implementation.
 
-### Public-release boundary
-
-OAuth verification/restricted-scope security assessment is R90 release work where actual scopes/deployment require it. It is not a blanket blocker to local/private complete-loop implementation.
-
-## 11. Microsoft
-
-Microsoft Graph remains a future provider boundary and is not a current Minimum Complete Delegation Loop prerequisite.
-
-## 12. AI runtime
+## 11. AI runtime
 
 Use official OpenAI SDK + Responses API + Structured Outputs for two bounded candidate paths after trusted contracts exist:
 
 1. Responsibility interpretation candidate;
-2. contextual AI draft candidate inside an authorized current Reply context.
+2. contextual AI reply-draft candidate.
 
-The model never owns authentication, provider facts, admission/identity/effects, live tracking/defer, Temporal effects or Send permission.
+Structured `json_schema` output constrains syntax; it does not grant semantic authority. Runtime/source/currentness validation remains mandatory.
+
+The model never owns authentication, provider facts, Responsibility admission/identity/effects, tracking/defer, Temporal effects, sender/recipient authority or Send permission.
 
 ### Data-control activation gate
 
 `store: false` is not synonymous with Zero Data Retention.
 
 Before production email AI use:
+
 - re-read current OpenAI data controls;
-- know actual org/project retention mode;
+- record actual org/project retention mode;
 - use minimum authorized context;
 - use `store:false` where appropriate;
 - avoid raw mail/prompt/output logging by default;
-- avoid incompatible features if ZDR is a requirement;
+- verify ZDR eligibility/settings/feature compatibility if ZDR is required;
 - record model/config/data-control basis in evidence.
 
-### Eval gate
+Interpretation and drafting use separate schemas/evals. Manual Source/Reply remains available if AI fails.
 
-Interpretation and drafting have separate schemas/evals. Use layered correctness, high-harm/prompt-injection tests and family-stratified holdout. Manual Source/Reply remains available if AI fails.
+## 12. Search / attachments
 
-## 13. Search
+Authorized **exact Source search is V1 CORE** and belongs to G21. Start with PostgreSQL indexing/full-text plus `pg_trgm` where useful. No vector DB initially.
 
-Authorized **exact Source search is V1 CORE** and belongs to the G21 Source path.
+Natural-language/semantic retrieval remains conditional and must not be advertised until activated. Similarity is never Responsibility identity authority.
 
-Start with PostgreSQL indexes/full-text and `pg_trgm` where useful. No vector DB initially.
+Authorized attachment evidence access/open/download/provider fallback is CORE. Rich native preview is not.
 
-Natural-language/semantic retrieval remains conditional and must not be advertised until activated. Search similarity is never Responsibility identity authority.
-
-## 14. Testing / verification
+## 13. Testing / verification
 
 Tasks select appropriate evidence from:
+
 - Vitest;
 - React Testing Library;
 - Playwright;
@@ -257,6 +244,4 @@ Tasks select appropriate evidence from:
 - real provider contract/integration evidence;
 - exact-head CI.
 
-Async/external effects test request, pending, accepted, failure, ambiguity and reconciliation—not only happy-path output.
-
-Visual references remain subordinate to textual Product/UI authority.
+Async/external effects test request, pending, accepted, failure, ambiguity and reconciliation—not only happy path. Visual references remain subordinate to textual Product/UI authority.

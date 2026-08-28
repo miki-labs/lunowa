@@ -1,29 +1,52 @@
 # Knowledge Map
 
-This map routes a question to its authoritative source. It is navigation, not a substitute for the sources it names. Authority depends on the question; executable evidence that exposes stale documentation requires reconciliation rather than a silent redefinition of intended behavior.
+This map routes questions to authoritative sources. It is navigation, not a substitute for the sources it names.
 
-| Question / knowledge class | Primary authority | Secondary/context source | Freshness/live rule | Notes |
-| --- | --- | --- | --- | --- |
-| Product vision / problem / audience hypothesis / differentiation / validation state / highest-level v1 direction | `docs/product/PRODUCT.md` | `docs/product/PRODUCT-CONTENT.md`; `docs/design/DESIGN.md`; durable decisions; current task Issue | Keep accepted Product direction separate from hypotheses/needs-validation; re-check market/competitor/provider claims when freshness matters | Highest-level Product “what/why/for whom” authority. Execution priority does not turn a hypothesis into a validated fact. |
-| Detailed Product operating behavior: control/correction/escalation, degraded behavior, account lifecycle, Settings, communication edge cases, Managed/Review, zero/unavailable states, final feature scope | `docs/product/PRODUCT-CONTENT.md` | `docs/product/PRODUCT.md`; canonical design; Responsibility authority | Re-check current Product authority and live task when a Product decision is being changed | This file is Product behavior authority, not schema authority. FIXED Responsibility semantics still win semantic-truth conflicts. |
-| Product-level end-to-end acceptance / regression consequence | `docs/product/GOLDEN-SCENARIO-BANK.md` | `docs/product/PRODUCT.md`; `PRODUCT-CONTENT.md`; Responsibility scenario/oracle corpus | Use current bank for Product consequence, but current Responsibility oracle for semantic truth | Product Golden scenarios never replace or weaken Responsibility semantic oracles. |
-| Accepted UX / design behavior | `docs/design/DESIGN.md`, `docs/design/INTERACTIONS.md`, and `docs/design/RESPONSIVE.md` | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md`; `docs/product/PRODUCT.md`; `docs/product/PRODUCT-CONTENT.md`; applicable visual references; implementation tests; current UI/UX task Issue | Inspect rendered behavior when actual UI state matters; while Issue #55 is active, read the v1 UI implementation contract together with the canonical design trio | Visual references are interpreted under their README; screenshots do not override current textual Product semantics. The v1 implementation contract concretizes screen/state/component/read-model/test behavior without creating Product/domain authority. |
-| v1 UI implementation-facing screen/state/component/read-model/accessibility contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | `docs/design/DESIGN.md`; `INTERACTIONS.md`; `RESPONSIVE.md`; Product Golden Scenarios; Responsibility oracles; `docs/product/research/issue-55-ui-ux-evidence-2026-08-28.md` | Use the accepted exact version when decomposing frontend implementation; if a future Product/design authority changes, reconcile this contract before coding against it | Owns implementation-facing concretization only. It must not create lifecycle/schema/provider/authorization truth, and visual references remain subordinate. |
-| Architecture and contracts | `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, and `CONTRACTS.md` | Relevant decisions and implementation evidence | Reconcile when executable evidence reveals stale docs | Architecture docs answer intended boundaries; code answers actual behavior. Product vocabulary does not silently create schema. |
-| Responsibility semantics / persistence / evals | `docs/product/responsibility/` canonical sources | ADRs 0008/0009 and implementation/proof evidence | Follow the current freeze/proof level and exact evidence; static review is not executable proof | Do not duplicate detailed Responsibility conclusions in Product/continuity files. |
-| Durable decision rationale | Applicable `docs/decisions/` record | Current canonical documentation and Git history | Record supersession where future interpretation needs it | Decision status belongs to the decision artifact. |
-| Accepted technology / platform choices | `docs/product/TECH-STACK.md` and relevant ADRs | Official current provider/platform documentation | Recheck live external facts before time-sensitive activation | Accepted stack is not proof of current vendor behavior. |
-| Current implementation sequence / owner-directed critical path | `docs/product/IMPLEMENTATION-PLAN.md` | `docs/continuity/CURRENT.md`; current Product scope authorities; current task Issue; design/domain constraints | Treat the plan as living execution state; query live Issue when priority changes | **Implementation authorization and empirical-claim authorization are separate.** Current execution may build accepted hypotheses before Issue #36, while ICP/PMF/WTP/reliability claims remain unvalidated. |
-| Empirical Product-discovery disposition | Current Product-discovery Issue (currently #36) + accepted evidence result | `docs/product/PRODUCT.md`; dated research evidence | Query live Issue/result; implementation progress is not empirical evidence | A deferred execution priority is not PASS/FAIL. |
-| Actual implementation / runtime behavior | Code, schema, migrations, tests, deployed/runtime evidence | Canonical intended behavior documentation | Prefer current executable/live evidence for actual-state questions | A mismatch does not automatically make either side correct; reconcile the stale artifact. |
-| Current requested change | Current GitHub Issue | Relevant canonical constraints and code | Fetch live Issue state before acting | The Issue is task intent, not a copied durable specification. |
-| Candidate change / review / evidence | GitHub PR, review threads, CI, and branch diff | Current Issue and canonical constraints | Query GitHub; do not duplicate review state in `CURRENT.md` | `agent:review-ready` means ready to inspect, never PASS. |
-| Current project checkpoint | `docs/continuity/CURRENT.md` as navigation snapshot | Canonical sources and live GitHub state | Stale checkpoint loses to canonical/current evidence | Keep only material resume context. |
-| Reusable Blueprint baseline / adoption | Upstream `miki-thecat/software-engineering-blueprint` plus `docs/continuity/BLUEPRINT-ADOPTION.md` | Local reusable baseline documents | Review applicability before adopting upstream change | Local Product/domain sources remain authoritative for Lunowa. |
-| Current external/provider/competitor facts | Authoritative external primary source, API, or live tool | Time-stamped local decision/evidence when relevant | Query current primary source when freshness matters | Do not copy volatile facts as timeless Product truth. |
+| Question / knowledge class | Primary authority | Secondary/context | Freshness rule |
+|---|---|---|---|
+| Product vision / problem / v1 direction / explicit hypotheses | `docs/product/PRODUCT.md` | `PRODUCT-CONTENT.md`, design, current Issue | Keep accepted direction separate from empirical validation |
+| Detailed Product behavior / scope / failure / lifecycle / Settings / Feature Matrix | `docs/product/PRODUCT-CONTENT.md` | `PRODUCT.md`, design, Responsibility authority | Re-read when Product behavior changes |
+| Product end-to-end consequence | `docs/product/GOLDEN-SCENARIO-BANK.md` | Responsibility oracles | Responsibility authority wins semantic-truth conflicts |
+| Canonical UX/design behavior | `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` | `V1-UI-IMPLEMENTATION-CONTRACT.md`, Product authorities | Inspect rendered behavior when runtime UI matters |
+| v1 implementation-facing UI contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | canonical design + Product Golden Scenarios | Issue #55 / PR #57 completed this contract; do not treat #55 as current task |
+| Responsibility semantics/evals/persistence proof | `docs/product/responsibility/` | ADRs 0008/0009, executable evidence | Follow exact freeze/proof level; static review != executable proof |
+| Conceptual Product engineering architecture | `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` | ADRs, implementation evidence | Reconcile when executable evidence exposes stale intent |
+| Accepted technology choices | `docs/product/TECH-STACK.md` | official vendor/platform docs | Recheck volatile facts at activation |
+| High-level implementation sequence | `docs/product/IMPLEMENTATION-PLAN.md` | `CURRENT.md`, Product scope | Living execution sequence only |
+| Exact dependency / parallelization / schema writer / FK topology | `docs/product/IMPLEMENTATION-GRAPH.md` **after Issue #58 accepted merge** | live implementation Issues, Issue #58 dated evidence | While #58 is open, graph is candidate; always inspect live #58 state |
+| Current task-specific contract | live GitHub Issue | owning canonical artifacts | Fetch live Issue before acting |
+| Candidate/review/CI state | GitHub PR/review/checks | current Issue | `agent:review-ready` != PASS; exact-head evidence matters |
+| Actual runtime behavior | code/schema/migrations/tests/deployed evidence | canonical intended behavior | Executable behavior establishes what happens; reconcile mismatch rather than silently choosing |
+| Current checkpoint | `docs/continuity/CURRENT.md` | canonical sources + live GitHub | Mutable router loses to canonical/live evidence |
+| Empirical Product Discovery | current Product Discovery Issue, currently #36 | Product authorities + protected/public evidence | Implementation progress cannot satisfy empirical claims |
+| Durable rationale | applicable `docs/decisions/` ADR | current canonical docs/history | Record supersession when needed |
+| Current external/provider facts | authoritative current external primary source | dated local evidence | Recheck when freshness materially affects activation/release |
+| Reusable engineering baseline | upstream Blueprint + `BLUEPRINT-ADOPTION.md` | local docs | Local Lunowa Product/domain authority wins |
 
-## Update lifecycle and duplication boundary
+## Current routing checkpoint
 
-Update this map only when authority routing, a durable source location, or a freshness rule changes. Do not add current workstream inventory, detailed Product semantics, a universal precedence order, or copied content from the sources above. Use repository-relative links and stable GitHub identifiers when links are needed.
+- Issue #55 / PR #57: UI/UX implementation-readiness **complete**.
+- Issue #58: current implementation-graph gate until full audit + exact-head CI + merge.
+- After accepted #58 merge: `IMPLEMENTATION-GRAPH.md` owns exact execution topology; first runtime gate is G00 and V01 may run independently.
+- Issues #13/#14/#15 remain the Responsibility L2 executable proof/freeze chain.
+- Issue #36 remains open empirical Product Discovery, deferred in current execution order.
 
-A material owner-priority change belongs in the live Issue/`CURRENT.md`/`IMPLEMENTATION-PLAN.md`; Product truth changes belong in Product authorities. Do not rewrite one merely because the other changed.
+## Important authority boundaries
+
+### Production FK topology
+
+The current L2 candidate may reference production entities outside Responsibility-owned tables. `IMPLEMENTATION-GRAPH.md` must explicitly close every such target to a production owner/order. Proof-only fixtures never satisfy production topology.
+
+### Parallel work
+
+Worktree, Docker and database namespace isolation establish execution isolation, not merge isolation. When concurrent tasks touch shared root assets such as `package.json` / `pnpm-lock.yaml`, live graph/task contracts govern serialized merge and re-verification.
+
+### AI/provider authority
+
+A provider capability, database table, scheduled job or AI result does not by itself authorize Product behavior or accepted domain effects.
+
+## Update lifecycle
+
+Update this map only when authority routing, a durable source location or a freshness rule changes. Do not duplicate detailed Product/domain/DAG semantics here.
+
+If a navigation artifact conflicts with owning canonical or live GitHub state, consult the owning source, surface unresolved conflicts, and repair the stale router in the same accepted workstream.

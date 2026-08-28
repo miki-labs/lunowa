@@ -4,15 +4,16 @@ This is a compact mutable bootstrap/router, not Product/design/domain/architectu
 
 ## Metadata
 
-- Last reconciled: `2026-08-28`
+- Last reconciled: `2026-08-29`
+- Current accepted `main`: `9f7209928578c8b84a09649ea8112b4c6c2a8c9f` or later accepted main
 - Highest-level Product: `docs/product/PRODUCT.md`
 - Detailed Product scope: `docs/product/PRODUCT-CONTENT.md`
 - Product acceptance: `docs/product/GOLDEN-SCENARIO-BANK.md`
 - UI implementation authority: `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` + canonical design trio
 - Responsibility authority: `docs/product/responsibility/`
 - High-level execution: `docs/product/IMPLEMENTATION-PLAN.md`
-- Exact graph candidate: `docs/product/IMPLEMENTATION-GRAPH.md`
-- Current live gate until merge: GitHub Issue #58
+- Exact dependency/parallelization authority: `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues
+- Current live runtime gate: GitHub Issue #60 / `G00`
 
 ## Product direction
 
@@ -24,35 +25,66 @@ v1 remains a one-provider **Minimum Complete Delegation Loop**, not broad provid
 
 Implementation does not establish ICP, PMF, WTP, retention or real monitoring relinquishment.
 
-## Completed specification work
+## Completed specification/design gates
 
-- Product Content / Golden Scenarios: complete enough for current implementation hypothesis.
+- Product Content / Golden Scenarios: complete enough for the current implementation hypothesis.
 - Issue #55 / PR #57: implementation-facing UI/UX contract **COMPLETE** after full cumulative audit + exact-head Verify/E2E.
-- Main baseline after PR #57: `9869d7cdee2559b00d73203dec40d92bc90f537f`.
+- Issue #58 / PR #59: implementation graph / architecture activation topology **COMPLETE** after repeated full cumulative audit + exact-head CI.
+- Issue #61 / PR #76: minimal canonical visual-reference freeze **COMPLETE**; five active references are canonical visual guidance and textual authority still wins.
+- Current accepted main after PR #76: `9f7209928578c8b84a09649ea8112b4c6c2a8c9f`.
 - Runtime remains bootstrap-level; frozen contracts != implemented Product.
 
-## Current gate — Issue #58
+## Current runtime gate — G00 / Issue #60
 
-Issue #58 freezes:
+G00 is the first runtime `SERIAL_GATE` after the graph/visual freezes.
 
-- implementation-state reconstruction;
-- current volatile vendor evidence;
-- architecture activation boundaries;
-- exhaustive production FK topology;
-- single-writer collision zones;
-- parallel execution vs serialized merge rules;
-- implementation DAG;
-- Product/Responsibility/UI/provider acceptance mapping.
-
-Do not launch broad production fanout until #58 passes full cumulative audit + exact-head CI and merges.
-
-If live GitHub shows #58 already merged/closed, this checkpoint's transition is:
+Current repo still pins:
 
 ```text
-next runtime gate = G00 patched framework security baseline
-parallel-safe visual lane = V01 final visual-reference pass
-exact downstream order = IMPLEMENTATION-GRAPH.md + live Issues
+next                16.3.0
+eslint-config-next  16.3.0
 ```
+
+Execution-time evidence was rechecked on `2026-08-29`:
+
+- Next.js official August 25, 2026 security release identifies `16.3.3` as the current Active LTS security baseline for the accepted 16.3 line;
+- official `v16.3.3` fixes two Critical unauthenticated RCE advisories (`GHSA-p293-qw3h-jr36` and `GHSA-2xp9-vwfh-vxw4`);
+- npm currently exposes `16.3.3` as the `latest` stable tag; 16.4 is pre-release/canary at this checkpoint.
+
+Therefore G00 remains a narrow security patch to `16.3.3`, with directly coupled `eslint-config-next` / lock resolution only as required. No framework-major/minor migration or unrelated dependency sweep is justified by current evidence.
+
+G00 acceptance remains:
+
+```text
+latest accepted main
+-> narrow Next.js security patch
+-> clean pnpm install --frozen-lockfile
+-> pnpm verify
+-> Playwright E2E smoke
+-> exact-head GitHub CI
+-> full cumulative acceptance audit
+-> merge only on PASS
+```
+
+Do not launch the first write-heavy production fanout before G00 PASS/merge.
+
+## First execution wave after G00
+
+The first safe parallel execution wave is:
+
+```text
+P13 / Issue #13  Responsibility PostgreSQL/Drizzle executable proof
+P14 / Issue #14  Better Auth UUID persistence proof
+G11 / Issue #63  structural Product UI shell/read-model/accessibility harness
+```
+
+They may execute concurrently in isolated worktrees/runtime namespaces, but:
+
+```text
+parallel execution != parallel merge
+```
+
+`package.json` and `pnpm-lock.yaml` are serialized merge assets. Later concurrent PRs touching them refresh onto latest accepted main, regenerate the lockfile with pnpm, rerun repository verification, and rerun any proof materially affected by the changed dependency/version basis.
 
 ## Actual implementation state
 
@@ -62,20 +94,14 @@ Production capability is still mostly bootstrap-only. Better Auth production aut
 accepted stack != installed capability != configured integration != implemented Product
 ```
 
-Current repo still pins Next.js 16.3.0; official Aug-25 2026 security guidance moves the accepted Active-LTS 16.3 baseline to 16.3.3. G00 owns that update after #58.
-
-## Corrected dependency shape
+## Current dependency shape
 
 ```text
-#58 merge
-  |
-  +-> G00 security baseline
-  +-> V01 visual-reference pass
-
-After G00:
-  P13 Drizzle/PostgreSQL proof ----+
-  P14 Better Auth UUID proof ------+-> P15 L2 independent freeze
-  G11 structural UI harness
+G00 security baseline
+ |
+ +-> P13 Drizzle/PostgreSQL proof ----+
+ +-> P14 Better Auth UUID proof ------+-> P15 L2 independent freeze
+ +-> G11 structural UI harness
 
 P14 PASS -> G10 app User/session
 P13 PASS + G10 -> G19 provider-neutral evidence foundation
@@ -84,7 +110,7 @@ G19 -> G20 Gmail -> G21 Source/exact search
   |
   +-> P15 PASS -> G30 production persistence -> G31 reducer -> G32 attention/Temporal
 
-G11 + G21 + G31/G32 -> G40 Product surfaces
+G11 + G21 + G31 + G32 -> G40 Product surfaces
 G31 + frozen evidence contract -> G70 bounded AI
 G20 + G40 -> G50 contextual Draft/immediate Send request
 G31 + G50 -> G51 provider Send reconciliation
@@ -117,16 +143,6 @@ Ownership/order:
 Creating ParticipantIdentity does not activate CRM/Person Product scope. Creating AIInterpretationRun does not activate model execution; G70 owns AI runtime.
 
 Proof fixture != production FK target.
-
-## Parallelism correction
-
-P13/P14/G11 can execute concurrently after G00 in isolated worktrees/runtime namespaces, but:
-
-```text
-parallel execution != parallel merge
-```
-
-`package.json` and `pnpm-lock.yaml` are serialized merge assets. Later concurrent PRs touching them refresh onto latest accepted main, regenerate the lockfile with pnpm, rerun repository verification, and rerun materially dependency-sensitive proof.
 
 ## Responsibility proof state
 

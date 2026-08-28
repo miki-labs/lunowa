@@ -2,15 +2,13 @@
 
 ## Status
 
-Dated external/repository evidence for Issue #58. **Evidence/rationale, not timeless Product truth.** Volatile facts must be rechecked when the activation/release gate actually executes.
+Dated external/repository evidence for Issue #58. **Evidence/rationale, not timeless Product truth.** Volatile facts must be rechecked when the actual activation/release gate executes.
 
 ## 1. Repository implementation fact
 
 Baseline after PR #57: `9869d7cdee2559b00d73203dec40d92bc90f537f`.
 
-Current production dependencies remain bootstrap-only: Next.js / React / next-intl. Better Auth, Drizzle/PostgreSQL production persistence, Gmail integration, Trigger.dev and OpenAI SDK are not activated. The app is still a bootstrap route/component with bootstrap-focused tests.
-
-Therefore:
+Current production dependencies remain bootstrap-only: Next.js / React / next-intl. Better Auth, Drizzle/PostgreSQL production persistence, Gmail integration, Trigger.dev and OpenAI SDK are not activated. The app remains a bootstrap route/component with bootstrap-focused tests.
 
 ```text
 accepted docs/ADR
@@ -19,81 +17,105 @@ accepted docs/ADR
 != implemented Product behavior
 ```
 
-## 2. Next.js
+## 2. Vendor/platform evidence coverage oracle
 
-Checked 2026-08-28.
+Issue #58 may pass only if every changing external dependency explicitly required by its contract has current dated evidence or an explicit bounded deferral.
 
-Primary source:
+| Required area | 2026-08-28 evidence | Graph consequence |
+|---|---|---|
+| Next.js / React runtime | Next 16.3.3 Active-LTS security release; Next 16 uses React 19.2 feature line; React docs latest major/minor 19.2 | G00 security patch; remain on accepted React 19.x |
+| Better Auth | latest stable changelog 1.7.2 on 2026-08-26; 1.7 requires regeneration for some schema changes; UUID DB strategy documented | P14 rechecks/pins exact current stable and generated schema |
+| PostgreSQL / Drizzle | PostgreSQL 18.6 current supported 18 release; Drizzle GitHub Releases latest stable 0.45.2; current defects reinforce generated-SQL/real-DB proof | P13/P14 exact pins + real PostgreSQL 18; no RC/main-branch inference |
+| Gmail OAuth / watch / history | watch renewal, offline access, push-as-signal, stale-history 404/full-sync, scope/security requirements | G20 acceptance oracles + R90 public-release separation |
+| Trigger.dev | current 4.5 line; durable execution/idempotency facilities and version-changing defaults | G32 adapter only; DB/domain remains authority |
+| OpenAI | Responses + JSON Schema/Structured Outputs available; Responses retention/ZDR behavior is organization/feature dependent | G70 data-control + eval gate; `store:false` != ZDR |
+| Web accessibility | WCAG 2.2 remains W3C Recommendation/current conformance target with Focus Not Obscured, Target Size, Accessible Authentication, Status Messages relevant to current UI | G11 / release acceptance baseline |
+
+This table is an audit oracle: a future #58-like graph change that adds a volatile vendor without current evidence must fail rather than silently inherit an old snapshot.
+
+## 3. Next.js / React
+
+Primary sources:
+
 - https://nextjs.org/blog
+- https://nextjs.org/docs/app/guides/upgrading/version-16
+- https://react.dev/versions
 
 Observed:
-- 2026-08-25 security release;
-- Active-LTS 16.3 users directed to `16.3.3` for two Critical-severity fixes;
-- repo currently pins `16.3.0`.
+
+- 2026-08-25 Next.js security release directs Active-LTS 16.3 users to `16.3.3` for two Critical-severity fixes;
+- repo currently pins Next.js `16.3.0`;
+- Next.js 16 documents React 19.2 features in the App Router;
+- React docs identify 19.2 as the latest documented React version family; repo declares React/React DOM 19.2.7.
 
 Consequence:
-- G00 is a narrow PRE-WAVE serial security update + existing verification before write-heavy production-feature fanout.
-- #58 planning branch does not mix in the dependency patch itself.
 
-## 3. Node.js
+- G00 is a narrow PRE-WAVE serial Next.js security update + existing verification before write-heavy production-feature fanout;
+- no speculative React major change is required by current evidence;
+- runtime compatibility is proven again by exact-head build/E2E after G00.
+
+## 4. Node.js
 
 Primary source:
 - https://nodejs.org/en/about/previous-releases
 
-Observed:
-- Node 24 remains LTS.
+Observed: Node 24 remains LTS.
 
-Consequence:
-- retain Node 24, normal patch/security maintenance applies.
+Consequence: retain Node 24; normal patch/security maintenance applies.
 
-## 4. Better Auth
+## 5. Better Auth
 
 Primary sources:
+
 - https://better-auth.com/changelog
 - https://better-auth.com/blog/1-7
 - https://better-auth.com/docs/concepts/database
 
 Observed:
-- stable `1.7.1` released 2026-08-18;
-- 1.7 includes storage/identity changes that can require regenerated schema;
-- current DB docs support `advanced.database.generateId: "uuid"` and PostgreSQL UUID handling.
+
+- latest stable changelog is `1.7.2`, released 2026-08-26;
+- 1.7 introduced identity/storage changes and instructs affected Drizzle users to regenerate schema;
+- current DB docs support UUID generation strategies for PostgreSQL.
 
 Consequence:
-- historical v1.6 validation is stale evidence;
-- P14 pins current stable at execution, explicitly configures UUID, inspects generated schema/real PostgreSQL rather than inferring from docs/types.
 
-## 5. PostgreSQL
+- historical v1.6/v1.7.1 snapshots are dated evidence only;
+- P14 pins **current stable at execution**, explicitly configures the intended UUID strategy and inspects generated schema/real PostgreSQL rather than inferring from docs/types.
+
+## 6. PostgreSQL
 
 Primary source:
-- https://www.postgresql.org/docs/18/
+- https://www.postgresql.org/docs/release/18.6/
 
-Observed:
-- major 18 remains supported/accepted; current point-release evidence is 18.6.
+Observed: PostgreSQL 18.6 released 2026-08-13 and major 18 remains current/supported.
 
-Consequence:
-- executable Responsibility/Auth proof stays on real PostgreSQL 18 and records exact server version.
+Consequence: executable Responsibility/Auth/Source proof stays on real PostgreSQL 18 and records the exact server version.
 
-## 6. Drizzle ORM / Kit
+## 7. Drizzle ORM / Kit
 
 Evidence:
+
 - https://github.com/drizzle-team/drizzle-orm/releases
-- recent issue evidence including transaction/migration/introspection defects.
+- current issue evidence around migration/introspection behavior.
 
 Observed:
-- stable evidence remains 0.45.x (`0.45.2`); 1.0 remains RC/pre-release;
-- current issues reinforce that ORM/API intent is not DB proof.
+
+- GitHub Releases still identifies `0.45.2` as the latest stable release;
+- repository `main` may contain a higher package version and is **not** release evidence;
+- current defects reinforce that ORM/API intent is not database proof.
 
 Consequence:
-- no automatic RC adoption;
-- P13/P14 pin exact stable ORM/Kit/driver, inspect generated SQL and execute against real PostgreSQL 18;
-- production changes use committed migrations, not `push` as final process.
 
-## 7. Responsibility L2 upstream prerequisites
+- no automatic RC/unreleased-main adoption;
+- P13/P14 pin exact stable ORM/Kit/driver versions, inspect generated SQL and execute against real PostgreSQL 18;
+- production changes use committed migrations rather than `push` as final process.
+
+## 8. Responsibility L2 upstream Source prerequisites
 
 Repository source:
 - `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` v0.4.
 
-Current candidate explicitly requires broader Source schema invariants including:
+Current candidate requires upstream production invariants including:
 
 ```sql
 connected_accounts UNIQUE (id, user_id)
@@ -101,130 +123,167 @@ conversations UNIQUE (id, connected_account_id)
 messages UNIQUE (id, connected_account_id)
 ```
 
-and a monotonic non-negative `Conversation.semantic_evidence_revision`.
+plus monotonic non-negative `Conversation.semantic_evidence_revision`.
 
 Consequence:
-- G10 must not independently freeze Source production schema before this prerequisite proof;
-- P13 proves current prerequisite behavior;
-- after P13 PASS, G20 is the single writer for production ConnectedAccount/ProviderSyncState/Conversation/Message/Attachment schema conforming to those prerequisites;
-- P15 still gates Responsibility-owned production tables.
 
-## 8. Gmail push / history reconciliation
+- P13 proves these prerequisites in its isolated executable harness;
+- G10 creates the real app-auth User/session target;
+- **G19**, not G20, is the single writer for provider-neutral production ConnectedAccount/ProviderSyncState/Conversation/Message/Attachment persistence conforming to the proven prerequisites;
+- G20 consumes G19 for live Gmail integration;
+- P15 still gates Responsibility-owned production tables;
+- G30 may reference only accepted G19 production FK targets, never P13 proof fixtures.
+
+## 9. Gmail push / history reconciliation
 
 Primary sources:
+
 - https://developers.google.com/workspace/gmail/api/guides/push
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users/watch
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list
 
 Observed:
-- `users.watch` must be renewed at least every 7 days; Google recommends daily;
-- watched user notification limit is one event/sec/user and excess may be dropped;
-- notifications may be delayed/dropped, so fallback reconciliation is required;
+
+- Gmail says `watch` must be renewed at least every 7 days and recommends once per day;
+- notifications may be delayed/dropped and provider limits apply;
 - stale/invalid `startHistoryId` typically yields HTTP 404 and requires full sync;
-- watch response includes `historyId` and `expiration`.
+- watch response exposes `historyId` and `expiration`.
 
 Consequence:
-- push = reconciliation signal, not truth;
-- G20 must prove renewal, periodic safety reconciliation, cursor commit ordering, duplicate/drop tolerance and 404/full-sync recovery.
 
-## 9. Google OAuth offline access / token handling
+- push = reconciliation signal, not truth;
+- G20 proves renewal, periodic safety reconciliation, cursor commit ordering, duplicate/drop tolerance and 404/full-sync recovery.
+
+## 10. Google OAuth offline access / token handling
 
 Primary sources checked 2026-08-28:
+
 - https://developers.google.com/identity/protocols/oauth2
 - https://developers.google.com/identity/protocols/oauth2/web-server
 - https://developers.google.com/identity/protocols/oauth2/resources/best-practices
 - https://developers.google.com/identity/protocols/oauth2/policies
 
 Observed:
-- background access beyond an access-token lifetime uses refresh-token/offline authorization;
-- Google says refresh tokens belong in secure long-term/persistent storage;
-- OAuth best practices require secure token storage and no plaintext transmission;
-- server-side apps storing user tokens should encrypt them at rest;
-- OAuth policy (last modified 2026-08-05) says tokens should always be stored encrypted at rest and revoked/deleted when no longer needed.
+
+- background access beyond access-token lifetime uses refresh-token/offline authorization;
+- Google requires secure token handling and states server-side stored tokens should be encrypted at rest;
+- current OAuth policy requires encrypted-at-rest storage and revocation/deletion when no longer needed.
 
 Consequence:
+
 - secure token-at-rest handling is required **before first durable persistence of a real token**, not merely before public beta;
-- a bounded non-persistent local protocol spike can avoid storing a long-lived token;
+- a bounded non-persistent protocol spike can avoid storing a long-lived token;
 - ownership-scoped lookup, no token logging and revoke/delete behavior are part of G20 minimum security;
-- R90 owns further production key rotation/operational hardening.
+- R90 owns broader production key-rotation/recovery hardening.
 
-## 10. OAuth scope minimization / public verification
+## 11. OAuth scope minimization / public verification
 
-Primary sources:
-- Google OAuth web-server/scopes/verification/security-assessment guidance.
+Observed from current Google OAuth/Gmail guidance:
 
-Observed:
-- request narrowest scopes needed by implemented features;
-- users may grant only a subset and corresponding unsupported capabilities must stay disabled;
-- sensitive/restricted scopes can require OAuth verification; server-side restricted-data use can require security assessment/reverification depending on actual deployment/scope.
+- request the narrowest scopes required by implemented capabilities;
+- partial grant means unsupported capabilities remain disabled;
+- sensitive/restricted scopes can require public verification/security assessment depending on actual use/deployment.
 
 Consequence:
-- minimum scopes in G20;
-- local/private complete-loop proof and public-beta compliance are separate gates;
-- R90 owns actual public-release verification/security work where required.
 
-## 11. Cloud Pub/Sub authenticated push
+- minimum scopes in G20;
+- local/private complete-loop proof and public-beta compliance remain separate gates;
+- R90 owns actual public verification/security work where required.
+
+## 12. Cloud Pub/Sub authenticated push
 
 Primary source:
 - https://cloud.google.com/pubsub/docs/authenticate-push-subscriptions
 
 Consequence:
+
 - production push ingress authenticates/validates expected audience/identity as applicable;
-- valid request acknowledged quickly and non-trivial work deferred;
+- valid requests are acknowledged quickly and non-trivial work deferred;
 - notification payload never directly mutates Responsibility.
 
-## 12. Trigger.dev
+## 13. Trigger.dev
 
 Primary sources:
+
+- https://trigger.dev/changelog
 - https://trigger.dev/docs/idempotency
-- https://trigger.dev/docs/triggering
-- https://trigger.dev/product
 
 Observed:
-- durable/checkpointed execution and idempotency facilities exist;
-- raw string idempotency defaults to `run` scope from v4.3.1 (previously global);
-- global remains task/environment scoped;
-- default key retention/TTL is finite (30-day current evidence);
-- failed runs clear their idempotency key.
+
+- current changelog is in the v4.5 line (`4.5.12` on 2026-08-20);
+- managed durable execution/idempotency facilities exist;
+- idempotency scope/retention/failure behavior has changed across v4 releases.
 
 Consequence:
-- Trigger.dev remains execution infrastructure;
-- PostgreSQL/domain owns provider uniqueness, Responsibility application idempotency, Temporal currentness and Send duplicate prevention;
-- Trigger keys require explicit composition/scope/TTL and cannot be the only durable promise.
 
-## 13. OpenAI Responses / data controls
+- Trigger.dev remains execution infrastructure only;
+- PostgreSQL/domain owns provider uniqueness, Responsibility application idempotency, Temporal currentness and Send duplicate prevention;
+- any Trigger key has explicit composition/scope/TTL and cannot be the only durable promise;
+- actual current behavior is rechecked when G32 activates the adapter.
+
+## 14. OpenAI Responses / Structured Outputs / data controls
+
+Primary sources:
+
+- https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
+- current Responses API / Structured Outputs documentation.
+
+Observed:
+
+- `/v1/responses` supports structured JSON-schema output patterns;
+- Responses application-state retention is distinct from abuse-monitoring controls;
+- Zero Data Retention is an eligible organization/project control and changes endpoint behavior;
+- `store:false` by itself is not evidence that the organization has ZDR;
+- some features, such as background operation, have additional retention/ZDR compatibility implications.
+
+Consequence:
+
+- Responses + Structured Outputs remains viable for bounded candidate generation;
+- production email AI activation requires current org/project data-control review, minimum context, appropriate `store:false`, no indiscriminate raw logging and separate layered eval/holdout;
+- AI remains outside accepted-state and Send authority.
+
+## 15. WCAG 2.2
 
 Primary source:
-- https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
+- https://www.w3.org/TR/WCAG22/
 
 Observed:
-- API data is not used for training by default unless opted in;
-- abuse-monitoring logs are generally retained up to 30 days by default;
-- eligible organizations can use Modified Abuse Monitoring / Zero Data Retention;
-- `/v1/responses` is ZDR-eligible, but `store:false` is not itself proof that the organization has ZDR;
-- Responses/data-retention behavior has feature-specific exceptions.
+
+- WCAG 2.2 remains a W3C Recommendation and W3C recommends it as the current conformance target;
+- relevant AA criteria include Focus Not Obscured (Minimum), Target Size (Minimum), Accessible Authentication (Minimum) and Status Messages.
 
 Consequence:
-- Responses + Structured Outputs remains viable for bounded candidate generation;
-- production AI activation requires current org/project data-control review, minimum context, appropriate `store:false`, no indiscriminate raw logging and separate layered eval/holdout.
 
-## 14. Product Feature Matrix coverage findings
+- G11 keeps WCAG 2.2 AA as the implementation baseline already fixed by the UI contract;
+- responsive/focus/async-status/auth implementation is tested against those criteria rather than visual inspection alone.
 
-Canonical `PRODUCT-CONTENT.md` marks as V1 CORE / CORE target:
-- exact Source search;
-- contextual Reply/Reply All;
-- bounded contextual AI draft;
-- explicit user Send;
-- send reconciliation;
-- source attachment evidence access;
-- Responsibility/attention/Temporal/Integrity surfaces.
+## 16. Product Feature Matrix coverage
 
-Consequence:
-- exact Source search is mandatory G21 scope, not optional;
-- contextual AI draft must have an owning AI contract/node distinct from manual composer and distinct from Responsibility interpretation;
-- manual composer remains mandatory AI-unavailable fallback.
+Canonical `PRODUCT-CONTENT.md` marks as V1 CORE / CORE target, with owning implementation nodes:
 
-## 15. Architecture conclusions
+| Capability | Owner |
+|---|---|
+| one-provider authorized Source read | G19/G20/G21 |
+| ingestion/reconciliation | G19/G20 |
+| Responsibility admission/update / No Responsibility | G30/G31 |
+| Needs You / Managed / Review / Moment / Source | G40 + G21 |
+| temporal monitoring / Later / return conditions | G32 |
+| field correction / Return Attention / Stop Tracking | G31/G32/G40 |
+| integrity / reconnect | G60 |
+| intentional disconnect / lifecycle controls | G60 / R90 boundary |
+| Product-account deletion boundary / release commitments | G60 routing + R90 |
+| minimal Settings | G40/G60 |
+| contextual Reply / Reply All | G50 |
+| bounded contextual AI draft | G70 with manual G50 fallback |
+| explicit immediate Send | G50 |
+| send reconciliation | G51 |
+| exact Source search | G21 |
+| operational retrieval sufficient for accepted cases | G21 + G40 |
+| attachment evidence access | G20/G21 |
+
+This mapping is a full-scope oracle: a future graph candidate that leaves a current CORE/CORE-target capability without an owner must fail.
+
+## 17. Architecture conclusions
 
 No new Product architecture is required. Current evidence strengthens these boundaries:
 
@@ -235,6 +294,7 @@ AI output != accepted state or Send authority
 task-run idempotency != domain idempotency
 Send request != provider acceptance != operational closure
 frozen interface availability != live adapter completion
+proof fixture != production FK target
 ```
 
-The key Issue #58 correction is dependency ownership: parallelize against frozen interfaces, serialize only actual shared authority/schema/external-effect collision zones.
+The central Issue #58 correction is dependency ownership: parallelize against frozen interfaces, serialize only actual shared security/schema/semantic/external-effect collision zones, and validate the graph against production FK topology plus explicit vendor-evidence coverage.

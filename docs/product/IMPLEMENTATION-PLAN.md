@@ -2,9 +2,9 @@
 
 ## Status
 
-**Active execution plan, reconciled 2026-08-28 after Issue #55 and Issue #58 acceptance-audit Round 3.**
+**Active execution plan, reconciled 2026-08-28 after Issue #55 completion and Issue #58 full-audit Round 4.**
 
-This is sequencing authority, not Product truth. Product truth lives in `PRODUCT.md` / `PRODUCT-CONTENT.md`; Product regression behavior in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics/oracles in `responsibility/`; UI behavior in `../design/`; exact dependency/parallelization detail in `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
+This is sequencing authority, not Product truth. Product truth lives in `PRODUCT.md` / `PRODUCT-CONTENT.md`; Product regressions in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics/oracles in `responsibility/`; UI behavior in `../design/`; exact dependency/parallelization/writer detail in `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
 ## 1. Objective
 
@@ -24,58 +24,62 @@ real Gmail Source
 -> continue monitoring or truthful closure
 ```
 
-Also keep authorized exact Source search and attachment evidence access available.
+Keep authorized exact Source search and attachment evidence access available.
 
 Implementation completion does not prove ICP/PMF/WTP/retention/monitoring relinquishment. Issue #36 remains open.
 
 ## 2. Completed specification gates
 
 - Product Content / Golden Scenarios: complete enough for current implementation hypothesis.
-- Issue #55 / PR #57: UI/UX implementation-readiness complete with full cumulative audit + exact-head CI.
+- Issue #55 / PR #57: UI/UX implementation-readiness COMPLETE after full cumulative audit + exact-head CI.
 - Canonical implementation-facing UI input: `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md`.
-
-Runtime remains bootstrap-level.
+- Runtime remains bootstrap-level.
 
 ## 3. Current gate — Issue #58
 
 Issue #58 freezes:
 
 - actual implementation-state reconstruction;
-- volatile vendor evidence relevant to activation;
+- current volatile vendor evidence;
 - architecture activation boundaries;
-- production FK/topological order;
+- exhaustive production FK/topological order;
 - single-writer collision zones;
-- implementation DAG and safe parallel waves;
+- parallel execution vs serialized merge rules;
+- implementation DAG and safe waves;
 - Product/Responsibility/UI/provider acceptance mapping.
 
-No broad production fanout before #58 PASS + merge.
+No broad production fanout before #58 full-audit PASS + exact-head CI + merge.
+
+After accepted #58 merge, `IMPLEMENTATION-GRAPH.md` becomes the exact dependency/parallelization authority.
 
 ## 4. G00 — framework security pre-wave
 
-First runtime task after #58.
+First runtime gate after #58.
 
-Current repo `next@16.3.0` is below the Aug-25 2026 patched 16.3 Active-LTS baseline (`16.3.3`).
+Current repo `next@16.3.0` is below the official Aug-25 2026 Active-LTS 16.3 security baseline `16.3.3`.
 
 Scope:
 
-- narrow Next.js security patch within accepted line;
-- directly coupled lock/config only as required;
-- full bootstrap verify + Playwright smoke + exact-head CI.
+- narrow Next.js security patch inside accepted line;
+- directly coupled resolution/config only as required;
+- `pnpm verify` + Playwright smoke + exact-head CI.
 
 No unrelated upgrade sweep.
 
-## 5. First safe parallel wave after G00
+## 5. First execution wave after G00
+
+The following may execute concurrently in isolated worktrees/runtime namespaces:
 
 ### P13 — Responsibility L2 PostgreSQL/Drizzle proof
 
 Existing Issue #13.
 
 - real PostgreSQL 18;
-- exact current stable Drizzle/Kit/driver pin;
+- current exact stable Drizzle/Kit/driver pin;
 - generated SQL inspection;
 - acceptance 01–46 and 50–60 except 47–49;
-- prove current upstream Source ownership/index/evidence-revision prerequisites;
-- isolated proof only.
+- prove all current upstream ownership/index/evidence prerequisites, including ParticipantIdentity prerequisites;
+- isolated proof only, no production migration.
 
 ### P14 — Better Auth UUID proof
 
@@ -85,11 +89,11 @@ Existing Issue #14.
 - explicit UUID configuration/generated schema;
 - real PostgreSQL 18;
 - acceptance 47–49;
-- no production OAuth.
+- no production OAuth/auth rollout.
 
 ### G11 — structural UI shell/read-model harness
 
-- root shell/navigation/responsive structure;
+- shell/navigation/responsive structure;
 - semantic tokens/components;
 - typed fixture/read-model state axes;
 - accessibility/focus/IME harness;
@@ -97,15 +101,30 @@ Existing Issue #14.
 
 ### V01 — final visual-reference pass
 
-May run after #58 because Product/UI/architecture textual contracts are now sufficiently frozen. It blocks final pixel-sensitive UI fidelity only, not backend/domain work.
+May run after #58 merge because textual Product/UI/architecture contracts are sufficiently frozen. It blocks final pixel-sensitive fidelity only, not backend/domain work.
 
-## 6. P15 — Responsibility L2 independent freeze
+## 6. Parallel execution != parallel merge
+
+P13/P14/G11 may all need root dependency changes.
+
+`package.json` and `pnpm-lock.yaml` are serialized merge assets:
+
+1. work may execute concurrently;
+2. PRs touching these files merge one at a time;
+3. every later PR refreshes/rebases onto latest accepted main;
+4. regenerate lockfile using pnpm, never a blind manual lockfile merge;
+5. rerun repository verification;
+6. rerun task proof materially affected by changed dependency/version basis.
+
+This preserves useful parallelism without treating worktree/runtime isolation as merge isolation.
+
+## 7. P15 — Responsibility L2 independent freeze
 
 After P13 + P14 concrete evidence.
 
-No production Responsibility-owned migrations/runtime before explicit P15 PASS/FREEZE.
+No production Responsibility-owned migrations/runtime before explicit P15 `PASS/FREEZE`.
 
-## 7. G10 — application session/auth activation
+## 8. G10 — application session/auth activation
 
 After G00 + P14 PASS.
 
@@ -114,17 +133,17 @@ Own only:
 - Better Auth application identity/session;
 - auth-owned User/session schema;
 - protected BFF/session validation;
-- committed auth SQL migration;
+- committed auth migration;
 - expiry/re-auth/revoke/sign-out behavior.
 
-Do **not** put ConnectedAccount/Conversation/Message/Responsibility/Draft/SendOperation into G10.
+Do not put ConnectedAccount/Conversation/Message/ParticipantIdentity/Responsibility/Draft/SendOperation into G10.
 
-## 8. G19 — provider-neutral Source persistence foundation
+## 9. G19 — provider-neutral evidence foundation
 
 After:
 
 - G10 production User/session schema;
-- **P13 PASS** for upstream Source-schema prerequisites required by the Responsibility candidate.
+- P13 PASS for upstream L2 prerequisites.
 
 G19 is the single production writer for:
 
@@ -133,59 +152,67 @@ G19 is the single production writer for:
 - Conversation;
 - Message;
 - Attachment metadata;
+- ParticipantIdentity;
 - required ownership/uniqueness indexes;
 - monotonic non-negative `Conversation.semantic_evidence_revision`;
-- provider-neutral Source repositories/fixtures;
+- provider-neutral repositories/fixtures;
 - committed SQL migrations.
 
-G19 contains no live Gmail OAuth/watch/history API work and no Responsibility-owned tables.
+Required current L2 production keys include:
 
-Acceptance includes clean real PostgreSQL migration/rebuild, tenant/account/source FK/uniqueness tests and direct satisfaction of P13-proven upstream prerequisites.
+```text
+connected_accounts UNIQUE(id,user_id)
+conversations UNIQUE(id,connected_account_id)
+participant_identities UNIQUE(id,user_id)
+messages UNIQUE(id,connected_account_id)
+```
 
-This node is the key fan-out gate:
+G19 contains no live Gmail API behavior and no Responsibility-owned tables. `ParticipantIdentity` here is evidence infrastructure, not Person/CRM Product scope.
+
+Acceptance includes clean real PostgreSQL migration/rebuild, tenant/account/evidence FK/uniqueness tests and direct satisfaction of P13-proven upstream prerequisites.
+
+Fan-out:
 
 ```text
 G19
   +-> G20 live Gmail lane
-  +-> after P15, G30 Responsibility production persistence
+  +-> after P15, G30 production persistence lane
 ```
 
-## 9. G20 — Gmail OAuth / watch / history / sync
+## 10. G20 — Gmail OAuth / watch / history / sync
 
 After G19 + G00.
 
-G20 **consumes** G19 Source persistence rather than owning that shared schema.
+G20 consumes G19 persistence rather than owning that shared schema.
 
-Provider behavior:
+Implement:
 
 - one Gmail account path;
 - minimum scopes;
-- offline OAuth when background access required;
+- offline OAuth when background access requires it;
 - initial sync;
-- authenticated Pub/Sub push ingress;
+- authenticated Pub/Sub ingress;
 - quick acknowledgement + durable `history.list` reconciliation;
 - watch renewal;
 - periodic safety reconciliation;
-- stale-history 404/full-sync recovery;
-- idempotent normalization/upsert through G19 repositories;
+- stale-history HTTP 404/full-sync recovery;
+- idempotent normalization/upsert through G19;
 - attachment evidence access.
 
-### Credential boundary
+Before first durable real Google token persistence:
 
-Before first durable persistence of a real Google token:
-
-- encrypt/store token securely at rest;
-- key/secret separate from repository/ordinary DB data;
+- encrypted at rest;
+- key/secret separate from ordinary DB/repository data;
 - no token logging;
-- lookup scoped by authenticated user + ConnectedAccount;
+- user + ConnectedAccount-scoped lookup/use;
 - explicit invalidation/reconnect;
 - revoke/delete when intentionally no longer needed where supported.
 
-A bounded non-persistent OAuth spike may avoid durable storage. Plaintext durable token storage is never an accepted intermediate state.
+A bounded non-persistent OAuth spike may avoid durable storage. Plaintext durable token storage is never accepted.
 
-Public OAuth verification/restricted-scope assessment remains R90 release work, not a blocker to all local/private proof.
+Public OAuth verification/restricted-scope assessment remains R90 release work where required.
 
-## 10. G21 — real Source + exact search
+## 11. G21 — real Source + exact search
 
 After G20 + G11.
 
@@ -194,22 +221,48 @@ Implement:
 - Source list/detail;
 - account/source provenance;
 - safe attachment open/download/provider fallback;
-- **authorized exact Source search — V1 CORE**;
+- authorized exact Source search — **V1 CORE**;
 - truthful partial/sync/degraded/no-match states.
 
-Natural-language/semantic Q&A remains conditional and is not advertised unless separately activated.
+Natural-language/semantic Q&A remains conditional.
 
-## 11. G30 — Responsibility production persistence
+## 12. G30 — production persistence with complete external-FK closure
 
 After P15 PASS/FREEZE + G19.
 
-Implement smallest frozen L2 production schema/migrations, preserving ownership/FK/idempotency/provenance/evidence-revision invariants.
+Current frozen L2 v0.4 references these external production targets:
 
-All production FKs must target accepted production tables created by G10/G19; proof-only fixture tables are invalid migration dependencies.
+```text
+User
+connected_accounts
+conversations
+participant_identities
+messages
+ai_interpretation_runs
+```
 
-G30 does **not** wait for live Gmail completion.
+G10/G19 create the first five target families. G30 begins with a **minimal production AIInterpretationRun provenance/basis prerequisite** satisfying `UNIQUE(id,user_id)` and accepted User/Conversation/Message basis references, then creates Responsibility-owned tables in valid FK order.
 
-## 12. Parallel provider/domain lanes
+Important boundary:
+
+```text
+AIInterpretationRun table existence != model execution != accepted AI authority
+```
+
+G70 owns runtime AI activation.
+
+Acceptance:
+
+- clean production-shaped migration;
+- every external FK targets an accepted production table;
+- no proof-only fixture FK target;
+- migration ordering directly inspected/tested;
+- frozen L2 invariants preserved;
+- no AI runtime side effect.
+
+G30 does not wait for live Gmail completion.
+
+## 13. Parallel provider/domain lanes
 
 After G19 + P15:
 
@@ -222,12 +275,12 @@ G20 Gmail -> G21 Source/read/search
 ### Deterministic domain lane
 
 ```text
-G30 Responsibility persistence
+G30 persistence
 -> G31 deterministic reducer
 -> G32 attention/Temporal runtime
 ```
 
-G31 consumes the frozen normalized Source contract with deterministic fixtures, **not live Gmail completion**.
+G31 consumes frozen normalized evidence fixtures, not live Gmail completion.
 
 ### G31 — deterministic Responsibility reducer
 
@@ -251,11 +304,11 @@ After G31:
 - Trigger.dev adapter if retained;
 - stale/overdue/restart reconciliation.
 
-G40 is where provider/UI/domain lanes integrate.
+G40 integrates provider/UI/domain lanes.
 
-## 13. G40 — Product surfaces on real state
+## 14. G40 — Product surfaces on real state
 
-After G11 + G21 + G31/G32.
+After G11 + G21 + G31 + G32.
 
 Connect real state to:
 
@@ -267,9 +320,9 @@ Connect real state to:
 - onboarding/first delegation;
 - supported Settings/integrity hooks.
 
-Preserve strict zero, trustworthy Managed, bounded Review, source-grounded Moment and distinct async axes.
+Preserve strict zero, trustworthy Managed, bounded Review, source-grounded Moment and distinct session/provider/integrity/domain/mutation axes.
 
-## 14. G50 — Draft + contextual immediate Send request
+## 15. G50 — Draft + contextual immediate Send request
 
 After G20 + G40.
 
@@ -277,7 +330,7 @@ G50 is the single writer for minimal:
 
 - Draft persistence/version contract;
 - initial SendOperation schema/request/pending state;
-- explicit operation idempotency identity.
+- operation idempotency identity.
 
 User path:
 
@@ -285,22 +338,17 @@ User path:
 - explicit sender;
 - inspectable recipients/body;
 - manual composer baseline;
-- explicit **IMMEDIATE** Send request.
+- explicit immediate Send request.
 
-Not current gates:
+Not current gates: Forward, Send Later, generic Undo/recall, silent offline queued Send.
 
-- Forward;
-- Send Later;
-- generic Undo/recall;
-- silent offline queued send.
-
-## 15. G51 — provider Send reconciliation
+## 16. G51 — provider Send reconciliation
 
 After G50 + G31.
 
-Implement provider dispatch/reconciliation transitions on G50's accepted SendOperation schema:
+Implement:
 
-- provider accepted/unknown/failed states;
+- provider accepted/unknown/failed transitions;
 - ambiguous timeout reconciliation;
 - no blind duplicate retry;
 - sent-message Source reconciliation;
@@ -312,7 +360,7 @@ Invariant:
 request/click != provider acceptance != operational closure
 ```
 
-## 16. G60 — integrity/reconnect/failure closure
+## 17. G60 — integrity/reconnect/failure closure
 
 After G20/G21 + G32 + G40 + G51.
 
@@ -322,38 +370,40 @@ Integrate:
 - sync lag/data-through;
 - notification delivery separation;
 - Temporal overdue recovery;
-- send ambiguity;
+- Send ambiguity;
 - attachment-access degradation;
-- persisted mutation failure/pending truth;
+- mutation pending/failure;
 - intentional disconnect vs app sign-out;
 - Product-account deletion boundary routing.
 
 No infrastructure failure may create fake Needs You, fake No Responsibility, false zero or healthy reassurance.
 
-## 17. G70 — bounded AI interpretation + contextual draft assistance
+## 18. G70 — bounded AI interpretation + contextual draft
 
-May start after G31 freezes trusted candidate/reducer boundaries and the normalized Source contract is available. It does **not** wait for G60 or live Gmail completion for initial fixture-based eval work.
+May start after G31 freezes trusted candidate/reducer boundaries and normalized evidence contract is available. It need not wait for live Gmail completion for fixture-based eval work.
 
-Two separate model contracts:
+Own two separate model contracts:
 
 1. Responsibility interpretation candidate;
-2. contextual AI draft candidate inside an authorized reply context.
+2. contextual editable draft candidate.
 
-Both require:
+Use G30-created AIInterpretationRun provenance substrate. Any schema evolution must preserve frozen Responsibility FK compatibility or use an explicit reviewed migration.
+
+Require:
 
 - official OpenAI SDK + Responses API;
-- Structured Outputs / JSON Schema where suitable;
+- Structured Outputs/JSON Schema where suitable;
 - strict runtime/source/currentness validation;
 - minimum authorized context;
-- current organization/project data-control review;
+- current org/project data-control review;
 - `store:false` where appropriate without equating it to ZDR;
-- layered eval + family-stratified holdout;
+- layered eval + holdout;
 - prompt-injection/high-harm cases;
 - manual fallback.
 
-AI never gains Send authority or accepted-state authority.
+AI never gains Send or accepted-state authority.
 
-## 18. G80 — complete-loop integration
+## 19. G80 — complete-loop integration
 
 Depends on G21 + G31/G32 + G40 + G51 + G60 + G70.
 
@@ -371,7 +421,7 @@ Must prove representative real-provider loops including:
 
 Use Product Golden Scenarios, Responsibility oracles, Issue #55 UI cases, real provider evidence, exact-head CI/E2E and full cumulative independent audit.
 
-## 19. R90 — public-beta release readiness
+## 20. R90 — public-beta release readiness
 
 Separate release gate; does not block local/private G80 proof.
 
@@ -379,32 +429,30 @@ Includes as applicable:
 
 - Google OAuth verification/restricted-scope assessment;
 - privacy/retention/deletion commitments;
-- production credential rotation/recovery operations beyond G20 minimum secure storage;
+- production credential rotation/recovery beyond G20 minimum storage security;
 - production secrets/region/backup/restore/observability;
 - current OpenAI privacy/data-control posture;
 - release accessibility/device/browser matrix;
 - security/abuse/recovery/support runbooks.
 
-## 20. Scope discipline
+## 21. Scope discipline
 
 Do not smuggle into the critical path:
 
 - Microsoft;
-- Person/CRM;
+- Person/CRM Product features;
 - broad multi-account Scope UX;
 - Pin;
 - generic automation/rules;
 - full mail-client parity;
 - Forward/Send Later/Undo parity;
 - autonomous Send;
-- native rich attachment preview as CORE;
+- rich native attachment preview as CORE;
 - natural-language Search as CORE.
 
-## 21. Review / parallel discipline
+## 22. Review discipline
 
-Use `IMPLEMENTATION-GRAPH.md` for exact edges, writer zones and validation oracles.
-
-Every write-heavy task:
+Every write-heavy task follows:
 
 ```text
 current accepted base
@@ -417,8 +465,8 @@ current accepted base
 -> merge
 ```
 
-Repeated correction failure triggers spec/oracle/architecture/decomposition/verification root-cause review before another patch cycle.
+If repeated correction failure occurs, analyze specification/oracle/architecture/decomposition/verification gaps before another patch loop.
 
-## 22. Empirical boundary
+## 23. Empirical boundary
 
-Issue #36 remains open. Implementation cannot by itself authorize claims about ICP, market pain, monitoring relinquishment, PMF, WTP, retention or differentiation against real workflows.
+Issue #36 remains open. Implementation cannot by itself authorize claims about ICP, market pain, monitoring relinquishment, PMF, WTP, retention or comparative differentiation.

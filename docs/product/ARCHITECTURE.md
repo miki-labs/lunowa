@@ -2,9 +2,9 @@
 
 ## Status
 
-**Accepted modular-monolith architecture contract, reconciled 2026-08-28 with Product Content, Responsibility v0.1, frozen v1 UI contract and Issue #58 implementation graph.**
+**Accepted modular-monolith architecture contract, reconciled 2026-08-28 with Product Content, Responsibility v0.1, frozen v1 UI contract and Issue #58 implementation topology.**
 
-This document owns system boundaries and invariants. It does **not** authorize every capability it names. Current activation, dependency and parallelization authority is `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
+This document owns intended system boundaries/invariants. It does **not** activate every capability it names. Exact activation/dependency/parallelization authority is `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
 Responsibility semantics remain owned by `responsibility/`; implementation-facing UI behavior by `../design/V1-UI-IMPLEMENTATION-CONTRACT.md`.
 
@@ -13,25 +13,23 @@ Responsibility semantics remain owned by `responsibility/`; implementation-facin
 Prioritize:
 
 1. trustworthy accepted Responsibility state;
-2. durable monitoring and Temporal promises;
+2. durable monitoring/Temporal promises;
 3. provider/account isolation;
 4. bounded AI authority;
 5. Source/manual communication availability under AI failure;
 6. explicit external-effect reconciliation;
 7. rebuildable derived projections;
-8. small, understandable operations through a modular monolith.
+8. small understandable operations through a modular monolith.
 
 ## 2. Current v1 activation
 
-The current critical path is one-provider Gmail **Minimum Complete Delegation Loop**.
-
-Current loop includes:
+Current target is one-provider Gmail **Minimum Complete Delegation Loop**:
 
 - Lunowa app session;
 - one Gmail ConnectedAccount;
-- provider-neutral Source persistence;
+- provider-neutral evidence persistence;
 - Gmail sync/read + exact Source search + attachment evidence access;
-- Responsibility deterministic persistence/reducer;
+- Responsibility persistence/reducer;
 - attention/Temporal monitoring;
 - Home / Needs You / Managed / Review / Moment / Source;
 - contextual Reply / Reply All;
@@ -40,19 +38,7 @@ Current loop includes:
 - integrity/reconnect/recovery;
 - bounded AI interpretation behind trusted contracts.
 
-Not current prerequisites:
-
-- Microsoft;
-- broad multi-account Scope UX;
-- Person/CRM or Pin;
-- generic fresh Compose / Forward parity;
-- Send Later / generic Undo or recall;
-- generic workflow/rule engine;
-- rich native attachment preview;
-- natural-language/semantic Q&A Search;
-- autonomous Send.
-
-Module existence is not implementation authorization.
+Not current prerequisites: Microsoft, broad multi-account Scope UX, Person/CRM Product features, Pin, generic Compose/Forward parity, Send Later/generic Undo, generic workflow engine, rich native attachment preview, natural-language Search, or autonomous Send.
 
 ## 3. System shape
 
@@ -62,15 +48,15 @@ Browser / responsive UI
         v
 Application API / BFF
         |
-        +------------------------------+
-        |                              |
-        v                              v
-Trusted Product/domain             Integration ports
-        |                              |
-        v                              +--> Gmail adapter (v1)
-PostgreSQL                           +--> Microsoft adapter (future)
-        |                              +--> AI adapter (bounded)
-        v                              +--> durable execution adapter
+        +-----------------------------+
+        |                             |
+        v                             v
+Trusted Product/domain            Integration ports
+        |                             |
+        v                             +-> Gmail adapter (v1)
+PostgreSQL                          +-> Microsoft adapter (future)
+        |                             +-> AI adapter (bounded)
+        v                             +-> durable execution adapter
 Durable intent / audit
         |
         v
@@ -95,87 +81,113 @@ Rules:
 - core domain does not depend on vendor SDK types;
 - workers invoke domain commands rather than mutate accepted state ad hoc;
 - search/read models are re-authorized and rebuildable;
-- all provider/AI/client input is validated at runtime.
+- provider/AI/client input is runtime-validated.
 
-A frozen normalized Source contract allows deterministic domain work before live Gmail completion. G31 may consume deterministic Source fixtures while G20/G21 build the provider lane; G40 is the integration point.
+A frozen normalized evidence contract allows deterministic domain work before live Gmail completion. G31 may consume deterministic fixtures while G20/G21 build the provider lane; G40 is the integration point.
 
 ## 5. Authority layers
 
-### Provider-authoritative observations
+### Provider observations
 
-Provider message/attachment existence/IDs, granted capabilities and provider-observed send acceptance are authoritative only within their provider scope.
+Provider message/attachment existence/IDs, granted capabilities and provider-observed Send acceptance are authoritative only in their provider scope.
 
 ### Communication evidence
 
-Actually sent/received communication is immutable evidence of what was communicated, not automatic proof of unrelated external-world truth.
+Actually sent/received communication is evidence of what was communicated, not automatic proof of unrelated external-world truth.
 
 ### Lunowa domain/product state
 
-Lunowa owns user/account ownership, accepted Responsibility state/provenance/correction, monitoring intent, Temporal Contracts, Draft/SendOperation state and supported user preferences.
+Lunowa owns user/account ownership, accepted Responsibility state/provenance/correction, monitoring intent, Temporal contracts, Draft/SendOperation state and supported preferences.
 
 ### Derived state
 
-Summaries, search indexes, embeddings, aggregate attention and cached context are rebuildable and never the sole critical authority.
+Summaries, search indexes, embeddings, aggregate attention and cached context are rebuildable and never sole critical authority.
 
 ## 6. Identity, mailbox authorization and credentials
 
-Application authentication and mailbox authorization remain separate:
-
 ```text
-Lunowa session != Gmail ConnectedAccount credential/capability
+Lunowa application session != Gmail ConnectedAccount authorization
 ```
 
-Better Auth owns app identity/session when activated. Gmail credentials stay in Lunowa-owned provider/credential services and are never authoritative through Better Auth social-account rows.
+Better Auth owns application identity/session when activated. Gmail credentials remain Lunowa-owned provider/credential state, never Better Auth social-account authority.
 
-Before any real Google token is durably persisted:
+Before a real Google token is durably persisted:
 
-- encrypt/store token material securely at rest;
-- keep encryption key/secret outside ordinary DB/repository data;
+- encrypt/store it securely at rest;
+- keep cryptographic key/secret outside ordinary DB/repository data;
 - never log token material;
 - authorize lookup/use by current user + ConnectedAccount ownership;
 - handle revocation/invalidation explicitly;
-- revoke and permanently delete tokens when no longer needed where supported.
+- revoke and permanently delete tokens when intentionally no longer needed where supported.
 
-A bounded non-persistent OAuth protocol spike may avoid durable token storage. Plaintext durable token storage is never an accepted architecture phase.
+A bounded non-persistent OAuth spike may avoid durable storage. Plaintext durable token storage is never an accepted architecture phase.
 
-## 7. Persistence ownership and topological order
+## 7. Persistence ownership and production topology
 
-PostgreSQL is the durable application store. Production migrations follow actual FK dependency order and single-writer ownership.
+PostgreSQL is the durable application store. Production migrations follow actual FK order and single-writer ownership.
 
 ```text
-P14 proof
-  -> G10 auth User/session
-       -> G19 provider-neutral Source schema
-            -> G30 Responsibility schema after P15 freeze
-                 -> G31 reducer
-                      -> G32 Temporal persistence/runtime
+P14 PASS -> G10 auth User/session
+P13 PASS + G10 -> G19 provider-neutral evidence foundation
+P13 + P14 -> P15 independent L2 freeze
+P15 PASS + G19 -> G30 prelude AIInterpretationRun prerequisite
+                  -> G30 frozen Responsibility tables
+                  -> G31 reducer
+                  -> G32 Temporal runtime
 
-G20 Gmail consumes G19 Source schema.
-G50 owns Draft + initial SendOperation request schema.
-G51 adds provider dispatch/reconciliation transitions.
+G20 Gmail consumes G19.
+G50 owns Draft + initial SendOperation request state.
+G51 owns provider dispatch/reconciliation transitions.
 ```
 
 ### G10 — auth schema
 
 Owns app-auth User/session schema only.
 
-### G19 — provider-neutral Source persistence
+### G19 — provider-neutral evidence foundation
 
-After P13 proves the upstream L2 prerequisites and G10 creates the real User identity target, G19 is the single production writer for:
+After P13 proves upstream L2 prerequisites and G10 creates the production User target, G19 is the single writer for:
 
 - ConnectedAccount;
 - ProviderSyncState;
 - Conversation;
 - Message;
 - Attachment metadata;
+- ParticipantIdentity;
 - required ownership/uniqueness indexes;
-- monotonic non-negative `Conversation.semantic_evidence_revision`.
+- monotonic non-negative `Conversation.semantic_evidence_revision`;
+- provider-neutral normalized repositories/fixtures.
 
-G19 contains **no live Gmail API implementation**. Its normalized repositories/fixtures must work independently of provider adapters.
+Required current L2 prerequisite keys include:
 
-### G30 — Responsibility persistence
+```text
+connected_accounts UNIQUE(id,user_id)
+conversations UNIQUE(id,connected_account_id)
+participant_identities UNIQUE(id,user_id)
+messages UNIQUE(id,connected_account_id)
+```
 
-P13/P14 -> P15 independent freeze -> G30 production Responsibility migrations. G30 FKs reference the already-accepted G19 production Source schema, never proof-only fixture tables.
+`ParticipantIdentity` is evidence normalization/ownership infrastructure, not Person/CRM Product activation.
+
+G19 contains no live Gmail API implementation and no Responsibility-owned tables.
+
+### G30 — AIInterpretationRun prerequisite + Responsibility persistence
+
+Frozen L2 v0.4 also references:
+
+```text
+ai_interpretation_runs UNIQUE(id,user_id)
+```
+
+G30 therefore begins with a minimal production `AIInterpretationRun` provenance/basis table, ordered before any Responsibility table referencing it. This table may reference accepted G10/G19 User/Conversation/Message targets.
+
+Creating the table does **not** invoke a model or grant AI authority. G70 owns runtime model invocation, schemas/evals and any explicit compatible schema evolution.
+
+After the prelude and only after P15 PASS/FREEZE, G30 creates the frozen Responsibility-owned tables in valid FK order.
+
+Production migration rule:
+
+> Every external FK target must be an accepted production table; proof-only fixtures never satisfy production topology.
 
 ### G32 — Temporal persistence
 
@@ -183,13 +195,25 @@ Owns persisted Temporal intent/currentness required by the active loop.
 
 ### G50/G51 — Draft/Send
 
-G50 owns minimal Draft + initial SendOperation request identity/state. G51 serially consumes it for provider dispatch/reconciliation transitions.
+G50 owns Draft + initial SendOperation request identity/state. G51 consumes it for provider dispatch/reconciliation transitions.
 
-No concurrent task may independently redefine a shared persistence collision zone.
+## 8. Parallel execution and merge ownership
 
-## 8. Provider integration / Gmail
+Worktree, Docker and database namespace isolation establish execution isolation, not Git merge isolation.
 
-G20 owns live Gmail OAuth, provider protocol, watch/history synchronization, attachment retrieval and send adapter behavior. It **consumes** G19 persistence rather than owning Source schema.
+When concurrent tasks touch `package.json` or `pnpm-lock.yaml`:
+
+```text
+parallel execution != parallel merge
+```
+
+Those PRs merge serially. Later PRs refresh onto the latest accepted main, regenerate the lockfile with pnpm, rerun repository verification, and rerun task proof materially affected by dependency/version changes.
+
+No concurrent task may independently redefine a shared schema, canonical reducer, root design-token authority or other declared collision zone.
+
+## 9. Provider integration / Gmail
+
+G20 owns live Gmail OAuth, provider protocol, watch/history synchronization, attachment retrieval and Send adapter behavior. It consumes G19 persistence.
 
 ```text
 OAuth/offline credential
@@ -197,7 +221,7 @@ OAuth/offline credential
 -> users.watch / Pub/Sub signal
 -> authenticate + acknowledge quickly
 -> durable history reconciliation
--> normalized idempotent commit through G19 repositories
+-> normalized idempotent commit through G19
 -> evidence/cursor commit
 -> downstream re-evaluation
 ```
@@ -205,43 +229,33 @@ OAuth/offline credential
 Required reliability:
 
 - renew watch before expiration under current provider requirements;
-- periodic safety reconciliation even when no push arrives;
+- periodic safety reconciliation even with no push;
 - tolerate duplicate/delayed/dropped notifications;
 - stale `historyId` / HTTP 404 enters full-sync recovery;
 - cursor advances only after required local durability;
-- push payload never directly mutates Responsibility state;
+- push payload never directly mutates Responsibility;
 - initial historical sync does not auto-activate old unresolved-looking work.
 
 Public OAuth verification/security assessment is a release gate distinct from local/private complete-loop proof.
 
-## 9. Normalized Source contract
+## 10. Normalized evidence / Source
 
-The provider-neutral Source layer preserves:
+Provider-neutral evidence preserves:
 
 - account ownership;
-- provider message/thread identifiers as boundary metadata;
+- provider message/thread identifiers at the boundary;
 - source chronology;
-- normalized text/sanitized renderable source;
+- normalized text/safe renderable source;
 - attachment metadata/provenance;
-- evidence revision;
-- idempotent uniqueness such as `(connected_account_id, provider_message_id)`.
+- participant identity evidence;
+- semantic evidence revision;
+- idempotent uniqueness.
 
 Processing order is not semantic chronology. Source loading is not Responsibility admission.
 
-## 10. Responsibility domain
+## 11. Responsibility domain
 
-Responsibility is the communication-bounded operational outcome and preserves orthogonal dimensions:
-
-- resolution/reason;
-- live tracking;
-- attention/defer;
-- obligation/actionability/conditions;
-- expected events;
-- completion criteria;
-- constraints/proposals/agreed facts;
-- temporal facts;
-- uncertainty/risk;
-- provenance/evidence revision.
+Responsibility is the communication-bounded operational outcome and preserves orthogonal dimensions: resolution, live tracking, attention/defer, obligation/actionability, expected events, temporal facts, uncertainty/risk and provenance/evidence revision.
 
 Admission/effects:
 
@@ -250,42 +264,27 @@ TRACK / DO_NOT_TRACK / NEEDS_REVIEW
 CREATE / UPDATE / RESOLVE / REOPEN / SUPERSEDE / INVALIDATE / NO_OP
 ```
 
-`MY_TURN / WAITING / LATER / DONE / REVIEW / NONE` are deterministic projections, not a canonical lifecycle enum.
+`MY_TURN / WAITING / LATER / DONE / REVIEW / NONE` are deterministic projections, not a lifecycle enum.
 
-## 11. Temporal / background execution
+## 12. Temporal/background execution
 
-Persisted database/domain intent is authority; job runtime executes attempts.
+Persisted DB/domain intent is authority; job runtime executes attempts.
 
-Every material async operation requires:
+Every material async operation requires durable intent/source reason, DB/domain idempotency, currentness validation, bounded retry/failure behavior and reconciliation evidence.
 
-- durable intent/source reason;
-- domain/database idempotency;
-- currentness/stale validation;
-- bounded retry/failure behavior;
-- reconciliation evidence.
+Trigger.dev may optimize execution but never replaces domain currentness/idempotency. Trigger fire means “reconsider current truth now”, not automatically notify or project MY_TURN.
 
-Trigger.dev facilities may optimize execution but do not replace Lunowa's durable currentness/idempotency. Trigger fire means “reconsider current truth now”, not automatically notify or project MY_TURN.
+## 13. UI / BFF / read models
 
-## 12. UI / BFF / read models
+UI owns rendering, focus/input and local pre-ack editing; never domain truth. BFF exposes authenticated Lunowa-shaped contracts rather than provider passthrough APIs.
 
-UI owns rendering, focus/input and pre-ack local editing; it never owns domain truth.
-
-BFF exposes authenticated Lunowa-shaped contracts rather than provider-shaped passthrough APIs.
-
-Read models keep distinct:
-
-- app session;
-- mailbox connection/capability;
-- sync/integrity/data-through;
-- accepted Responsibility projection;
-- pending/failed/ambiguous mutation/effect;
-- Source/provenance.
+Read models keep separate axes for app session, mailbox connection/capability, sync/integrity/data-through, accepted Responsibility projection, pending/failed/ambiguous effects and Source/provenance.
 
 Request/click is not accepted state until authoritative persistence/reconciliation completes.
 
-## 13. Draft / Send
+## 14. Draft / Send
 
-Current v1 activates contextual Reply/Reply All + explicit **immediate** Send.
+Current v1 activates contextual Reply/Reply All + explicit immediate Send.
 
 ```text
 send request != provider acceptance != Responsibility outcome satisfied
@@ -293,7 +292,7 @@ send request != provider acceptance != Responsibility outcome satisfied
 
 Forward, Send Later, generic Undo/recall and silent offline queued Send remain deferred/conditional.
 
-## 14. AI
+## 15. AI
 
 Two bounded model uses share transport but not authority/schema/eval:
 
@@ -302,21 +301,21 @@ Two bounded model uses share transport but not authority/schema/eval:
 
 AI never owns auth, provider facts, Responsibility admission/identity/effects, tracking/defer, Temporal effects, sender/recipient authority or Send permission.
 
-If AI fails, Source/manual communication remains usable and accepted state is preserved rather than replaced by fabricated certainty.
+If AI fails, Source/manual communication remains usable and accepted state is preserved.
 
-## 15. Search / attachments
+## 16. Search / attachments
 
-Authorized exact Source search is V1 CORE and consumes the G19/G20 Source layer. Search data are derived/re-authorized; similarity never authorizes Responsibility merge. Natural-language/semantic Q&A is conditional.
+Authorized exact Source search is V1 CORE and consumes G19/G20 evidence. Search projections are re-authorized/rebuildable; similarity never authorizes Responsibility merge. Natural-language Search remains conditional.
 
 Attachment CORE is authorized evidence access/open/download/provider fallback. Rich native preview is not a complete-loop prerequisite. Viewing an attachment is not operational completion.
 
-## 16. Observability / privacy
+## 17. Observability / privacy
 
 Record enough structured evidence to explain state changes, resurfacing, evidence revision, account/provider identity and pending/failed/reconciled external effects.
 
 Do not indiscriminately log credentials, full mail bodies, prompts or model outputs. Provider/AI data-control facts are rechecked at activation/release because they change.
 
-## 17. Failure posture
+## 18. Failure posture
 
 Dependency failure never fabricates domain truth:
 
@@ -324,11 +323,11 @@ Dependency failure never fabricates domain truth:
 - push failure != Source loss when reconciliation remains healthy;
 - auth loss != Responsibility resolution;
 - preview failure != global monitoring failure;
-- Send timeout != definitely sent or definitely unsent;
+- Send timeout != definitely sent/unsent;
 - partial sync != true zero.
 
 Healthy reassurance returns only after affected-scope reconciliation.
 
-## 18. Scaling posture
+## 19. Scaling posture
 
 Do not add microservices, Kubernetes, Redis, vector DB, custom event bus or generic workflow infrastructure without measured need.

@@ -2,25 +2,24 @@
 
 ## Status / authority
 
-**Implementation dependency and activation authority candidate for Issue #58, reconciled 2026-08-28 after repeated full acceptance audits and root-cause correction.**
+**Issue #58 final-candidate dependency and activation authority. Reconciled 2026-08-28 after repeated full acceptance audits.**
 
-This graph translates accepted Product / Responsibility / UI / architecture contracts into executable work. It does **not** redefine Product semantics, Responsibility semantics, provider facts, or empirical Product claims.
+This graph translates accepted Product / Responsibility / UI / architecture contracts into executable work. It does **not** redefine Product semantics, Responsibility semantics, empirical Product claims, or provider facts.
 
-After merge, this file owns implementation dependency/parallelization questions together with live GitHub Issues. Generic module presence is not implementation authorization.
+After merge, this file + live GitHub Issues own implementation dependency/parallelization questions.
 
 Primary authorities:
 
-- `PRODUCT.md` / `PRODUCT-CONTENT.md`;
-- `GOLDEN-SCENARIO-BANK.md`;
+- `PRODUCT.md`, `PRODUCT-CONTENT.md`, `GOLDEN-SCENARIO-BANK.md`;
 - `../design/V1-UI-IMPLEMENTATION-CONTRACT.md` + canonical design files;
 - `responsibility/` semantic/persistence oracles;
 - `ARCHITECTURE.md`, `CONTRACTS.md`, `TECH-STACK.md`;
-- dated Issue #58 evidence;
+- `research/issue-58-implementation-graph-evidence-2026-08-28.md`;
 - live GitHub Issue/PR/CI state.
 
 ## 1. Target
 
-Build the smallest real one-provider loop that demonstrates:
+Build the smallest real one-provider loop that proves:
 
 ```text
 real Gmail evidence
@@ -38,68 +37,97 @@ real Gmail evidence
 -> truthful healthy/degraded integrity
 ```
 
-Current CORE retrieval also includes **authorized exact Source search** and authorized attachment evidence access.
+Current CORE retrieval also includes authorized exact Source search and authorized attachment evidence access.
 
-Not current prerequisites:
-
-- Microsoft provider;
-- broad multi-account Scope UX;
-- Person/CRM context;
-- Pin;
-- generic fresh Compose / Forward parity;
-- Send Later / generic Undo or recall;
-- native rich attachment preview;
-- natural-language/semantic Q&A Search;
-- autonomous Send;
-- generic workflow/rule engine.
+Not current prerequisites: Microsoft, broad multi-account Scope UX, Person/CRM, Pin, generic Compose/Forward parity, Send Later/generic Undo, rich native attachment preview, natural-language Search, autonomous Send, or a generic workflow engine.
 
 ## 2. Parallelization classes
 
-- `SERIAL_GATE` — shared/security/semantic authority downstream work may not bypass.
-- `PARALLEL_SAFE` — isolated ownership/acceptance; may run concurrently with repository/runtime isolation.
-- `PARALLEL_AFTER_CONTRACT` — may fan out only after named shared interface/oracle freezes.
+- `SERIAL_GATE` — downstream work may not bypass the shared/security/semantic authority.
+- `PARALLEL_SAFE` — execution and merge ownership are isolated.
+- `PARALLEL_AFTER_CONTRACT` — execution may fan out only after the named interface/oracle freezes.
+- `PARALLEL_EXECUTION_SERIAL_MERGE` — isolated work may run concurrently, but shared repository assets must merge one at a time.
 - `INTEGRATION_GATE` — cumulative vertical-loop acceptance.
 - `RELEASE_GATE` — public-release obligation, not local/private complete-loop prerequisite.
+
+### 2.1 Parallel execution != parallel merge
+
+`package.json` and `pnpm-lock.yaml` are repository-wide serialized merge assets.
+
+If two concurrent tasks touch either file:
+
+1. they may execute in isolated worktrees/runtime namespaces;
+2. their PRs must merge serially;
+3. every later PR refreshes/rebases onto the latest accepted main;
+4. regenerate the lockfile using pnpm rather than hand-merging it;
+5. rerun repository verification;
+6. rerun any task proof whose dependency graph/version basis changed materially.
+
+The same rule applies to another shared root/config asset when a task proves it is a real collision zone. Worktree/runtime isolation alone does not establish merge independence.
 
 ## 3. Single-writer collision zones
 
 | Collision zone | Single owner / merge order |
 |---|---|
-| framework/package security baseline | G00 |
+| framework security baseline | G00 |
+| root dependency manifest/lockfile | serial merge across actual writers |
 | Better Auth User/session schema | P14 proof -> G10 |
-| provider-neutral Source schema (`ConnectedAccount`, sync, Conversation/Message/Attachment) | P13 prerequisite proof -> G19 |
+| provider-neutral evidence schema | P13 prerequisite proof -> G19 |
 | Gmail OAuth/watch/history adapter | G20 consumes G19 |
+| AIInterpretationRun minimal production prerequisite | G30 prelude; runtime activation G70 |
 | Responsibility physical schema | P13/P14 -> P15 -> G30 |
 | Responsibility reducer / accepted state | G31 |
-| Temporal intent/trigger persistence/currentness | G32 |
-| central Product read models | G40 integration over G11/G21/G31/G32 |
-| Draft + initial SendOperation request schema | G50 |
-| provider dispatch/reconciliation transitions | G51 after G50 |
-| root shell/global design tokens | G11; pixel fidelity after V01 |
-| shared real-provider E2E fixtures | G80 integration owner |
+| Temporal intent/currentness | G32 |
+| central Product read models | G40 over G11/G21/G31/G32 |
+| Draft + initial SendOperation schema | G50 |
+| provider dispatch/reconciliation transitions | G51 |
+| root shell/global design tokens | G11; final fidelity after V01 |
+| shared real-provider E2E fixtures | G80 |
 
 Parallel tasks may consume a frozen interface but may not independently redefine these zones.
 
 ## 4. Persistence topological-order oracle
 
-Every production FK/reference target must exist before the referencing production migration can pass.
+A production FK/reference target must exist as an accepted production table **before** a referencing table is created. Proof-only fixture tables never satisfy production dependencies.
 
-| Production writer | May start after | Creates / owns | Required downstream by |
-|---|---|---|---|
-| G10 | G00 + P14 PASS | app-auth User/session schema | G19, authenticated BFF |
-| G19 | G10 + P13 PASS | ConnectedAccount, ProviderSyncState, Conversation, Message, Attachment metadata + proven upstream indexes/revision | G20, G30, G21 |
-| G30 | P15 PASS + G19 | Responsibility L2-frozen production schema with real Source FKs | G31 |
-| G32 | G31 | Temporal durable intent/trigger persistence required by active loop | G40/G60 |
-| G50 | G20 + G40 | Draft + initial SendOperation request/pending schema | G51 |
-| G51 | G50 + G31 | dispatch/reconciliation transitions on existing SendOperation | G60/G80 |
+### 4.1 Exhaustive external FK closure for Responsibility L2 v0.4
 
-Audit rule: a production migration may not depend on proof-only fixture tables. If its FK target is not already an accepted production table, the DAG is invalid.
+Current L2 external targets are:
+
+| Target required by L2 | Production owner/order |
+|---|---|
+| application `User` | G10 |
+| `connected_accounts (id,user_id)` | G19 |
+| `conversations (id,connected_account_id)` | G19 |
+| `participant_identities (id,user_id)` | G19 |
+| `messages (id,connected_account_id)` | G19 |
+| `ai_interpretation_runs (id,user_id)` | G30 prelude, before Responsibility tables |
+
+G19 also owns `Conversation.semantic_evidence_revision` as monotonic non-negative evidence versioning.
+
+G30 must order its migration internally so the minimal `AIInterpretationRun` prerequisite exists before any Responsibility table referencing it. Creating this table does **not** activate a model or authorize AI effects; G70 owns runtime AI activation.
+
+Audit rule: every future L2 external FK addition must be added to this closure table or the graph fails.
+
+### 4.2 Writer order
+
+```text
+G10 User/session
+  -> G19 evidence foundation
+      -> G30 prelude AIInterpretationRun prerequisite
+          -> G30 frozen Responsibility tables
+              -> G31 reducer
+                  -> G32 Temporal runtime
+
+G50 Draft + initial SendOperation
+  -> G51 provider dispatch/reconciliation transitions
+```
 
 ## 5. Vendor-evidence coverage oracle
 
-Before graph acceptance, every volatile external dependency named by Issue #58 must have current dated evidence in `research/issue-58-implementation-graph-evidence-2026-08-28.md` or an explicit bounded deferral.
+Every volatile external dependency named by Issue #58 must have current dated evidence in the Issue #58 evidence file or an explicit bounded deferral.
 
-Coverage required here:
+Required coverage:
 
 ```text
 Next.js / React
@@ -108,375 +136,300 @@ PostgreSQL / Drizzle
 Gmail OAuth / watch / history / push
 Trigger.dev
 OpenAI Responses / Structured Outputs / data controls
-WCAG 2.2 web accessibility
+WCAG 2.2 accessibility
 ```
 
-Version/date facts remain evidence, not timeless Product semantics. Execution tasks recheck the facts that materially govern their own activation.
+Version/date facts are evidence, not Product semantics. Activation tasks recheck facts that materially govern their execution.
 
 ## 6. Product-scope coverage oracle
 
-Every current `PRODUCT-CONTENT.md` V1 CORE / CORE-target capability must map to at least one implementation owner and executable acceptance path. The dated Issue #58 evidence file carries the current mechanical mapping.
+Every current `PRODUCT-CONTENT.md` V1 CORE / CORE-target capability must map to an implementation owner and executable acceptance path. The dated Issue #58 evidence file contains the mechanical mapping.
 
-A graph that leaves a current CORE capability ownerless fails even if its happy-path DAG is otherwise valid.
+An ownerless CORE capability is a graph FAIL even if the happy-path DAG is valid.
 
----
-
-# 7. Dependency DAG
+## 7. Dependency DAG
 
 ```text
-#58 graph freeze
-   |
-   +--> G00 patched framework security baseline
-   +--> V01 final visual-reference pass
+#58 merge
+  |
+  +-> G00 patched framework security baseline
+  +-> V01 final visual-reference pass
 
 After G00:
-   P13 Responsibility PostgreSQL/Drizzle proof ----+
-   P14 Better Auth UUID proof ---------------------+--> P15 independent L2 freeze
-   G11 structural UI shell/read-model harness
+  P13 Responsibility PostgreSQL/Drizzle proof ----+
+  P14 Better Auth UUID proof ---------------------+-> P15 independent L2 freeze
+  G11 structural UI shell/read-model harness
 
 P14 PASS -> G10 app auth/session
-P13 PASS + G10 -> G19 provider-neutral Source persistence foundation
+P13 PASS + G10 -> G19 provider-neutral evidence foundation
 
-G19 -> G20 Gmail OAuth/watch/history/sync -------> G21 Source UI + exact search
+G19 -> G20 Gmail OAuth/watch/history/sync -> G21 Source UI + exact search
   |
-  +---- P15 PASS -> G30 Responsibility L3 -> G31 deterministic reducer -> G32 attention/Temporal
+  +-> P15 PASS -> G30 L3 persistence -> G31 reducer -> G32 attention/Temporal
 
-G11 + G21 + G31 + G32 ---------------------------------------------> G40 Product surfaces
+G11 + G21 + G31 + G32 -> G40 Product surfaces
+G31 + frozen normalized evidence contract -> G70 bounded AI lane
+G20 + G40 -> G50 contextual Draft/immediate Send request
+G31 + G50 -> G51 provider Send reconciliation
+G20/G21 + G32 + G40 + G51 -> G60 integrity/recovery
 
-G31 + frozen normalized Source contract ---------------------------> G70 bounded AI lane
-
-G20 + G40 ----------------------------------------------------------> G50 Draft + contextual immediate Send
-G31 + G50 ----------------------------------------------------------> G51 provider Send reconciliation
-G20/G21 + G32 + G40 + G51 ----------------------------------------> G60 integrity/recovery
-
-G21 + G31/G32 + G40 + G51 + G60 + G70 ---------------------------> G80 complete-loop integration
-                                                                            |
-                                                                            v
-                                                                   R90 public-beta release gates
+G21 + G31/G32 + G40 + G51 + G60 + G70 -> G80 complete-loop integration
+G80 -> R90 public-beta release gates
 ```
 
 Safe-parallel result:
 
-- after G19 + P15, **G20/G21 provider lane** and **G30/G31/G32 deterministic domain lane** proceed independently;
-- G31 consumes the frozen normalized Source contract + deterministic fixtures, not live Gmail completion;
-- G40 is where live Source and real domain projections integrate;
-- G70 can begin after G31 using deterministic/authorized fixture context and does not wait for G60; real-provider AI integration is proven at G80.
+- P13, P14 and G11 may execute concurrently after G00, subject to the serialized root-manifest/lockfile merge rule;
+- after G19 + P15, provider and deterministic Responsibility lanes may proceed independently;
+- G31 uses frozen normalized fixtures and does not wait for live Gmail completion;
+- G40 integrates live Source and accepted domain projections;
+- G70 may start after G31 using deterministic/authorized context; G80 proves real-provider AI integration.
 
----
+## 8. Node contracts
 
-# 8. Node contracts
+### G00 — Patched framework security baseline
 
-## G00 — Patched framework security baseline
+Class: `SERIAL_GATE`.
 
-Class: `SERIAL_GATE`
+Depends: #58 merge.
 
-Scope:
+Owns: update current accepted Next 16.3 line to the current patched security baseline, directly coupled Next config/lock resolution only.
 
-- update repo Next.js from current 16.3.0 to current patched accepted 16.3 Active-LTS baseline (16.3.3 evidence as of 2026-08-28);
-- directly coupled `eslint-config-next`/lock resolution only as required;
-- run existing verification/browser smoke.
+Acceptance: current security fix present; `pnpm verify`; E2E smoke; exact-head CI; no bootstrap regression.
 
-Non-goals: Product features, unrelated dependency sweep, framework-major migration.
+Freshness: recheck official Next.js security guidance immediately before execution.
 
-Acceptance:
+Non-goals: feature work, unrelated dependency sweep, framework-major migration.
 
-- current known Critical fixes included;
-- `pnpm verify` + E2E smoke + exact-head CI PASS;
-- no bootstrap regression.
+Unblocks: P13, P14, G11.
 
-## V01 — Final current visual-reference pass
+### V01 — Final current visual-reference pass
 
 Class: `PARALLEL_SAFE` after #58 merge.
 
-Scope:
+Owns: current CORE Home / Needs You / Managed / Review / Moment / Source plus lifecycle/integrity references across representative widths.
 
-- current CORE Home / Needs You / Managed / Review / Moment / Source plus lifecycle/integrity visual references;
-- representative desktop/compact/mobile direction;
-- map each reference to textual state.
+Acceptance: every reference maps to textual Product/UI state; no image invents behavior; textual authority wins.
 
-Textual Product/UI authority wins; imagery may not invent behavior. Blocks final pixel-sensitive fidelity only.
+Non-goals: Product-semantic changes.
 
-## P13 — Responsibility L2 PostgreSQL/Drizzle executable proof
+Unblocks: final pixel-sensitive fidelity only.
 
-Class: `PARALLEL_SAFE` with P14 after G00; existing Issue #13.
+### P13 — Responsibility L2 PostgreSQL/Drizzle executable proof
 
-Owns:
+Class: `PARALLEL_EXECUTION_SERIAL_MERGE` with P14/G11 after G00; existing Issue #13.
 
-- acceptance 01–46 and 50–60 except 47–49;
-- real PostgreSQL 18;
-- exact stable Drizzle ORM/Kit/driver pin;
-- generated SQL inspection;
-- real concurrency;
-- candidate upstream Source prerequisites including ownership indexes and `Conversation.semantic_evidence_revision`.
+Owns: acceptance 01–46 and 50–60 except 47–49; real PostgreSQL 18; exact stable Drizzle/Kit/driver versions; generated SQL review; real concurrency; upstream ownership indexes/revision including `participant_identities` prerequisite.
 
 No production migration.
 
-PASS unblocks G19's production Source schema to conform to those proven prerequisites and contributes to P15.
+Acceptance: current Issue #13 + canonical proof gate, exact version/environment evidence, no silent SKIP.
 
-## P14 — Better Auth UUID persistence proof
+Freshness: recheck stable Drizzle/driver versions at execution.
 
-Class: `PARALLEL_SAFE` with P13 after G00; existing Issue #14.
+Unblocks: G19 prerequisite conformance and P15.
 
-Owns acceptance 47–49 using the current stable Better Auth version at execution, explicit UUID strategy, exact Drizzle/driver versions, real PostgreSQL 18 and generated schema inspection. No production OAuth.
+### P14 — Better Auth UUID persistence proof
 
-PASS unblocks G10 and contributes to P15.
+Class: `PARALLEL_EXECUTION_SERIAL_MERGE` with P13/G11 after G00; existing Issue #14.
 
-## P15 — Responsibility L2 independent freeze
+Owns: acceptance 47–49 using current stable Better Auth, explicit PostgreSQL UUID strategy, exact Drizzle/driver versions and real PostgreSQL 18.
+
+No production OAuth/auth rollout.
+
+Acceptance: generated schema/catalog proves UUID; local user/session/account relationship and domain FK roundtrip; exact versions recorded.
+
+Freshness: recheck current stable Better Auth at execution.
+
+Unblocks: G10 and P15.
+
+### P15 — Responsibility L2 independent freeze
 
 Class: `SERIAL_GATE`; existing Issue #15.
 
-Depends P13 + P14 concrete evidence. Independently reviews 01–60 and records `PASS/FREEZE` or `FAIL/REVISE`.
+Depends: concrete P13 + P14 evidence.
+
+Acceptance: independent full 01–60 review of generated SQL/real PostgreSQL/concurrency/UUID evidence; explicit `PASS/FREEZE` or `FAIL/REVISE`.
 
 Only PASS/FREEZE unblocks G30.
 
-## G10 — Application session/auth production activation
+### G10 — Application session/auth production activation
 
-Class: `PARALLEL_AFTER_CONTRACT`
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-Depends G00 + P14 PASS.
+Depends: G00 + P14 PASS.
 
-Owns only:
+Owns only: Better Auth application identity/session; auth-owned User/session schema; protected BFF/session validation; committed auth migration; expiry/re-auth/revoke/sign-out.
 
-- Better Auth app identity/session;
-- auth-owned User/session schema;
-- protected BFF/session validation;
-- committed auth migration;
-- expiry/re-auth/revoke/sign-out.
+Acceptance: real PostgreSQL UUID remains true; auth isolation; UI session semantics; no mailbox credential authority through Better Auth social-account rows.
 
-Does not own ConnectedAccount/Source, Responsibility, Temporal, Draft or SendOperation.
+Non-goals: ConnectedAccount/Source, Responsibility, Temporal, Draft/Send.
 
-Acceptance:
+Unblocks: G19.
 
-- signed-out/signed-in/expiry/re-auth semantics match UI contract;
-- real PostgreSQL UUID contract remains true;
-- authorization isolation tests;
-- no mailbox credential authority through Better Auth social accounts.
+### G11 — Product UI shell + read-model/accessibility harness
 
-## G11 — Product UI shell + read-model/accessibility harness
+Class: `PARALLEL_EXECUTION_SERIAL_MERGE` when root dependencies change; otherwise `PARALLEL_AFTER_CONTRACT`.
 
-Class: `PARALLEL_AFTER_CONTRACT`
+Depends: G00 + accepted Issue #55 UI contract. V01 only blocks final pixel fidelity.
 
-Depends G00 + frozen Issue #55 UI contract. V01 is needed only before final pixel fidelity.
+Owns: shell/navigation/responsive panes/sheets; semantic tokens/primitives; typed fixture/read models; structural Home/Needs You/Managed/Review/Moment/Source states; loading/partial/degraded/session/provider/mutation cases; keyboard/focus/IME/accessibility harness.
 
-Scope:
+Acceptance: Issue #55 structural cases, WCAG 2.2 AA baseline, Japanese IME safety, no domain/provider authority invented in UI.
 
-- shell/navigation/responsive routing/panes/sheets;
-- semantic tokens/primitives;
-- typed UI state/read-model fixtures;
-- Home/Needs You/Managed/Review/Moment/Source structural surfaces;
-- loading/partial/degraded/session/provider/mutation fixtures;
-- keyboard/focus/IME/accessibility harness.
+Unblocks: G21/G40 UI integration.
 
-No provider/domain authority.
+### G19 — Provider-neutral evidence foundation
 
-Acceptance includes WCAG 2.2 AA baseline, Japanese IME safety and Issue #55 structural cases.
+Class: `SERIAL_GATE` for shared evidence schema, then fan-out enabler.
 
-## G19 — Provider-neutral Source persistence foundation
+Depends: G10 + P13 PASS.
 
-Class: `SERIAL_GATE` for shared Source schema, then fan-out enabler.
+Single-writer production scope:
 
-Depends:
+```text
+ConnectedAccount
+ProviderSyncState
+Conversation
+Message
+Attachment metadata
+ParticipantIdentity
+provider-neutral repositories/normalized fixtures
+```
 
-- G10 production User/session schema;
-- P13 PASS for current L2 upstream Source prerequisites.
+Required invariants include:
 
-Single-writer scope:
+```text
+connected_accounts UNIQUE (id,user_id)
+conversations UNIQUE (id,connected_account_id)
+participant_identities UNIQUE (id,user_id)
+messages UNIQUE (id,connected_account_id)
+(connected_account_id, provider_message_id) uniqueness
+Conversation.semantic_evidence_revision >= 0 and monotonic
+```
 
-- `ConnectedAccount`;
-- `ProviderSyncState`;
-- `Conversation`;
-- `Message`;
-- `Attachment` metadata;
-- provider-neutral repositories/ownership boundaries;
-- proven `UNIQUE (id,user_id)` / `UNIQUE (id,connected_account_id)` prerequisites;
-- monotonic non-negative `Conversation.semantic_evidence_revision`;
-- `(connected_account_id, provider_message_id)` uniqueness;
-- committed SQL migrations.
+Acceptance: clean real PostgreSQL migration/rebuild; tenant/account/evidence FK/uniqueness tests; evidence-revision tests; exact normalized fixtures usable without Gmail; all P13-proven upstream prerequisites represented in production.
 
-No live Gmail OAuth/watch/history API calls. No Responsibility tables.
+Non-goals: live Gmail OAuth/watch/history; Responsibility tables; Person/CRM Product behavior; AI runtime.
 
-Acceptance:
+Unblocks: G20; after P15, G30.
 
-- clean real PostgreSQL migration/rebuild;
-- tenant/account/source FK/uniqueness tests;
-- evidence revision rules executable;
-- production schema directly satisfies P13-proven upstream prerequisites;
-- normalized Source fixtures/repositories usable without Gmail.
+### G20 — Gmail authorization / watch / history / sync
 
-Unblocks in parallel:
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-- G20 real Gmail adapter/sync;
-- after P15, G30 Responsibility production migration.
+Depends: G19 + G00.
 
-## G20 — Gmail authorization / watch / history / sync
+Owns: one Gmail account; minimum scopes; offline OAuth where background access needs it; secure real-token persistence; initial sync; `users.watch`/Pub/Sub ingress; quick authenticated acknowledgement; durable `history.list` reconciliation; renewal; periodic safety reconciliation; stale-history 404/full-sync recovery; idempotent normalization through G19; attachment evidence access.
 
-Class: `PARALLEL_AFTER_CONTRACT`
+Credential gate before first durable real token: encrypted at rest, key/secret separated from ordinary DB/repo data, no token logging, user+ConnectedAccount-scoped use, explicit reconnect/invalidation, revoke/delete when intentionally removed where supported.
 
-Depends G19 + G00.
+Provider oracles: push is signal not truth; cursor advances only after required durability; duplicate/delayed/dropped signals converge; historical sync does not auto-activate Responsibilities.
 
-Consumes G19 Source persistence; does not redefine its schema independently except through an explicit reviewed migration if real provider evidence proves a bounded field is required.
+Acceptance: applicable Product Golden Scenarios/provider failure cases + real provider evidence where required.
 
-Scope:
+Freshness: current Google OAuth/Gmail/Pub/Sub docs at execution.
 
-- one Gmail account;
-- minimum scopes;
-- offline OAuth when background access required;
-- initial sync;
-- `users.watch` / Pub/Sub ingress;
-- authenticated quick acknowledgement;
-- durable `history.list` reconciliation;
-- watch renewal;
-- periodic safety reconciliation;
-- stale history/404 full-sync recovery;
-- idempotent normalization/upsert through G19 repositories;
-- attachment evidence access.
+Non-goals: public OAuth verification/security assessment, which belongs to R90 where actually required.
 
-Credential gate before first durable real token persistence:
+Unblocks: G21/G50/G60.
 
-- secure/encrypt token at rest;
-- cryptographic key/secret separated from ordinary DB/repo data;
-- no token logging;
-- authenticated user + ConnectedAccount ownership on lookup/use;
-- explicit invalidation/reconnect;
-- revoke/delete when intentionally no longer needed where supported.
+### G21 — Real Source + exact Source search
 
-A bounded non-persistent OAuth spike may avoid durable token storage; plaintext durable storage is never accepted.
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-Provider oracles:
+Depends: G11 + G20.
 
-- cursor advance after required Source durability;
-- push payload never mutates Responsibility;
-- duplicate/delayed/dropped push converges through reconciliation;
-- initial historical sync never auto-activates Responsibilities.
+Owns: Source list/detail; provider/account provenance; authorized attachment access/fallback; authorized exact deterministic Source search; partial/sync/degraded/no-match states.
 
-Acceptance Product cases: PG-20, 21, 28, 31, 33, 35, 36.
+Acceptance: Source remains accessible independently of Responsibility/Moment; safe content rendering; authorization isolation; partial != zero; deterministic exact search.
 
-Public OAuth verification/security assessment is R90, not local-proof prerequisite.
+Non-goals: natural-language/semantic Q&A.
 
-## G21 — Real Source Conversations + exact Source search
+Unblocks: G40/G60/G80.
 
-Class: `PARALLEL_AFTER_CONTRACT`
+### G30 — Responsibility L3 production persistence
 
-Depends G11 + G20.
+Class: `SERIAL_GATE`.
 
-Scope:
+Depends: P15 PASS/FREEZE + G19.
 
-- real Source list/detail;
-- provider/account/source provenance;
-- attachment evidence open/download/provider fallback;
-- authorized **exact Source search — V1 CORE**;
-- truthful partial/sync/degraded/no-match behavior.
+Prelude ownership: create the smallest production `AIInterpretationRun` prerequisite needed by frozen L2 references, including `UNIQUE(id,user_id)` and any accepted user/conversation/message basis FKs. This is provenance/evidence infrastructure only; it does not call a model.
 
-No NL/semantic Q&A unless separately activated.
+Then own: frozen L2 Responsibility production tables/migrations in valid FK order, with real G10/G19/prelude targets.
 
 Acceptance:
 
-- Source independent of Responsibility/Moment;
-- partial != zero;
-- safe content rendering;
-- exact search authorized/deterministic;
-- PG-22,23,28,31 + UI Search contract.
+- clean migration from accepted prior state;
+- every external FK target resolves to a production table, never a proof fixture;
+- migration ordering itself is inspected/tested;
+- frozen L2 invariants remain true;
+- no obsolete lifecycle-enum collapse;
+- no AI runtime side effect.
 
-## G30 — Responsibility L3 production persistence
+Unblocks: G31.
 
-Class: `SERIAL_GATE`
+### G31 — Deterministic Responsibility admission/reducer
 
-Depends P15 PASS/FREEZE + G19 production Source schema.
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-Scope:
+Depends: G30 + frozen normalized evidence contract; does not depend on G20/G21 completion.
 
-- smallest frozen L2 Responsibility production schema/migrations;
-- real FKs to accepted G19 Source tables;
-- provenance/evidence revision/currentness;
-- accepted tenant/idempotency constraints.
+Owns: `TRACK / DO_NOT_TRACK / NEEDS_REVIEW`; `CREATE / UPDATE / RESOLVE / REOPEN / SUPERSEDE / INVALIDATE / NO_OP`; field correction/provenance; orthogonal semantics; historical activation policy; deterministic projections.
 
-Acceptance:
+Acceptance: relevant Tier-0/transition/high-harm Responsibility oracles + applicable Product Golden Scenarios with deterministic fixtures.
 
-- no proof-only fixture FK targets;
-- frozen L2 tests/invariants remain true in production-shaped integration;
-- committed migrations;
-- no lifecycle-enum collapse.
+Unblocks: G32/G40/G51/G70.
 
-## G31 — Deterministic Responsibility admission/reducer
+### G32 — Attention + Temporal runtime
 
-Class: `PARALLEL_AFTER_CONTRACT`
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-Depends G30 + frozen normalized Source/evidence contract. **Does not depend on G20/G21 completion.**
+Depends: G31.
 
-Use deterministic normalized fixtures.
+Owns: Needs You/Waiting-Managed/Later/Review/Done projection; Return Attention; durable defer/expected-event/time/reply/deadline reconsideration; Temporal persistence/currentness/idempotency; Trigger.dev adapter if retained; overdue/stale/restart reconciliation.
 
-Scope:
+Acceptance: relevant temporal/race oracles and Product scenarios; DB/domain currentness remains final authority if vendor idempotency expires/fails.
 
-- `TRACK / DO_NOT_TRACK / NEEDS_REVIEW`;
-- `CREATE / UPDATE / RESOLVE / REOPEN / SUPERSEDE / INVALIDATE / NO_OP`;
-- field correction/provenance;
-- orthogonal semantics;
-- historical activation policy;
-- deterministic projections.
+Freshness: recheck Trigger.dev behavior if activated.
 
-Acceptance: relevant Tier-0/transition/high-harm oracles + PG-05–19.
+Unblocks: G40/G60/G80.
 
-## G32 — Attention + Temporal Contract runtime
+### G40 — Product surfaces on real domain loop
 
-Class: `PARALLEL_AFTER_CONTRACT`
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-Depends G31.
+Depends: G11 + G21 + G31 + G32.
 
-Scope:
+Owns: Home, Needs You, Managed, Review, Moment, onboarding/first delegation, supported Settings/integrity hooks.
 
-- Needs You/Waiting-Managed/Later/Review/Done projections;
-- Return Attention without fake actionability;
-- durable defer/expected-event/time/reply/deadline reconsideration as accepted;
-- Temporal persistence/currentness/idempotency;
-- Trigger.dev adapter if retained;
-- overdue/stale/restart reconciliation.
+Acceptance: strict zero; trustworthy Managed; bounded Review; source-grounded Moment; separate session/provider/integrity/domain/mutation axes; applicable Product Golden Scenarios + Issue #55 acceptance.
 
-Vendor idempotency keys are secondary; DB/domain intent/currentness is final authority.
+Unblocks: G50/G60/G80.
 
-Acceptance: PG-01–04,09–10,18,24,27 + Responsibility temporal/race oracles.
+### G50 — Contextual Draft / Reply / Reply All + immediate Send request
 
-## G40 — Product surfaces on real domain loop
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-Class: `PARALLEL_AFTER_CONTRACT`
+Depends: G20 + G40.
 
-Depends G11 + G21 + G31/G32.
+Single-writer persistence: minimal durable Draft/versioning + initial SendOperation request/pending identity; no delayed-send model.
 
-Scope: Home, Needs You, Managed, Review, Moment, onboarding/first delegation and supported Settings/integrity hooks.
+User path: contextual Reply/Reply All, explicit sender, inspectable recipients/body, manual text baseline, explicit immediate Send request.
 
-Acceptance: strict zero, trustworthy Managed, bounded Review, source-grounded Moment, distinct session/provider/integrity/domain/mutation axes, applicable Product Golden Scenarios + Issue #55.
+Acceptance: draft preservation; sender/recipient visibility; Japanese IME; idempotent request; offline attempt does not silently send later; manual path works without AI.
 
-## G50 — Contextual Draft / Reply / Reply All + immediate Send request
+Non-goals: generic fresh Compose, Forward, Send Later, generic Undo/recall.
 
-Class: `PARALLEL_AFTER_CONTRACT`
+Unblocks: G51.
 
-Depends G20 + G40.
-
-Single-writer persistence:
-
-- minimal durable Draft/versioning;
-- minimal SendOperation request/pending schema;
-- operation/idempotency identity;
-- no delayed-send scheduling model.
-
-User path:
-
-- contextual Reply / Reply All;
-- explicit sender;
-- inspectable recipients/body;
-- manual text baseline;
-- explicit **IMMEDIATE** Send request.
-
-Deferred: Forward, Send Later, generic Undo/recall, silent offline queued Send.
-
-Acceptance: draft preservation, sender/recipient visibility, Japanese IME, no duplicate commit, offline attempt does not later send silently, PG-14/26/29 manual path.
-
-## G51 — Provider Send reconciliation + Responsibility re-evaluation
+### G51 — Provider Send reconciliation + Responsibility re-evaluation
 
 Class: `SERIAL_GATE` for external-effect truth.
 
-Depends G50 + G31.
+Depends: G50 + G31.
 
-Owns provider dispatch/reconciliation transitions on G50's existing SendOperation schema, ambiguous timeout handling, no blind retry, sent-message Source reconciliation and post-send reducer input.
+Owns: provider dispatch/reconciliation transitions on existing SendOperation; ambiguous timeout handling; no blind retry; sent-message Source reconciliation; post-send reducer evidence.
 
 Invariant:
 
@@ -484,198 +437,110 @@ Invariant:
 request/click != provider acceptance != operational outcome satisfied
 ```
 
-Acceptance: PG-01,05,25,26 + duplicate/retry/restart/ambiguity tests.
+Acceptance: duplicate/retry/restart/ambiguity tests; provider evidence and Responsibility consequences are separately proven.
 
-## G60 — Integrity / reconnect / failure closure
+Unblocks: G60/G80.
+
+### G60 — Integrity / reconnect / failure closure
 
 Class: `INTEGRATION_GATE` for reliance behavior.
 
-Depends G20/G21 + G32 + G40 + G51.
+Depends: G20/G21 + G32 + G40 + G51.
 
-Covers auth loss/reconnect/backfill, sync lag/data-through, notification-delivery separation, Temporal overdue recovery, Send ambiguity, attachment-access degradation, mutation pending/failure, intentional disconnect vs app sign-out and Product-account deletion boundary routing.
+Owns: auth loss/reconnect/backfill; sync lag/data-through; notification delivery separation; Temporal overdue recovery; Send ambiguity; attachment degradation; mutation pending/failure; intentional disconnect vs sign-out/account deletion routing.
 
-Acceptance: applicable PG-20–38; no false healthy reassurance, false zero or fake domain state from infrastructure failure.
+Acceptance: no false healthy reassurance; degraded scope and last-trustworthy observation are visible; reconnect restores healthy only after reconciliation; applicable Product failure Golden Scenarios pass.
 
-## G70 — Bounded AI interpretation + contextual draft assistance
+Unblocks: G80.
 
-Class: `PARALLEL_AFTER_CONTRACT`
+### G70 — Bounded AI interpretation + contextual AI draft
 
-May begin after G31 freezes the trusted candidate/reducer boundary and the normalized Source contract exists. It does not require live Gmail completion for fixture/eval work and does not wait for G60.
+Class: `PARALLEL_AFTER_CONTRACT`.
 
-Two independent model contracts/evals:
+Depends: G31 + frozen normalized evidence contract. Real-provider integration closes at G80.
 
-1. Responsibility interpretation candidates;
-2. editable contextual reply-draft candidates.
+Owns two separate model schemas/evals:
 
-Requirements:
+1. Responsibility interpretation candidate;
+2. editable contextual draft candidate.
 
-- official OpenAI SDK + Responses API;
-- Structured Outputs / JSON Schema where suitable;
-- runtime/source/currentness validation;
-- minimum authorized context;
-- current org/project data-control review;
-- `store:false` where appropriate without equating it to ZDR;
-- family-stratified holdout, prompt-injection/high-harm cases;
-- manual Source/Reply fallback.
+Uses G30-created AIInterpretationRun provenance substrate and may evolve it only through an explicit reviewed migration compatible with frozen Responsibility references.
 
-AI never gains Send or accepted-state authority.
+Authority: AI never owns auth/provider facts, admission/identity/effects, accepted state, tracking/defer, Temporal effects, sender/recipient authority, Send permission, or provider actions.
 
-## G80 — Complete-loop integration
+Acceptance: runtime schema validation; evidence-revision freshness; prompt-injection/high-harm evals; manual Source/Reply fallback; model/config/data-control evidence recorded.
 
-Class: `INTEGRATION_GATE`
+Freshness: current OpenAI Responses/Structured Outputs/data controls immediately before activation.
 
-Depends G21 + G31/G32 + G40 + G51 + G60 + G70.
+Unblocks: G80.
 
-Must prove representative real-provider loops including:
+### G80 — Complete-loop integration
 
-- request/send -> Waiting/Managed;
-- progress reply stays quiet;
-- action reply returns Needs You/Moment;
-- no-reply trigger re-evaluates current evidence;
-- contextual AI draft -> edit -> explicit Send -> reconciliation;
-- same communication path succeeds manually if AI unavailable;
-- auth/sync loss -> Integrity -> reconnect/backfill;
-- ambiguous Send -> no duplicate;
-- exact Source search + attachment fallback.
+Class: `INTEGRATION_GATE`.
 
-Acceptance uses Product Golden Scenarios, Responsibility oracles, Issue #55 UI cases, real provider evidence, exact-head CI/E2E and a full cumulative independent audit.
+Depends: G21 + G31/G32 + G40 + G51 + G60 + G70.
 
-## R90 — Public-beta release readiness
+Owns cumulative real-provider acceptance and shared E2E fixtures.
 
-Class: `RELEASE_GATE`
-
-Does not block local/private G80 proof.
-
-Includes as applicable:
-
-- Google OAuth verification/restricted-scope assessment;
-- exact privacy/retention/deletion commitments;
-- production credential rotation/recovery beyond G20 minimum secure storage;
-- production secrets/region/backup/restore/observability;
-- current AI data-control/privacy posture;
-- release accessibility/device/browser matrix;
-- security/abuse/recovery/support runbooks.
-
----
-
-# 9. Parallel-wave plan
-
-### Wave 0
-
-- merge #58;
-- G00 security baseline.
-
-### Wave 1 after G00
-
-Parallel:
-
-- P13 (#13);
-- P14 (#14);
-- G11;
-- V01 may run independently after #58 merge.
-
-### Wave 2
-
-- P14 PASS -> G10;
-- P13 + P14 -> P15;
-- G11 continues;
-- visual work continues if needed.
-
-### Wave 3
-
-- P13 PASS + G10 -> G19;
-- P15 PASS waits independently for G30 authorization.
-
-### Wave 4 after G19 + P15
-
-Parallel lanes:
+Must prove at least:
 
 ```text
-Provider: G20 -> G21
-Domain:   G30 -> G31 -> G32
-UI:       G11/V01 completion
-AI:       G70 after G31 contract freeze
-```
-
-### Wave 5
-
-- G40 integration;
-- G50/G51 Send path;
-- G60 recovery;
-- G80 full loop;
-- R90 release only after local/private product proof reaches the required maturity.
-
-## 10. Critical path
-
-Ignoring optional visual parallel work, the dependency chain controlling the first complete loop is approximately:
-
-```text
-#58
--> G00
--> P14 -> G10
--> P13 -> G19
--> P15 -> G30 -> G31 -> G32
--> G20 -> G21
--> G40
--> G50 -> G51
--> G60
--> G70
--> G80
-```
-
-Several branches overlap; this is not a mandate to serialize independent work.
-
-## 11. Final complete-loop acceptance
-
-G80 is PASS only when the system proves behavior, not component completion:
-
-```text
-real provider evidence
--> authorized Source state
--> accepted Responsibility decision
--> quiet reliable monitoring
--> durable return condition
--> current event/time causes re-evaluation
--> correct Needs You/Review/Managed outcome
+real Gmail evidence
+-> admitted Responsibility
+-> Managed quiet monitoring
+-> durable reconsideration
+-> Needs You / Review return
 -> source-grounded Moment
--> contextual manual/AI-assisted reply
+-> contextual manual/AI draft
 -> explicit immediate Send
 -> provider reconciliation
--> correct Responsibility continuation/closure
--> trustworthy integrity during failure/recovery
+-> correct Responsibility consequence
+-> truthful failure/recovery behavior
 ```
 
-All evidence must bind to the exact candidate head/CI execution. Component builders do not self-approve the integrated behavior.
+Also prove exact Source search, attachment evidence access, AI-unavailable manual path, restart/idempotency/ambiguity behavior, and current Golden Scenario coverage.
 
-## 12. Non-goals / deferred scope
+Acceptance: exact-head CI + real-provider evidence for claims that mocks cannot establish.
 
-Do not pull into the current critical path merely because architecture can support them:
+Unblocks: R90.
 
-- Microsoft;
-- broad multi-account Scope UX;
-- Person/CRM;
-- Pin;
-- generic fresh Compose / Forward;
-- Send Later / generic Undo;
-- rich native attachment preview;
-- natural-language Search;
-- autonomous Send;
-- generic workflow/rule engine.
+### R90 — Public-beta release readiness
 
-## 13. Review discipline
+Class: `RELEASE_GATE`.
 
-Every node requires its own current contract, executable acceptance and independent cumulative review before merge.
+Depends: G80.
 
-For parallel waves:
+Owns only obligations actually required for public release: Google OAuth verification/restricted-scope assessment where applicable, production credential/key rotation/recovery, privacy/retention/deletion commitments, current AI data controls, operational monitoring/recovery, release security/hardening.
 
-- start from the same accepted fresh base;
-- run repository preflight;
-- isolate worktree/runtime resources;
-- avoid overlapping single-writer zones;
-- integrate only after upstream contract heads are accepted.
+Does not establish ICP, PMF, WTP, retention, or monitoring relinquishment.
 
-On FAIL, audit the entire candidate and batch all known material corrections. Repeated correction failure triggers spec/oracle/architecture/decomposition/verification root-cause analysis before another patch loop.
+## 9. Actual Issue creation rule
 
-## 14. Empirical boundary
+After #58 itself passes full cumulative audit + exact-head CI and merges, create/reconcile implementation Issues from these nodes. Each executable Issue must include:
 
-Issue #36 remains open. Building G80 cannot prove ICP, market prevalence, monitoring relinquishment, PMF, WTP, retention or differentiation against real workflows.
+- stable purpose and owned files/boundaries;
+- prerequisites and exact accepted base;
+- acceptance tests/oracles;
+- required live/vendor evidence;
+- non-goals;
+- parallel class and collision assets;
+- merge/unblock condition.
+
+Do not launch broad implementation from chat-only descriptions.
+
+## 10. Final graph acceptance oracle
+
+#58 may pass only if all are true:
+
+1. main baseline/current implementation fact is correct;
+2. current Product/UI/Responsibility authorities are preserved;
+3. every CORE capability has an owner;
+4. every production FK target has a topological owner/order;
+5. proof fixtures are never production dependencies;
+6. P13/P14/P15 gates are not waived;
+7. shared root manifest/lockfile parallel-merge collisions are controlled;
+8. vendor evidence coverage is current and date-scoped;
+9. provider/AI/scheduler capabilities do not become authority;
+10. no second-provider/full-client scope is smuggled in;
+11. final candidate receives a full cumulative acceptance audit;
+12. exact-head Verify/E2E CI passes before merge.

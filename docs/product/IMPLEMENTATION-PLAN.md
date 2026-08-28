@@ -2,7 +2,7 @@
 
 ## Status
 
-**Active execution plan, reconciled 2026-08-28 after Issue #55 completion and Issue #58 full-audit Round 4.**
+**Active execution plan, reconciled 2026-08-29 after Issue #58 / PR #59 implementation-graph freeze and Issue #61 / PR #76 visual-reference freeze.**
 
 This is sequencing authority, not Product truth. Product truth lives in `PRODUCT.md` / `PRODUCT-CONTENT.md`; Product regressions in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics/oracles in `responsibility/`; UI behavior in `../design/`; exact dependency/parallelization/writer detail in `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
@@ -28,47 +28,60 @@ Keep authorized exact Source search and attachment evidence access available.
 
 Implementation completion does not prove ICP/PMF/WTP/retention/monitoring relinquishment. Issue #36 remains open.
 
-## 2. Completed specification gates
+## 2. Completed specification/design gates
 
 - Product Content / Golden Scenarios: complete enough for current implementation hypothesis.
-- Issue #55 / PR #57: UI/UX implementation-readiness COMPLETE after full cumulative audit + exact-head CI.
+- Issue #55 / PR #57: UI/UX implementation-readiness **COMPLETE** after full cumulative audit + exact-head CI.
 - Canonical implementation-facing UI input: `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md`.
-- Runtime remains bootstrap-level.
+- Issue #58 / PR #59: implementation graph / architecture activation topology **COMPLETE** after repeated full cumulative audit + exact-head CI.
+- `docs/product/IMPLEMENTATION-GRAPH.md` is now the accepted exact dependency/parallelization authority together with live GitHub Issues.
+- Issue #61 / PR #76: minimal five-reference visual freeze **COMPLETE**; runtime/browser audit owns final state-specific/pixel-sensitive fidelity.
+- Current accepted main after PR #76: `9f7209928578c8b84a09649ea8112b4c6c2a8c9f`.
+- Runtime remains bootstrap-level; frozen contracts != implemented Product.
 
-## 3. Current gate — Issue #58
+## 3. Current gate — G00 / Issue #60
 
-Issue #58 freezes:
+G00 is the first runtime `SERIAL_GATE`.
 
-- actual implementation-state reconstruction;
-- current volatile vendor evidence;
-- architecture activation boundaries;
-- exhaustive production FK/topological order;
-- single-writer collision zones;
-- parallel execution vs serialized merge rules;
-- implementation DAG and safe waves;
-- Product/Responsibility/UI/provider acceptance mapping.
+Current repo still pins:
 
-No broad production fanout before #58 full-audit PASS + exact-head CI + merge.
+```text
+next                16.3.0
+eslint-config-next  16.3.0
+```
 
-After accepted #58 merge, `IMPLEMENTATION-GRAPH.md` becomes the exact dependency/parallelization authority.
+Execution-time vendor evidence was rechecked on `2026-08-29` as required by Issue #60:
+
+- Next.js official August 25, 2026 security release identifies `16.3.3` as the current Active LTS security baseline for the accepted 16.3 line;
+- official `v16.3.3` is a stable/non-prerelease release and fixes two Critical unauthenticated RCE advisories:
+  - `GHSA-p293-qw3h-jr36` — Windows-hosted servers;
+  - `GHSA-2xp9-vwfh-vxw4` — AVIF Image Optimization path;
+- npm currently exposes `16.3.3` as `latest`; the 16.4 line is canary/pre-release at this checkpoint.
+
+Therefore no Issue-contract version change is required. Patch narrowly inside the accepted 16.3 line before the first write-heavy fanout.
+
+Do not launch P13/P14/G11 production-wave work from a stale pre-G00 dependency basis.
 
 ## 4. G00 — framework security pre-wave
 
-First runtime gate after #58.
-
-Current repo `next@16.3.0` is below the official Aug-25 2026 Active-LTS 16.3 security baseline `16.3.3`.
-
 Scope:
 
-- narrow Next.js security patch inside accepted line;
-- directly coupled resolution/config only as required;
-- `pnpm verify` + Playwright smoke + exact-head CI.
+- update Next.js from `16.3.0` to `16.3.3` unless newer execution-time official security guidance supersedes this dated evidence;
+- update directly coupled `eslint-config-next` / lock resolution only as required;
+- preserve Node 24 / React 19 accepted compatibility unless actual official/install/build evidence requires a bounded correction;
+- clean `pnpm install --frozen-lockfile`;
+- `pnpm verify`;
+- Playwright E2E smoke;
+- exact-head GitHub CI;
+- full cumulative acceptance audit of current Issue #60 contract × final candidate.
 
-No unrelated upgrade sweep.
+No unrelated dependency sweep, Product feature implementation, framework-major/minor migration, Better Auth/Drizzle/Gmail/AI activation or UI redesign.
+
+`package.json` and `pnpm-lock.yaml` are serialized merge assets across this gate.
 
 ## 5. First execution wave after G00
 
-The following may execute concurrently in isolated worktrees/runtime namespaces:
+The following may execute concurrently in isolated worktrees/runtime namespaces after G00 PASS/merge:
 
 ### P13 — Responsibility L2 PostgreSQL/Drizzle proof
 
@@ -93,15 +106,16 @@ Existing Issue #14.
 
 ### G11 — structural UI shell/read-model harness
 
+Existing Issue #63.
+
 - shell/navigation/responsive structure;
 - semantic tokens/components;
 - typed fixture/read-model state axes;
 - accessibility/focus/IME harness;
+- use the accepted five-reference visual grammar where visually material;
 - no provider/domain authority.
 
-### V01 — final visual-reference pass
-
-May run after #58 merge because textual Product/UI/architecture contracts are sufficiently frozen. It blocks final pixel-sensitive fidelity only, not backend/domain work.
+V01 is already complete and is not a remaining execution-wave task. Missing state-specific screenshots do not block structural implementation; textual Product/UI authority plus runtime/browser visual audit governs those states.
 
 ## 6. Parallel execution != parallel merge
 

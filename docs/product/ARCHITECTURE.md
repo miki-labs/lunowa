@@ -213,7 +213,7 @@ No concurrent task may independently redefine a shared schema, canonical reducer
 
 ## 9. Provider integration / Gmail
 
-G20 owns live Gmail OAuth, provider protocol, watch/history synchronization, attachment retrieval and Send adapter behavior. It consumes G19 persistence.
+G20 owns live Gmail OAuth, provider/source protocol, watch/history synchronization and attachment retrieval. It consumes G19 persistence. **G20 does not own provider Send dispatch/reconciliation.** G51 is the single implementation owner for Gmail Send serialization/dispatch/result reconciliation after G50 establishes the trusted Draft/SendOperation request state.
 
 ```text
 OAuth/offline credential
@@ -285,6 +285,15 @@ Request/click is not accepted state until authoritative persistence/reconciliati
 ## 14. Draft / Send
 
 Current v1 activates contextual Reply/Reply All + explicit immediate Send.
+
+```text
+G50 trusted Draft + SendOperation request identity/state
+-> G51 Gmail serialization/dispatch/result reconciliation
+-> sent Source reconciliation
+-> trusted Responsibility re-evaluation
+```
+
+Invariant:
 
 ```text
 send request != provider acceptance != Responsibility outcome satisfied

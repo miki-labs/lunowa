@@ -11,9 +11,11 @@ This file is a **task router**, not the handbook. Read only the owning source ne
 - Phase-0 application/runtime/verification foundation exists.
 - Product Content / Golden Scenarios are specification-ready for the current implementation hypothesis; this is **not** Product-market validation.
 - Issue #55 / PR #57 completed the implementation-facing v1 UI/UX contract.
-- **Issue #58 is the current implementation-graph gate until it passes full cumulative audit, exact-head CI and merges.**
-- After accepted #58 merge, the first runtime gate is **G00 — patched framework security baseline**; **V01 — final visual-reference pass** may run independently in parallel.
-- Detailed dependency, schema-writer, FK-topology and parallelization authority after #58 merge is `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
+- Issue #58 / PR #59 completed the implementation-graph / architecture-activation freeze.
+- Issue #61 / PR #76 completed the minimal five-reference visual freeze; runtime/browser audit owns final state-specific/pixel-sensitive fidelity.
+- **Issue #60 / G00 is the current runtime `SERIAL_GATE`: patch the accepted Next.js 16.3 line to the current security baseline before the first write-heavy fanout.**
+- `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues now own exact dependency, schema-writer, FK-topology and parallelization authority.
+- After G00 PASS/merge, P13 / P14 / G11 are the first safe parallel execution wave, subject to serialized `package.json` / `pnpm-lock.yaml` merge ownership.
 - Issue #36 remains open empirical Product Discovery but is deferred in execution order; implementation cannot turn ICP/PMF/WTP/retention/reliability into facts.
 - Issue #28 remains its bounded comparative fake-data experiment unless explicitly reconciled; do not repurpose it as the Product-completion lane.
 
@@ -52,7 +54,7 @@ AGENTS.md
 - `docs/design/INTERACTIONS.md`
 - `docs/design/RESPONSIVE.md`
 - `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` — accepted implementation-facing contract from #55/#57.
-- `docs/design/references/` — visual direction only; images never override textual Product semantics.
+- `docs/design/references/` — accepted minimal visual-reference set; visual direction only, and images never override textual Product semantics.
 
 ### Responsibility
 
@@ -75,7 +77,7 @@ Do not derive canonical domain semantics from UI labels or screenshots.
 - `docs/product/CONTRACTS.md` — logical module contracts.
 - `docs/product/TECH-STACK.md` — accepted replaceable technology choices.
 - `docs/product/IMPLEMENTATION-PLAN.md` — high-level execution sequence.
-- `docs/product/IMPLEMENTATION-GRAPH.md` — exact dependency/parallelization/writer/FK authority after #58 merge.
+- `docs/product/IMPLEMENTATION-GRAPH.md` — accepted exact dependency/parallelization/writer/FK authority.
 - live GitHub Issue — task-specific contract.
 - code/tests/schema/runtime — actual implementation behavior.
 

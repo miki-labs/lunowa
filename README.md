@@ -16,14 +16,16 @@ The core Product value is **Attention Delegation**: unresolved communication may
 
 Canonical direction can still contain explicit hypotheses/unknowns. Do not infer market validation from implementation progress, screenshots, candidates or this README.
 
-## Current status — 2026-08-28
+## Current status — 2026-08-29
 
 - Phase-0 runtime/verification foundation exists.
 - Product Content / Golden Scenarios are specification-ready for the current implementation hypothesis; this is **not** Product-market validation.
 - Issue #55 / PR #57 completed the implementation-facing v1 UI/UX contract.
-- **Issue #58 is the current implementation-graph gate until full cumulative audit + exact-head CI + merge.**
-- After accepted #58 merge, `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues own exact dependency/parallelization/schema-writer/FK topology.
-- The first runtime gate after #58 is **G00 — patched framework security baseline**; **V01 — final visual-reference pass** may run independently.
+- Issue #58 / PR #59 completed the implementation graph / architecture activation freeze.
+- Issue #61 / PR #76 completed the minimal five-reference visual freeze; textual Product/UI authority remains normative and runtime/browser audit owns final fidelity.
+- `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues now own exact dependency/parallelization/schema-writer/FK topology.
+- **Issue #60 / G00 is the current runtime `SERIAL_GATE`.** Current repo remains `next@16.3.0`; the execution-time 2026-08-29 recheck confirms `16.3.3` as the current accepted Active-LTS security baseline for the 16.3 line.
+- After G00 PASS/merge, P13 / P14 / G11 form the first safe parallel execution wave, with serialized root dependency/lockfile merge ownership.
 - Issue #36 remains open empirical Product Discovery, deferred in current execution order. Implementation cannot turn ICP/PMF/WTP/retention/reliability into facts.
 - Real Product runtime remains materially unimplemented; current application code is bootstrap foundation.
 
@@ -134,25 +136,18 @@ docs/continuity/
 
 ## Current implementation routing
 
-While Issue #58 is open:
-
 ```text
-#58 full candidate
+G00 / Issue #60 framework security baseline
+-> full current-contract implementation
+-> clean frozen install + pnpm verify + E2E
+-> exact-head GitHub CI
 -> full cumulative acceptance audit
--> batched corrections on FAIL
--> exact-head Verify + E2E
--> merge
-```
+-> merge only on PASS
 
-After accepted #58 merge:
-
-```text
-G00 security baseline
-+ V01 visual-reference lane
--> #13/#14 proof lanes + G11 UI harness
--> #15 freeze + G10/G19 evidence foundation
--> Gmail / deterministic Responsibility lanes
--> Product surfaces / contextual Send / AI / integrity
+After G00:
+P13 / #13  +  P14 / #14  +  G11 / #63   (parallel execution)
+-> serialized merge for shared package/lock assets
+-> downstream graph according to IMPLEMENTATION-GRAPH.md
 -> G80 complete-loop integration
 -> R90 public-beta readiness
 ```

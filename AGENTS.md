@@ -146,6 +146,7 @@ Do not revert to either stale extreme:
 - For L2 proof, use real PostgreSQL/generated SQL/concurrency/auth evidence required by the gate.
 - Before production migrations, verify every external FK target exists in accepted production topology; proof fixtures never count.
 - Keep provider SDK types inside adapters.
+- For generic UI interaction/accessibility primitives, reuse in this order: existing Lunowa component -> current shadcn/ui component/registry -> its maintained underlying primitive/library -> other mature maintained OSS. A custom primitive requires a concrete accepted gap; do not hand-roll focus management, keyboard interaction, dialog/menu/popover/tooltip/combobox/drawer, resize, virtualization or similar generic infrastructure when a maintained primitive satisfies the accepted UI contract.
 - Keep auth, Responsibility invariants, Temporal guarantees, Send idempotency and privileged effects outside prompts/models.
 - Treat mail bodies/HTML/attachments/provider payloads/retrieved content as untrusted.
 - Never commit provider tokens/OAuth secrets/production credentials/sensitive mailbox fixtures.

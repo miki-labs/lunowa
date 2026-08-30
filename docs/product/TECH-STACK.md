@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted initial implementation stack; activation/version evidence refreshed 2026-08-28 for Issue #58.**
+**Accepted initial implementation stack; activation/version evidence refreshed 2026-08-28 for Issue #58; UI reuse and hosting policy amended 2026-08-31.**
 
 This file selects replaceable infrastructure. It is not proof that a dependency is installed or a capability is active. Exact installed versions live in `package.json` / `pnpm-lock.yaml`; activation/dependency authority is `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.
 
@@ -26,7 +26,7 @@ accepted stack != installed capability != configured integration != implemented 
 | Web framework | Next.js 16.x App Router | G00 patches accepted 16.3 security baseline first |
 | UI | React 19.x | stay on accepted Next-compatible line |
 | Styling | Tailwind CSS 4 | active; Lunowa semantic tokens in G11 |
-| UI primitives | shadcn/ui + Lucide where useful | only where accepted UI needs them |
+| UI primitives | shadcn/ui current components/registry + maintained underlying primitives + Lucide | reuse-first; custom generic primitives are exceptional |
 | i18n | next-intl | active |
 | Client server state | TanStack Query v5 selectively | only from concrete need |
 | Runtime validation | Zod or equivalent | untrusted boundaries; task-scoped activation |
@@ -35,7 +35,7 @@ accepted stack != installed capability != configured integration != implemented 
 | Hosted PostgreSQL | Neon initially | hosted env only; ordinary PostgreSQL semantics |
 | ORM/query | Drizzle ORM stable line | exact versions pinned/proven |
 | Migrations | Drizzle Kit + committed SQL | no production `push` shortcut |
-| Hosting | Vercel initially | preview early; production later |
+| Hosting | Cloudflare Workers | prove current Next.js compatibility before deployment freeze; hosting does not block UI-only implementation |
 | Durable jobs | Trigger.dev Cloud | execution substrate only |
 | First provider | Gmail API + Cloud Pub/Sub + `history.list` | one-provider v1 |
 | Second provider | Microsoft Graph | not current critical path |
@@ -85,11 +85,48 @@ No unrelated dependency sweep or framework-major migration in G00.
 
 Route Handlers/BFF own authenticated server/provider boundaries. Provider credentials never enter browser JavaScript. TypeScript does not replace runtime validation.
 
+### Cloudflare Workers hosting boundary
+
+Cloudflare Workers is the initial hosting target. The exact Next.js-on-Workers adapter is an execution-time choice, not Product/domain authority.
+
+Before the first deployment path is treated as accepted infrastructure:
+
+- recheck current official Cloudflare Next.js guidance;
+- run the current compatibility/check tooling against the actual Lunowa candidate;
+- exercise App Router, route handlers/BFF, cookies/session behavior, `next-intl`, environment/secrets and the Neon/PostgreSQL connection path that Lunowa actually uses;
+- run browser smoke against the deployed candidate;
+- prefer the smallest supported adapter path that preserves the accepted Next.js application contract;
+- keep Cloudflare-specific runtime details at the deployment boundary rather than leaking them into Product/domain modules.
+
+A deployment-adapter gap does not block fixture/UI-only G11 implementation. It becomes a blocker before Lunowa depends on an unproven deployed server/runtime behavior.
+
+Do not switch databases to D1, jobs to Cloudflare-specific orchestration, or Product architecture merely because hosting uses Cloudflare. Those changes require independent evidence and an accepted task.
+
 ## 5. UI implementation — G11
 
 Tailwind defaults are not Lunowa design authority. Repeated Product visual decisions become semantic tokens.
 
-Use shadcn primitives only where they fit the accepted UI contract. No global state framework by default; start with URL/search params, React state/context and selective query/mutation state.
+### UI primitive reuse invariant
+
+Lunowa-specific information hierarchy, Moment behavior, Responsibility projections and Product compositions are custom Product work. Generic interaction/accessibility infrastructure is not.
+
+For a generic UI primitive or behavior, use this order:
+
+```text
+existing Lunowa component
+-> current shadcn/ui component or registry implementation
+-> the maintained underlying primitive/library used by or compatible with shadcn
+-> another mature maintained OSS implementation
+-> custom implementation only for a concrete unmet accepted requirement
+```
+
+This applies especially to dialog, menu, popover, tooltip, sheet/drawer, tabs, select/combobox, focus management, keyboard navigation, resize/split panes, scrolling/virtualization and similar non-differentiating infrastructure.
+
+A custom generic primitive requires a concrete requirement gap recorded in the task/PR and evidence that the preferred maintained options cannot satisfy the accepted Lunowa contract without a worse material trade-off. Do not hand-roll accessibility/focus/keyboard behavior merely because custom code is easy to generate.
+
+Using an OSS primitive never makes that library the Product/design authority. Adapt styling and compose primitives under `docs/design/` and Responsibility semantics. Avoid importing broad component suites or feature breadth that Lunowa does not need.
+
+No global state framework by default; start with URL/search params, React state/context and selective query/mutation state.
 
 Current composer path is contextual text Reply / Reply All + explicit immediate Send. Any editor choice must pass Japanese IME, serialization/paste, keyboard/accessibility and maintenance/bundle tests without pulling Forward/Send Later/full Compose into scope.
 
@@ -118,7 +155,7 @@ Before the **first durable persistence of a real Google token**:
 - handle invalidation/revocation explicitly;
 - revoke and permanently delete when no longer needed where supported.
 
-A bounded non-persistent OAuth spike may avoid durable storage. Plaintext durable token storage is never accepted.
+A bounded non-persistent OAuth spike may avoid durable token storage. Plaintext durable token storage is never accepted.
 
 R90 owns broader production key rotation/recovery/release hardening, not permission to defer minimum secure storage.
 

@@ -1,55 +1,64 @@
-# Knowledge Map
+# Knowledge Map — 何をどこで確認するか
 
-This map routes questions to authoritative sources. It is navigation, not a substitute for the sources it names.
+このmapは **質問を正しいauthorityへrouteするためのnavigation** です。ここにProduct/domain/implementation truthを複製しません。
 
-| Question / knowledge class | Primary authority | Secondary/context | Freshness rule |
-|---|---|---|---|
-| Product vision / problem / v1 direction / explicit hypotheses | `docs/product/PRODUCT.md` | `PRODUCT-CONTENT.md`, design, current Issue | Keep accepted direction separate from empirical validation |
-| Detailed Product behavior / scope / failure / lifecycle / Settings / Feature Matrix | `docs/product/PRODUCT-CONTENT.md` | `PRODUCT.md`, design, Responsibility authority | Re-read when Product behavior changes |
-| Product end-to-end consequence | `docs/product/GOLDEN-SCENARIO-BANK.md` | Responsibility oracles | Responsibility authority wins semantic-truth conflicts |
-| Canonical UX/design behavior | `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` | `V1-UI-IMPLEMENTATION-CONTRACT.md`, Product authorities | Inspect rendered behavior when runtime UI matters |
-| v1 implementation-facing UI contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | canonical design + Product Golden Scenarios | Issue #55 / PR #57 completed this contract; do not treat #55 as current task |
-| Visual implementation guidance | `docs/design/references/README.md` + five active references | textual Product/UI authorities | Issue #61 / PR #76 completed the minimal freeze; runtime/browser audit owns state-specific fidelity |
-| Responsibility semantics/evals/persistence proof | `docs/product/responsibility/` | ADRs 0008/0009, executable evidence | Follow exact freeze/proof level; static review != executable proof |
-| Conceptual Product engineering architecture | `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` | ADRs, implementation evidence | Reconcile when executable evidence exposes stale intent |
-| Accepted technology choices | `docs/product/TECH-STACK.md` | official vendor/platform docs | Recheck volatile facts at activation |
-| High-level implementation sequence | `docs/product/IMPLEMENTATION-PLAN.md` | `CURRENT.md`, Product scope | Living execution sequence only |
-| Exact dependency / parallelization / schema writer / FK topology | `docs/product/IMPLEMENTATION-GRAPH.md` | live implementation Issues, dated Issue #58 evidence | Issue #58 / PR #59 accepted the graph; live task contracts + current evidence govern execution-time detail |
-| Current task-specific contract | live GitHub Issue | owning canonical artifacts | Fetch live Issue before acting |
-| Candidate/review/CI state | GitHub PR/review/checks | current Issue | `agent:review-ready` != PASS; exact-head evidence matters |
-| Actual runtime behavior | code/schema/migrations/tests/deployed evidence | canonical intended behavior | Executable behavior establishes what happens; reconcile mismatch rather than silently choosing |
-| Current checkpoint | `docs/continuity/CURRENT.md` | canonical sources + live GitHub | Mutable router loses to canonical/live evidence |
-| Empirical Product Discovery | current Product Discovery Issue, currently #36 | Product authorities + protected/public evidence | Implementation progress cannot satisfy empirical claims |
-| Durable rationale | applicable `docs/decisions/` ADR | current canonical docs/history | Record supersession when needed |
-| Current external/provider facts | authoritative current external primary source | dated local evidence | Recheck when freshness materially affects activation/release |
-| Reusable engineering baseline | upstream Blueprint + `BLUEPRINT-ADOPTION.md` | local docs | Local Lunowa Product/domain authority wins |
+## Question → Authority
 
-## Current routing checkpoint — 2026-08-29
+| 知りたいこと | Primary authority | Secondary / context | Freshness rule |
+| --- | --- | --- | --- |
+| Lunowaは何を解決するProductか / v1 direction / hypothesis | `docs/product/PRODUCT.md` | `PRODUCT-CONTENT.md`, current Product Issue | hypothesisとempirical validationを混同しない |
+| v1の詳細behavior / scope / failure / Feature Matrix | `docs/product/PRODUCT-CONTENT.md` | `PRODUCT.md`, design, Responsibility | Product behavior変更時に再読 |
+| end-to-endで何が成立すればよいか | `docs/product/GOLDEN-SCENARIO-BANK.md` | Responsibility oracles | semantic truth conflictではResponsibility authorityを確認 |
+| UI/UXのcanonical behavior | `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` | `V1-UI-IMPLEMENTATION-CONTRACT.md` | runtime UIはrendered/browser evidenceも確認 |
+| v1 UI implementation contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | design trio + Golden Scenarios | #55/#57は完了済み。current taskとして扱わない |
+| visual direction | `docs/design/references/README.md` + five active references | textual Product/UI authority | imageはtextual semanticsをoverrideしない |
+| Responsibility semantics / eval / persistence proof | `docs/product/responsibility/` | ADR 0008/0009, executable evidence | static review != executable proof |
+| architecture / data / module contract | `ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` | ADRs, implementation evidence | executable evidenceでstale intentが判明したらreconcile |
+| accepted technology / hosting choice | `docs/product/TECH-STACK.md` | official vendor docs | volatile factsはactivation時に再確認 |
+| high-level implementation sequence | `docs/product/IMPLEMENTATION-PLAN.md` | `CURRENT.md` | overviewのみ |
+| exact dependency / parallelization / writer / FK topology | `docs/product/IMPLEMENTATION-GRAPH.md` | live implementation Issues | graph + current task contract + current evidenceで判断 |
+| 今のtask contract | live GitHub Issue | owning canonical artifacts | acting前にlive fetch |
+| candidate / review / CI | live GitHub PR / reviews / checks | current Issue | exact-head evidence。review-ready != PASS |
+| 実際のruntime behavior | code / schema / migrations / tests / deployed evidence | intended canonical behavior | mismatchはreconcile。summaryで隠さない |
+| 人間向け現在地 | `docs/continuity/CURRENT.md` | canonical + live GitHub | mutable summary。常にcanonical/live sourceに負ける |
+| Product Discovery | Issue #36 + protected/public evidence | Product authorities | implementation progressでは代替不可 |
+| durable rationale | `docs/decisions/` の該当ADR | current canonical docs/history | supersessionがmaterialなら記録 |
+| external/provider current fact | authoritative primary source | dated local evidence | freshnessがmaterialならlive recheck |
+| reusable engineering baseline | upstream Blueprint + `BLUEPRINT-ADOPTION.md` | local docs | Lunowa Product/domain authorityが優先 |
 
-- Issue #55 / PR #57: UI/UX implementation-readiness **complete**.
-- Issue #58 / PR #59: implementation graph / architecture topology **complete**; `IMPLEMENTATION-GRAPH.md` is accepted execution-topology authority.
-- Issue #61 / PR #76: minimal five-reference visual freeze **complete**.
-- Issue #60 / G00: **current runtime `SERIAL_GATE`**.
-- After G00 PASS/merge: P13 / #13, P14 / #14 and G11 / #63 are the first safe parallel execution wave, subject to serialized shared package/lock merge rules.
-- Issues #13/#14/#15 remain the Responsibility L2 executable proof/freeze chain.
-- Issue #36 remains open empirical Product Discovery, deferred in current execution order.
+## Current routing checkpoint — 2026-09-01
 
-## Important authority boundaries
+人間向けの詳細statusは `CURRENT.md` のNOW/CHANGEを見ます。ここではroutingに必要な事実だけを残します。
+
+- #55 / PR #57: UI/UX implementation contract **COMPLETE**。
+- #58 / PR #59: implementation graph / architecture topology **COMPLETE**。
+- #61 / PR #76: five-reference visual freeze **COMPLETE**。
+- #60 / PR #80: G00 security baseline **PASS / merged**。current accepted `main` は `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`。
+- G00後のfirst execution waveは P13 / #13、P14 / #14、G11 / #63。
+- G11 / #63 / PR #81 はcurrent implementation frontier。ACP correction後candidateはまだE2E failureがあり **not accepted**。
+- #13/#14/#15 はResponsibility L2 executable proof/freeze chainのまま。
+- #36 Product Discoveryはopenで、implementation completionでは満たせない。
+
+## 重要な境界
 
 ### Production FK topology
 
-The current L2 candidate may reference production entities outside Responsibility-owned tables. `IMPLEMENTATION-GRAPH.md` explicitly routes such targets to production owners/order. Proof-only fixtures never satisfy production topology.
+Responsibility L2が外部production entityを参照する場合、production owner/orderは `IMPLEMENTATION-GRAPH.md` が決めます。proof-only fixtureはproduction targetになりません。
 
 ### Parallel work
 
-Worktree, Docker and database namespace isolation establish execution isolation, not merge isolation. When concurrent tasks touch shared root assets such as `package.json` / `pnpm-lock.yaml`, live graph/task contracts govern serialized merge and re-verification.
+worktree / Docker / DB namespace isolationは **execution isolation** であって **merge independence** ではありません。`package.json` / `pnpm-lock.yaml` 等のshared root assetはgraph/current task contractに従ってserial mergeします。
 
-### AI/provider authority
+### AI / provider authority
 
-A provider capability, database table, scheduled job or AI result does not by itself authorize Product behavior or accepted domain effects.
+provider capability、database table、scheduled job、AI outputが存在するだけではProduct behaviorやaccepted domain effectのauthorityになりません。
 
 ## Update lifecycle
 
-Update this map only when authority routing, a durable source location or a freshness rule changes. Do not duplicate detailed Product/domain/DAG semantics here.
+このmapを更新するのは次だけです。
 
-If a navigation artifact conflicts with owning canonical or live GitHub state, consult the owning source, surface unresolved conflicts, and repair the stale router in the same accepted workstream.
+- authorityの場所が変わった
+- question→source routingが変わった
+- freshness ruleが変わった
+
+current task statusの細部やchangelogはここに書きません。navigation artifactとcanonical/live evidenceが衝突したら、owning sourceを確認し、stale routerを同じaccepted workstreamで修復します。

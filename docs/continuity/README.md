@@ -1,79 +1,125 @@
 # Lunowa Knowledge Continuity System
 
-## Purpose and scope
+## 目的
 
-This continuity layer helps a fresh session recover the decision-relevant Lunowa project state from durable repository and GitHub sources without relying on prior chat history. It is navigation and checkpoint infrastructure, not a second product, architecture, decision, or session-history knowledge base.
+この層は、過去chatを読み直さなくても、fresh sessionや人間が **Lunowaの現在地と正しいsource of truthを短時間で復元するためのnavigation / checkpoint infrastructure** です。
 
-It preserves decision continuity, not conversation transcripts or private reasoning. This stable contract should change rarely; mutable project checkpoint information belongs in `CURRENT.md`.
+ここにProduct・Architecture・Responsibility・Issue backlogを複製しません。会話ログやprivate reasoningも保存しません。
 
-## Knowledge classes and authority boundaries
+### 人間向けの入口
 
-| Knowledge class | Role | Authority rule |
-| --- | --- | --- |
-| Canonical knowledge | Accepted product, design, domain, architecture, contract, decision, and external-fact knowledge | The artifact authoritative for the question remains normative. |
-| Navigation / checkpoint state | `AGENTS.md`, `CURRENT.md`, and `KNOWLEDGE-MAP.md` | Routes readers to authority and may summarize only what is needed to resume safely. |
-| Live execution state | GitHub Issues, PRs, reviews, labels, CI, and review queues | Query GitHub when current task/review state matters; do not maintain a duplicate backlog here. |
-| Reusable upstream baseline | `miki-thecat/software-engineering-blueprint` and local adoption metadata | `BLUEPRINT-ADOPTION.md` records local adoption/divergence; it never overrides Lunowa product/domain authority. |
-| Transient reasoning / execution context | Chats, Codex sessions, private reasoning, routine debugging | Useful context, but never the sole record of a material accepted decision or required dependency after checkpointing. |
-
-Authority is determined by the question, not by a universal total-order precedence rule. Code, schema, tests, and runtime evidence establish what actually happens; accepted canonical documentation establishes what behavior is intended. GitHub Issues state the requested change, and PR/CI evidence states live review/execution status. Current external/provider facts require their authoritative live source.
-
-## Promotion and bounded duplication
-
-Use one-way promotion:
+まず `CURRENT.md` を見ます。
 
 ```text
-transient discussion or research
-  -> classify decision-relevant change
-  -> promote it to the artifact authoritative for that question
-  -> update navigation/checkpoint only if routing or current state changed
+CURRENT.md
+  ├─ NOW     今どこまで出来ている？
+  ├─ CHANGE  前回から何が変わった？
+  ├─ MAP     大きな構造は？
+  └─ RUN     実物をどう確認する？
 ```
 
-Promote only information whose loss could materially cause a wrong decision, repeated costly research, violation of a durable constraint, incorrect dependency ordering, or loss of necessary evidence/rationale. Keep ordinary brainstorming, discarded wording, transient debugging, and recoverable conversation detail transient.
+より正確なauthority routingが必要なら `KNOWLEDGE-MAP.md`、その後にowning canonical source / live GitHub / code/tests/runtimeへ進みます。
 
-Navigation may point to authority; canonical artifacts must not depend on continuity summaries to reconstruct their meaning. Concise duplication is permitted only when it is necessary to resume safely. If changing a canonical rule routinely requires matching substantive edits here, move the detail back to the canonical artifact and leave a pointer.
+## Language policy — 人間は日本語第一、machine identifiersは維持
 
-When accepted knowledge changes, update the current normative artifact first. Record a supersession only where a future reader could otherwise repeat an old decision or misread evidence. `CURRENT.md` may note only recent, material supersessions affecting bootstrap; it is not a changelog.
+高速なAI開発で人間のmental modelが失われないことを優先します。
 
-## Freshness, updates, and conflict handling
+- `CURRENT.md`、human-facing checkpoint、Issue/PRの短いHuman Summaryは **日本語第一**。
+- code identifiers、schema/API名、stable ID（`G11`, `G20`, `P13`等）、commands、framework/library名は英語を維持。
+- technical termは必要に応じて `Evidence Foundation（証拠基盤）` のように英語名を併記し、code/searchとの対応を失わない。
+- canonical technical contractを無理に日英二重化しない。完全な二重本文はdrift・maintenance・context増加を招くため避ける。
+- 将来のnon-trivial Issue/PRは、可能なら先頭に数行の **Human Summary / 人間向け要約** を置き、「何をする / 何をしない / 今どの状態か」を日本語で理解できるようにする。
 
-- Keep `CURRENT.md` small, dated, and interpretable with repository candidate state and whether live GitHub was checked.
-- Update `KNOWLEDGE-MAP.md` when a routing or authority boundary changes.
-- Update `BLUEPRINT-ADOPTION.md` only after an applicability review changes local adoption metadata.
-- Use repository-relative paths and stable GitHub Issue/PR identifiers; do not rely on ephemeral chat links, local paths, or hidden model state.
-- Do not introduce a global status enum. Status vocabulary is scoped to the owning artifact or system.
+目的は翻訳ではなく、**machine truthからhuman mental modelを安く復元できること**です。
 
-If a navigation artifact is stale, contradictory, or incomplete: identify the question, consult `KNOWLEDGE-MAP.md`, inspect the source authoritative for that question, check live/current evidence when freshness matters, and surface any unresolved material conflict rather than guessing. Repair the stale navigation/checkpoint artifact in the same accepted change when appropriate. A checkpoint never outranks its canonical source or live GitHub state.
+## Authority boundary
+
+| Knowledge class | 役割 | Authority rule |
+| --- | --- | --- |
+| Canonical knowledge | Product / design / domain / architecture / contract / decision | owning artifactがnormative |
+| Human checkpoint / navigation | `AGENTS.md`, `CURRENT.md`, `KNOWLEDGE-MAP.md` | routeと要約だけ。canonical/live evidenceに負ける |
+| Live execution state | GitHub Issues / PRs / reviews / CI | current stateはGitHubをlive query。backlogをdocsへ複製しない |
+| Actual behavior | code / schema / tests / runtime evidence | 実際に何が起きるかを示す。intentとの差はreconcileする |
+| Reusable upstream baseline | Blueprint + `BLUEPRINT-ADOPTION.md` | Lunowa固有authorityをoverrideしない |
+| Transient context | chats / Codex sessions / routine debugging | material decisionの唯一の保存先にしない |
+
+Authorityは「どの質問に答えるか」で決まります。万能な一列のpriority orderは作りません。
+
+## Promotion rule — 必要なものだけdurableにする
+
+```text
+transient discussion / research
+  -> materialか判定
+  -> owning canonical artifactへpromotion
+  -> routing/current stateが変わった時だけCURRENT/MAPを更新
+```
+
+保存するのは、失うと次のどれかが起きる情報だけです。
+
+- materially wrongなdecision
+- costly researchのやり直し
+- durable constraint違反
+- dependency/orderの誤り
+- 必須evidence/rationaleの喪失
+
+brainstorm、捨てた案、routine debugging、recoverable chat detailは残しません。
+
+## Freshness rule
+
+- `CURRENT.md` は小さく保ち、**accepted main / implementation frontier / material blocker / RUN path** が変わった時だけreconcileする。
+- `CHANGE` はchangelogにせず、直近のmaterial deltaだけを残す。古い履歴はGit/GitHubへ任せる。
+- `KNOWLEDGE-MAP.md` はauthorityの場所やroutingが変わった時だけ更新する。
+- current Issue/PR/CIが重要なら、必ずlive GitHubを確認する。
+- navigation artifactがstaleなら、canonical/live sourceを確認して同じaccepted workstreamでrouterを修復する。
+
+### 明示的に作らないもの
+
+実利用で不足が証明されるまでは、以下を追加しません。
+
+- status database
+- knowledge graph
+- chat archive
+- duplicated Issue/PR ledger
+- 自動生成wikiを新しいauthorityにする仕組み
+- global status enum
+- continuity専用service
 
 ## Fresh-session bootstrap
 
-Use a selective bootstrap; do not load the entire repository or Blueprint by default:
+全部読まず、progressive disclosureを使います。
 
 ```text
 AGENTS.md
-  -> this README
-  -> CURRENT.md + KNOWLEDGE-MAP.md
-  -> current GitHub Issue / PR / review queue state
-  -> only the canonical sources relevant to the decision
-  -> code, tests, or runtime evidence when implementation state matters
-  -> BLUEPRINT-ADOPTION.md only when reusable-baseline drift matters
+  -> docs/continuity/CURRENT.md
+  -> docs/continuity/KNOWLEDGE-MAP.md（必要なとき）
+  -> live current Issue / PR / CI
+  -> decisionに必要なcanonical sourcesだけ
+  -> implementation stateが必要ならcode/tests/runtime
+  -> Blueprint driftがmaterialなときだけBLUEPRINT-ADOPTION.md
 ```
 
-A later bootstrap evaluation is successful only if a fresh AI context with repository/GitHub access can identify authoritative project state, unresolved material blockers, relevant canonical sources, and the correct next action without hidden memory. It should also test stale or contradictory checkpoint cases.
+成功条件は、hidden memoryなしのfresh contextでも、authoritative project state・material blocker・正しいsource・next actionを復元できることです。
 
-## Session-close or phase-checkpoint promotion
+## Session / phase checkpoint
 
-Before closing a material session or phase, ask whether any of these changed: accepted fact/evidence, durable decision, material assumption/hypothesis, consequential rejection/supersession, blocker/dependency/next decision, or canonical-document freshness. Promote the result to its proper canonical artifact first. Then update `CURRENT.md` only when checkpoint or routing information changed.
+materialなsessionやphaseの終わりに、次だけ確認します。
 
-Do not dump transcripts, create dated handoff trees, or backfill a research archive. Add automation or another knowledge system only after real usage shows recurring drift or burden that this small structure cannot address.
+- accepted fact/evidenceが変わったか
+- durable decision/assumption/hypothesisが変わったか
+- blocker/dependency/next decisionが変わったか
+- canonical sourceのfreshness/routingが変わったか
+
+まずowning artifactへ反映し、その後 `CURRENT.md` のNOW/CHANGE/MAP/RUNにmaterialな影響がある場合だけ更新します。
 
 ## Forbidden duplication
 
-The continuity layer must not become:
+continuity layerを次のものにしてはいけません。
 
-- a duplicate product, architecture, contract, or decision source of truth;
-- a manually maintained Issue/PR backlog or CI ledger;
-- a chat, session, or reasoning archive;
-- a Responsibility research/conclusion store;
-- a copied Blueprint handbook or automatic synchronization mechanism; or
-- a circular authority system in which canonical documents depend on continuity summaries.
+- duplicate Product / Architecture / contract / decision source
+- manually maintained Issue/PR/CI backlog
+- chat/session/reasoning archive
+- Responsibility conclusion store
+- copied Blueprint handbook
+- canonical docsがcontinuity summaryに依存するcircular authority
+
+迷ったら **追加するより削る / linkする / live sourceをqueryする** を優先します。

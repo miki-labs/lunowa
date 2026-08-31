@@ -24,7 +24,7 @@ Canonical direction can still contain explicit hypotheses/unknowns. Do not infer
 - Issue #58 / PR #59 completed the implementation graph / architecture activation freeze.
 - Issue #61 / PR #76 completed the minimal five-reference visual freeze; textual Product/UI authority remains normative and runtime/browser audit owns final fidelity.
 - `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues now own exact dependency/parallelization/schema-writer/FK topology.
-- **Issue #60 / G00 is the current runtime `SERIAL_GATE`.** Current repo remains `next@16.3.0`; the execution-time 2026-08-29 recheck confirms `16.3.3` as the current accepted Active-LTS security baseline for the 16.3 line.
+- **Issue #60 / G00 is the current runtime `SERIAL_GATE`.** The repo now pins `next@16.3.3` and coupled `eslint-config-next@16.3.3`; the execution-time 2026-08-31 recheck confirms `16.3.3` as the current accepted Active-LTS security baseline for the 16.3 line.
 - After G00 PASS/merge, P13 / P14 / G11 form the first safe parallel execution wave, with serialized root dependency/lockfile merge ownership.
 - Issue #36 remains open empirical Product Discovery, deferred in current execution order. Implementation cannot turn ICP/PMF/WTP/retention/reliability into facts.
 - Real Product runtime remains materially unimplemented; current application code is bootstrap foundation.

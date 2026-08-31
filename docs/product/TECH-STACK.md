@@ -55,10 +55,10 @@ accepted stack != installed capability != configured integration != implemented 
 4. Recheck volatile vendor behavior at activation/release gates.
 5. Do not infer a stable release from an unreleased repository `main` package version.
 
-Current dated evidence, 2026-08-28:
+Current dated evidence, rechecked 2026-08-31 for G00:
 
 - Node 24 remains LTS.
-- repo Next.js `16.3.0` is below the Aug-25 Active-LTS security baseline `16.3.3`; G00 patches first.
+- the official Next.js Aug-25 security release identifies `16.3.3` as the Active-LTS security baseline for the accepted 16.3 line; the public npm registry still resolves `next@16.3` and the directly coupled `eslint-config-next@16.3` to exactly `16.3.3`, and G00 pins both versions.
 - repo React/React DOM remain 19.2.7; no speculative major change is justified.
 - Better Auth changelog latest stable is `1.7.2` (2026-08-26); P14 rechecks execution-time stable.
 - PostgreSQL major 18 remains accepted.

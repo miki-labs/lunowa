@@ -1,0 +1,184 @@
+name: P14 Trusted Evidence Packaging
+
+on:
+  workflow_run:
+    workflows:
+      - P14 Auth UUID Proof
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  p14-evidence:
+    name: P14 trusted evidence packaging
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Fetch upstream proof metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          P14_UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          P14_UPSTREAM_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+        run: |
+          gh api --method GET "/repos/$GITHUB_REPOSITORY/actions/runs/$P14_UPSTREAM_RUN_ID" > "$RUNNER_TEMP/upstream-run.json"
+          gh api --method GET "/repos/$GITHUB_REPOSITORY/actions/workflows/$P14_UPSTREAM_WORKFLOW_ID" > "$RUNNER_TEMP/upstream-workflow.json"
+
+      - name: Validate upstream proof binding
+        id: binding
+        env:
+          P14_UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+
+          const expectedRepository = 'miki-labs/lunowa';
+          const expectedWorkflow = 'P14 Auth UUID Proof';
+          const expectedWorkflowPath = '.github/workflows/p14-auth-uuid-proof.yml';
+          const shaPattern = /^[0-9a-f]{40}$/;
+          const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          const run = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/upstream-run.json`, 'utf8'));
+          const workflow = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/upstream-workflow.json`, 'utf8'));
+
+          if (
+            process.env.GITHUB_REPOSITORY !== expectedRepository ||
+            event.repository?.full_name !== expectedRepository ||
+            run.repository?.full_name !== expectedRepository
+          ) {
+            throw new Error('The upstream proof is not from the expected repository.');
+          }
+          if (
+            String(run.id) !== process.env.P14_UPSTREAM_RUN_ID ||
+            run.name !== expectedWorkflow ||
+            run.event !== 'pull_request' ||
+            run.conclusion !== 'success' ||
+            workflow.name !== expectedWorkflow ||
+            workflow.path !== expectedWorkflowPath
+          ) {
+            throw new Error('The upstream run is not the expected successful pull-request proof workflow.');
+          }
+
+          const pullRequests = run.pull_requests;
+          if (!Array.isArray(pullRequests) || pullRequests.length !== 1) {
+            throw new Error('The upstream proof must bind to exactly one pull request.');
+          }
+
+          const pullRequest = pullRequests[0];
+          if (
+            !Number.isSafeInteger(pullRequest.number) ||
+            pullRequest.number < 1 ||
+            typeof pullRequest.head?.sha !== 'string' ||
+            !shaPattern.test(pullRequest.head.sha)
+          ) {
+            throw new Error('The upstream proof has an invalid pull-request head binding.');
+          }
+
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `pr_number=${pullRequest.number}\nhead_sha=${pullRequest.head.sha}\n`,
+            'utf8',
+          );
+          NODE
+
+      - name: Fetch current PR, proof definitions, and Issue 14
+        env:
+          GH_TOKEN: ${{ github.token }}
+          P14_PR_NUMBER: ${{ steps.binding.outputs.pr_number }}
+          P14_HEAD_SHA: ${{ steps.binding.outputs.head_sha }}
+          P14_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          gh api --method GET "/repos/$GITHUB_REPOSITORY/pulls/$P14_PR_NUMBER" > "$RUNNER_TEMP/current-pr.json"
+          gh api --method GET "/repos/$GITHUB_REPOSITORY/contents/.github/workflows/p14-auth-uuid-proof.yml?ref=$P14_HEAD_SHA" > "$RUNNER_TEMP/head-proof-workflow.json"
+          gh api --method GET "/repos/$GITHUB_REPOSITORY/contents/.github/workflows/p14-auth-uuid-proof.yml?ref=$P14_DEFAULT_BRANCH" > "$RUNNER_TEMP/default-proof-workflow.json"
+          gh api --method GET "/repos/$GITHUB_REPOSITORY/issues/14" > "$RUNNER_TEMP/issue-14.json"
+
+      - name: Generate trusted evidence
+        env:
+          P14_PR_NUMBER: ${{ steps.binding.outputs.pr_number }}
+          P14_HEAD_SHA: ${{ steps.binding.outputs.head_sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const expectedRepository = 'miki-labs/lunowa';
+          const expectedWorkflowPath = '.github/workflows/p14-auth-uuid-proof.yml';
+          const shaPattern = /^[0-9a-f]{40}$/;
+          const readJson = (name) => JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/${name}`, 'utf8'));
+          const decodeContent = (document, description) => {
+            if (document.encoding !== 'base64' || typeof document.content !== 'string') {
+              throw new Error(`${description} is not a base64 GitHub contents response.`);
+            }
+            return Buffer.from(document.content.replace(/\s/g, ''), 'base64');
+          };
+
+          const pullRequest = readJson('current-pr.json');
+          const headWorkflow = readJson('head-proof-workflow.json');
+          const defaultWorkflow = readJson('default-proof-workflow.json');
+          const issue = readJson('issue-14.json');
+          const pullRequestNumber = Number(process.env.P14_PR_NUMBER);
+          const headSha = process.env.P14_HEAD_SHA;
+
+          if (
+            process.env.GITHUB_REPOSITORY !== expectedRepository ||
+            !Number.isSafeInteger(pullRequestNumber) ||
+            pullRequestNumber < 1 ||
+            typeof headSha !== 'string' ||
+            !shaPattern.test(headSha) ||
+            pullRequest.number !== pullRequestNumber ||
+            pullRequest.state !== 'open' ||
+            pullRequest.head?.sha !== headSha
+          ) {
+            throw new Error('The pull request is no longer the exact head proved by the upstream run.');
+          }
+          if (
+            headWorkflow.path !== expectedWorkflowPath ||
+            defaultWorkflow.path !== expectedWorkflowPath ||
+            !decodeContent(headWorkflow, 'The PR-head proof workflow').equals(
+              decodeContent(defaultWorkflow, 'The default-branch proof workflow'),
+            )
+          ) {
+            throw new Error('The upstream proof workflow definition does not match the accepted default-branch definition.');
+          }
+          if (typeof issue.body !== 'string') {
+            throw new Error('Issue #14 body is unavailable.');
+          }
+
+          const issueContractSha256 = createHash('sha256')
+            .update(Buffer.from(issue.body, 'utf8'))
+            .digest('hex');
+          const evidence = {
+            kind: 'acp-acceptance-evidence-v1',
+            repository: expectedRepository,
+            issue: 14,
+            pullRequest: pullRequestNumber,
+            headSha,
+            issueContractSha256,
+            postgresql: '18.6',
+            acceptance: {
+              '47': 'PASS',
+              '48': 'PASS',
+              '49': 'PASS',
+            },
+            statement: 'This is prerequisite evidence, not an independent-review PASS.',
+          };
+
+          writeFileSync(
+            `${process.env.RUNNER_TEMP}/p14-auth-uuid-evidence.json`,
+            `${JSON.stringify(evidence, null, 2)}\n`,
+            'utf8',
+          );
+          NODE
+
+      - name: Upload trusted evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: p14-auth-uuid-evidence-${{ github.event.workflow_run.id }}
+          path: ${{ runner.temp }}/p14-auth-uuid-evidence.json
+          if-no-files-found: error

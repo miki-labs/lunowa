@@ -1,0 +1,69 @@
+name: P14 Auth UUID Proof
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/p14-auth-uuid-proof.yml"
+      - ".github/workflows/p14-auth-uuid-evidence.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "proofs/better-auth-uuid/**"
+      - "tests/better-auth-uuid*.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  p14-proof:
+    name: P14 PostgreSQL 18.6 proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: lunowa_issue_14
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55414:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lunowa_issue_14"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.20.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate and verify committed schema artifacts
+        run: |
+          pnpm proof:auth-uuid:schema
+          git diff --exit-code -- proofs/better-auth-uuid
+          test -z "$(git ls-files --others --exclude-standard -- proofs/better-auth-uuid)"
+
+      - name: Run P14 acceptance 47-49
+        env:
+          P14_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55414/lunowa_issue_14
+        run: pnpm test:auth-uuid

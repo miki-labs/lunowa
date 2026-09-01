@@ -1,0 +1,55 @@
+{
+  "track": "P14 Better Auth UUID persistence proof",
+  "candidateBase": "bc46ac5e6c9707f8d4571d56d9760e5f964a6f0e",
+  "runtimeNamespace": {
+    "dockerComposeProject": "lunowa-issue-14",
+    "postgresDatabase": "lunowa_issue_14",
+    "hostPort": 55414
+  },
+  "toolVersions": {
+    "betterAuth": "1.7.2",
+    "drizzleOrm": "0.45.2",
+    "drizzleKit": "0.31.10",
+    "postgresDriver": "pg 8.23.0",
+    "postgresRequired": "18.6"
+  },
+  "configuration": {
+    "betterAuthAdvancedDatabaseGenerateId": "uuid",
+    "idGeneration": "PostgreSQL gen_random_uuid() database defaults",
+    "productionAuthActivated": false,
+    "oauthOrMailboxCredentialsUsed": false
+  },
+  "generatedSchemaEvidence": {
+    "sql": "proofs/better-auth-uuid/drizzle/0000_dear_felicia_hardy.sql",
+    "expectedUserIdType": "uuid",
+    "expectedForeignKeyType": "uuid"
+  },
+  "accountSemantics": {
+    "localProviderId": "credential",
+    "localIssuer": "local:credential",
+    "localAccountId": "user.id",
+    "identitySelector": ["issuer", "accountId"],
+    "externalOAuthLinking": "NOT_RUN: deliberately excluded because credentials are forbidden"
+  },
+  "acceptance": {
+    "47": {
+      "status": "NOT_RUN",
+      "test": "tests/better-auth-uuid.node.test.ts",
+      "requiredEvidence": "PostgreSQL 18 catalog user.id = uuid after Better Auth sign-up"
+    },
+    "48": {
+      "status": "NOT_RUN",
+      "test": "tests/better-auth-uuid.node.test.ts",
+      "requiredEvidence": "Better Auth local credential account/session plus domain UUID FK roundtrip"
+    },
+    "49": {
+      "status": "NOT_RUN",
+      "test": "tests/better-auth-uuid.node.test.ts",
+      "requiredEvidence": "Generated SQL and PostgreSQL catalog retain UUID IDs/FKs"
+    }
+  },
+  "localExecution": {
+    "staticSchemaTests": "PASS",
+    "realPostgreSQL18": "NOT_RUN: Docker and a PostgreSQL 18 server are unavailable in this workspace"
+  }
+}

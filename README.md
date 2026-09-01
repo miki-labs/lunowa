@@ -61,9 +61,9 @@ Current COREにはauthorized exact Source searchとattachment evidence accessも
 | Productの最高位contract | [`docs/product/PRODUCT.md`](docs/product/PRODUCT.md) |
 | v1の詳細behavior / Feature Matrix | [`docs/product/PRODUCT-CONTENT.md`](docs/product/PRODUCT-CONTENT.md) |
 | end-to-end acceptance | [`docs/product/GOLDEN-SCENARIO-BANK.md`](docs/product/GOLDEN-SCENARIO-BANK.md) |
-| UI/UX | [`docs/design/`](docs/design/) + `V1-UI-IMPLEMENTATION-CONTRACT.md` |
+| UI/UX | [`docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md`](docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md) + [`docs/design/`](docs/design/) |
 | Responsibility semantics | [`docs/product/responsibility/`](docs/product/responsibility/) |
-| architecture / data / contracts | `ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` |
+| architecture / data / module contracts | [`ARCHITECTURE.md`](docs/product/ARCHITECTURE.md) / [`DATA-MODEL.md`](docs/product/DATA-MODEL.md) / [`CONTRACTS.md`](docs/product/CONTRACTS.md) |
 | exact implementation DAG | [`docs/product/IMPLEMENTATION-GRAPH.md`](docs/product/IMPLEMENTATION-GRAPH.md) + live Issues |
 | current candidate / review / CI | live GitHub PR / reviews / checks |
 | 実際のbehavior | code / schema / tests / runtime evidence |

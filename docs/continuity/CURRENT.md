@@ -4,6 +4,13 @@
 >
 > これは Product / Design / Responsibility / Architecture / Issue contract の authority ではありません。正確さが重要なときは、リンク先の canonical source と live GitHub state を確認してください。
 
+## Checkpoint metadata
+
+- Last reconciled: **2026-09-01**
+- Accepted `main` at reconcile: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`
+- Live GitHub Issue / PR / CI checked: **yes**
+- Mutable snapshot: current PR/CI stateは変わり得るため、action/review時はlive GitHubを再確認する
+
 ## 0. 読み方
 
 このファイルは **NOW / CHANGE / MAP / RUN** の4つだけを扱います。

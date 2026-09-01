@@ -1,0 +1,152 @@
+name: Issue 89 ChatGPT Frontend Refactor
+
+on:
+  push:
+    branches:
+      - chatgpt/issue-89-shell-read-model-boundary
+    paths:
+      - ".github/workflows/issue-89-chatgpt-refactor.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chatgpt/issue-89-shell-read-model-boundary
+          fetch-depth: 1
+
+      - name: Extract accepted G11 shell model
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          shell_path = Path('src/components/lunowa-shell.tsx')
+          model_path = Path('src/components/lunowa-shell-model.ts')
+          test_path = Path('tests/lunowa-shell-model.test.ts')
+          workflow_path = Path('.github/workflows/issue-89-chatgpt-refactor.yml')
+
+          source = shell_path.read_text(encoding='utf-8')
+          start_marker = 'export type AppSession ='
+          end_marker = "type Surface = 'home'"
+
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('Refactor markers are not unique; refusing to edit.')
+
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          model_block = source[start:end].rstrip()
+
+          required_fragments = [
+              "export type ShellFixture = {",
+              "export const shellFixtures: readonly ShellFixture[] = [",
+              "id: 'normal'",
+              "id: 'zero'",
+              "id: 'session-expired'",
+          ]
+          for fragment in required_fragments:
+              if fragment not in model_block:
+                  raise SystemExit(f'Missing expected model fragment: {fragment}')
+
+          replacement = """import {
+            shellFixtures,
+            type CommonMutationTarget,
+            type MutationState,
+            type SendLifecycle,
+            type ShellFixture
+          } from './lunowa-shell-model';
+
+          export * from './lunowa-shell-model';
+
+          """
+
+          new_source = source[:start] + replacement + source[end:]
+          if new_source.count('export type AppSession =') != 0:
+              raise SystemExit('Presentation component still owns AppSession type.')
+          if new_source.count('export const shellFixtures') != 0:
+              raise SystemExit('Presentation component still owns shellFixtures.')
+
+          model_path.write_text(
+              "// G11 presentation/read-model fixture contract. This module owns no provider or domain authority.\n\n"
+              + model_block
+              + "\n",
+              encoding='utf-8',
+          )
+          shell_path.write_text(new_source, encoding='utf-8')
+          test_path.write_text(
+              """import {describe, expect, it} from 'vitest';
+          import {shellFixtures} from '@/components/lunowa-shell-model';
+
+          describe('G11 shell read-model contract', () => {
+            it('is independently importable and preserves the accepted fixture set', () => {
+              expect(shellFixtures).toHaveLength(15);
+              expect(shellFixtures.map(({id}) => id)).toEqual([
+                'normal',
+                'zero',
+                'not-delegated',
+                'stopped',
+                'loading',
+                'partial',
+                'degraded',
+                'mutation-pending',
+                'mutation-confirmed',
+                'mutation-failed',
+                'send-pending',
+                'send-failed',
+                'send-ambiguous',
+                'send-reconciling',
+                'session-expired'
+              ]);
+            });
+
+            it('keeps the accepted cross-cutting axes distinct', () => {
+              expect(shellFixtures.find(({id}) => id === 'zero')).toMatchObject({
+                sourceReadiness: 'ready',
+                integrity: 'healthy',
+                monitoringPosture: 'active',
+                hasNeedsYou: false,
+                hasReview: false
+              });
+              expect(shellFixtures.find(({id}) => id === 'partial')).toMatchObject({
+                sourceReadiness: 'partial',
+                sourceRead: 'partially_available'
+              });
+              expect(shellFixtures.find(({id}) => id === 'not-delegated')).toMatchObject({
+                monitoringPosture: 'not_delegated',
+                integrity: 'healthy'
+              });
+              expect(shellFixtures.find(({id}) => id === 'send-ambiguous')).toMatchObject({
+                mutation: 'idle',
+                send: 'provider_ambiguous'
+              });
+            });
+          });
+          """,
+              encoding='utf-8',
+          )
+
+          workflow_path.unlink()
+          PY
+
+      - name: Verify bounded diff
+        run: |
+          git diff --check
+          test ! -e .github/workflows/issue-89-chatgpt-refactor.yml
+          test -e src/components/lunowa-shell-model.ts
+          test -e tests/lunowa-shell-model.test.ts
+          ! grep -q "export type AppSession" src/components/lunowa-shell.tsx
+          ! grep -q "export const shellFixtures" src/components/lunowa-shell.tsx
+          git diff -- src/components/lunowa-shell.tsx src/components/lunowa-shell-model.ts tests/lunowa-shell-model.test.ts
+
+      - name: Commit refactor
+        run: |
+          git config user.name "chatgpt-frontend-builder"
+          git config user.email "chatgpt-frontend-builder@users.noreply.github.com"
+          git add -A
+          git commit -m "Refactor G11 shell read-model boundary (#89)"
+          git push origin HEAD:chatgpt/issue-89-shell-read-model-boundary

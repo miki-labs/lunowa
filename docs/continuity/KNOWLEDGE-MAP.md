@@ -1,6 +1,8 @@
 # Knowledge Map — 何をどこで確認するか
 
-このmapは **質問を正しいauthorityへrouteするためのnavigation** です。ここにProduct/domain/implementation truthを複製しません。
+このmapは **質問を正しいauthorityへrouteするためのnavigation** です。ここにProduct/domain/implementation truthやcurrent task statusを複製しません。
+
+current main / implementation frontier / blocker / current PR・CIは `CURRENT.md` にだけ置きます。
 
 ## Question → Authority
 
@@ -10,7 +12,7 @@
 | v1の詳細behavior / scope / failure / Feature Matrix | `docs/product/PRODUCT-CONTENT.md` | `PRODUCT.md`, design, Responsibility | Product behavior変更時に再読 |
 | end-to-endで何が成立すればよいか | `docs/product/GOLDEN-SCENARIO-BANK.md` | Responsibility oracles | semantic truth conflictではResponsibility authorityを確認 |
 | UI/UXのcanonical behavior | `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` | `V1-UI-IMPLEMENTATION-CONTRACT.md` | runtime UIはrendered/browser evidenceも確認 |
-| v1 UI implementation contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | design trio + Golden Scenarios | #55/#57は完了済み。current taskとして扱わない |
+| v1 UI implementation contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | design trio + Golden Scenarios | accepted contract。current task statusはlive Issue/PRで確認 |
 | visual direction | `docs/design/references/README.md` + five active references | textual Product/UI authority | imageはtextual semanticsをoverrideしない |
 | Responsibility semantics / eval / persistence proof | `docs/product/responsibility/` | ADR 0008/0009, executable evidence | static review != executable proof |
 | architecture / data / module contract | `ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` | ADRs, implementation evidence | executable evidenceでstale intentが判明したらreconcile |
@@ -21,23 +23,10 @@
 | candidate / review / CI | live GitHub PR / reviews / checks | current Issue | exact-head evidence。review-ready != PASS |
 | 実際のruntime behavior | code / schema / migrations / tests / deployed evidence | intended canonical behavior | mismatchはreconcile。summaryで隠さない |
 | 人間向け現在地 | `docs/continuity/CURRENT.md` | canonical + live GitHub | mutable summary。常にcanonical/live sourceに負ける |
-| Product Discovery | Issue #36 + protected/public evidence | Product authorities | implementation progressでは代替不可 |
+| Product Discovery | current Product Discovery Issue | Product authorities + protected/public evidence | implementation progressでは代替不可 |
 | durable rationale | `docs/decisions/` の該当ADR | current canonical docs/history | supersessionがmaterialなら記録 |
 | external/provider current fact | authoritative primary source | dated local evidence | freshnessがmaterialならlive recheck |
 | reusable engineering baseline | upstream Blueprint + `BLUEPRINT-ADOPTION.md` | local docs | Lunowa Product/domain authorityが優先 |
-
-## Current routing checkpoint — 2026-09-01
-
-人間向けの詳細statusは `CURRENT.md` のNOW/CHANGEを見ます。ここではroutingに必要な事実だけを残します。
-
-- #55 / PR #57: UI/UX implementation contract **COMPLETE**。
-- #58 / PR #59: implementation graph / architecture topology **COMPLETE**。
-- #61 / PR #76: five-reference visual freeze **COMPLETE**。
-- #60 / PR #80: G00 security baseline **PASS / merged**。current accepted `main` は `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`。
-- G00後のfirst execution waveは P13 / #13、P14 / #14、G11 / #63。
-- G11 / #63 / PR #81 はcurrent implementation frontier。ACP correction後candidateはまだE2E failureがあり **not accepted**。
-- #13/#14/#15 はResponsibility L2 executable proof/freeze chainのまま。
-- #36 Product Discoveryはopenで、implementation completionでは満たせない。
 
 ## 重要な境界
 

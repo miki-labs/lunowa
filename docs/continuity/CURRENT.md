@@ -7,7 +7,8 @@
 ## Checkpoint metadata
 
 - Last reconciled: **2026-09-01**
-- Accepted `main` at reconcile: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`
+- Last accepted **runtime-capability baseline** at reconcile: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`（G00）
+- Current `main` SHA: **live GitHubで確認**。このmutable document自身のmergeで即staleになるため固定しない
 - Live GitHub Issue / PR / CI checked: **yes**
 - Mutable snapshot: current PR/CI stateは変わり得るため、action/review時はlive GitHubを再確認する
 
@@ -34,11 +35,12 @@ Lunowaは、メール中心の **Attention Delegation / Open-loop Monitoring Off
 
 現在のv1目標は、広いメールクライアント機能ではなく、**Gmail 1 providerで Minimum Complete Delegation Loop を一本完成させること**です。
 
-### Current accepted `main`
+### Accepted runtime-capability baseline
 
-- `main`: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`
-- 直近accepted change: **G00 / Issue #60 — Next.js security baseline 16.3.3**
-- `main`上では、Better Auth production auth、PostgreSQL/Drizzle production persistence、Gmail integration、Trigger.dev runtime、OpenAI runtimeはまだ未activateです。
+- 最後にProduct/runtime capability boundaryを進めたaccepted baseline: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`
+- そのchange: **G00 / Issue #60 — Next.js security baseline 16.3.3**
+- 現在の`main` SHA自体はlive GitHubで確認します。docs-only change等までここへ逐次複製しません。
+- このbaseline上では、Better Auth production auth、PostgreSQL/Drizzle production persistence、Gmail integration、Trigger.dev runtime、OpenAI runtimeはまだ未activateです。
 
 ### Capability status
 
@@ -95,7 +97,7 @@ PR #81 はACP correction後に HEAD `b2eb1d67667905e05087c9745d1850bd59d4d575` �
 
 - **G00 / Issue #60 / PR #80** がPASS/merge。
   - Next.js / `eslint-config-next` を accepted 16.3 lineのsecurity baseline **16.3.3** に更新。
-  - current accepted `main` は `a6c07763...`。
+  - last accepted runtime-capability baselineは `a6c07763...`。
 
 ### In progress
 
@@ -207,7 +209,7 @@ Hosted previewが人間のProduct把握に継続的な価値を持つことが�
 
 このファイルは毎commit更新しません。次のどれかが起きたときだけreconcileします。
 
-- accepted `main` がProduct capability boundaryを進めた
+- accepted Product/runtime capability boundaryを進めた
 - current implementation frontier / blocker / next gateがmaterialに変わった
 - 人間向けMAPの大きな境界が変わった
 - 実物を確認するRUN pathが変わった

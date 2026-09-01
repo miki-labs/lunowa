@@ -17,6 +17,8 @@ MAP     何がどこにある？
 RUN     実物をどう確認する？
 ```
 
+**current main / implementation frontier / blocker / current PR・CIは `CURRENT.md` だけに集約**します。このREADMEにはmutable statusを複製しません。
+
 現在地のsummaryはauthorityではありません。正確さが必要な場合は、そこからcanonical docs / live GitHub Issue・PR・CI / code・testsへ辿ります。
 
 ## 現在のv1目標
@@ -51,16 +53,6 @@ Current COREにはauthorized exact Source searchとattachment evidence accessも
 - natural-language Search
 - autonomous Send
 - generic workflow / rule engine
-
-## 現在の実装状態
-
-Current accepted `main` は `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`（G00 / Next.js 16.3.3 security baseline）。
-
-現在のimplementation frontierは **G11 / Issue #63 / PR #81 — UI Foundation** です。最初のstructural UI candidateとACP correctionは作成済みですが、current corrected candidateは `Verify` PASS / `E2E Smoke` FAILのため、**まだaccepted mainには入っていません**。
-
-Better Auth production auth、PostgreSQL/Drizzle production persistence、real Gmail integration、Responsibility reducer/Temporal monitoring、real Send、OpenAI runtime、complete delegation loopはまだ未実装です。
-
-より正確なstatus matrixとcurrent blockerは [`CURRENT.md`](docs/continuity/CURRENT.md) を確認してください。
 
 ## Source of truth
 

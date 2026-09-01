@@ -8,7 +8,7 @@
 
 - Last reconciled: **2026-09-01**
 - Last accepted **runtime-capability baseline** at reconcile: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`（G00）
-- Current `main` SHA: **live GitHubで確認**。このmutable document自身のmergeで即staleになるため固定しない
+- Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
 - Live GitHub Issue / PR / CI checked: **yes**
 - Mutable snapshot: current PR/CI stateは変わり得るため、action/review時はlive GitHubを再確認する
 
@@ -81,9 +81,13 @@ PR #81 はACP correction後に HEAD `b2eb1d67667905e05087c9745d1850bd59d4d575` �
 
 - `Verify`: **PASS**
 - `E2E Smoke`: **FAIL**
-- current browser blockers:
-  1. `<720px` のresponsive oracleで grid column countが期待 `1` に対して `4`
-  2. reflow testで compact navigation pathが考慮されず `会話を表示` button待ちでtimeout
+- current-head full acceptance audit: **FAIL**
+- Issue #63: **`agent:ready`**（次のbounded correction待ち）
+- current material blockers:
+  1. responsive E2E oracle/pathの2 defects（`<720px`でblock layoutをgrid-column countで判定、720pxでdrawerを開かずhidden navを操作）
+  2. 125% / 150% / 200% **zoom/text scaling**を実測しておらず、viewport幅変更だけではcontractを満たさない
+  3. compact conversation entryの一部でBack後のfocus return先が実在せず、meaningful place / focus-return contract未達
+  4. runtime audit record自身が未実行と明記しており、desktop + compact/mobileの**実際のvisual audit**がまだ完了していない
 
 したがって **G11はまだPASS/mergeしていません**。PR #81のcorrected candidateをaccepted capabilityとして扱わないでください。
 
@@ -98,13 +102,15 @@ PR #81 はACP correction後に HEAD `b2eb1d67667905e05087c9745d1850bd59d4d575` �
 - **G00 / Issue #60 / PR #80** がPASS/merge。
   - Next.js / `eslint-config-next` を accepted 16.3 lineのsecurity baseline **16.3.3** に更新。
   - last accepted runtime-capability baselineは `a6c07763...`。
+- **Issue #82 / PR #83** で日本語第一のHuman Comprehension Layerをdocs-onlyで導入。Product/runtime capability自体は変えていない。
 
 ### In progress
 
 - **G11 / Issue #63 / PR #81** が最初のstructural Product UI candidateを作成。
 - 最初のfull acceptance auditは7 material blockersでFAIL。
 - ACPのbounded correction pathが実戦で動き、同じPR #81へ correction commit `b2eb1d676...` をpublish。
-- correction後のCIでは `Verify` PASS、`E2E Smoke` FAIL。したがって再correction / fresh acceptanceが必要。
+- correctionで旧7 blockersの多くは改善したが、exact-head E2EはまだFAIL。
+- current-head full acceptance auditで残る4 material blockersを一括記録し、Issue #63を再び`agent:ready`へ戻した。次は1回のbounded correctionでまとめて直す。
 
 ### Still not real
 

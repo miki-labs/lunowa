@@ -8,14 +8,14 @@ current main / implementation frontier / blocker / current PR・CIは `CURRENT.m
 
 | 知りたいこと | Primary authority | Secondary / context | Freshness rule |
 | --- | --- | --- | --- |
-| Lunowaは何を解決するProductか / v1 direction / hypothesis | `docs/product/PRODUCT.md` | `PRODUCT-CONTENT.md`, current Product Issue | hypothesisとempirical validationを混同しない |
-| v1の詳細behavior / scope / failure / Feature Matrix | `docs/product/PRODUCT-CONTENT.md` | `PRODUCT.md`, design, Responsibility | Product behavior変更時に再読 |
+| Lunowaは何を解決するProductか / v1 direction / hypothesis | `docs/product/PRODUCT.md` | `docs/product/PRODUCT-CONTENT.md`, current Product Issue | hypothesisとempirical validationを混同しない |
+| v1の詳細behavior / scope / failure / Feature Matrix | `docs/product/PRODUCT-CONTENT.md` | `docs/product/PRODUCT.md`, design, Responsibility | Product behavior変更時に再読 |
 | end-to-endで何が成立すればよいか | `docs/product/GOLDEN-SCENARIO-BANK.md` | Responsibility oracles | semantic truth conflictではResponsibility authorityを確認 |
-| UI/UXのcanonical behavior | `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md` | `V1-UI-IMPLEMENTATION-CONTRACT.md` | runtime UIはrendered/browser evidenceも確認 |
+| UI/UXのcanonical behavior | `docs/design/DESIGN.md`, `docs/design/INTERACTIONS.md`, `docs/design/RESPONSIVE.md` | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | runtime UIはrendered/browser evidenceも確認 |
 | v1 UI implementation contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | design trio + Golden Scenarios | accepted contract。current task statusはlive Issue/PRで確認 |
 | visual direction | `docs/design/references/README.md` + five active references | textual Product/UI authority | imageはtextual semanticsをoverrideしない |
 | Responsibility semantics / eval / persistence proof | `docs/product/responsibility/` | ADR 0008/0009, executable evidence | static review != executable proof |
-| architecture / data / module contract | `ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` | ADRs, implementation evidence | executable evidenceでstale intentが判明したらreconcile |
+| architecture / data / module contract | `docs/product/ARCHITECTURE.md`, `docs/product/DATA-MODEL.md`, `docs/product/CONTRACTS.md` | ADRs, implementation evidence | executable evidenceでstale intentが判明したらreconcile |
 | accepted technology / hosting choice | `docs/product/TECH-STACK.md` | official vendor docs | volatile factsはactivation時に再確認 |
 | high-level implementation sequence | `docs/product/IMPLEMENTATION-PLAN.md` | `CURRENT.md` | overviewのみ |
 | exact dependency / parallelization / writer / FK topology | `docs/product/IMPLEMENTATION-GRAPH.md` | live implementation Issues | graph + current task contract + current evidenceで判断 |
@@ -32,7 +32,7 @@ current main / implementation frontier / blocker / current PR・CIは `CURRENT.m
 
 ### Production FK topology
 
-Responsibility L2が外部production entityを参照する場合、production owner/orderは `IMPLEMENTATION-GRAPH.md` が決めます。proof-only fixtureはproduction targetになりません。
+Responsibility L2が外部production entityを参照する場合、production owner/orderは `docs/product/IMPLEMENTATION-GRAPH.md` が決めます。proof-only fixtureはproduction targetになりません。
 
 ### Parallel work
 

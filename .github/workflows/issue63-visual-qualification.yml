@@ -1,0 +1,73 @@
+name: Issue 63 exact-head visual qualification
+
+on:
+  push:
+    branches:
+      - qualification/issue63-visual-2025284a
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 2025284a2d5af39afaa34e611fba6910c42f510c
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bind exact candidate
+        run: test "$(git rev-parse HEAD)" = "2025284a2d5af39afaa34e611fba6910c42f510c"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@11.20.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build application
+        run: pnpm build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Capture representative runtime states
+        shell: bash
+        run: |
+          pnpm start > /tmp/lunowa-next.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/ja >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/ja >/dev/null
+          mkdir -p visual-audit
+          node --input-type=module <<'EOF'
+          import {chromium} from '@playwright/test';
+          const browser = await chromium.launch();
+          try {
+            const desktop = await browser.newPage({viewport: {width: 1600, height: 1000}, deviceScaleFactor: 1});
+            await desktop.goto('http://127.0.0.1:3000/ja', {waitUntil: 'networkidle'});
+            await desktop.screenshot({path: 'visual-audit/desktop-home-1600.png', fullPage: true});
+            await desktop.getByRole('button', {name: '対応が必要を表示'}).click();
+            await desktop.screenshot({path: 'visual-audit/desktop-needs-you-1600.png', fullPage: true});
+
+            const compact = await browser.newPage({viewport: {width: 390, height: 844}, deviceScaleFactor: 1});
+            await compact.goto('http://127.0.0.1:3000/ja', {waitUntil: 'networkidle'});
+            await compact.screenshot({path: 'visual-audit/compact-home-390.png', fullPage: true});
+            await compact.getByRole('button', {name: 'ナビゲーションを開く'}).click();
+            await compact.getByRole('button', {name: '対応が必要を表示'}).click();
+            await compact.screenshot({path: 'visual-audit/compact-needs-you-390.png', fullPage: true});
+          } finally {
+            await browser.close();
+          }
+          EOF
+      - name: Upload visual audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue63-visual-audit-2025284a
+          path: visual-audit/*.png
+          if-no-files-found: error
+          retention-days: 7

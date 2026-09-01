@@ -53,6 +53,8 @@ jobs:
             await desktop.screenshot({path: 'visual-audit/desktop-home-1600.png', fullPage: true});
             await desktop.getByRole('button', {name: '対応が必要を表示'}).click();
             await desktop.screenshot({path: 'visual-audit/desktop-needs-you-1600.png', fullPage: true});
+            await desktop.getByRole('button', {name: /見積書を確認して返信する/}).click();
+            await desktop.screenshot({path: 'visual-audit/desktop-moment-1600.png', fullPage: true});
 
             const compact = await browser.newPage({viewport: {width: 390, height: 844}, deviceScaleFactor: 1});
             await compact.goto('http://127.0.0.1:3000/ja', {waitUntil: 'networkidle'});
@@ -60,6 +62,8 @@ jobs:
             await compact.getByRole('button', {name: 'ナビゲーションを開く'}).click();
             await compact.getByRole('button', {name: '対応が必要を表示'}).click();
             await compact.screenshot({path: 'visual-audit/compact-needs-you-390.png', fullPage: true});
+            await compact.getByRole('button', {name: /見積書を確認して返信する/}).click();
+            await compact.screenshot({path: 'visual-audit/compact-moment-390.png', fullPage: true});
           } finally {
             await browser.close();
           }
@@ -68,7 +72,7 @@ jobs:
       - name: Upload visual audit evidence
         uses: actions/upload-artifact@v4
         with:
-          name: issue63-visual-audit-with-references-2025284a
+          name: issue63-visual-audit-complete-2025284a
           path: visual-audit/*.png
           if-no-files-found: error
           retention-days: 7

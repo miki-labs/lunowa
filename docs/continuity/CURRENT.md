@@ -1,208 +1,219 @@
-# Current Project Checkpoint
+# Lunowa 現在地 — Human Checkpoint
 
-This is a compact mutable bootstrap/router, not Product/design/domain/architecture/research authority. Query owning canonical artifacts and live GitHub state when precision matters.
+> **目的:** 5分以内に「今どこまで実装され、何がまだ本物ではなく、次に何を確認すべきか」を復元するための人間向け入口。
+>
+> これは Product / Design / Responsibility / Architecture / Issue contract の authority ではありません。正確さが重要なときは、リンク先の canonical source と live GitHub state を確認してください。
 
-## Metadata
+## Checkpoint metadata
 
-- Last reconciled: `2026-08-29`
-- Current accepted `main`: `9f7209928578c8b84a09649ea8112b4c6c2a8c9f` or later accepted main
-- Highest-level Product: `docs/product/PRODUCT.md`
-- Detailed Product scope: `docs/product/PRODUCT-CONTENT.md`
-- Product acceptance: `docs/product/GOLDEN-SCENARIO-BANK.md`
-- UI implementation authority: `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` + canonical design trio
-- Responsibility authority: `docs/product/responsibility/`
-- High-level execution: `docs/product/IMPLEMENTATION-PLAN.md`
-- Exact dependency/parallelization authority: `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues
-- Current live runtime gate: GitHub Issue #60 / `G00`
+- Last reconciled: **2026-09-01**
+- Last accepted **runtime-capability baseline** at reconcile: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`（G00）
+- Current `main` SHA: **live GitHubで確認**。このmutable document自身のmergeで即staleになるため固定しない
+- Live GitHub Issue / PR / CI checked: **yes**
+- Mutable snapshot: current PR/CI stateは変わり得るため、action/review時はlive GitHubを再確認する
 
-## Product direction
+## 0. 読み方
 
-Lunowa remains an email-centered **Attention Delegation / Open-loop Monitoring Offload** Product.
+このファイルは **NOW / CHANGE / MAP / RUN** の4つだけを扱います。
 
-> 必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。
+- **NOW** — 今、実際にどこまで出来ているか
+- **CHANGE** — 前回の人間向けcheckpointから何が変わったか
+- **MAP** — 実装の大きな構造と、詳細を読む場所
+- **RUN** — 実物・tests・CIをどう確認するか
 
-v1 remains a one-provider **Minimum Complete Delegation Loop**, not broad provider/full-client parity.
+人間向け説明は **日本語第一**、コード・stable ID・API・技術用語は検索性を保つため **英語名を併記/維持**します。
 
-Implementation does not establish ICP, PMF, WTP, retention or real monitoring relinquishment.
+---
 
-## Completed specification/design gates
+## NOW — 今どこまで出来ている？
 
-- Product Content / Golden Scenarios: complete enough for the current implementation hypothesis.
-- Issue #55 / PR #57: implementation-facing UI/UX contract **COMPLETE** after full cumulative audit + exact-head Verify/E2E.
-- Issue #58 / PR #59: implementation graph / architecture activation topology **COMPLETE** after repeated full cumulative audit + exact-head CI.
-- Issue #61 / PR #76: minimal canonical visual-reference freeze **COMPLETE**; five active references are canonical visual guidance and textual authority still wins.
-- Current accepted main after PR #76: `9f7209928578c8b84a09649ea8112b4c6c2a8c9f`.
-- Runtime remains bootstrap-level; frozen contracts != implemented Product.
+### Productの一言
 
-## Current runtime gate — G00 / Issue #60
+Lunowaは、メール中心の **Attention Delegation / Open-loop Monitoring Offload** Productです。
 
-G00 is the first runtime `SERIAL_GATE` after the graph/visual freezes.
+> **必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。**
 
-Current repo still pins:
+現在のv1目標は、広いメールクライアント機能ではなく、**Gmail 1 providerで Minimum Complete Delegation Loop を一本完成させること**です。
 
-```text
-next                16.3.0
-eslint-config-next  16.3.0
-```
+### Accepted runtime-capability baseline
 
-Execution-time evidence was rechecked on `2026-08-29`:
+- 最後にProduct/runtime capability boundaryを進めたaccepted baseline: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`
+- そのchange: **G00 / Issue #60 — Next.js security baseline 16.3.3**
+- 現在の`main` SHA自体はlive GitHubで確認します。docs-only change等までここへ逐次複製しません。
+- このbaseline上では、Better Auth production auth、PostgreSQL/Drizzle production persistence、Gmail integration、Trigger.dev runtime、OpenAI runtimeはまだ未activateです。
 
-- Next.js official August 25, 2026 security release identifies `16.3.3` as the current Active LTS security baseline for the accepted 16.3 line;
-- official `v16.3.3` fixes two Critical unauthenticated RCE advisories (`GHSA-p293-qw3h-jr36` and `GHSA-2xp9-vwfh-vxw4`);
-- npm currently exposes `16.3.3` as the `latest` stable tag; 16.4 is pre-release/canary at this checkpoint.
+### Capability status
 
-Therefore G00 remains a narrow security patch to `16.3.3`, with directly coupled `eslint-config-next` / lock resolution only as required. No framework-major/minor migration or unrelated dependency sweep is justified by current evidence.
+`Specified` は仕様があること、`Structural` はfake/fixtureを含む構造実装、`Real` は本物のprovider/database/runtime接続、`Verified` はcurrent exact candidateで必要なacceptance evidenceが通ったことを表します。
 
-G00 acceptance remains:
+| Capability | Specified | Structural | Real | Verified | 現在の意味 |
+| --- | --- | --- | --- | --- | --- |
+| UI Foundation / G11 | ✅ | 🟡 PR #81 | — | ❌ | shell・responsive・IME/accessibility harnessを実装中。まだaccepted mainではない |
+| App Auth / G10 | ✅ | ❌ | ❌ | ❌ | P14 #14のUUID proof待ち |
+| Evidence Foundation / G19 | ✅ | ❌ | ❌ | ❌ | P13 #13 + G10待ち |
+| Gmail Sync / G20 | ✅ | ❌ | ❌ | ❌ | real Gmail OAuth/watch/history未実装 |
+| Source / Search / G21 | ✅ | ❌ | ❌ | ❌ | real Source/search未実装 |
+| Responsibility Persistence / G30 | ✅ | ❌ | ❌ | ❌ | P15 freeze + G19待ち |
+| Responsibility Reducer / G31 | ✅ | ❌ | ❌ | ❌ | deterministic accepted-state runtime未実装 |
+| Attention / Temporal / G32 | ✅ | ❌ | ❌ | ❌ | durable reconsideration未実装 |
+| Product Surfaces / G40 | ✅ | ❌ | ❌ | ❌ | real state接続前 |
+| Draft / Send Request / G50 | ✅ | ❌ | ❌ | ❌ | contextual Draft/Send request未実装 |
+| Gmail Send / G51 | ✅ | ❌ | ❌ | ❌ | provider dispatch/reconciliation未実装 |
+| Integrity / Recovery / G60 | ✅ | ❌ | ❌ | ❌ | reconnect/degraded recovery未実装 |
+| Bounded AI / G70 | ✅ | ❌ | ❌ | ❌ | model runtime未実装 |
+| Complete Loop / G80 | ✅ | ❌ | ❌ | ❌ | vertical loop未完成 |
 
-```text
-latest accepted main
--> narrow Next.js security patch
--> clean pnpm install --frozen-lockfile
--> pnpm verify
--> Playwright E2E smoke
--> exact-head GitHub CI
--> full cumulative acceptance audit
--> merge only on PASS
-```
-
-Do not launch the first write-heavy production fanout before G00 PASS/merge.
-
-## First execution wave after G00
-
-The first safe parallel execution wave is:
+**重要:** `仕様がある` / `packageが入っている` / `fixtureが動く` / `本番capabilityがある` は別です。
 
 ```text
-P13 / Issue #13  Responsibility PostgreSQL/Drizzle executable proof
-P14 / Issue #14  Better Auth UUID persistence proof
-G11 / Issue #63  structural Product UI shell/read-model/accessibility harness
+accepted contract
+!= installed dependency
+!= structural fixture
+!= real integration
+!= verified Product capability
 ```
 
-They may execute concurrently in isolated worktrees/runtime namespaces, but:
+### Current implementation frontier
+
+今の最前線は **G11 / Issue #63 / PR #81** です。
+
+PR #81 はACP correction後に HEAD `b2eb1d67667905e05087c9745d1850bd59d4d575` へ更新されました。
+
+- `Verify`: **PASS**
+- `E2E Smoke`: **FAIL**
+- current browser blockers:
+  1. `<720px` のresponsive oracleで grid column countが期待 `1` に対して `4`
+  2. reflow testで compact navigation pathが考慮されず `会話を表示` button待ちでtimeout
+
+したがって **G11はまだPASS/mergeしていません**。PR #81のcorrected candidateをaccepted capabilityとして扱わないでください。
+
+---
+
+## CHANGE — 前回のcheckpointから何が変わった？
+
+前回のcontinuity checkpoint（2026-08-29）以降の、実装理解にmaterialな差分だけを記録します。これは履歴台帳ではありません。
+
+### Accepted
+
+- **G00 / Issue #60 / PR #80** がPASS/merge。
+  - Next.js / `eslint-config-next` を accepted 16.3 lineのsecurity baseline **16.3.3** に更新。
+  - last accepted runtime-capability baselineは `a6c07763...`。
+
+### In progress
+
+- **G11 / Issue #63 / PR #81** が最初のstructural Product UI candidateを作成。
+- 最初のfull acceptance auditは7 material blockersでFAIL。
+- ACPのbounded correction pathが実戦で動き、同じPR #81へ correction commit `b2eb1d676...` をpublish。
+- correction後のCIでは `Verify` PASS、`E2E Smoke` FAIL。したがって再correction / fresh acceptanceが必要。
+
+### Still not real
+
+この期間に以下が「実装済み」へ昇格したわけではありません。
+
+- production auth/session
+- production PostgreSQL/Drizzle persistence
+- real Gmail OAuth/sync
+- real Responsibility reducer/Temporal monitoring
+- real Send
+- OpenAI runtime
+- complete delegation loop
+
+---
+
+## MAP — 何がどこにある？
+
+詳細DAGのauthorityは `docs/product/IMPLEMENTATION-GRAPH.md` です。ここでは人間が覚えるべき大きな地図だけを示します。
 
 ```text
-parallel execution != parallel merge
+Lunowa
+│
+├─ UI / 人間が見る面
+│  ├─ G11  UI Foundation              ← 今ここ
+│  └─ G40  Product Surfaces
+│
+├─ Evidence / メールの事実
+│  ├─ G19  Evidence Foundation
+│  ├─ G20  Gmail Sync
+│  └─ G21  Source + Exact Search
+│
+├─ Responsibility / 何が未完了か
+│  ├─ P13/P14/P15  L2 executable proof/freeze
+│  ├─ G30  Persistence
+│  ├─ G31  Deterministic Reducer
+│  └─ G32  Attention / Temporal
+│
+├─ Effects / 外部へ作用する面
+│  ├─ G50  Draft + Send Request
+│  └─ G51  Gmail Send + Reconciliation
+│
+├─ Reliability
+│  └─ G60  Integrity / Recovery
+│
+├─ AI
+│  └─ G70  Bounded AI
+│
+└─ Integration
+   └─ G80  Complete Delegation Loop
 ```
 
-`package.json` and `pnpm-lock.yaml` are serialized merge assets. Later concurrent PRs touching them refresh onto latest accepted main, regenerate the lockfile with pnpm, rerun repository verification, and rerun any proof materially affected by the changed dependency/version basis.
+### 「何について知りたい？」→読む場所
 
-## Actual implementation state
+| 知りたいこと | まず読む |
+| --- | --- |
+| Lunowaは何を作る？ | `docs/product/PRODUCT.md` |
+| v1で何をする/しない？ | `docs/product/PRODUCT-CONTENT.md` |
+| 最終的に何が出来ればPASS？ | `docs/product/GOLDEN-SCENARIO-BANK.md` |
+| UI/UXはどう振る舞う？ | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` + design trio |
+| Responsibilityの意味は？ | `docs/product/responsibility/` |
+| 実装順・依存関係は？ | `docs/product/IMPLEMENTATION-GRAPH.md` + live Issues |
+| 今のcandidate/CIは？ | live GitHub PR / reviews / checks |
+| 実際のコードは何をしてる？ | code / tests / runtime evidence |
 
-Production capability is still mostly bootstrap-only. Better Auth production auth, Drizzle/PostgreSQL production persistence, Gmail integration, Trigger.dev runtime and OpenAI runtime are not activated.
+より完全なauthority routingは `docs/continuity/KNOWLEDGE-MAP.md` を使います。
 
-```text
-accepted stack != installed capability != configured integration != implemented Product
+---
+
+## RUN — 実物をどう確認する？
+
+### Local runtime
+
+現在のProduct runtimeを触る最短経路:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-## Current dependency shape
+repository-wide verification:
 
-```text
-G00 security baseline
- |
- +-> P13 Drizzle/PostgreSQL proof ----+
- +-> P14 Better Auth UUID proof ------+-> P15 L2 independent freeze
- +-> G11 structural UI harness
-
-P14 PASS -> G10 app User/session
-P13 PASS + G10 -> G19 provider-neutral evidence foundation
-
-G19 -> G20 Gmail -> G21 Source/exact search
-  |
-  +-> P15 PASS -> G30 production persistence -> G31 reducer -> G32 attention/Temporal
-
-G11 + G21 + G31 + G32 -> G40 Product surfaces
-G31 + frozen evidence contract -> G70 bounded AI
-G20 + G40 -> G50 contextual Draft/immediate Send request
-G31 + G50 -> G51 provider Send reconciliation
-G20/G21 + G32 + G40 + G51 -> G60 integrity/recovery
-
-G21 + G31/G32 + G40 + G51 + G60 + G70 -> G80 complete loop
-G80 -> R90 public-beta readiness
+```bash
+pnpm verify
+pnpm test:e2e
 ```
 
-## Exhaustive production FK closure
+### PR / CI
 
-Current Responsibility L2 v0.4 requires production targets for:
+実装中candidateを見るときは、**Issue contract → PR summary/diff → exact-head CI** の順で確認します。
 
-```text
-User
-connected_accounts
-conversations
-participant_identities
-messages
-ai_interpretation_runs
-```
+現在は PR #81 がG11 candidateです。`main`ではなくPR candidateなので、UI Foundationをcurrent accepted Productと混同しないでください。
 
-Ownership/order:
+### Hosted preview
 
-- G10: User/session;
-- G19: ConnectedAccount, Conversation, Message, ParticipantIdentity, ProviderSyncState, Attachment metadata and evidence revision;
-- G30 prelude: minimal AIInterpretationRun prerequisite before Responsibility tables;
-- G30 after P15: frozen Responsibility-owned tables.
+Initial hosting targetは **Cloudflare Workers** です。現時点ではhosting adapter/deploymentはaccepted runtime capabilityではなく、G11を理解するためだけに新しいpreview platformを追加しません。
 
-Creating ParticipantIdentity does not activate CRM/Person Product scope. Creating AIInterpretationRun does not activate model execution; G70 owns AI runtime.
+Hosted previewが人間のProduct把握に継続的な価値を持つことが実測されたら、accepted hosting pathのactivation時に **PR/commitから直接開けるpreview** を追加します。今はlocal runtime + GitHub CI/browser evidenceを使います。
 
-Proof fixture != production FK target.
+---
 
-## Responsibility proof state
+## Human checkpoint update rule
 
-```text
-L0 semantics                          FROZEN v0.1
-L1 logical persistence                FROZEN v0.1
-L2 exact PostgreSQL/Drizzle candidate v0.4 STATIC REVIEW COMPLETE
-L2 executable proof                   PENDING (#13/#14)
-L2 final freeze                       BLOCKED (#15)
-L3 production Responsibility runtime  NOT AUTHORIZED
-```
+このファイルは毎commit更新しません。次のどれかが起きたときだけreconcileします。
 
-## Provider / security boundary
+- accepted Product/runtime capability boundaryを進めた
+- current implementation frontier / blocker / next gateがmaterialに変わった
+- 人間向けMAPの大きな境界が変わった
+- 実物を確認するRUN pathが変わった
 
-G20 consumes G19 persistence for live Gmail OAuth/watch/history/sync.
+更新時は必ず **canonical docs / live Issue / PR / CI / code/tests** を確認し、ここだけをauthorityにしません。
 
-```text
-watch/PubSub signal
--> authenticated quick acknowledgement
--> durable reconciliation
--> history.list / full-sync recovery
--> normalized Source commit
-```
-
-Push is not truth. Stale `historyId`/404 requires full sync. Before first durable real Google token persistence, store encrypted at rest, keep key material separate, never log it, scope use by user+ConnectedAccount, and revoke/delete when intentionally no longer needed where supported.
-
-Public OAuth verification/restricted-scope assessment remains R90 release work where required.
-
-## AI / search / send boundaries
-
-- exact authorized Source search = V1 CORE, G21;
-- attachment evidence access = V1 CORE, G20/G21;
-- G70 owns separate bounded Responsibility-interpretation and contextual-draft schemas/evals;
-- AI never owns accepted state, sender/recipient authority, Send permission or provider actions;
-- `store:false` != proof of Zero Data Retention;
-- G50 owns Draft + initial immediate SendOperation request;
-- G51 owns dispatch/reconciliation;
-- Send request != provider acceptance != operational closure.
-
-## Current exclusions
-
-Not current critical-path prerequisites:
-
-- Microsoft;
-- broad multi-account Scope UX;
-- Person/CRM Product features;
-- Pin;
-- generic fresh Compose/Forward;
-- Send Later/generic Undo;
-- rich native attachment preview;
-- natural-language Search;
-- autonomous Send;
-- generic workflow/rule engine.
-
-## Empirical Product Discovery
-
-Issue #36 remains open/deferred in execution order, not passed. Implementation cannot authorize claims about ICP, market pain, monitoring relinquishment, PMF, WTP, retention or differentiation against real workflows.
-
-## Durable update rule
-
-Update owning GitHub/docs in the same workstream when owner priority, accepted contract, dependency graph, blocker/unblocker, material external evidence, authority routing or final review/merge disposition changes. Do not record every tentative discussion turn.
-
-If this router conflicts with canonical sources, executable evidence or live GitHub state, the authoritative/current source wins and this router should be repaired.
+`CHANGE` は直近のmaterial差分だけを残し、古い履歴はGit/GitHubへ任せます。Issue/PR/CI backlogをこのファイルへ複製しません。

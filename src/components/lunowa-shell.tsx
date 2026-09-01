@@ -211,7 +211,7 @@ export function LunowaShell() {
     setFixtureId(id);
   };
 
-  const openDetail = (next: Detail, origin = attentionItem.id) => {
+  const openDetail = (next: Detail, origin: string) => {
     setDetail(next);
     setDetailOrigin(origin);
     window.setTimeout(() => {
@@ -331,10 +331,10 @@ export function LunowaShell() {
           fixture={fixture}
           search={search}
           onSearch={setSearch}
-          openMoment={(origin) => openDetail('moment', origin)}
+          openMoment={(origin = attentionItem.id) => openDetail('moment', origin)}
           openManaged={() => openDetail('managed-detail', 'managed-estimate')}
           openReview={() => openDetail('review-detail', 'review-condition')}
-          openConversation={() => openDetail('conversation', sourceItem.id)}
+          openConversation={(origin) => openDetail('conversation', origin)}
         />
         <FixtureSwitch fixtureId={fixtureId} onChange={changeFixture} />
       </section>
@@ -392,7 +392,7 @@ function SurfaceContent({surface, fixture, search, onSearch, openMoment, openMan
   openMoment: (origin?: string) => void;
   openManaged: () => void;
   openReview: () => void;
-  openConversation: () => void;
+  openConversation: (origin: string) => void;
 }) {
   const title = navigation.find((item) => item.id === surface)?.label ?? 'ホーム';
   const integrity = fixture.integrity === 'degraded';
@@ -402,7 +402,7 @@ function SurfaceContent({surface, fixture, search, onSearch, openMoment, openMan
     <>
       <div className="surface-header">
         <div><p className="eyebrow">LUNOWA</p><h1 id="surface-heading">{title}</h1></div>
-        <button className="quiet-button" type="button" onClick={() => openConversation()}>会話を見る</button>
+        <button id={`surface-open-conversation-${surface}`} className="quiet-button" type="button" onClick={(event) => openConversation(event.currentTarget.id)}>会話を見る</button>
       </div>
       {integrity && <IntegrityBanner />}
       {partial && <p className="coverage-notice" role="status">一部の会話のみを表示しています。最新の確認範囲: 10:15。</p>}
@@ -430,8 +430,8 @@ function Home({fixture, openMoment, openReview, openManaged}: {fixture: ShellFix
   </div>;
 }
 
-function NeedsYou({fixture, openMoment, openConversation}: {fixture: ShellFixture; openMoment: () => void; openConversation: () => void}) {
-  return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{fixture.hasNeedsYou ? <><AttentionButton onClick={openMoment} /><button className="source-link" type="button" onClick={openConversation}>元の会話を開く</button></> : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
+function NeedsYou({fixture, openMoment, openConversation}: {fixture: ShellFixture; openMoment: () => void; openConversation: (origin: string) => void}) {
+  return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{fixture.hasNeedsYou ? <><AttentionButton onClick={openMoment} /><button id="needs-open-source" className="source-link" type="button" onClick={(event) => openConversation(event.currentTarget.id)}>元の会話を開く</button></> : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
 }
 
 function AttentionButton({onClick}: {onClick: () => void}) {
@@ -447,12 +447,12 @@ function Review({fixture, openReview}: {fixture: ShellFixture; openReview: () =>
   return <div className="surface-content"><p className="surface-intro">小さく、判断が必要な確認だけを表示しています。</p>{fixture.hasReview ? <button id="review-condition" className="list-row review-row" type="button" onClick={openReview}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>更新日が会話内で一致していません。</span></button> : <p className="empty-state">現在、確認が必要な事項はありません。</p>}</div>;
 }
 
-function SourceList({openConversation, openMoment}: {openConversation: () => void; openMoment: (origin?: string) => void}) {
-  return <div className="surface-content"><p className="surface-intro">元の会話をそのまま確認できます。</p><article className="source-row"><button id={sourceItem.id} className="source-main" type="button" onClick={openConversation}><strong>{sourceItem.sender}</strong><span>{sourceItem.subject}</span><span>{sourceItem.preview}</span></button><button className="status-affordance" type="button" onClick={() => openMoment(sourceItem.id)} aria-label="この会話の対応状況を見る">対応</button><time>{sourceItem.time}</time></article></div>;
+function SourceList({openConversation, openMoment}: {openConversation: (origin: string) => void; openMoment: (origin?: string) => void}) {
+  return <div className="surface-content"><p className="surface-intro">元の会話をそのまま確認できます。</p><article className="source-row"><button id={sourceItem.id} className="source-main" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.sender}</strong><span>{sourceItem.subject}</span><span>{sourceItem.preview}</span></button><button className="status-affordance" type="button" onClick={() => openMoment(sourceItem.id)} aria-label="この会話の対応状況を見る">対応</button><time>{sourceItem.time}</time></article></div>;
 }
 
-function Search({search, onSearch, openConversation}: {search: string; onSearch: (value: string) => void; openConversation: () => void}) {
-  return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button className="list-row" type="button" onClick={openConversation}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
+function Search({search, onSearch, openConversation}: {search: string; onSearch: (value: string) => void; openConversation: (origin: string) => void}) {
+  return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button id="search-result-estimate" className="list-row" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
 }
 
 function Settings({fixture}: {fixture: ShellFixture}) {

@@ -28,17 +28,20 @@ The deterministic browser oracle in `e2e/lunowa-shell.spec.ts` covers:
 | Coverage | Oracle |
 | --- | --- |
 | 1600, 1440, 1180, 900, 768, 720, 430, 390 CSS px | pane count/order, no ordinary horizontal overflow, Stage-D header placement, rail-label discoverability |
-| effective 125%, 150%, 200% reflow widths | 1152, 960, 720 CSS px with Source-to-composer flow and focused input not under the compact header |
+| browser-equivalent zoom/reflow + text scaling at 125%, 150%, 200% | 1152, 960, 720 CSS px respectively, with root text set to the matching 125%, 150%, or 200%; verifies rendered text enlarges, Source-to-composer flow remains usable, and focused input is not under the compact header at 200% |
 | compact flow | drawer navigation and draft preservation at 390 px |
+| compact focus return | Needs You source link and Search result conversation entry both return focus to their invoking control after Back at 390 px |
 | keyboard/IME | normal slash navigation, editable-target suppression, composition middle events, and the `keyCode === 229` composition-end boundary |
 
 ## Execution status
 
-`pnpm exec playwright test --list` discovered all five browser checks on this
-candidate. Runtime execution is **not verified in this workspace**: the
+`pnpm exec playwright test --list` discovered all six browser checks on this
+final candidate. Runtime execution remains **not verified in this workspace**: the
 managed sandbox blocks all loopback access, including Playwright's configured
 `127.0.0.1:3000` web server. The attempted `pnpm test:e2e` terminated before
 test execution with that policy error. The browser suite and this audit matrix
 must be run in an environment that permits the repository's local Playwright
-web server before acceptance/merge; this record does not claim screenshot or
-runtime visual PASS.
+web server before acceptance/merge. In that browser-enabled environment,
+inspect and record representative 1600px desktop and 390px compact states
+against references `00`–`04`, then record any material correction and the
+final result. This record does not claim screenshot or runtime visual PASS.

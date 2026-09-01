@@ -42,7 +42,7 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
       const nav = document.querySelector<HTMLElement>('.primary-nav')!;
       const scrollWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
       return {
-        columns: getComputedStyle(shell).gridTemplateColumns.split(' ').length,
+        display: getComputedStyle(shell).display,
         header: header.getBoundingClientRect().toJSON(),
         surface: surface.getBoundingClientRect().toJSON(),
         detail: detail.getBoundingClientRect().toJSON(),
@@ -52,15 +52,19 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
       };
     });
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.viewport);
-    if (width >= 1440) expect(geometry.columns).toBe(3);
+    if (width >= 1440) expect(geometry.display).toBe('grid');
     if (width >= 900 && width < 1180) expect(geometry.nav.width).toBeLessThanOrEqual(72);
     if (width >= 720 && width < 900) {
-      expect(geometry.columns).toBe(2);
+      expect(geometry.display).toBe('grid');
       expect(geometry.header.width).toBeCloseTo(width, 0);
       expect(geometry.surface.y).toBeGreaterThanOrEqual(geometry.header.y + geometry.header.height);
       expect(geometry.detail.y).toBeGreaterThanOrEqual(geometry.header.y + geometry.header.height);
     }
-    if (width < 720) expect(geometry.columns).toBe(1);
+    if (width < 720) {
+      expect(geometry.display).toBe('block');
+      expect(geometry.surface.width).toBeCloseTo(width, 0);
+      expect(geometry.detail.width).toBe(0);
+    }
   }
 
   await page.setViewportSize({width: 900, height: 844});
@@ -69,10 +73,14 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
   await expect(page.locator('.nav-tooltip', {hasText: '会話'})).toBeVisible();
 });
 
-test('preserves core reading and focus visibility at effective 125, 150, and 200 percent reflow widths', async ({page}) => {
-  for (const width of [1152, 960, 720]) {
+test('preserves core reading and focus visibility at 125, 150, and 200 percent browser-equivalent zoom and text scaling', async ({page}) => {
+  for (const {scale, width} of [{scale: 1.25, width: 1152}, {scale: 1.5, width: 960}, {scale: 2, width: 720}]) {
     await page.setViewportSize({width, height: 844});
     await page.goto('/ja');
+    await page.evaluate((textScale) => {
+      document.documentElement.style.fontSize = `${textScale * 100}%`;
+    }, scale);
+    if (width < 900) await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
     await nav(page, '会話').click();
     await page.getByRole('button', {name: /佐藤ひろ子/}).click();
     const draft = page.getByLabel('本文');
@@ -84,12 +92,32 @@ test('preserves core reading and focus visibility at effective 125, 150, and 200
         scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
         viewport: window.innerWidth,
         inputTop: input.top,
-        headerBottom: header.bottom
+        headerBottom: header.bottom,
+        bodyFontSize: Number.parseFloat(getComputedStyle(document.body).fontSize)
       };
     });
     expect(result.scrollWidth).toBeLessThanOrEqual(result.viewport);
+    expect(result.bodyFontSize).toBeCloseTo(16 * scale, 0);
     if (width === 720) expect(result.inputTop).toBeGreaterThanOrEqual(result.headerBottom);
   }
+});
+
+test('returns focus to compact conversation-entry controls', async ({page}) => {
+  await page.setViewportSize({width: 390, height: 844});
+  await page.goto('/ja');
+
+  await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: '元の会話を開く'}).click();
+  await page.getByRole('button', {name: /一覧に戻る/}).click();
+  await expect(page.locator('#needs-open-source')).toBeFocused();
+
+  await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
+  await nav(page, '検索').click();
+  await page.getByLabel('メールを検索').fill('見積書');
+  await page.locator('#search-result-estimate').click();
+  await page.getByRole('button', {name: /一覧に戻る/}).click();
+  await expect(page.locator('#search-result-estimate')).toBeFocused();
 });
 
 test('does not activate global search for editable input or Japanese IME composition boundary events', async ({page}) => {

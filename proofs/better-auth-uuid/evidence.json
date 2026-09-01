@@ -1,6 +1,8 @@
 {
   "track": "P14 Better Auth UUID persistence proof",
   "candidateBase": "bc46ac5e6c9707f8d4571d56d9760e5f964a6f0e",
+  "candidateHeadBeforeCorrection": "0c5346558d3f9725be7aff71a0869f410b43c5e2",
+  "candidateState": "uncommitted correction workspace; regenerate direct runtime evidence after the final committed candidate exists",
   "runtimeNamespace": {
     "dockerComposeProject": "lunowa-issue-14",
     "postgresDatabase": "lunowa_issue_14",
@@ -8,6 +10,7 @@
   },
   "toolVersions": {
     "betterAuth": "1.7.2",
+    "betterAuthCli": "auth 1.7.2",
     "drizzleOrm": "0.45.2",
     "drizzleKit": "0.31.10",
     "postgresDriver": "pg 8.23.0",
@@ -15,41 +18,51 @@
   },
   "configuration": {
     "betterAuthAdvancedDatabaseGenerateId": "uuid",
-    "idGeneration": "PostgreSQL gen_random_uuid() database defaults",
+    "betterAuthCliCommand": "auth generate --config proofs/better-auth-uuid/auth.config.ts --adapter drizzle --dialect postgresql --output proofs/better-auth-uuid/auth-schema.ts --yes",
+    "idGeneration": "Better Auth CLI emits pg_catalog.gen_random_uuid() database defaults",
     "productionAuthActivated": false,
     "oauthOrMailboxCredentialsUsed": false
   },
   "generatedSchemaEvidence": {
-    "sql": "proofs/better-auth-uuid/drizzle/0000_dear_felicia_hardy.sql",
+    "betterAuthCliOutput": "proofs/better-auth-uuid/auth-schema.ts",
+    "drizzleInput": "proofs/better-auth-uuid/schema.ts",
+    "sqlDirectory": "proofs/better-auth-uuid/drizzle",
     "expectedUserIdType": "uuid",
-    "expectedForeignKeyType": "uuid"
+    "expectedForeignKeyType": "uuid",
+    "localGeneration": "PASS: Better Auth CLI and Drizzle Kit regenerated from the 1.7.2 configuration on this correction workspace"
   },
   "accountSemantics": {
+    "identityStrategy": "issuer-account-id",
+    "identitySelector": ["issuer", "accountId"],
+    "configuredAccountIdentityStrategy": "NOT_APPLICABLE: Better Auth 1.7.2 exposes no supported account.identityStrategy option; the installed runtime's account-key API and generated unique index use issuer + accountId",
     "localProviderId": "credential",
     "localIssuer": "local:credential",
     "localAccountId": "user.id",
-    "identitySelector": ["issuer", "accountId"],
-    "externalOAuthLinking": "NOT_RUN: deliberately excluded because credentials are forbidden"
+    "externalOAuthLinking": "BLOCKED_BY_SCOPE: deliberately excluded because real provider credentials are forbidden"
   },
   "acceptance": {
     "47": {
-      "status": "NOT_RUN",
-      "test": "tests/better-auth-uuid.node.test.ts",
-      "requiredEvidence": "PostgreSQL 18 catalog user.id = uuid after Better Auth sign-up"
+      "status": "BLOCKED",
+      "test": "P14_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55414/lunowa_issue_14 pnpm test:auth-uuid",
+      "requiredEvidence": "PostgreSQL 18.6 catalog user.id = uuid after Better Auth sign-up",
+      "blocker": "Docker and an isolated PostgreSQL 18.6 server are unavailable in this workspace"
     },
     "48": {
-      "status": "NOT_RUN",
-      "test": "tests/better-auth-uuid.node.test.ts",
-      "requiredEvidence": "Better Auth local credential account/session plus domain UUID FK roundtrip"
+      "status": "BLOCKED",
+      "test": "P14_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55414/lunowa_issue_14 pnpm test:auth-uuid",
+      "requiredEvidence": "Better Auth local credential account/session plus domain UUID FK roundtrip",
+      "blocker": "Docker and an isolated PostgreSQL 18.6 server are unavailable in this workspace"
     },
     "49": {
-      "status": "NOT_RUN",
-      "test": "tests/better-auth-uuid.node.test.ts",
-      "requiredEvidence": "Generated SQL and PostgreSQL catalog retain UUID IDs/FKs"
+      "status": "BLOCKED",
+      "test": "pnpm proof:auth-uuid:schema then P14_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55414/lunowa_issue_14 pnpm test:auth-uuid",
+      "requiredEvidence": "Better Auth CLI output, Drizzle SQL, and PostgreSQL 18.6 catalog retain UUID IDs/FKs",
+      "blocker": "CLI-to-Drizzle generation passed locally, but PostgreSQL 18.6 catalog inspection is unavailable"
     }
   },
   "localExecution": {
-    "staticSchemaTests": "PASS",
-    "realPostgreSQL18": "NOT_RUN: Docker and a PostgreSQL 18 server are unavailable in this workspace"
+    "schemaGeneration": "PASS",
+    "staticSchemaTests": "BLOCKED as designed: CLI-output/Drizzle assertions pass, while the final PASS-ledger guard fails until 47–49 receive direct PostgreSQL 18.6 evidence",
+    "realPostgreSQL18": "BLOCKED: docker command is unavailable; no substitute database is accepted"
   }
 }

@@ -1,14 +1,14 @@
 // @vitest-environment node
 
-import {readFile} from 'node:fs/promises';
+import {readdir, readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 
 import {createProofAuth} from '../proofs/better-auth-uuid/auth';
+import {proofAccountIdentityPolicy} from '../proofs/better-auth-uuid/auth.config';
 
 const databaseUrl = process.env.P14_DATABASE_URL;
-const runtime = databaseUrl ? describe : describe.skip;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function assertIsP14Namespace(url: string) {
@@ -18,8 +18,17 @@ function assertIsP14Namespace(url: string) {
   expect(parsed.pathname).toBe('/lunowa_issue_14');
 }
 
-runtime('P14 Better Auth UUID persistence proof (real PostgreSQL only)', () => {
-  if (!databaseUrl) return;
+async function readGeneratedSql() {
+  const sqlFiles = (await readdir(resolve('proofs/better-auth-uuid/drizzle')))
+    .filter((file) => file.endsWith('.sql'));
+  expect(sqlFiles).toHaveLength(1);
+  return readFile(resolve('proofs/better-auth-uuid/drizzle', sqlFiles[0] ?? ''), 'utf8');
+}
+
+describe('P14 Better Auth UUID persistence proof (real PostgreSQL only)', () => {
+  if (!databaseUrl) {
+    throw new Error('P14_DATABASE_URL is required; this acceptance path must run on isolated PostgreSQL 18.6.');
+  }
 
   const {auth, pool} = createProofAuth(databaseUrl);
   let userId = '';
@@ -31,10 +40,7 @@ runtime('P14 Better Auth UUID persistence proof (real PostgreSQL only)', () => {
     const version = await pool.query<{version: string}>('select version()');
     expect(version.rows[0]?.version).toMatch(/^PostgreSQL 18\./);
 
-    const generatedSql = await readFile(
-      resolve('proofs/better-auth-uuid/drizzle/0000_dear_felicia_hardy.sql'),
-      'utf8'
-    );
+    const generatedSql = await readGeneratedSql();
     await pool.query('drop table if exists responsibility_proof_fixture, verification, account, session, "user" cascade');
     await pool.query(generatedSql);
   });
@@ -72,9 +78,9 @@ runtime('P14 Better Auth UUID persistence proof (real PostgreSQL only)', () => {
       [userId]
     );
     expect(accountRow.rows).toEqual([{
-      issuer: 'local:credential',
-      provider_id: 'credential',
-      account_id: userId,
+      issuer: proofAccountIdentityPolicy.localCredentialIssuer,
+      provider_id: proofAccountIdentityPolicy.localCredentialProviderId,
+      account_id: proofAccountIdentityPolicy.localCredentialAccountId === 'user.id' ? userId : '',
       user_id: userId
     }]);
 
@@ -112,5 +118,10 @@ runtime('P14 Better Auth UUID persistence proof (real PostgreSQL only)', () => {
       {table_name: 'account', column_name: 'user_id', udt_name: 'uuid'},
       {table_name: 'responsibility_proof_fixture', column_name: 'user_id', udt_name: 'uuid'}
     ]));
+
+    const accountIdentityIndex = await pool.query<{indexdef: string}>(
+      "select indexdef from pg_indexes where schemaname = 'public' and tablename = 'account' and indexname = 'account_issuer_accountId_uidx'"
+    );
+    expect(accountIdentityIndex.rows[0]?.indexdef).toContain('issuer, account_id');
   });
 });

@@ -7,10 +7,11 @@
 ## Checkpoint metadata
 
 - Last reconciled: **2026-09-01**
-- Last accepted **runtime-capability baseline** at reconcile: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`（G00）
+- Last accepted **Product/runtime capability boundary** at reconcile: `6a71b79abdc22ea7bc68deafdc925d51b32a8a1b`（G11）
+- Framework/security baseline: Next.js **16.3.3**（G00）
 - Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
 - Live GitHub Issue / PR / CI checked: **yes**
-- Mutable snapshot: current PR/CI stateは変わり得るため、action/review時はlive GitHubを再確認する
+- Mutable snapshot: current Issue / PR / CI stateは変わり得るため、action/review時はlive GitHubを再確認する
 
 ## 0. 読み方
 
@@ -35,31 +36,35 @@ Lunowaは、メール中心の **Attention Delegation / Open-loop Monitoring Off
 
 現在のv1目標は、広いメールクライアント機能ではなく、**Gmail 1 providerで Minimum Complete Delegation Loop を一本完成させること**です。
 
-### Accepted runtime-capability baseline
+### Accepted capability baseline
 
-- 最後にProduct/runtime capability boundaryを進めたaccepted baseline: `a6c07763bc05b20755d3e424364c2c5a3d2b9e7e`
-- そのchange: **G00 / Issue #60 — Next.js security baseline 16.3.3**
+- 最後にProduct/runtime capability boundaryを進めたaccepted change: **G11 / Issue #63 / PR #81**
+- accepted merge: `6a71b79abdc22ea7bc68deafdc925d51b32a8a1b`
+- G11で、structural Product shell、responsive layout、typed read-model/fixture axes、keyboard/focus/Japanese IME/accessibility harnessが`main`へ入りました。
+- exact candidate CIは `Verify` / `E2E Smoke` ともPASSし、desktop/compactの実runtime visual auditもexact candidateに対して完了しました。
+- framework/security baselineは引き続き **G00 / Next.js 16.3.3** です。
 - 現在の`main` SHA自体はlive GitHubで確認します。docs-only change等までここへ逐次複製しません。
-- このbaseline上では、Better Auth production auth、PostgreSQL/Drizzle production persistence、Gmail integration、Trigger.dev runtime、OpenAI runtimeはまだ未activateです。
+
+G11は**本物のGmail/DB/domain runtimeを接続したという意味ではありません**。Better Auth production auth、PostgreSQL/Drizzle production persistence、Gmail integration、Responsibility reducer/Temporal、Send、OpenAI runtimeはまだ未activateです。
 
 ### Capability status
 
-`Specified` は仕様があること、`Structural` はfake/fixtureを含む構造実装、`Real` は本物のprovider/database/runtime接続、`Verified` はcurrent exact candidateで必要なacceptance evidenceが通ったことを表します。
+`Specified` は仕様があること、`Structural` はfake/fixtureを含む構造実装、`Real` は本物のprovider/database/runtime接続、`Verified` はaccepted candidateで必要なacceptance evidenceが通ったことを表します。
 
 | Capability | Specified | Structural | Real | Verified | 現在の意味 |
 | --- | --- | --- | --- | --- | --- |
-| UI Foundation / G11 | ✅ | 🟡 PR #81 | — | ❌ | shell・responsive・IME/accessibility harnessを実装中。まだaccepted mainではない |
+| UI Foundation / G11 | ✅ | ✅ | — | ✅ | structural shell・responsive・IME/accessibility harnessがaccepted mainに入った |
 | App Auth / G10 | ✅ | ❌ | ❌ | ❌ | P14 #14のUUID proof待ち |
 | Evidence Foundation / G19 | ✅ | ❌ | ❌ | ❌ | P13 #13 + G10待ち |
 | Gmail Sync / G20 | ✅ | ❌ | ❌ | ❌ | real Gmail OAuth/watch/history未実装 |
-| Source / Search / G21 | ✅ | ❌ | ❌ | ❌ | real Source/search未実装 |
+| Source / Search / G21 | ✅ | 🟡 G11 shellのみ | ❌ | ❌ | structural Source surfaceはあるがreal Source/search未接続 |
 | Responsibility Persistence / G30 | ✅ | ❌ | ❌ | ❌ | P15 freeze + G19待ち |
 | Responsibility Reducer / G31 | ✅ | ❌ | ❌ | ❌ | deterministic accepted-state runtime未実装 |
 | Attention / Temporal / G32 | ✅ | ❌ | ❌ | ❌ | durable reconsideration未実装 |
-| Product Surfaces / G40 | ✅ | ❌ | ❌ | ❌ | real state接続前 |
-| Draft / Send Request / G50 | ✅ | ❌ | ❌ | ❌ | contextual Draft/Send request未実装 |
+| Product Surfaces / G40 | ✅ | 🟡 G11 shellのみ | ❌ | ❌ | structural surfacesはあるがreal state未接続 |
+| Draft / Send Request / G50 | ✅ | 🟡 structural stateのみ | ❌ | ❌ | provider effectを持たないfixture/harness段階 |
 | Gmail Send / G51 | ✅ | ❌ | ❌ | ❌ | provider dispatch/reconciliation未実装 |
-| Integrity / Recovery / G60 | ✅ | ❌ | ❌ | ❌ | reconnect/degraded recovery未実装 |
+| Integrity / Recovery / G60 | ✅ | 🟡 structural stateのみ | ❌ | ❌ | degraded表示fixtureはあるがreal recovery未実装 |
 | Bounded AI / G70 | ✅ | ❌ | ❌ | ❌ | model runtime未実装 |
 | Complete Loop / G80 | ✅ | ❌ | ❌ | ❌ | vertical loop未完成 |
 
@@ -75,46 +80,45 @@ accepted contract
 
 ### Current implementation frontier
 
-今の最前線は **G11 / Issue #63 / PR #81** です。
+**G11は完了しました。** 次の実装frontierは、G00後に並列可能だったL2 prerequisite proofです。
 
-PR #81 はACP correction後に HEAD `b2eb1d67667905e05087c9745d1850bd59d4d575` へ更新されました。
+1. **P14 / Issue #14 — Better Auth UUID persistence proof**
+   - G10 production auth/sessionを直接unblockするため、one-shot runnerでは先に実行する。
+   - 2026-09-01のexecution-time再確認でも Better Auth 1.7.2 / PostgreSQL 18.6 / Drizzle ORM stable 0.45.2 の前提は維持。
+2. **P13 / Issue #13 — Responsibility PostgreSQL/Drizzle executable proof**
+   - P14後に続ける。
+   - P13 + G10が揃うとG19 provider-neutral evidence foundationへ進める。
+3. **P15 / Issue #15 — independent L2 freeze**
+   - P13/P14両方のconcrete evidence後。
 
-- `Verify`: **PASS**
-- `E2E Smoke`: **FAIL**
-- current-head full acceptance audit: **FAIL**
-- Issue #63: **`agent:ready`**（次のbounded correction待ち）
-- current material blockers:
-  1. responsive E2E oracle/pathの2 defects（`<720px`でblock layoutをgrid-column countで判定、720pxでdrawerを開かずhidden navを操作）
-  2. 125% / 150% / 200% **zoom/text scaling**を実測しておらず、viewport幅変更だけではcontractを満たさない
-  3. compact conversation entryの一部でBack後のfocus return先が実在せず、meaningful place / focus-return contract未達
-  4. runtime audit record自身が未実行と明記しており、desktop + compact/mobileの**実際のvisual audit**がまだ完了していない
-
-したがって **G11はまだPASS/mergeしていません**。PR #81のcorrected candidateをaccepted capabilityとして扱わないでください。
+P13/P14は理論上parallel execution可能ですが、どちらも`package.json` / `pnpm-lock.yaml`を書き得るため**mergeはserial**です。現在のone-shot runnerでは、不要なbase refreshと再proofを減らすため **P14 → P13** の順で進めます。
 
 ---
 
 ## CHANGE — 前回のcheckpointから何が変わった？
 
-前回のcontinuity checkpoint（2026-08-29）以降の、実装理解にmaterialな差分だけを記録します。これは履歴台帳ではありません。
+直近の、実装理解にmaterialな差分だけを記録します。これは履歴台帳ではありません。
 
 ### Accepted
 
-- **G00 / Issue #60 / PR #80** がPASS/merge。
-  - Next.js / `eslint-config-next` を accepted 16.3 lineのsecurity baseline **16.3.3** に更新。
-  - last accepted runtime-capability baselineは `a6c07763...`。
-- **Issue #82 / PR #83** で日本語第一のHuman Comprehension Layerをdocs-onlyで導入。Product/runtime capability自体は変えていない。
+- **G11 / Issue #63 / PR #81** がfull acceptance audit PASSでsquash merge。
+  - structural Home / Needs You / Managed / Review / Moment / Source shellを導入。
+  - responsive stages、compact navigation/focus return、125/150/200% text scaling/reflow、Japanese IME `keyCode === 229` boundaryをbrowser oracle化。
+  - monitoring posture / integrity、common mutation / Send lifecycle等のfixture/read-model軸を分離。
+  - exact-head `Verify` + `E2E Smoke` PASS。
+  - exact candidateを実行したdesktop/compact runtime visual auditも完了。
+- **G00 / Issue #60 / PR #80** のNext.js 16.3.3 security baselineは継続してaccepted。
+- 日本語第一のHuman Comprehension Layerは引き続きこの`CURRENT.md`を唯一のmutable human checkpointとして使う。
 
-### In progress
+### Next
 
-- **G11 / Issue #63 / PR #81** が最初のstructural Product UI candidateを作成。
-- 最初のfull acceptance auditは7 material blockersでFAIL。
-- ACPのbounded correction pathが実戦で動き、同じPR #81へ correction commit `b2eb1d676...` をpublish。
-- correctionで旧7 blockersの多くは改善したが、exact-head E2EはまだFAIL。
-- current-head full acceptance auditで残る4 material blockersを一括記録し、Issue #63を再び`agent:ready`へ戻した。次は1回のbounded correctionでまとめて直す。
+- P14 #14を先に実行し、PASS後にP13 #13へ進む。
+- P13/P14の両証拠が揃った後、P15 #15でL2を独立freezeする。
+- G10はP14 PASS後、G19はP13 PASS + G10後に進める。
 
 ### Still not real
 
-この期間に以下が「実装済み」へ昇格したわけではありません。
+この期間に以下が「本番接続済み」へ昇格したわけではありません。
 
 - production auth/session
 - production PostgreSQL/Drizzle persistence
@@ -134,8 +138,13 @@ PR #81 はACP correction後に HEAD `b2eb1d67667905e05087c9745d1850bd59d4d575` �
 Lunowa
 │
 ├─ UI / 人間が見る面
-│  ├─ G11  UI Foundation              ← 今ここ
+│  ├─ G11  UI Foundation              ✓ accepted
 │  └─ G40  Product Surfaces
+│
+├─ Prerequisite proofs
+│  ├─ P14  Better Auth UUID proof     ← 次
+│  ├─ P13  PostgreSQL/Drizzle proof   ← その次
+│  └─ P15  L2 independent freeze
 │
 ├─ Evidence / メールの事実
 │  ├─ G19  Evidence Foundation
@@ -143,7 +152,6 @@ Lunowa
 │  └─ G21  Source + Exact Search
 │
 ├─ Responsibility / 何が未完了か
-│  ├─ P13/P14/P15  L2 executable proof/freeze
 │  ├─ G30  Persistence
 │  ├─ G31  Deterministic Reducer
 │  └─ G32  Attention / Temporal
@@ -183,7 +191,7 @@ Lunowa
 
 ### Local runtime
 
-現在のProduct runtimeを触る最短経路:
+現在のaccepted structural Product shellを触る最短経路:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -201,13 +209,13 @@ pnpm test:e2e
 
 実装中candidateを見るときは、**Issue contract → PR summary/diff → exact-head CI** の順で確認します。
 
-現在は PR #81 がG11 candidateです。`main`ではなくPR candidateなので、UI Foundationをcurrent accepted Productと混同しないでください。
+G11はすでに`main`へ入っています。今後のP13/P14はproof harnessであり、Product画面の完成度が直接進むtaskではありません。
 
 ### Hosted preview
 
-Initial hosting targetは **Cloudflare Workers** です。現時点ではhosting adapter/deploymentはaccepted runtime capabilityではなく、G11を理解するためだけに新しいpreview platformを追加しません。
+Initial hosting targetは **Cloudflare Workers** です。現時点ではhosting adapter/deploymentはaccepted runtime capabilityではなく、人間の把握だけを目的に新しいpreview platformを追加しません。
 
-Hosted previewが人間のProduct把握に継続的な価値を持つことが実測されたら、accepted hosting pathのactivation時に **PR/commitから直接開けるpreview** を追加します。今はlocal runtime + GitHub CI/browser evidenceを使います。
+Hosted previewが継続的な価値を持つことが実測されたら、accepted hosting pathのactivation時に **PR/commitから直接開けるpreview** を追加します。今はlocal runtime + GitHub CI/browser evidenceを使います。
 
 ---
 

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/p14-auth-uuid-proof.yml"
+      - ".github/workflows/p14-auth-uuid-evidence.yml"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -66,65 +67,3 @@ jobs:
         env:
           P14_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55414/lunowa_issue_14
         run: pnpm test:auth-uuid
-
-  p14-evidence:
-    name: P14 trusted evidence packaging
-    needs: p14-proof
-    if: ${{ needs.p14-proof.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      issues: read
-
-    steps:
-      - name: Fetch current Issue 14 contract
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api --method GET /repos/miki-labs/lunowa/issues/14 > "$RUNNER_TEMP/issue-14.json"
-
-      - name: Generate trusted evidence
-        env:
-          P14_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          P14_PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          node --input-type=module <<'NODE'
-          import { createHash } from 'node:crypto';
-          import { readFileSync, writeFileSync } from 'node:fs';
-
-          const issue = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/issue-14.json`, 'utf8'));
-          if (typeof issue.body !== 'string') {
-            throw new Error('Issue #14 body is unavailable.');
-          }
-
-          const issueContractSha256 = createHash('sha256')
-            .update(Buffer.from(issue.body, 'utf8'))
-            .digest('hex');
-          const evidence = {
-            kind: 'acp-acceptance-evidence-v1',
-            repository: 'miki-labs/lunowa',
-            issue: 14,
-            pullRequest: Number(process.env.P14_PR_NUMBER),
-            headSha: process.env.P14_HEAD_SHA,
-            issueContractSha256,
-            postgresql: '18.6',
-            acceptance: {
-              '47': 'PASS',
-              '48': 'PASS',
-              '49': 'PASS',
-            },
-            statement: 'This is prerequisite evidence, not an independent-review PASS.',
-          };
-
-          writeFileSync(
-            `${process.env.RUNNER_TEMP}/p14-auth-uuid-evidence.json`,
-            `${JSON.stringify(evidence, null, 2)}\n`,
-            'utf8',
-          );
-          NODE
-
-      - name: Upload trusted evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: p14-auth-uuid-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/p14-auth-uuid-evidence.json
-          if-no-files-found: error

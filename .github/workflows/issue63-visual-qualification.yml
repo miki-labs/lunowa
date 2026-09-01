@@ -64,10 +64,11 @@ jobs:
             await browser.close();
           }
           EOF
+          cp docs/design/references/0{0,1,2,3,4}-*.png visual-audit/
       - name: Upload visual audit evidence
         uses: actions/upload-artifact@v4
         with:
-          name: issue63-visual-audit-2025284a
+          name: issue63-visual-audit-with-references-2025284a
           path: visual-audit/*.png
           if-no-files-found: error
           retention-days: 7

@@ -66,7 +66,8 @@ brainstorm、捨てた案、routine debugging、recoverable chat detailは残し
 
 ## Freshness rule
 
-- `CURRENT.md` は小さく保ち、**accepted main / implementation frontier / material blocker / RUN path** が変わった時だけreconcileする。
+- `CURRENT.md` は小さく保ち、**accepted Product/runtime capability boundary / implementation frontier / material blocker / RUN path** が変わった時だけreconcileする。docs-only merge等の全main SHAを追跡しない。
+- exact current `main` SHAが必要なaction/reviewではlive GitHubを確認し、mutable summaryへ固定しない。
 - `CHANGE` はchangelogにせず、直近のmaterial deltaだけを残す。古い履歴はGit/GitHubへ任せる。
 - `KNOWLEDGE-MAP.md` はauthorityの場所やroutingが変わった時だけ更新する。
 - current Issue/PR/CIが重要なら、必ずlive GitHubを確認する。

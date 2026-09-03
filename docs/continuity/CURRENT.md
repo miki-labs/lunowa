@@ -216,9 +216,9 @@ G11はすでに`main`へ入っています。今後のP13/P14はproof harnessで
 
 Initial hosting targetは **Cloudflare Workers** です。Issue #91 candidateは、Next.js applicationの外側に限定したCloudflare deployment boundaryと、supplied URLを検証するPlaywright smokeを用意しています。これはfixture-only shellをhostするためのvisibility infrastructureであり、Product/Provider/Auth/DBのauthorityや実capabilityを変えません。
 
-Cloudflare account/Git integrationはこのworkspaceでは未activateです。activation手順は [`../deployment-preview.md`](../deployment-preview.md) を使います。activation後、accepted `main`を開く場所は **GitHubのlatest deployment status → View deployment** です。PR candidateもPR上の同じlive deployment statusから開き、mutable URLをこのcheckpointや他のdocsへ手で複製しません。
+Cloudflare account/Git integrationはこのworkspaceでは未activateです。activation手順は [`../deployment-preview.md`](../deployment-preview.md) を使います。activation後、accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから開きます。PR candidateはCloudflare Workers BuildsがPRへ投稿するpreview URLから直接開きます。mutable URLをこのcheckpointや他のdocsへ手で複製しません。
 
-deployed runtime truthはsemantic/capability truthとは別です。GitHub deployment statusからコピーしたlive URLを`PLAYWRIGHT_BASE_URL`へ設定して`pnpm test:e2e:preview`を実行し、hosted URLが応答するかを確認します。capability statusは引き続きこの`CURRENT.md`とcanonical sourceで判断します。
+deployed runtime truthはsemantic/capability truthとは別です。CloudflareのPR commentまたはactive Workerから得たlive URLを`PLAYWRIGHT_BASE_URL`へ設定して`pnpm test:e2e:preview`を実行し、hosted URLが応答するかを確認します。capability statusは引き続きこの`CURRENT.md`とcanonical sourceで判断します。
 
 ---
 

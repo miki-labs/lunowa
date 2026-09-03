@@ -12,7 +12,9 @@
     "build": "next build",
     "build:cloudflare": "vinext build",
     "check:cloudflare": "vinext check",
-    "deploy:cloudflare": "vinext-cloudflare deploy --config dist/server/wrangler.json",
+    "deploy:cloudflare": "wrangler deploy --config dist/server/wrangler.json",
+    "preview:cloudflare": "wrangler versions upload --config dist/server/wrangler.json",
+    "check:cloudflare:deploy": "node -e \"require('node:fs').accessSync('dist/server/wrangler.json')\" && wrangler deploy --config dist/server/wrangler.json --dry-run",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -20,7 +22,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test e2e/deployed-preview-smoke.spec.ts",
-    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare"
+    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare && pnpm check:cloudflare:deploy"
   },
   "dependencies": {
     "@vinext/cloudflare": "1.0.0-beta.7",

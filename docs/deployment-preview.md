@@ -30,7 +30,7 @@ The following commands succeeded on this candidate:
 ```bash
 pnpm check:cloudflare
 pnpm build:cloudflare
-pnpm exec vinext-cloudflare deploy --config dist/server/wrangler.json --dry-run
+pnpm check:cloudflare:deploy
 ```
 
 `wrangler.jsonc` intentionally names only the Worker and compatibility
@@ -45,13 +45,14 @@ An authorized Cloudflare account owner should:
 
 1. Create or select the Workers project named `lunowa-preview`, then connect
    this GitHub repository through Cloudflare Workers Builds/Git integration.
-2. Set `main` as the production branch and configure the Workers build to run
-   `pnpm install --frozen-lockfile` followed by `pnpm build:cloudflare`. Use
-   the generated `dist/server/wrangler.json` deployment configuration (the
-   equivalent repository command is `pnpm deploy:cloudflare`).
-3. Enable branch and pull-request preview deployments in that integration, so
-   Cloudflare publishes deployment status and the direct URL to GitHub for
-   both `main` and PR candidates.
+2. Set `main` as the production branch. In **Settings → Build**, set the
+   Build command to `pnpm build:cloudflare`, the production Deploy command to
+   `pnpm deploy:cloudflare`, and the Non-production branch deploy command to
+   `pnpm preview:cloudflare`. Both deploy commands consume the exact generated
+   `dist/server/wrangler.json` proven by `pnpm check:cloudflare:deploy`.
+3. Enable **Builds for non-production branches**. Production commits then use
+   `wrangler deploy`, while PR/branch candidates use
+   `wrangler versions upload` and therefore receive Cloudflare preview URLs.
 4. For any future preview that can reach real auth, provider, or user data,
    protect the preview environment with a Cloudflare Access application and
    policy before enabling that data. Do not add repository custom auth for
@@ -59,9 +60,13 @@ An authorized Cloudflare account owner should:
 
 Cloudflare credentials, account configuration, deployment execution, and the
 resulting hosted URL are intentionally outside this repository task. After the
-integration is enabled, open accepted `main` from GitHub's latest deployment
-status using **View deployment**. For a PR, use that PR's live deployment
-status in the same way; those URLs are deliberately not copied into docs.
+integration is enabled, accepted `main` is opened from the active
+`lunowa-preview` Worker in Cloudflare's Deployments/Version History surface
+(and its stable workers.dev URL once Cloudflare has created it). For a PR,
+Cloudflare Workers Builds posts the preview URL directly in the PR comment
+when the non-production command performs `wrangler versions upload`.
+GitHub check-run **Details** links to the Cloudflare build. Mutable preview
+URLs are deliberately not copied into repository docs.
 
 ## Deployed smoke
 
@@ -69,8 +74,9 @@ Once Cloudflare has supplied a preview URL, an authorized reviewer can verify
 the actual deployed shell without secrets or a second E2E framework:
 
 ```bash
-# Set PLAYWRIGHT_BASE_URL to the live URL copied from GitHub deployment status.
-pnpm test:e2e:preview
+# Use the PR preview URL from Cloudflare's PR comment, or the active
+# lunowa-preview Worker URL for accepted main.
+PLAYWRIGHT_BASE_URL=https://example.invalid pnpm test:e2e:preview
 ```
 
 The supplied base URL disables Playwright's local web server and checks a

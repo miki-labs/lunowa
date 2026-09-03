@@ -58,7 +58,7 @@ G11/preview foundationは**本物のGmail/DB/domain runtimeを接続したとい
 | Capability | Specified | Structural | Real | Verified | 現在の意味 |
 | --- | --- | --- | --- | --- | --- |
 | UI Foundation / G11 | ✅ | ✅ | — | ✅ | structural shell・responsive・IME/accessibility harnessがaccepted mainに入った |
-| Preview / Human Preview Layer | ✅ | ✅ | ✅ hosted fixture shell | ✅ | accepted main/PR candidateをCloudflare previewで確認できる。Product capability authorityではない |
+| Preview / Human Preview Layer | ✅ | ✅ | ✅ hosted main fixture + PR/branch deployment | ✅ main hosted smoke + PR preview deployment | accepted mainのhosted preview smokeは実証済み。PR #97ではCloudflareのCommit Preview URL / Branch Preview URL deploymentも実際にexercise済み。PR preview URLに対するPlaywright `test:e2e:preview` smokeまでは未実施であり、そこは未証明として扱う。Product capability authorityではない |
 | App Auth / G10 | ✅ | ❌ | ❌ | ❌ | P14 #14のUUID proof待ち |
 | Evidence Foundation / G19 | ✅ | ❌ | ❌ | ❌ | P13 #13 + G10待ち |
 | Gmail Sync / G20 | ✅ | ❌ | ❌ | ❌ | real Gmail OAuth/watch/history未実装 |
@@ -247,7 +247,7 @@ ACP builderが実行できないreal DB/provider/browser claimは、Issueが要�
 
 Initial hosting targetは **Cloudflare Workers** です。Issue #91 / PR #92で、Next.js applicationの外側に限定したCloudflare deployment boundaryと、supplied URLを検証するPlaywright smokeがaccepted mainへ入りました。これはfixture-only shellをhostするためのvisibility infrastructureであり、Product/Provider/Auth/DBのauthorityや実capabilityを変えません。
 
-Cloudflare account/Git integrationは外部でactivate済みです。accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから確認できます。PR candidateは利用可能なCloudflare deployment metadata / preview URLから確認します。mutable URLをこのcheckpointや複数docsへ手で複製しません。
+Cloudflare account/Git integrationは外部でactivate済みです。accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから確認できます。PR #97ではCloudflareがCommit Preview URL / Branch Preview URLのdeployment成功を投稿しており、PR/branch preview deployment pathは直接exercise済みです。ただし、そのPR preview URLを`PLAYWRIGHT_BASE_URL`へ指定した`pnpm test:e2e:preview`の実行証拠はまだないため、PR-preview-specific smoke PASSとは記録しません。mutable URLをこのcheckpointや複数docsへ手で複製しません。
 
 deployed runtime truthはsemantic/capability truthとは別です。Cloudflare/GitHubのlive deployment metadataから得たURLを`PLAYWRIGHT_BASE_URL`へ設定して`pnpm test:e2e:preview`を実行し、hosted URLが応答するかを確認します。capability statusは引き続きこの`CURRENT.md`とcanonical sourceで判断します。
 

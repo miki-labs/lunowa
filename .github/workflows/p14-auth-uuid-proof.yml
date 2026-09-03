@@ -1,13 +1,9 @@
 name: P14 Auth UUID Proof
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
-      - ".github/workflows/p14-auth-uuid-proof.yml"
-      - ".github/workflows/p14-auth-uuid-evidence.yml"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
       - "proofs/better-auth-uuid/**"
       - "tests/better-auth-uuid*.ts"
 

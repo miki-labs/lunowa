@@ -7,11 +7,13 @@
 ## Checkpoint metadata
 
 - Last reconciled: **2026-09-03**
-- Last accepted **Product/runtime capability boundary** at reconcile: `6a71b79abdc22ea7bc68deafdc925d51b32a8a1b`（G11）
+- Last accepted **Product/runtime capability boundary**: `6a71b79abdc22ea7bc68deafdc925d51b32a8a1b`（G11）
+- Latest accepted **preview/developer-visibility boundary** at reconcile: Issue #91 / PR #92, merge `5e390371c7ad8f5fe829b627051a169c8ee25e99`
 - Framework/security baseline: Next.js **16.3.3**（G00）
 - Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
+- Production ACP basis checked at reconcile: `dfb207b75c71617f13e903a01a2219213b468cff`（Luna-first / Sol-only critical escalation / one-shot admission）
 - Live GitHub Issue / PR / CI checked: **yes**
-- Mutable snapshot: current Issue / PR / CI stateは変わり得るため、action/review時はlive GitHubを再確認する
+- Mutable snapshot: current Issue / PR / CI / ACP deployment stateは変わり得るため、action/review時はlive stateを再確認する
 
 ## 0. 読み方
 
@@ -43,9 +45,11 @@ Lunowaは、メール中心の **Attention Delegation / Open-loop Monitoring Off
 - G11で、structural Product shell、responsive layout、typed read-model/fixture axes、keyboard/focus/Japanese IME/accessibility harnessが`main`へ入りました。
 - exact candidate CIは `Verify` / `E2E Smoke` ともPASSし、desktop/compactの実runtime visual auditもexact candidateに対して完了しました。
 - framework/security baselineは引き続き **G00 / Next.js 16.3.3** です。
-- 現在の`main` SHA自体はlive GitHubで確認します。docs-only change等までここへ逐次複製しません。
+- **Issue #91 / PR #92** はCloudflare Workers向けpreview/deployment foundationをaccepted `main`へ追加しました。これはdeveloper visibility infrastructureであり、Product capabilityの昇格ではありません。
+- Cloudflare account-side activationも外部で完了し、fixture-only accepted shellをhosted previewで確認できる状態です。preview URLそのものはGitHub/Cloudflareのlive deployment metadataをauthorityとし、このmutable checkpointへ固定コピーしません。
+- 現在の`main` SHA自体はlive GitHubで確認します。docs/control-plane changeまでここへ逐次複製しません。
 
-G11は**本物のGmail/DB/domain runtimeを接続したという意味ではありません**。Better Auth production auth、PostgreSQL/Drizzle production persistence、Gmail integration、Responsibility reducer/Temporal、Send、OpenAI runtimeはまだ未activateです。
+G11/preview foundationは**本物のGmail/DB/domain runtimeを接続したという意味ではありません**。Better Auth production auth、PostgreSQL/Drizzle production persistence、Gmail integration、Responsibility reducer/Temporal、Send、OpenAI runtimeはまだ未activateです。
 
 ### Capability status
 
@@ -54,6 +58,7 @@ G11は**本物のGmail/DB/domain runtimeを接続したという意味ではあ�
 | Capability | Specified | Structural | Real | Verified | 現在の意味 |
 | --- | --- | --- | --- | --- | --- |
 | UI Foundation / G11 | ✅ | ✅ | — | ✅ | structural shell・responsive・IME/accessibility harnessがaccepted mainに入った |
+| Preview / Human Preview Layer | ✅ | ✅ | ✅ hosted fixture shell | ✅ | accepted main/PR candidateをCloudflare previewで確認できる。Product capability authorityではない |
 | App Auth / G10 | ✅ | ❌ | ❌ | ❌ | P14 #14のUUID proof待ち |
 | Evidence Foundation / G19 | ✅ | ❌ | ❌ | ❌ | P13 #13 + G10待ち |
 | Gmail Sync / G20 | ✅ | ❌ | ❌ | ❌ | real Gmail OAuth/watch/history未実装 |
@@ -68,30 +73,48 @@ G11は**本物のGmail/DB/domain runtimeを接続したという意味ではあ�
 | Bounded AI / G70 | ✅ | ❌ | ❌ | ❌ | model runtime未実装 |
 | Complete Loop / G80 | ✅ | ❌ | ❌ | ❌ | vertical loop未完成 |
 
-**重要:** `仕様がある` / `packageが入っている` / `fixtureが動く` / `本番capabilityがある` は別です。
+**重要:** `仕様がある` / `packageが入っている` / `fixtureが動く` / `hosted previewがある` / `本番capabilityがある` は別です。
 
 ```text
 accepted contract
 != installed dependency
 != structural fixture
+!= hosted preview
 != real integration
 != verified Product capability
 ```
 
 ### Current implementation frontier
 
-**G11は完了しました。** 次の実装frontierは、G00後に並列可能だったL2 prerequisite proofです。
+**G00 / G11 / preview foundationは完了しています。** 次の実装frontierはL2 prerequisite proofです。
 
 1. **P14 / Issue #14 — Better Auth UUID persistence proof**
-   - G10 production auth/sessionを直接unblockするため、one-shot runnerでは先に実行する。
-   - 2026-09-01のexecution-time再確認でも Better Auth 1.7.2 / PostgreSQL 18.6 / Drizzle ORM stable 0.45.2 の前提は維持。
+   - 2026-09-03にcurrent ACP向けtask contractをfresh化済み。
+   - stale failed PR #86は再利用しない。次はcurrent accepted `main`から`model-fresh`。
+   - trusted `P14 Auth UUID Proof` + `P14 Trusted Evidence Packaging` workflowはaccepted `main`に存在。
+   - current pre-admission vendor basisは Better Auth/CLI 1.7.2、Drizzle ORM 0.45.2、Kit 0.31.10、pg 8.23.0、PostgreSQL 18.6。
 2. **P13 / Issue #13 — Responsibility PostgreSQL/Drizzle executable proof**
-   - P14後に続ける。
-   - P13 + G10が揃うとG19 provider-neutral evidence foundationへ進める。
+   - 2026-09-03にcurrent ACP workerとreal-PostgreSQL evidenceの境界をfresh化済み。
+   - P14後に実行し、root dependency/lock refreshを減らす。
 3. **P15 / Issue #15 — independent L2 freeze**
-   - P13/P14両方のconcrete evidence後。
+   - P13/P14両方のfinal concrete evidence後。
+   - builder/model self-approval taskではなく、独立full acceptance audit gate。
 
-P13/P14は理論上parallel execution可能ですが、どちらも`package.json` / `pnpm-lock.yaml`を書き得るため**mergeはserial**です。現在のone-shot runnerでは、不要なbase refreshと再proofを減らすため **P14 → P13** の順で進めます。
+### ACP compatibility gate
+
+Issue #95で、pre-created implementation DAG × current production ACPのfull compatibility auditをdurable化しました。
+
+現在の重要ルール:
+
+- pre-created Issueは**planning inventory**であり、そのまま実行権限ではない;
+- fresh model taskは `agent:action:model-fresh` + `agent:ready` が必要;
+- current ACPはIssue本文のprose prerequisiteではなくGitHub native `blocked_by`をmachine dependencyとして読む;
+- downstream #15/#62/#64–#75のprose dependenciesは設計上妥当だが、2026-09-03監査時点ではmachine `blocked_by`が未materializeだったため、ready化前に修正が必要;
+- ACP workerはgeneral web/provider accessを持たないので、volatile vendor researchはready化前にtrusted planner/reviewerがrefreshしてIssueへbindする;
+- real DB/browser/Gmail/provider/deployment等は、必要に応じてpublication後のexact-head trusted CI/host/provider evidenceで閉じる;
+- current model routingは Luna-first、security/high-impact external-effectだけSol critical escalation。
+
+**Issue #95のcontrol-plane reconciliationが完了するまでP14へ`agent:ready`を付けない。**
 
 ---
 
@@ -108,13 +131,17 @@ P13/P14は理論上parallel execution可能ですが、どちらも`package.json
   - exact-head `Verify` + `E2E Smoke` PASS。
   - exact candidateを実行したdesktop/compact runtime visual auditも完了。
 - **G00 / Issue #60 / PR #80** のNext.js 16.3.3 security baselineは継続してaccepted。
-- 日本語第一のHuman Comprehension Layerは引き続きこの`CURRENT.md`を唯一のmutable human checkpointとして使う。
-- **Issue #91 candidate** はCloudflare Workers向けのpreview deployment boundaryを追加した。これはProduct capabilityの昇格ではない。candidateのadapter evidenceとaccount-side activationは [`../deployment-preview.md`](../deployment-preview.md) にあり、hosted URLそのものはGitHub/Cloudflareのlive deployment metadataにのみ置く。
+- **Issue #91 / PR #92** のpreview foundationがaccepted mainへmerge。外部Cloudflare account-side activationも完了し、fixture-only shellのhosted smokeを実行可能。
+- production ACPは2026-09-03にLuna-first / Sol-only critical escalation + volatile-cache recovery修正版へ更新・再有効化済み。ACPはLunowa Product authorityではない。
+- **Issue #95** でpre-created implementation Issuesとcurrent ACP one-shot admissionのcompatibility auditを開始し、P13/P14 task contractをcurrent execution modelへreconcile。
+- P13/P14に`agent:model:complex`、downstream taskにも現行Luna/Sol基準のmodel classを付与。model labelはexecution authorityではない。
 
 ### Next
 
-- P14 #14を先に実行し、PASS後にP13 #13へ進む。
-- P13/P14の両証拠が揃った後、P15 #15でL2を独立freezeする。
+- #95のmachine dependency / router reconciliationを完了する。
+- その後P14 #14だけをfresh `model-fresh`としてready化する。
+- P14 PASS/merge後、P13 #13をcurrent mainへrefreshしてready化する。
+- P13/P14両証拠が揃った後、P15 #15でL2を独立freezeする。
 - G10はP14 PASS後、G19はP13 PASS + G10後に進める。
 
 ### Still not real
@@ -143,7 +170,7 @@ Lunowa
 │  └─ G40  Product Surfaces
 │
 ├─ Prerequisite proofs
-│  ├─ P14  Better Auth UUID proof     ← 次
+│  ├─ P14  Better Auth UUID proof     ← #95完了後の次task
 │  ├─ P13  PostgreSQL/Drizzle proof   ← その次
 │  └─ P15  L2 independent freeze
 │
@@ -180,7 +207,8 @@ Lunowa
 | 最終的に何が出来ればPASS？ | `docs/product/GOLDEN-SCENARIO-BANK.md` |
 | UI/UXはどう振る舞う？ | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` + design trio |
 | Responsibilityの意味は？ | `docs/product/responsibility/` |
-| 実装順・依存関係は？ | `docs/product/IMPLEMENTATION-GRAPH.md` + live Issues |
+| 実装順・依存関係は？ | `docs/product/IMPLEMENTATION-GRAPH.md` + live Issues + GitHub `blocked_by` |
+| ACPで今実行可能？ | current Issue labels/blocked_by + Issue #95 activation rules |
 | 今のcandidate/CIは？ | live GitHub PR / reviews / checks |
 | 実際のコードは何をしてる？ | code / tests / runtime evidence |
 
@@ -208,17 +236,19 @@ pnpm test:e2e
 
 ### PR / CI
 
-実装中candidateを見るときは、**Issue contract → PR summary/diff → exact-head CI** の順で確認します。
+実装中candidateを見るときは、**Issue contract → PR summary/diff → exact-head CI/external evidence → independent full audit** の順で確認します。
 
 G11はすでに`main`へ入っています。今後のP13/P14はproof harnessであり、Product画面の完成度が直接進むtaskではありません。
 
+ACP builderが実行できないreal DB/provider/browser claimは、Issueが要求するexact-head GitHub Actions / trusted host / provider evidenceで確認します。builderがローカルで実行できなかったこととacceptance requirementを削除することは同義ではありません。
+
 ### Hosted preview
 
-Initial hosting targetは **Cloudflare Workers** です。Issue #91 candidateは、Next.js applicationの外側に限定したCloudflare deployment boundaryと、supplied URLを検証するPlaywright smokeを用意しています。これはfixture-only shellをhostするためのvisibility infrastructureであり、Product/Provider/Auth/DBのauthorityや実capabilityを変えません。
+Initial hosting targetは **Cloudflare Workers** です。Issue #91 / PR #92で、Next.js applicationの外側に限定したCloudflare deployment boundaryと、supplied URLを検証するPlaywright smokeがaccepted mainへ入りました。これはfixture-only shellをhostするためのvisibility infrastructureであり、Product/Provider/Auth/DBのauthorityや実capabilityを変えません。
 
-Cloudflare account/Git integrationはこのworkspaceでは未activateです。activation手順は [`../deployment-preview.md`](../deployment-preview.md) を使います。activation後、accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから開きます。PR candidateはCloudflare Workers BuildsがPRへ投稿するpreview URLから直接開きます。mutable URLをこのcheckpointや他のdocsへ手で複製しません。
+Cloudflare account/Git integrationは外部でactivate済みです。accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから確認できます。PR candidateは利用可能なCloudflare deployment metadata / preview URLから確認します。mutable URLをこのcheckpointや複数docsへ手で複製しません。
 
-deployed runtime truthはsemantic/capability truthとは別です。CloudflareのPR commentまたはactive Workerから得たlive URLを`PLAYWRIGHT_BASE_URL`へ設定して`pnpm test:e2e:preview`を実行し、hosted URLが応答するかを確認します。capability statusは引き続きこの`CURRENT.md`とcanonical sourceで判断します。
+deployed runtime truthはsemantic/capability truthとは別です。Cloudflare/GitHubのlive deployment metadataから得たURLを`PLAYWRIGHT_BASE_URL`へ設定して`pnpm test:e2e:preview`を実行し、hosted URLが応答するかを確認します。capability statusは引き続きこの`CURRENT.md`とcanonical sourceで判断します。
 
 ---
 

@@ -86,7 +86,7 @@ accepted contract
 
 ### Current implementation frontier
 
-**G00 / G11 / preview foundationは完了しています。** 次の実装frontierはL2 prerequisite proofです。
+**G00 / G11 / preview foundation / execution-control reconciliationは完了しています。** 次の実装frontierはL2 prerequisite proofです。
 
 1. **P14 / Issue #14 — Better Auth UUID persistence proof**
    - 2026-09-03にcurrent ACP向けtask contractをfresh化済み。
@@ -102,20 +102,20 @@ accepted contract
 
 ### ACP compatibility gate
 
-Issue #95で、pre-created implementation DAG × current ACP code/one-shot contractのfull compatibility auditをdurable化しました。
+Issue #95で、pre-created implementation DAG × current ACP code/one-shot contractのfull compatibility auditをdurable化し、**PASS / completed**で閉じました。
 
 現在の重要ルール:
 
 - pre-created Issueは**planning inventory**であり、そのまま実行権限ではない;
 - fresh model taskは `agent:action:model-fresh` + `agent:ready` が必要;
 - current ACPはIssue本文のprose prerequisiteではなくGitHub native `blocked_by`をmachine dependencyとして読む;
-- downstream #15/#62/#64–#75のprose dependenciesは設計上妥当だが、2026-09-03監査時点ではmachine `blocked_by`が未materializeだったため、ready化前に修正が必要;
+- #15/#62/#64–#75のGitHub native `blocked_by` DAGは2026-09-03にmaterializeし、意図したdependency graphとの一致を独立確認済み;
 - ACP workerはgeneral web/GitHub/provider/private-registry accessを持たない。public-pnpm network exceptionはnpm registryに限定され、qualified trust boundaryでは任意のcontroller/host-local/private destinationへ到達できないことを要求する。`allow_local_binding = false`を「local listener作成が必ず不可能」という意味には使わない;
 - volatile vendor researchはready化前にtrusted planner/reviewerがrefreshしてIssueへbindする;
 - real DB/browser/Gmail/provider/deployment等は、必要に応じてpublication後のexact-head trusted CI/host/provider evidenceで閉じる;
 - current model routingは Luna-first、security/high-impact external-effectだけSol critical escalation。
 
-**Issue #95のcontrol-plane reconciliationが完了するまでP14へ`agent:ready`を付けない。**
+**P14 #14は、current main / current Issue contract / blocked_by / vendor checkpoint / trusted external-evidence laneを確認するbounded activation auditにPASSした後だけ`agent:ready`へ進める。**
 
 ---
 
@@ -134,13 +134,12 @@ Issue #95で、pre-created implementation DAG × current ACP code/one-shot contr
 - **G00 / Issue #60 / PR #80** のNext.js 16.3.3 security baselineは継続してaccepted。
 - **Issue #91 / PR #92** のpreview foundationがaccepted mainへmerge。外部Cloudflare account-side activationも完了し、fixture-only shellのhosted smokeを実行可能。
 - ACP #83のreal-host restart qualificationはPASSし、ACP `main`にはLuna-first routingとvolatile-cache recovery修正版がmerge済み。**現在のWindows Task Schedulerが実際にEnabled/Disabledのどちらかはmutable host stateなので、GitHubだけから再有効化済みとは断定しない。**
-- **Issue #95** でpre-created implementation Issuesとcurrent ACP one-shot admissionのcompatibility auditを開始し、P13/P14 task contractをcurrent execution modelへreconcile。
+- **Issue #95** はpre-created implementation Issuesとcurrent ACP one-shot admissionのcompatibility reconciliationをfull acceptance audit PASSで完了。GitHub native machine DAG、P13/P14 execution boundary、Luna/Sol model routing、review-only #15を確認してcompletedでclose。
 - P13/P14に`agent:model:complex`、downstream taskにも現行Luna/Sol基準のmodel classを付与。model labelはexecution authorityではない。
 
 ### Next
 
-- #95のmachine dependency / router reconciliationを完了する。
-- その後P14 #14だけをfresh `model-fresh`としてready化する。
+- P14 #14をcurrent mainに対してbounded activation auditし、PASSならfresh `model-fresh`としてready化する。
 - P14 PASS/merge後、P13 #13をcurrent mainへrefreshしてready化する。
 - P13/P14両証拠が揃った後、P15 #15でL2を独立freezeする。
 - G10はP14 PASS後、G19はP13 PASS + G10後に進める。
@@ -171,7 +170,7 @@ Lunowa
 │  └─ G40  Product Surfaces
 │
 ├─ Prerequisite proofs
-│  ├─ P14  Better Auth UUID proof     ← #95完了後の次task
+│  ├─ P14  Better Auth UUID proof     ← current frontier
 │  ├─ P13  PostgreSQL/Drizzle proof   ← その次
 │  └─ P15  L2 independent freeze
 │

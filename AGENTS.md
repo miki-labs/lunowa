@@ -13,10 +13,13 @@ This file is a **task router**, not the handbook. Read only the owning source ne
 - Issue #55 / PR #57 completed the implementation-facing v1 UI/UX contract.
 - Issue #58 / PR #59 completed the implementation-graph / architecture-activation freeze.
 - Issue #61 / PR #76 completed the minimal five-reference visual freeze; runtime/browser audit owns final state-specific/pixel-sensitive fidelity.
-- **Issue #60 / G00 is the current runtime `SERIAL_GATE`: patch the accepted Next.js 16.3 line to the current security baseline before the first write-heavy fanout.**
-- `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues now own exact dependency, schema-writer, FK-topology and parallelization authority.
-- After G00 PASS/merge, P13 / P14 / G11 are the first safe parallel execution wave, subject to serialized `package.json` / `pnpm-lock.yaml` merge ownership.
-- Issue #36 remains open empirical Product Discovery but is deferred in execution order; implementation cannot turn ICP/PMF/WTP/retention/reliability into facts.
+- Issue #60 / G00 is **COMPLETE**; the accepted Next.js 16.3 security baseline is already on `main`.
+- Issue #63 / G11 is **COMPLETE**; the fixture/read-model product shell and accessibility/IME harness are already on `main`.
+- Issue #91 / PR #92 completed the repository-side Human Preview Layer / Cloudflare preview foundation; preview/deployment infrastructure is not Product authority.
+- The current implementation frontier is Responsibility executable proof: **P14 #14 first operationally, then P13 #13**, followed by independent P15 #15. P13 and P14 remain logically separable, but current production ACP admits one unresolved model task per repository at a time and root dependency/lock assets remain serialized.
+- Issue #95 records the current ACP-compatibility reconciliation. A pre-created Issue is planning inventory until its activation audit passes.
+- `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub Issues own architectural dependency, schema-writer, FK-topology and parallelization authority; GitHub-native `blocked_by` relationships own ACP's machine dependency gate.
+- Issue #36 remains open empirical Product Discovery; implementation cannot turn ICP/PMF/WTP/retention/reliability into facts.
 - Issue #28 remains its bounded comparative fake-data experiment unless explicitly reconciled; do not repurpose it as the Product-completion lane.
 
 Responsibility proof routing remains:
@@ -38,6 +41,34 @@ AGENTS.md
 -> live current Issue/PR/CI
 -> only the canonical sources relevant to the decision
 ```
+
+## Current ACP activation contract
+
+The production ACP is a one-shot GitHub-native coding-agent controller. **Pre-created Issues are not automatically executable.** Before any non-trivial Issue receives model authority, perform a bounded activation audit:
+
+```text
+current accepted main
++ current Issue body
++ current owning canonical sources
++ live GitHub blocked_by
++ current volatile vendor evidence where applicable
++ required external/host/provider evidence lane
++ explicit model class when non-default strength is justified
+= executable task contract
+```
+
+Rules:
+
+- A fresh model task requires `agent:action:model-fresh` + `agent:ready`; a model label alone never authorizes execution.
+- `agent:action:model-correction` is valid only for an existing deterministic open PR with a trusted current-head FAIL handoff. Closed/stale candidates are not correction authority.
+- GitHub-native `blocked_by` must mirror unresolved implementation prerequisites before an Issue is made ready. ACP does not parse prose dependency text as its machine DAG.
+- Do not bulk-add `agent:ready` to the backlog. Activate only the current verified frontier.
+- ACP consumes one ready authorization into `agent:running` before one model execution; scheduler restart never authorizes automatic model replay.
+- Current model routing is Luna-first: `simple` -> Luna/medium, default `standard` -> Luna/high, `complex` -> Luna/xhigh, `critical` -> Sol/high. Use `critical` only for genuinely security/destructive/high-impact external-effect work.
+- The isolated ACP worker has no general web/GitHub/provider/private-registry access and no local network binding. For this public pnpm repository it may access the public npm registry only.
+- Therefore execution-time vendor research is a **trusted pre-admission planning/review responsibility**. Refresh volatile vendor facts before `agent:ready` and bind the result into the Issue or accepted canonical evidence; do not ask the worker to browse unavailable sources.
+- Real PostgreSQL, browser/deployment, Gmail/provider, credential-bound and other host-only claims must come from exact-head trusted CI/host/provider evidence after publication when the worker cannot establish them. Never weaken an acceptance criterion because it is outside the worker sandbox.
+- Candidate-authored tests/workflows are part of the cumulative candidate and must themselves be audited; green CI is evidence only for what the oracle actually proves.
 
 ## Source of truth by question
 
@@ -143,7 +174,7 @@ Do not revert to either stale extreme:
 - Verify `origin`/repository and accepted base before task-branch work.
 - For Responsibility work, map behavior to canonical scenarios/transitions/oracles.
 - For Product behavior, use Golden Scenarios without overriding Responsibility truth.
-- For L2 proof, use real PostgreSQL/generated SQL/concurrency/auth evidence required by the gate.
+- For L2 proof, preserve real PostgreSQL/generated SQL/concurrency/auth acceptance; use the Issue's current builder-vs-external-evidence boundary rather than faking unavailable host proof.
 - Before production migrations, verify every external FK target exists in accepted production topology; proof fixtures never count.
 - Keep provider SDK types inside adapters.
 - For generic UI interaction/accessibility primitives, reuse in this order: existing Lunowa component -> current shadcn/ui component/registry -> its maintained underlying primitive/library -> other mature maintained OSS. A custom primitive requires a concrete accepted gap; do not hand-roll focus management, keyboard interaction, dialog/menu/popover/tooltip/combobox/drawer, resize, virtualization or similar generic infrastructure when a maintained primitive satisfies the accepted UI contract.

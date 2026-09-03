@@ -11,9 +11,9 @@
 - Latest accepted **preview/developer-visibility boundary** at reconcile: Issue #91 / PR #92, merge `5e390371c7ad8f5fe829b627051a169c8ee25e99`
 - Framework/security baseline: Next.js **16.3.3**（G00）
 - Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
-- Production ACP basis checked at reconcile: `dfb207b75c71617f13e903a01a2219213b468cff`（Luna-first / Sol-only critical escalation / one-shot admission）
+- ACP code basis checked at reconcile: `dfb207b75c71617f13e903a01a2219213b468cff`（Luna-first / Sol-only critical escalation / one-shot admission）
 - Live GitHub Issue / PR / CI checked: **yes**
-- Mutable snapshot: current Issue / PR / CI / ACP deployment stateは変わり得るため、action/review時はlive stateを再確認する
+- Mutable snapshot: current Issue / PR / CI / ACP host deployment stateは変わり得るため、action/review時はlive stateを再確認する
 
 ## 0. 読み方
 
@@ -102,7 +102,7 @@ accepted contract
 
 ### ACP compatibility gate
 
-Issue #95で、pre-created implementation DAG × current production ACPのfull compatibility auditをdurable化しました。
+Issue #95で、pre-created implementation DAG × current ACP code/one-shot contractのfull compatibility auditをdurable化しました。
 
 現在の重要ルール:
 
@@ -110,7 +110,8 @@ Issue #95で、pre-created implementation DAG × current production ACPのfull c
 - fresh model taskは `agent:action:model-fresh` + `agent:ready` が必要;
 - current ACPはIssue本文のprose prerequisiteではなくGitHub native `blocked_by`をmachine dependencyとして読む;
 - downstream #15/#62/#64–#75のprose dependenciesは設計上妥当だが、2026-09-03監査時点ではmachine `blocked_by`が未materializeだったため、ready化前に修正が必要;
-- ACP workerはgeneral web/provider accessを持たないので、volatile vendor researchはready化前にtrusted planner/reviewerがrefreshしてIssueへbindする;
+- ACP workerはgeneral web/GitHub/provider/private-registry accessを持たない。public-pnpm network exceptionはnpm registryに限定され、qualified trust boundaryでは任意のcontroller/host-local/private destinationへ到達できないことを要求する。`allow_local_binding = false`を「local listener作成が必ず不可能」という意味には使わない;
+- volatile vendor researchはready化前にtrusted planner/reviewerがrefreshしてIssueへbindする;
 - real DB/browser/Gmail/provider/deployment等は、必要に応じてpublication後のexact-head trusted CI/host/provider evidenceで閉じる;
 - current model routingは Luna-first、security/high-impact external-effectだけSol critical escalation。
 
@@ -132,7 +133,7 @@ Issue #95で、pre-created implementation DAG × current production ACPのfull c
   - exact candidateを実行したdesktop/compact runtime visual auditも完了。
 - **G00 / Issue #60 / PR #80** のNext.js 16.3.3 security baselineは継続してaccepted。
 - **Issue #91 / PR #92** のpreview foundationがaccepted mainへmerge。外部Cloudflare account-side activationも完了し、fixture-only shellのhosted smokeを実行可能。
-- production ACPは2026-09-03にLuna-first / Sol-only critical escalation + volatile-cache recovery修正版へ更新・再有効化済み。ACPはLunowa Product authorityではない。
+- ACP #83のreal-host restart qualificationはPASSし、ACP `main`にはLuna-first routingとvolatile-cache recovery修正版がmerge済み。**現在のWindows Task Schedulerが実際にEnabled/Disabledのどちらかはmutable host stateなので、GitHubだけから再有効化済みとは断定しない。**
 - **Issue #95** でpre-created implementation Issuesとcurrent ACP one-shot admissionのcompatibility auditを開始し、P13/P14 task contractをcurrent execution modelへreconcile。
 - P13/P14に`agent:model:complex`、downstream taskにも現行Luna/Sol基準のmodel classを付与。model labelはexecution authorityではない。
 

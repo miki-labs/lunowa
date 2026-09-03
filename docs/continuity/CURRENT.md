@@ -6,7 +6,7 @@
 
 ## Checkpoint metadata
 
-- Last reconciled: **2026-09-01**
+- Last reconciled: **2026-09-03**
 - Last accepted **Product/runtime capability boundary** at reconcile: `6a71b79abdc22ea7bc68deafdc925d51b32a8a1b`（G11）
 - Framework/security baseline: Next.js **16.3.3**（G00）
 - Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
@@ -109,6 +109,7 @@ P13/P14は理論上parallel execution可能ですが、どちらも`package.json
   - exact candidateを実行したdesktop/compact runtime visual auditも完了。
 - **G00 / Issue #60 / PR #80** のNext.js 16.3.3 security baselineは継続してaccepted。
 - 日本語第一のHuman Comprehension Layerは引き続きこの`CURRENT.md`を唯一のmutable human checkpointとして使う。
+- **Issue #91 candidate** はCloudflare Workers向けのpreview deployment boundaryを追加した。これはProduct capabilityの昇格ではない。candidateのadapter evidenceとaccount-side activationは [`../deployment-preview.md`](../deployment-preview.md) にあり、hosted URLそのものはGitHub/Cloudflareのlive deployment metadataにのみ置く。
 
 ### Next
 
@@ -213,9 +214,11 @@ G11はすでに`main`へ入っています。今後のP13/P14はproof harnessで
 
 ### Hosted preview
 
-Initial hosting targetは **Cloudflare Workers** です。現時点ではhosting adapter/deploymentはaccepted runtime capabilityではなく、人間の把握だけを目的に新しいpreview platformを追加しません。
+Initial hosting targetは **Cloudflare Workers** です。Issue #91 candidateは、Next.js applicationの外側に限定したCloudflare deployment boundaryと、supplied URLを検証するPlaywright smokeを用意しています。これはfixture-only shellをhostするためのvisibility infrastructureであり、Product/Provider/Auth/DBのauthorityや実capabilityを変えません。
 
-Hosted previewが継続的な価値を持つことが実測されたら、accepted hosting pathのactivation時に **PR/commitから直接開けるpreview** を追加します。今はlocal runtime + GitHub CI/browser evidenceを使います。
+Cloudflare account/Git integrationはこのworkspaceでは未activateです。activation手順は [`../deployment-preview.md`](../deployment-preview.md) を使います。activation後、accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから開きます。PR candidateはCloudflare Workers BuildsがPRへ投稿するpreview URLから直接開きます。mutable URLをこのcheckpointや他のdocsへ手で複製しません。
+
+deployed runtime truthはsemantic/capability truthとは別です。CloudflareのPR commentまたはactive Workerから得たlive URLを`PLAYWRIGHT_BASE_URL`へ設定して`pnpm test:e2e:preview`を実行し、hosted URLが応答するかを確認します。capability statusは引き続きこの`CURRENT.md`とcanonical sourceで判断します。
 
 ---
 

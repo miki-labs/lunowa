@@ -19,6 +19,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "proof:auth-uuid:schema": "auth generate --config proofs/better-auth-uuid/auth.ts --output proofs/better-auth-uuid/auth-schema.ts --yes && drizzle-kit generate --config proofs/better-auth-uuid/drizzle.config.ts",
+    "test:auth-uuid": "node --import tsx tests/better-auth-uuid-proof.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test e2e/deployed-preview-smoke.spec.ts",
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.54.3",
     "@playwright/test": "1.62.1",
+    "@types/pg": "8.23.1",
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",
@@ -44,14 +47,20 @@
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.1.1",
     "@vitejs/plugin-rsc": "0.5.34",
+    "auth": "1.7.2",
+    "better-auth": "1.7.2",
+    "drizzle-kit": "0.31.10",
+    "drizzle-orm": "0.45.2",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.3",
     "jsdom": "30.0.1",
     "postcss": "^8.5.0",
+    "pg": "8.23.0",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "vite": "8.2.2",
     "vitest": "4.1.10",
+    "tsx": "4.21.0",
     "wrangler": "4.128.0"
   }
 }

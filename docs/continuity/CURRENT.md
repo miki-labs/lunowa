@@ -58,7 +58,7 @@ G11/preview foundationは**本物のGmail/DB/domain runtimeを接続したとい
 | Capability | Specified | Structural | Real | Verified | 現在の意味 |
 | --- | --- | --- | --- | --- | --- |
 | UI Foundation / G11 | ✅ | ✅ | — | ✅ | structural shell・responsive・IME/accessibility harnessがaccepted mainに入った |
-| Preview / Human Preview Layer | ✅ | ✅ | ✅ hosted fixture shell | ✅ | accepted main/PR candidateをCloudflare previewで確認できる。Product capability authorityではない |
+| Preview / Human Preview Layer | ✅ | ✅ | ✅ hosted main fixture shell | ✅ main hosted smoke | accepted mainのhosted previewは実証済み。repositoryはPR/branch preview-readyだが、実PR preview URLのexerciseは次のreal PRで確認する。Product capability authorityではない |
 | App Auth / G10 | ✅ | ❌ | ❌ | ❌ | P14 #14のUUID proof待ち |
 | Evidence Foundation / G19 | ✅ | ❌ | ❌ | ❌ | P13 #13 + G10待ち |
 | Gmail Sync / G20 | ✅ | ❌ | ❌ | ❌ | real Gmail OAuth/watch/history未実装 |
@@ -247,7 +247,7 @@ ACP builderが実行できないreal DB/provider/browser claimは、Issueが要�
 
 Initial hosting targetは **Cloudflare Workers** です。Issue #91 / PR #92で、Next.js applicationの外側に限定したCloudflare deployment boundaryと、supplied URLを検証するPlaywright smokeがaccepted mainへ入りました。これはfixture-only shellをhostするためのvisibility infrastructureであり、Product/Provider/Auth/DBのauthorityや実capabilityを変えません。
 
-Cloudflare account/Git integrationは外部でactivate済みです。accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから確認できます。PR candidateは利用可能なCloudflare deployment metadata / preview URLから確認します。mutable URLをこのcheckpointや複数docsへ手で複製しません。
+Cloudflare account/Git integrationは外部でactivate済みです。accepted `main`はCloudflareの`lunowa-preview` Workerのactive deployment / workers.dev URLから確認できます。PR candidateは利用可能なCloudflare deployment metadata / preview URLから確認します。PR/branch preview URLの実exerciseは次のreal non-production Lunowa PRで確認し、未確認状態をhosted-main proofと混同しません。mutable URLをこのcheckpointや複数docsへ手で複製しません。
 
 deployed runtime truthはsemantic/capability truthとは別です。Cloudflare/GitHubのlive deployment metadataから得たURLを`PLAYWRIGHT_BASE_URL`へ設定して`pnpm test:e2e:preview`を実行し、hosted URLが応答するかを確認します。capability statusは引き続きこの`CURRENT.md`とcanonical sourceで判断します。
 

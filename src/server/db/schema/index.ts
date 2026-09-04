@@ -8,3 +8,14 @@ export {
   participantIdentities,
   providerSyncStates
 } from './evidence';
+export {
+  aiInterpretationRuns,
+  responsibilities,
+  responsibilityAdmissionReviews,
+  responsibilityDomainEvents,
+  responsibilityExpectedEvents,
+  responsibilityFieldDecisions,
+  responsibilityObligationLegs,
+  responsibilityProvenanceRefs,
+  responsibilityTemporalFacts
+} from './responsibility';

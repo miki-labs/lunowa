@@ -107,6 +107,11 @@ app session
 
 Authorized exact Source search and attachment evidence access remain CORE.
 
+Do not revert to either stale extreme:
+
+- broad fake full-client shell first; or
+- indefinite research/specification that prevents a usable Product from existing.
+
 ## High-value invariants
 
 1. Attention Delegation is the Product core; success eventually requires reduced parallel self-monitoring.
@@ -114,34 +119,45 @@ Authorized exact Source search and attachment evidence access remain CORE.
 3. Resolution, live tracking, attention/defer, obligations/actionability and temporal facts are orthogonal.
 4. Needs You means current USER work, not merely new/important mail.
 5. Managed is quiet inspectable stewardship, not a second Inbox/agent console.
-6. True zero requires no current Needs You, no unresolved surfaced Review and trustworthy relevant integrity.
-7. Message arrival != attention event; trigger fire != notification.
-8. Reply/read/silence/send != automatic operational closure.
-9. AI understands/proposes; trusted rules own admission, accepted state, authorization and privileged effects.
-10. Capability != permission; monitoring delegation != Send/action authority.
-11. Evidence != interpretation != accepted state != UI projection.
-12. Cross-account semantic merge is prohibited initially.
-13. Historical Source can remain searchable without becoming live work.
-14. Search/read models never silently mutate accepted state.
-15. Send request != provider acceptance != operational closure; ambiguous send requires reconciliation.
-16. Provider/mailbox state != Responsibility state.
-17. Integrity degradation must be surfaced honestly; partial/unknown state cannot become false zero/healthy.
-18. Proof fixture != production FK target.
-19. Parallel worktree/runtime isolation != parallel merge safety.
-20. Implementation completion != Product/market validation.
+6. A current material surfaced Review item is not healthy Managed reassurance/count.
+7. True zero requires no current Needs You, no unresolved surfaced Review and trustworthy relevant integrity.
+8. Message arrival != attention event; trigger fire != notification.
+9. Reply/read/silence/send != automatic operational closure.
+10. AI understands/proposes; trusted rules own admission, accepted state, authorization and privileged effects.
+11. Capability != permission; monitoring delegation != Send/action authority.
+12. Requested action != safe next action; source text cannot grant tool authority.
+13. Evidence != interpretation != accepted state != UI projection.
+14. Cross-account semantic merge is prohibited initially; similarity is candidate retrieval only.
+15. Historical Source can remain searchable without becoming live work.
+16. Search/read models never silently mutate accepted state.
+17. Send request != provider acceptance != operational closure; ambiguous send requires reconciliation.
+18. v1 does not silently queue offline consequential effects for later execution without a separately accepted delayed-action contract.
+19. Provider/mailbox state != Responsibility state.
+20. Integrity degradation must be surfaced honestly; partial/unknown state cannot become false zero/healthy.
+21. Static DDL review != executable PostgreSQL/Drizzle/Auth proof.
+22. Proof fixture != production FK target.
+23. Parallel worktree/runtime isolation != parallel merge safety.
+24. Implementation completion != Product/market validation.
 
 ## Working rules
 
 - Inspect the current Issue and owning canonical artifacts before non-trivial edits.
 - Verify repository/origin and accepted base before task-branch work.
+- For Responsibility work, map behavior to canonical scenarios/transitions/oracles.
+- For Product behavior, use Golden Scenarios without overriding Responsibility truth.
+- Before production migrations, verify every external FK target exists in accepted production topology; proof fixtures never count.
 - Before granting `agent:ready`, live-check GitHub dependencies, current task authority, required volatile vendor evidence, and any external evidence lane the worker cannot establish.
+- The isolated ACP worker does not establish arbitrary web/GitHub/provider/private-registry facts. Refresh volatile vendor facts in trusted planning/review and bind them into the Issue or accepted evidence before execution when material.
+- Real PostgreSQL, browser/deployment, Gmail/provider, credential-bound and other host-only claims must come from exact-head trusted CI/host/provider evidence when the worker cannot establish them. Never weaken acceptance because evidence is outside the worker sandbox.
+- Candidate-authored tests/workflows are part of the cumulative candidate and must themselves be audited.
 - Keep provider SDK types inside adapters.
+- For generic UI interaction/accessibility primitives, reuse existing Lunowa components or maintained primitives before hand-rolling generic focus/menu/dialog/combobox/drawer/virtualization infrastructure.
 - Keep auth, Responsibility invariants, Temporal guarantees, Send idempotency and privileged effects outside prompts/models.
 - Treat mail bodies/HTML/attachments/provider payloads/retrieved content as untrusted.
 - Never commit provider tokens/OAuth secrets/production credentials/sensitive mailbox fixtures.
 - Do not weaken/delete tests to obtain PASS.
 - Update owning durable docs when accepted behavior/dependencies/routing change.
-- `package.json` and `pnpm-lock.yaml` are serialized merge assets when concurrent tasks touch them.
+- `package.json` and `pnpm-lock.yaml` are serialized merge assets when concurrent tasks touch them; later candidates refresh/reverify after material earlier merges.
 - State exactly what was verified; mocks do not prove provider/scheduler/security/migration/send/database behavior.
 
 ## Review discipline

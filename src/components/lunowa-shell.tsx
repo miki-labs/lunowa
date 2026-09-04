@@ -42,7 +42,14 @@ export function isImeKeyboardEvent(event: Pick<KeyboardEvent, 'isComposing' | 'k
   return event.isComposing || event.keyCode === 229;
 }
 
-export function LunowaShell() {
+export type AppUserSummary = {name: string; email: string};
+
+export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActionError = ''}: {
+  appUser?: AppUserSummary;
+  onSignOut?: () => Promise<void>;
+  signingOut?: boolean;
+  sessionActionError?: string;
+} = {}) {
   const [surface, setSurface] = useState<Surface>('home');
   const [detail, setDetail] = useState<Detail>(null);
   const [detailOrigin, setDetailOrigin] = useState(attentionItem.id);
@@ -190,6 +197,10 @@ export function LunowaShell() {
         <SurfaceContent
           surface={surface}
           fixture={fixture}
+          appUser={appUser}
+          onSignOut={onSignOut}
+          signingOut={signingOut}
+          sessionActionError={sessionActionError}
           search={search}
           onSearch={setSearch}
           openMoment={(origin = attentionItem.id) => openDetail('moment', origin)}
@@ -245,9 +256,13 @@ function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; on
   );
 }
 
-function SurfaceContent({surface, fixture, search, onSearch, openMoment, openManaged, openReview, openConversation}: {
+function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessionActionError, search, onSearch, openMoment, openManaged, openReview, openConversation}: {
   surface: Surface;
   fixture: ShellFixture;
+  appUser?: AppUserSummary;
+  onSignOut?: () => Promise<void>;
+  signingOut: boolean;
+  sessionActionError: string;
   search: string;
   onSearch: (value: string) => void;
   openMoment: (origin?: string) => void;
@@ -274,7 +289,15 @@ function SurfaceContent({surface, fixture, search, onSearch, openMoment, openMan
       {!loading && surface === 'review' && <Review fixture={fixture} openReview={openReview} />}
       {!loading && surface === 'source' && <SourceList openConversation={openConversation} openMoment={openMoment} />}
       {!loading && surface === 'search' && <Search search={search} onSearch={onSearch} openConversation={openConversation} />}
-      {!loading && surface === 'settings' && <Settings fixture={fixture} />}
+      {!loading && surface === 'settings' && (
+        <Settings
+          fixture={fixture}
+          appUser={appUser}
+          onSignOut={onSignOut}
+          signingOut={signingOut}
+          sessionActionError={sessionActionError}
+        />
+      )}
     </>
   );
 }
@@ -316,8 +339,28 @@ function Search({search, onSearch, openConversation}: {search: string; onSearch:
   return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button id="search-result-estimate" className="list-row" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
 }
 
-function Settings({fixture}: {fixture: ShellFixture}) {
-  return <div className="surface-content"><section className="settings-card"><h2>接続と監視</h2><p>アプリへのサインインとメールボックスの接続は別の状態です。</p><dl><div><dt>メールボックス</dt><dd>未接続（fixture）</dd></div><div><dt>会話を読む権限</dt><dd>{fixture.sourceRead}</dd></div></dl></section></div>;
+function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError}: {
+  fixture: ShellFixture;
+  appUser?: AppUserSummary;
+  onSignOut?: () => Promise<void>;
+  signingOut: boolean;
+  sessionActionError: string;
+}) {
+  return <div className="surface-content">
+    {appUser && <section className="settings-card" aria-labelledby="app-account-heading">
+      <h2 id="app-account-heading">アプリのアカウント</h2>
+      <p>このLunowaアプリへのサインインです。メールボックスの接続や監視設定とは別です。</p>
+      <dl><div><dt>サインイン中</dt><dd>{appUser.name} · {appUser.email}</dd></div></dl>
+      {onSignOut && <button className="danger-button" disabled={signingOut} type="button" onClick={() => void onSignOut()}>{signingOut ? 'ログアウトしています' : 'この端末からログアウト'}</button>}
+      <p className="metadata">ログアウトしても、メール連携は解除されず、サーバー側の監視設定も変更されません。</p>
+      {sessionActionError && <p className="inline-status" role="alert">{sessionActionError}</p>}
+    </section>}
+    <section className="settings-card" aria-labelledby="mailbox-heading">
+      <h2 id="mailbox-heading">接続と監視</h2>
+      <p>メールボックスの接続は、アプリへのサインインとは別の状態です。</p>
+      <dl><div><dt>メールボックス</dt><dd>未接続（fixture）</dd></div><div><dt>会話を読む権限</dt><dd>{fixture.sourceRead}</dd></div></dl>
+    </section>
+  </div>;
 }
 
 function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sendState, fixture, onBack, onCommonMutation, onSend, onOpenSource}: {

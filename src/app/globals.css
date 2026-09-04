@@ -108,7 +108,7 @@ h3 { font-size: 1rem; margin-bottom: 8px; }
 .source-row time { color: var(--muted-foreground); font-size: .75rem; }
 .status-affordance { min-height: 32px; border: 1px solid #c6b9df; border-radius: 8px; background: var(--review-bg); color: var(--review-fg); font-size: .75rem; font-weight: 700; padding: 5px 8px; }
 .search-box { display: grid; gap: 8px; color: var(--foreground); font-size: .875rem; font-weight: 700; }
-.search-box input, textarea { width: 100%; border: 1px solid #aeb9cb; border-radius: 9px; background: white; color: var(--foreground); font-size: 1rem; line-height: 1.5; padding: 10px 12px; }
+.search-box input, .auth-form input, textarea { width: 100%; border: 1px solid #aeb9cb; border-radius: 9px; background: white; color: var(--foreground); font-size: 1rem; line-height: 1.5; padding: 10px 12px; }
 .empty-state { border: 1px dashed #b9c7dd; border-radius: 12px; color: var(--muted-foreground); line-height: 1.6; padding: 20px; }
 .settings-card { border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
 .settings-card dl { display: grid; gap: 10px; font-size: .875rem; }
@@ -123,6 +123,7 @@ h3 { font-size: 1rem; margin-bottom: 8px; }
 fieldset { border: 0; margin: 24px 0; padding: 0; } legend { font-weight: 700; margin-bottom: 10px; }.message-card { border-left: 4px solid var(--waiting-fg); background: white; box-shadow: 0 1px 3px rgb(23 32 51 / .08); padding: 16px; }.composer { border: 1px solid var(--border); border-radius: 14px; background: white; margin-top: 28px; padding: 18px; }.composer label { display: grid; gap: 8px; font-size: .875rem; font-weight: 700; }.composer textarea { margin-bottom: 10px; resize: vertical; }.composer .primary-button { margin-top: 6px; }.empty-detail { max-width: 460px; color: var(--muted-foreground); margin: 22vh auto 0; text-align: center; }.empty-detail h2 { color: var(--foreground); }.status-region { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .mobile-header, .scrim { display: none; }
 .session-panel { display: grid; width: min(100% - 32px, 520px); min-height: 100dvh; align-content: center; gap: 12px; margin: auto; }.session-panel p { color: var(--muted-foreground); line-height: 1.6; }.session-panel .fixture-switch { margin-top: 30px; }
+.auth-form { display: grid; gap: 14px; margin-top: 4px; }.auth-form label { display: grid; gap: 7px; font-size: .875rem; font-weight: 700; }.auth-form .primary-button { width: 100%; margin-top: 4px; }.session-notice { border-left: 4px solid var(--waiting-fg); background: var(--waiting-bg); color: #203f6b !important; padding: 10px 12px; }.auth-error { color: #8d332e !important; font-size: .875rem; margin-bottom: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 @media (max-width: 1439px) { .app-shell { grid-template-columns: 192px minmax(340px, 410px) minmax(0, 1fr); }.primary-nav { padding-inline: 8px; }.brand { padding-inline: 10px; } }

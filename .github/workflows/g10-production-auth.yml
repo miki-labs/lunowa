@@ -1,0 +1,72 @@
+name: G10 Production Auth
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/g10-production-auth.yml"
+      - "drizzle/**"
+      - "drizzle.config.ts"
+      - "src/app/api/auth/**"
+      - "src/app/api/bff/**"
+      - "src/components/auth-boundary.tsx"
+      - "src/server/auth/**"
+      - "src/server/db/**"
+      - "tests/auth-*.ts"
+      - "tests/auth-*.tsx"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  g10-auth:
+    name: PostgreSQL 18.6 auth acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: lunowa_g10_auth
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55410:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lunowa_g10_auth"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.20.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify committed production migration is current
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- drizzle src/server/db/schema/auth.ts
+          test -z "$(git ls-files --others --exclude-standard -- drizzle)"
+
+      - name: Run production auth acceptance
+        env:
+          G10_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55410/lunowa_g10_auth
+        run: pnpm test:auth-production

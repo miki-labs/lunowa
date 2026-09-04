@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       external_evidence_reference:
-        description: Trusted OAuth consent and Pub/Sub delivery evidence reference
+        description: Reviewer-inspectable app OAuth, Terraform, push, cron and reconnect evidence reference
         required: true
         type: string
 

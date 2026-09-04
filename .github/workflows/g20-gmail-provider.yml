@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/g20-gmail-provider.yml'
+      - 'infra/gmail-pubsub/**'
+      - 'wrangler.jsonc'
+      - 'src/worker.ts'
       - 'drizzle/**'
       - 'drizzle.config.ts'
       - 'src/app/api/**/gmail/**'

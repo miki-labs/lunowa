@@ -21,6 +21,7 @@ import type {
   GmailWatch
 } from '@/server/gmail/types';
 import {GmailProviderError, GMAIL_READONLY_SCOPE} from '@/server/gmail/types';
+import {runGmailReconciliation} from '@/server/gmail/worker';
 
 const environment: GmailEnvironment = {
   clientId: 'client-id',
@@ -129,23 +130,23 @@ describe('G20 Gmail credential and authorization boundary', () => {
         row.consumed = true;
         return row as never;
       }),
-      putCredential: vi.fn(async (input: {encryptedPayload: string; grantedScopes: readonly string[]}) => {
-        credentials.encryptedPayload = input.encryptedPayload;
+      activateConnection: vi.fn(async (input: {
+        encryptPayload: (connectedAccountId: string) => string;
+        grantedScopes: readonly string[];
+      }) => {
+        credentials.encryptedPayload = input.encryptPayload('00000000-0000-4000-8000-000000000002');
         credentials.scopes = input.grantedScopes;
-        return 'credential-id';
-      }),
-      enqueueSignal: vi.fn(async () => true)
-    };
-    const evidenceRepository = {
-      upsertConnectedAccount: vi.fn(async () => '00000000-0000-4000-8000-000000000002'),
-      upsertProviderSyncState: vi.fn(async () => undefined)
+        return {
+          connectedAccountId: '00000000-0000-4000-8000-000000000002',
+          credentialId: 'credential-id'
+        };
+      })
     };
     const service = new GmailAuthorizationService(
       environment,
       cipher,
       provider(),
-      gmailRepository as never,
-      evidenceRepository
+      gmailRepository as never
     );
     const authorizationUrl = new URL(await service.createAuthorizationUrl('00000000-0000-4000-8000-000000000001', '//evil.example'));
     expect(authorizationUrl.searchParams.get('scope')).toBe(GMAIL_READONLY_SCOPE);
@@ -241,16 +242,43 @@ describe('G20 Gmail credential and authorization boundary', () => {
   });
 });
 
+describe('G20 deployed runtime bindings', () => {
+  it('binds the durable worker owner to the deployed ten-minute cron', async () => {
+    const enqueueDueWork = vi.fn(async () => 2);
+    const runPending = vi.fn(async () => ({processed: 3, failed: 1}));
+    await expect(runGmailReconciliation({sync: {enqueueDueWork, runPending} as never}))
+      .resolves.toEqual({enqueued: 2, processed: 3, failed: 1});
+    expect(runPending).toHaveBeenCalledWith(20);
+
+    const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8');
+    const worker = readFileSync(resolve(process.cwd(), 'src/worker.ts'), 'utf8');
+    expect(wrangler).toContain('"main": "src/worker.ts"');
+    expect(wrangler).toContain('"crons": ["*/10 * * * *"]');
+    expect(worker).toContain('context.waitUntil(runGmailReconciliation())');
+  });
+
+  it('declares the complete authenticated Gmail Pub/Sub IAM chain', () => {
+    const provisioning = readFileSync(resolve(process.cwd(), 'infra/gmail-pubsub/main.tf'), 'utf8');
+    expect(provisioning).toContain('serviceAccount:gmail-api-push@system.gserviceaccount.com');
+    expect(provisioning).toContain('roles/pubsub.publisher');
+    expect(provisioning).toContain('roles/iam.serviceAccountTokenCreator');
+    expect(provisioning).toContain('@gcp-sa-pubsub.iam.gserviceaccount.com');
+    expect(provisioning).toContain('oidc_token {');
+    expect(provisioning).toContain('audience              = var.oidc_audience');
+    expect(provisioning).toContain('retry_policy {');
+  });
+});
+
 describe('G20 Gmail normalization', () => {
-  it('normalizes chronology, direction, labels and attachment evidence deterministically', () => {
+  it('normalizes chronology, direction, labels and attachment evidence deterministically', async () => {
     const input = {
       userId: '00000000-0000-4000-8000-000000000001',
       connectedAccountId: '00000000-0000-4000-8000-000000000002',
       accountEmail: 'owner@example.com',
       message: message('message-a')
     };
-    const first = normalizeGmailMessage(input);
-    const second = normalizeGmailMessage(input);
+    const first = await normalizeGmailMessage(input);
+    const second = await normalizeGmailMessage(input);
     expect(first.conversation.id).toBe(second.conversation.id);
     expect(first.direction).toBe('INBOUND');
     expect(first.occurredAt.toISOString()).toBe('2024-01-01T00:00:00.000Z');
@@ -260,11 +288,11 @@ describe('G20 Gmail normalization', () => {
       contentReference: 'gmail://message-a/attachment-message-a',
       previewState: 'PROVIDER_FETCH_REQUIRED'
     });
-    expect('sanitizedHtmlBody' in first).toBe(false);
+    expect(first.sanitizedHtmlBody).toBeUndefined();
   });
 
-  it('sanitizes hostile filenames, MIME types, subjects and snippets at the provider boundary', () => {
-    const normalized = normalizeGmailMessage({
+  it('sanitizes hostile filenames, MIME types, subjects and snippets at the provider boundary', async () => {
+    const normalized = await normalizeGmailMessage({
       userId: '00000000-0000-4000-8000-000000000001',
       connectedAccountId: '00000000-0000-4000-8000-000000000002',
       accountEmail: 'owner@example.com',
@@ -296,8 +324,8 @@ describe('G20 Gmail normalization', () => {
     expect(normalized.attachments[0]!.contentReference).not.toContain('..');
   });
 
-  it('rejects control-character address injection and malformed mailbox addresses', () => {
-    expect(() => normalizeGmailMessage({
+  it('represents unsafe or unsupported addresses explicitly without poisoning reconciliation', async () => {
+    const normalized = await normalizeGmailMessage({
       userId: '00000000-0000-4000-8000-000000000001',
       connectedAccountId: '00000000-0000-4000-8000-000000000002',
       accountEmail: 'owner@example.com',
@@ -309,7 +337,98 @@ describe('G20 Gmail normalization', () => {
           ]
         }
       })
-    })).toThrow(/unsafe metadata|invalid participant/);
+    });
+    expect(normalized.sender).toMatchObject({
+      displayName: 'Unsupported provider address',
+      derivedMetadata: {providerRepresentation: 'UNSUPPORTED_RFC5322_ADDRESS'}
+    });
+    expect(normalized.recipients).toEqual([]);
+    expect(normalized.rawProviderMetadata.normalization).toMatchObject({status: 'PARTIAL'});
+    expect(normalized.rawProviderMetadata.normalization.unsupported).toEqual(expect.arrayContaining([
+      'FROM_HEADER_UNSAFE', 'TO_ADDRESS_UNSUPPORTED'
+    ]));
+  });
+
+  it('parses quoted comments and RFC 5322 groups without splitting display-name commas', async () => {
+    const normalized = await normalizeGmailMessage({
+      userId: '00000000-0000-4000-8000-000000000001',
+      connectedAccountId: '00000000-0000-4000-8000-000000000002',
+      accountEmail: 'owner@example.com',
+      message: message('message-addresses', {
+        payload: {
+          headers: [
+            {name: 'From', value: '"Doe, Jane" (Sales) <jane@example.com>'},
+            {name: 'To', value: 'Team: Owner <owner@example.com>, Other <other@example.com>;'}
+          ],
+          mimeType: 'text/plain',
+          body: {data: Buffer.from('hello').toString('base64url')}
+        }
+      })
+    });
+    expect(normalized.sender).toMatchObject({email: 'jane@example.com', displayName: 'Doe, Jane'});
+    expect(normalized.recipients.map(({email}) => email)).toEqual(['owner@example.com', 'other@example.com']);
+  });
+
+  it('preserves sanitized HTML-only body evidence', async () => {
+    const normalized = await normalizeGmailMessage({
+      userId: '00000000-0000-4000-8000-000000000001',
+      connectedAccountId: '00000000-0000-4000-8000-000000000002',
+      accountEmail: 'owner@example.com',
+      message: message('message-html', {
+        payload: {
+          mimeType: 'text/html',
+          headers: [{name: 'From', value: 'sender@example.com'}],
+          body: {data: Buffer.from('<p>Hello <strong>world</strong><script>alert(1)</script></p>').toString('base64url')}
+        }
+      })
+    });
+    expect(normalized.textBody).toBeUndefined();
+    expect(normalized.sanitizedHtmlBody).toBe('<p>Hello <strong>world</strong></p>');
+    expect(normalized.rawProviderMetadata.normalization.bodyState).toBe('INLINE');
+  });
+
+  it('fetches externalized text as body evidence and does not misclassify it as an attachment', async () => {
+    const loadBodyPart = vi.fn(async () => ({
+      data: Buffer.from('externalized body').toString('base64url'),
+      size: 17
+    }));
+    const normalized = await normalizeGmailMessage({
+      userId: '00000000-0000-4000-8000-000000000001',
+      connectedAccountId: '00000000-0000-4000-8000-000000000002',
+      accountEmail: 'owner@example.com',
+      message: message('message-external-body', {
+        payload: {
+          mimeType: 'multipart/alternative',
+          headers: [{name: 'From', value: 'sender@example.com'}],
+          parts: [{
+            partId: '1', mimeType: 'text/plain', filename: '',
+            body: {attachmentId: 'body-attachment-id', size: 17}
+          }]
+        }
+      }),
+      loadBodyPart
+    });
+    expect(loadBodyPart).toHaveBeenCalledWith('body-attachment-id');
+    expect(normalized.textBody).toBe('externalized body');
+    expect(normalized.attachments).toEqual([]);
+    expect(normalized.rawProviderMetadata.normalization.bodyState).toBe('PROVIDER_FETCHED');
+  });
+
+  it('uses Gmail SENT evidence for messages sent from an account alias', async () => {
+    const normalized = await normalizeGmailMessage({
+      userId: '00000000-0000-4000-8000-000000000001',
+      connectedAccountId: '00000000-0000-4000-8000-000000000002',
+      accountEmail: 'primary@example.com',
+      message: message('message-alias', {
+        labelIds: ['SENT'],
+        payload: {
+          mimeType: 'text/plain',
+          headers: [{name: 'From', value: 'Alias <alias@example.com>'}],
+          body: {data: Buffer.from('sent from alias').toString('base64url')}
+        }
+      })
+    });
+    expect(normalized.direction).toBe('OUTBOUND');
   });
 });
 

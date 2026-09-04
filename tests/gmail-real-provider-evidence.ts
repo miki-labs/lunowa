@@ -53,11 +53,13 @@ const changedIds = new Set(histories.flatMap((item) => [
 assert(changedIds.has(messageId), 'real history interval did not contain the prepared evidence message');
 
 const realMessage = await client.getMessage(refreshed.accessToken, messageId);
-const normalized = normalizeGmailMessage({
+const normalized = await normalizeGmailMessage({
   userId: '00000000-0000-4000-8000-000000000001',
   connectedAccountId: '00000000-0000-4000-8000-000000000002',
   accountEmail: profile.emailAddress,
-  message: realMessage
+  message: realMessage,
+  loadBodyPart: (providerAttachmentId) =>
+    client.getAttachment(refreshed.accessToken, messageId, providerAttachmentId)
 });
 assert(
   normalized.attachments.some((attachment) => attachment.providerAttachmentId === attachmentId),

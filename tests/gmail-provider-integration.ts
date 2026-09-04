@@ -1,6 +1,7 @@
 import {randomBytes, randomUUID} from 'node:crypto';
 import {resolve} from 'node:path';
 
+import {eq} from 'drizzle-orm';
 import {drizzle} from 'drizzle-orm/node-postgres';
 import {migrate} from 'drizzle-orm/node-postgres/migrator';
 import {Pool} from 'pg';
@@ -9,9 +10,11 @@ import {EvidenceRepository} from '../src/server/db/repositories/evidence';
 import {GmailRepository} from '../src/server/db/repositories/gmail';
 import * as databaseSchema from '../src/server/db/schema';
 import {
+  connectedAccounts,
   conversations,
   gmailBootstrapStates,
   gmailProviderCredentials,
+  gmailSyncSignals,
   messages,
   providerSyncStates,
   responsibilities,
@@ -63,21 +66,6 @@ try {
 
   const evidence = new EvidenceRepository(db);
   const gmail = new GmailRepository(db);
-  const accountId = await evidence.upsertConnectedAccount({
-    userId: ownerId,
-    provider: 'gmail',
-    providerAccountId: 'owner@example.com',
-    emailAddress: 'owner@example.com',
-    credentialReference: `gmail-credential:${randomUUID()}`,
-    grantedCapabilities: ['mail_read', 'incremental_sync', 'attachment_fetch']
-  });
-  await evidence.upsertProviderSyncState({
-    userId: ownerId,
-    connectedAccountId: accountId,
-    status: 'PENDING',
-    syncGeneration: 0
-  });
-
   const cipher = new GmailCredentialCipher(randomBytes(32).toString('base64'));
   const token: GmailTokenSet = {
     accessToken: `access-${randomUUID()}`,
@@ -85,14 +73,56 @@ try {
     expiresAt: Date.now() + 3600_000,
     tokenType: 'Bearer'
   };
-  const encryptedPayload = cipher.encrypt(token, `gmail-token:${ownerId}:${accountId}`);
-  await gmail.putCredential({
+
+  try {
+    await gmail.activateConnection({
+      activationId: randomUUID(),
+      credentialId: randomUUID(),
+      userId: ownerId,
+      providerAccountId: 'interrupted@example.com',
+      emailAddress: 'interrupted@example.com',
+      encryptPayload: () => { throw new Error('simulated interruption'); },
+      keyVersion: 'integration-v1',
+      grantedScopes: [GMAIL_READONLY_SCOPE],
+      grantedCapabilities: ['mail_read', 'incremental_sync', 'attachment_fetch']
+    });
+    throw new Error('interrupted activation unexpectedly committed');
+  } catch (error) {
+    assert(error instanceof Error && error.message === 'simulated interruption',
+      'activation interruption did not preserve the original failure');
+  }
+  const interrupted = await db.select({id: connectedAccounts.id}).from(connectedAccounts);
+  assert(interrupted.length === 0, 'activation interruption published a partial connected account');
+
+  const activated = await gmail.activateConnection({
+    activationId: randomUUID(),
+    credentialId: randomUUID(),
     userId: ownerId,
-    connectedAccountId: accountId,
-    encryptedPayload,
+    providerAccountId: 'owner@example.com',
+    emailAddress: 'owner@example.com',
+    encryptPayload: (connectedAccountId) =>
+      cipher.encrypt(token, `gmail-token:${ownerId}:${connectedAccountId}`),
     keyVersion: 'integration-v1',
-    grantedScopes: [GMAIL_READONLY_SCOPE]
+    grantedScopes: [GMAIL_READONLY_SCOPE],
+    grantedCapabilities: ['mail_read', 'incremental_sync', 'attachment_fetch']
   });
+  const accountId = activated.connectedAccountId;
+  const activationInvariant = await db
+    .select({
+      connectionState: connectedAccounts.connectionState,
+      syncStatus: providerSyncStates.status,
+      signalStatus: gmailSyncSignals.status
+    })
+    .from(connectedAccounts)
+    .innerJoin(providerSyncStates, eq(providerSyncStates.connectedAccountId, connectedAccounts.id))
+    .innerJoin(gmailSyncSignals, eq(gmailSyncSignals.connectedAccountId, connectedAccounts.id));
+  assert(
+    activationInvariant.length === 1 &&
+      activationInvariant[0]?.connectionState === 'CONNECTED' &&
+      activationInvariant[0]?.syncStatus === 'PENDING' &&
+      activationInvariant[0]?.signalStatus === 'PENDING',
+    'CONNECTED became visible without sync state and durable initial work'
+  );
 
   const persisted = await db.select({encryptedPayload: gmailProviderCredentials.encryptedPayload})
     .from(gmailProviderCredentials);

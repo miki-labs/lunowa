@@ -33,10 +33,10 @@ pnpm build:cloudflare
 pnpm check:cloudflare:deploy
 ```
 
-`wrangler.jsonc` intentionally names only the Worker and compatibility
-boundary. It contains no account ID, token, secret, user-specific
-configuration, or data/service binding (the generated static-assets binding is
-the only required runtime wiring). `vinext` emits the deployable
+`wrangler.jsonc` names the custom Worker entry point, compatibility boundary,
+and G20 ten-minute Gmail safety/watch-renewal trigger. It contains no account
+ID, token, secret, user-specific configuration, or data binding (the generated
+static-assets binding is still required runtime wiring). `vinext` emits the deployable
 `dist/server/wrangler.json`; that generated file is not committed.
 
 ## Account-side activation (not performed by this workspace)

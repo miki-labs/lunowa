@@ -1,16 +1,32 @@
 import {createHash} from 'node:crypto';
 
+import emailAddresses from 'email-addresses';
+import iconv from 'iconv-lite';
+import sanitizeHtml from 'sanitize-html';
+
 import type {NormalizedAttachment, NormalizedParticipant} from '@/server/evidence/normalized';
 
 import type {GmailMessage, GmailMessagePart} from './types';
+import {GmailProviderError} from './types';
 
 const MAX_TEXT_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_HEADER_CHARS = 16_384;
 const MAX_MIME_PARTS = 1_000;
+const MAX_MIME_DEPTH = 30;
+const MAX_NORMALIZATION_ISSUES = 32;
 const PROVIDER_ID = /^[A-Za-z0-9_-]{1,1024}$/;
 const MIME_TYPE = /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+$/;
+const BASE64URL = /^[A-Za-z0-9_-]*={0,2}$/;
 const UNSAFE_METADATA_CHARACTERS = /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g;
 const HAS_UNSAFE_METADATA_CHARACTERS = /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/;
+const UNSUPPORTED_PARTICIPANT_DOMAIN = 'unsupported.invalid';
+
+type BodyLoader = (providerAttachmentId: string) => Promise<{data: string; size?: number}>;
+type BodyEvidence = {
+  textBody?: string;
+  sanitizedHtmlBody?: string;
+  state: 'INLINE' | 'PROVIDER_FETCHED' | 'NOT_PRESENT' | 'UNSUPPORTED';
+};
 
 function deterministicUuid(value: string): string {
   const bytes = createHash('sha256').update(value, 'utf8').digest().subarray(0, 16);
@@ -29,45 +45,31 @@ function cleanMetadata(value: string, maxLength: number): string {
     .slice(0, maxLength);
 }
 
-function header(part: GmailMessagePart | undefined, name: string, rejectControls = false): string | undefined {
-  const value = part?.headers?.find((candidate) => candidate.name?.toLowerCase() === name.toLowerCase())?.value;
+function rawHeader(part: GmailMessagePart | undefined, name: string): string | undefined {
+  return part?.headers?.find((candidate) => candidate.name?.toLowerCase() === name.toLowerCase())?.value;
+}
+
+function safeHeader(part: GmailMessagePart | undefined, name: string, issues: string[]): string | undefined {
+  const value = rawHeader(part, name);
   if (value === undefined) return undefined;
-  if (value.length > MAX_HEADER_CHARS || (rejectControls && HAS_UNSAFE_METADATA_CHARACTERS.test(value))) {
-    throw new Error(`Gmail ${name} header contains unsafe metadata.`);
-  }
-  return value;
+  if (value.length > MAX_HEADER_CHARS) issues.push(`${name.toUpperCase()}_HEADER_TRUNCATED`);
+  if (HAS_UNSAFE_METADATA_CHARACTERS.test(value)) issues.push(`${name.toUpperCase()}_HEADER_UNSAFE`);
+  return value.slice(0, MAX_HEADER_CHARS);
 }
 
-function splitAddresses(value: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let quoted = false;
-  for (const character of value) {
-    if (character === '"') quoted = !quoted;
-    if (character === ',' && !quoted) {
-      if (current.trim()) result.push(current.trim());
-      current = '';
-    } else {
-      current += character;
-    }
-  }
-  if (current.trim()) result.push(current.trim());
-  return result;
+function flattenAddresses(
+  parsed: readonly (emailAddresses.ParsedMailbox | emailAddresses.ParsedGroup)[]
+): emailAddresses.ParsedMailbox[] {
+  return parsed.flatMap((item) => item.type === 'group' ? item.addresses : [item]);
 }
 
-function parseAddress(value: string): NormalizedParticipant {
-  const angle = value.match(/^(.*?)<([^<>]+@[^<>]+)>\s*$/);
-  if (angle) {
-    const email = angle[2]!.trim().toLowerCase();
-    if (!isSafeMailboxAddress(email)) throw new Error('Gmail message contains an invalid participant address.');
-    return {
-      email,
-      displayName: cleanMetadata(angle[1]!.trim().replace(/^"|"$/g, ''), 512) || undefined
-    };
-  }
-  const email = value.match(/[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+/i)?.[0];
-  if (!email || !isSafeMailboxAddress(email)) throw new Error('Gmail message contains an invalid participant address.');
-  return {email: email.toLowerCase()};
+function unsupportedParticipant(headerName: string, value: string): NormalizedParticipant {
+  const digest = createHash('sha256').update(`${headerName}:${value}`, 'utf8').digest('hex').slice(0, 24);
+  return {
+    email: `unsupported-${digest}@${UNSUPPORTED_PARTICIPANT_DOMAIN}`,
+    displayName: 'Unsupported provider address',
+    derivedMetadata: {providerRepresentation: 'UNSUPPORTED_RFC5322_ADDRESS'}
+  };
 }
 
 export function isSafeMailboxAddress(value: string): boolean {
@@ -82,31 +84,61 @@ export function isSafeMailboxAddress(value: string): boolean {
   );
 }
 
-function addresses(part: GmailMessagePart | undefined, name: string): NormalizedParticipant[] {
-  const value = header(part, name, true);
-  return value ? splitAddresses(value).map(parseAddress) : [];
+function addresses(
+  part: GmailMessagePart | undefined,
+  name: string,
+  issues: string[],
+  required = false
+): NormalizedParticipant[] {
+  const value = safeHeader(part, name, issues);
+  if (!value) {
+    if (required) issues.push(`${name.toUpperCase()}_ADDRESS_MISSING`);
+    return required ? [unsupportedParticipant(name, '')] : [];
+  }
+  if (HAS_UNSAFE_METADATA_CHARACTERS.test(value)) {
+    return required ? [unsupportedParticipant(name, value)] : [];
+  }
+  let parsed: ReturnType<typeof emailAddresses.parseAddressList>;
+  try {
+    parsed = emailAddresses.parseAddressList({input: value, rfc6532: true, strict: false});
+  } catch {
+    parsed = null;
+  }
+  if (!parsed) {
+    issues.push(`${name.toUpperCase()}_ADDRESS_UNSUPPORTED`);
+    return required ? [unsupportedParticipant(name, value)] : [];
+  }
+  const result: NormalizedParticipant[] = [];
+  for (const mailbox of flattenAddresses(parsed)) {
+    const email = mailbox.address.trim().toLowerCase();
+    if (!isSafeMailboxAddress(email)) {
+      issues.push(`${name.toUpperCase()}_ADDRESS_UNSUPPORTED`);
+      continue;
+    }
+    result.push({
+      email,
+      displayName: cleanMetadata(mailbox.name ?? '', 512) || undefined
+    });
+  }
+  if (required && result.length === 0) result.push(unsupportedParticipant(name, value));
+  return result;
 }
 
-function decodeBody(data: string | undefined): string | undefined {
-  if (!data) return undefined;
-  const bytes = Buffer.from(data, 'base64url');
-  if (bytes.length > MAX_TEXT_BODY_BYTES) return undefined;
-  return bytes.toString('utf8').replace(/\0/g, '');
-}
-
-function walkParts(part: GmailMessagePart | undefined): GmailMessagePart[] {
-  if (!part) return [];
+function walkParts(part: GmailMessagePart | undefined): {parts: GmailMessagePart[]; truncated: boolean} {
+  if (!part) return {parts: [], truncated: false};
   const result: GmailMessagePart[] = [];
   const pending: {part: GmailMessagePart; depth: number}[] = [{part, depth: 0}];
-  while (pending.length > 0) {
+  let truncated = false;
+  while (pending.length > 0 && result.length < MAX_MIME_PARTS) {
     const current = pending.shift()!;
-    if (current.depth > 30 || result.length >= MAX_MIME_PARTS) {
-      throw new Error('Gmail message MIME structure exceeds safe bounds.');
+    if (current.depth > MAX_MIME_DEPTH) {
+      truncated = true;
+      continue;
     }
     result.push(current.part);
     pending.unshift(...(current.part.parts ?? []).map((child) => ({part: child, depth: current.depth + 1})));
   }
-  return result;
+  return {parts: result, truncated: truncated || pending.length > 0};
 }
 
 function safeFilename(value: string | undefined, fallback: string): string {
@@ -120,9 +152,19 @@ function safeMimeType(value: string | undefined): string {
   return MIME_TYPE.test(normalized) ? normalized : 'application/octet-stream';
 }
 
-function normalizedAttachments(message: GmailMessage): NormalizedAttachment[] {
-  return walkParts(message.payload)
-    .filter((part) => Boolean(part.body?.attachmentId))
+function contentDisposition(part: GmailMessagePart): string {
+  return rawHeader(part, 'Content-Disposition')?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+}
+
+function isTextBodyPart(part: GmailMessagePart): boolean {
+  const mimeType = part.mimeType?.toLowerCase();
+  return (mimeType === 'text/plain' || mimeType === 'text/html') &&
+    !part.filename?.trim() && contentDisposition(part) !== 'attachment';
+}
+
+function normalizedAttachments(message: GmailMessage, parts: readonly GmailMessagePart[]): NormalizedAttachment[] {
+  return parts
+    .filter((part) => Boolean(part.body?.attachmentId) && !isTextBodyPart(part))
     .map((part) => {
       const providerAttachmentId = part.body!.attachmentId!;
       if (!PROVIDER_ID.test(providerAttachmentId)) throw new Error('Gmail attachment has an invalid provider ID.');
@@ -132,42 +174,119 @@ function normalizedAttachments(message: GmailMessage): NormalizedAttachment[] {
         filename: safeFilename(part.filename, `attachment-${fallbackPart}`),
         mimeType: safeMimeType(part.mimeType),
         sizeBytes: Number.isSafeInteger(part.body?.size) && part.body!.size! >= 0 ? part.body?.size : undefined,
-        contentDisposition: 'attachment',
+        contentDisposition: contentDisposition(part) === 'inline' ? 'inline' : 'attachment',
         contentReference: `gmail://${encodeURIComponent(message.id)}/${encodeURIComponent(providerAttachmentId)}`,
         previewState: 'PROVIDER_FETCH_REQUIRED'
       };
     });
 }
 
-function textBody(message: GmailMessage): string | undefined {
-  const parts = walkParts(message.payload);
-  const plain = parts.find((part) => part.mimeType?.toLowerCase() === 'text/plain' && part.body?.data);
-  if (plain) return decodeBody(plain.body?.data);
-  if (message.payload?.mimeType?.toLowerCase() === 'text/plain') {
-    return decodeBody(message.payload.body?.data);
-  }
-  return undefined;
+function charset(part: GmailMessagePart): string {
+  const contentType = rawHeader(part, 'Content-Type') ?? '';
+  const match = contentType.match(/(?:^|;)\s*charset\s*=\s*(?:"([^"]+)"|'([^']+)'|([^;\s]+))/i);
+  const candidate = (match?.[1] ?? match?.[2] ?? match?.[3] ?? 'utf-8').trim();
+  return iconv.encodingExists(candidate) ? candidate : 'utf-8';
 }
 
-export function normalizeGmailMessage(input: {
+function decodeBody(data: string, part: GmailMessagePart, issues: string[]): string | undefined {
+  if (!BASE64URL.test(data)) {
+    issues.push('BODY_ENCODING_UNSUPPORTED');
+    return undefined;
+  }
+  const bytes = Buffer.from(data, 'base64url');
+  if (bytes.length > MAX_TEXT_BODY_BYTES) {
+    issues.push('BODY_TOO_LARGE');
+    return undefined;
+  }
+  return iconv.decode(bytes, charset(part)).replace(/\0/g, '');
+}
+
+async function bodyEvidence(
+  parts: readonly GmailMessagePart[],
+  loadBodyPart: BodyLoader | undefined,
+  issues: string[]
+): Promise<BodyEvidence> {
+  const candidates = parts
+    .filter(isTextBodyPart)
+    .sort((left, right) => Number(left.mimeType?.toLowerCase() === 'text/html') - Number(right.mimeType?.toLowerCase() === 'text/html'));
+  for (const part of candidates) {
+    let data = part.body?.data;
+    let fetched = false;
+    if (!data && part.body?.attachmentId) {
+      const attachmentId = part.body.attachmentId;
+      if (!PROVIDER_ID.test(attachmentId)) {
+        issues.push('BODY_ATTACHMENT_ID_UNSUPPORTED');
+        continue;
+      }
+      if ((part.body.size ?? 0) > MAX_TEXT_BODY_BYTES) {
+        issues.push('BODY_TOO_LARGE');
+        continue;
+      }
+      if (!loadBodyPart) {
+        issues.push('BODY_PROVIDER_FETCH_REQUIRED');
+        continue;
+      }
+      try {
+        const loaded = await loadBodyPart(attachmentId);
+        if ((loaded.size ?? 0) > MAX_TEXT_BODY_BYTES) {
+          issues.push('BODY_TOO_LARGE');
+          continue;
+        }
+        data = loaded.data;
+        fetched = true;
+      } catch (error) {
+        if (error instanceof GmailProviderError && [403, 404, 451].includes(error.status)) {
+          issues.push('BODY_PROVIDER_BLOCKED');
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!data) continue;
+    const decoded = decodeBody(data, part, issues);
+    if (decoded === undefined) continue;
+    if (part.mimeType?.toLowerCase() === 'text/html') {
+      const sanitized = sanitizeHtml(decoded, {
+        allowedTags: ['p', 'br', 'div', 'span', 'strong', 'em', 'b', 'i', 'u', 's', 'blockquote', 'pre', 'code', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'hr'],
+        allowedAttributes: {},
+        disallowedTagsMode: 'discard'
+      }).slice(0, MAX_TEXT_BODY_BYTES);
+      return {sanitizedHtmlBody: sanitized, state: fetched ? 'PROVIDER_FETCHED' : 'INLINE'};
+    }
+    return {textBody: decoded, state: fetched ? 'PROVIDER_FETCHED' : 'INLINE'};
+  }
+  if (candidates.length === 0) issues.push('BODY_NOT_PRESENT');
+  return {state: candidates.length === 0 ? 'NOT_PRESENT' : 'UNSUPPORTED'};
+}
+
+export async function normalizeGmailMessage(input: {
   userId: string;
   connectedAccountId: string;
   accountEmail: string;
   message: GmailMessage;
+  loadBodyPart?: BodyLoader;
 }) {
   const {message} = input;
-  const sender = addresses(message.payload, 'From')[0];
-  if (!sender) throw new Error('Gmail message has no sender evidence.');
   if (!PROVIDER_ID.test(message.id) || !PROVIDER_ID.test(message.threadId) || !message.internalDate) {
     throw new Error('Gmail message is missing provider identity or chronology.');
   }
   const occurredAt = new Date(Number(message.internalDate));
   if (Number.isNaN(occurredAt.getTime())) throw new Error('Gmail message has invalid chronology.');
+
+  const issues: string[] = [];
+  const walked = walkParts(message.payload);
+  if (walked.truncated) issues.push('MIME_STRUCTURE_TRUNCATED');
+  const sender = addresses(message.payload, 'From', issues, true)[0]!;
+  const body = await bodyEvidence(walked.parts, input.loadBodyPart, issues);
   const providerThreadId = message.threadId;
-  const subject = cleanMetadata(header(message.payload, 'Subject') ?? '', 2048) || '(no subject)';
+  const subject = cleanMetadata(safeHeader(message.payload, 'Subject', issues) ?? '', 2048) || '(no subject)';
   const labels = [...(message.labelIds ?? [])]
     .filter((label) => PROVIDER_ID.test(label))
     .sort();
+  const recipients = addresses(message.payload, 'To', issues);
+  const cc = addresses(message.payload, 'Cc', issues);
+  const bcc = addresses(message.payload, 'Bcc', issues);
+  const boundedIssues = [...new Set(issues)].slice(0, MAX_NORMALIZATION_ISSUES);
 
   return {
     userId: input.userId,
@@ -180,23 +299,29 @@ export function normalizeGmailMessage(input: {
     providerMessageId: message.id,
     providerThreadId,
     direction:
-      sender.email.trim().toLowerCase() === input.accountEmail.trim().toLowerCase()
+      labels.includes('SENT') || sender.email === input.accountEmail.trim().toLowerCase()
         ? 'OUTBOUND' as const
         : 'INBOUND' as const,
     sender,
-    recipients: addresses(message.payload, 'To'),
-    cc: addresses(message.payload, 'Cc'),
-    bcc: addresses(message.payload, 'Bcc'),
+    recipients,
+    cc,
+    bcc,
     subject,
-    textBody: textBody(message),
+    textBody: body.textBody,
+    sanitizedHtmlBody: body.sanitizedHtmlBody,
     occurredAt,
     providerReceivedAt: occurredAt,
     readState: labels.includes('UNREAD') ? 'UNREAD' : 'READ',
     mailboxStateSnapshot: {labelIds: labels},
     rawProviderMetadata: {
       gmailHistoryId: message.historyId ?? null,
-      snippet: message.snippet ? cleanMetadata(message.snippet, 4096) : null
+      snippet: message.snippet ? cleanMetadata(message.snippet, 4096) : null,
+      normalization: {
+        status: boundedIssues.length > 0 ? 'PARTIAL' : 'COMPLETE',
+        bodyState: body.state,
+        unsupported: boundedIssues
+      }
     },
-    attachments: normalizedAttachments(message)
+    attachments: normalizedAttachments(message, walked.parts)
   };
 }

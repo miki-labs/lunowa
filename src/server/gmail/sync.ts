@@ -63,11 +63,14 @@ export class GmailSyncService {
   }, accessToken: string, messageId: string): Promise<void> {
     try {
       const message = await this.provider.getMessage(accessToken, messageId);
-      await this.evidence.upsertNormalizedMessage(normalizeGmailMessage({
+      const normalized = await normalizeGmailMessage({
         ...context,
         accountEmail: context.emailAddress,
-        message
-      }));
+        message,
+        loadBodyPart: (attachmentId) =>
+          this.provider.getAttachment(accessToken, message.id, attachmentId)
+      });
+      await this.evidence.upsertNormalizedMessage(normalized);
     } catch (error) {
       if (error instanceof GmailProviderError && error.status === 404) {
         await this.evidence.markNormalizedMessageAbsent({

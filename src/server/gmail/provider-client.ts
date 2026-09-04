@@ -9,6 +9,8 @@ import type {
 } from './types';
 import {GmailProviderError} from './types';
 
+const MAX_PROVIDER_JSON_BYTES = 40 * 1024 * 1024;
+
 type ProviderClientConfig = {
   clientId: string;
   clientSecret: string;
@@ -25,6 +27,32 @@ function providerCode(status: number, payload: unknown): string {
   return `HTTP_${status}`;
 }
 
+async function boundedResponseText(response: Response): Promise<string> {
+  const declaredLength = Number(response.headers.get('content-length') ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PROVIDER_JSON_BYTES) {
+    throw new GmailProviderError(502, 'PROVIDER_RESPONSE_TOO_LARGE');
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_PROVIDER_JSON_BYTES) {
+        await reader.cancel();
+        throw new GmailProviderError(502, 'PROVIDER_RESPONSE_TOO_LARGE');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total).toString('utf8');
+}
+
 export class GoogleGmailClient implements GmailProviderClient {
   private readonly request: typeof fetch;
 
@@ -34,7 +62,15 @@ export class GoogleGmailClient implements GmailProviderClient {
 
   private async json<T>(url: string, init: RequestInit = {}): Promise<T> {
     const response = await this.request(url, init);
-    const payload = await response.json().catch(() => null) as unknown;
+    const text = await boundedResponseText(response);
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      // An error status may have a non-JSON body. A successful provider
+      // response must still conform to the documented JSON protocol.
+      if (response.ok) throw new GmailProviderError(502, 'INVALID_PROVIDER_JSON');
+    }
     if (!response.ok) {
       throw new GmailProviderError(response.status, providerCode(response.status, payload));
     }

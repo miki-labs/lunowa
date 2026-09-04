@@ -61,6 +61,117 @@ export class GmailRepository {
     });
   }
 
+  /**
+   * Publishes a usable Gmail connection only after its encrypted credential,
+   * sync state, and initial durable work obligation exist in the same commit.
+   * Repeating the same activation ID is idempotent after an ambiguous client
+   * response; a rollback exposes none of the intermediate ERROR state.
+   */
+  async activateConnection(input: {
+    activationId: string;
+    credentialId: string;
+    userId: string;
+    providerAccountId: string;
+    emailAddress: string;
+    encryptPayload: (connectedAccountId: string) => string;
+    keyVersion: string;
+    grantedScopes: readonly string[];
+    grantedCapabilities: readonly string[];
+  }): Promise<{connectedAccountId: string; credentialId: string}> {
+    const now = new Date();
+    return this.db.transaction(async (tx) => {
+      const [account] = await tx
+        .insert(connectedAccounts)
+        .values({
+          userId: input.userId,
+          provider: 'gmail',
+          providerAccountId: input.providerAccountId,
+          emailAddress: input.emailAddress,
+          connectionState: 'ERROR',
+          grantedCapabilities: [],
+          credentialReference: `gmail-credential:${input.credentialId}`,
+          createdAt: now,
+          updatedAt: now
+        })
+        .onConflictDoUpdate({
+          target: [connectedAccounts.userId, connectedAccounts.provider, connectedAccounts.providerAccountId],
+          set: {
+            emailAddress: input.emailAddress,
+            connectionState: 'ERROR',
+            grantedCapabilities: [],
+            updatedAt: now
+          }
+        })
+        .returning({id: connectedAccounts.id});
+      if (!account) throw new Error('Gmail account activation did not return an account ID.');
+      const encryptedPayload = input.encryptPayload(account.id);
+
+      const [credential] = await tx
+        .insert(gmailProviderCredentials)
+        .values({
+          id: input.credentialId,
+          userId: input.userId,
+          connectedAccountId: account.id,
+          encryptedPayload,
+          keyVersion: input.keyVersion,
+          grantedScopes: [...input.grantedScopes],
+          createdAt: now,
+          updatedAt: now
+        })
+        .onConflictDoUpdate({
+          target: gmailProviderCredentials.connectedAccountId,
+          set: {
+            encryptedPayload,
+            keyVersion: input.keyVersion,
+            grantedScopes: [...input.grantedScopes],
+            invalidatedAt: null,
+            updatedAt: now
+          }
+        })
+        .returning({id: gmailProviderCredentials.id});
+      if (!credential) throw new Error('Gmail credential activation did not return an ID.');
+
+      await tx
+        .insert(providerSyncStates)
+        .values({connectedAccountId: account.id, status: 'PENDING', syncGeneration: 0, updatedAt: now})
+        .onConflictDoUpdate({
+          target: providerSyncStates.connectedAccountId,
+          set: {status: 'PENDING', lastErrorCode: null, updatedAt: now}
+        });
+
+      const deliveryKey = `initial:${account.id}:${input.activationId}`;
+      const queued = await tx
+        .insert(gmailSyncSignals)
+        .values({connectedAccountId: account.id, deliveryKey, reason: 'INITIAL', availableAt: now})
+        .onConflictDoNothing({target: gmailSyncSignals.deliveryKey})
+        .returning({id: gmailSyncSignals.id});
+      if (queued.length === 0) {
+        const [existing] = await tx
+          .select({id: gmailSyncSignals.id})
+          .from(gmailSyncSignals)
+          .where(and(
+            eq(gmailSyncSignals.deliveryKey, deliveryKey),
+            eq(gmailSyncSignals.connectedAccountId, account.id),
+            eq(gmailSyncSignals.reason, 'INITIAL')
+          ))
+          .limit(1);
+        if (!existing) throw new Error('Gmail initial sync obligation conflicted with another activation.');
+      }
+
+      await tx
+        .update(connectedAccounts)
+        .set({
+          connectionState: 'CONNECTED',
+          grantedCapabilities: [...input.grantedCapabilities],
+          credentialReference: `gmail-credential:${credential.id}`,
+          updatedAt: now
+        })
+        .where(and(eq(connectedAccounts.id, account.id), eq(connectedAccounts.userId, input.userId)));
+
+      return {connectedAccountId: account.id, credentialId: credential.id};
+    });
+  }
+
   async putCredential(input: {
     id?: string;
     userId: string;

@@ -1,6 +1,5 @@
 import {randomUUID} from 'node:crypto';
 
-import {EvidenceRepository} from '@/server/db/repositories/evidence';
 import {GmailRepository} from '@/server/db/repositories/gmail';
 
 import type {GmailEnvironment} from './config';
@@ -12,8 +11,7 @@ import {GmailProviderError, GMAIL_READONLY_SCOPE} from './types';
 
 const OAUTH_STATE_TTL_MS = 10 * 60_000;
 
-type OAuthRepository = Pick<GmailRepository, 'createOauthState' | 'consumeOauthState' | 'putCredential' | 'enqueueSignal'>;
-type AccountRepository = Pick<EvidenceRepository, 'upsertConnectedAccount' | 'upsertProviderSyncState'>;
+type OAuthRepository = Pick<GmailRepository, 'createOauthState' | 'consumeOauthState' | 'activateConnection'>;
 
 function safeReturnPath(candidate: string | undefined): string {
   if (
@@ -36,8 +34,7 @@ export class GmailAuthorizationService {
     private readonly environment: GmailEnvironment,
     private readonly cipher: GmailCredentialCipher,
     private readonly provider: GmailProviderClient,
-    private readonly gmailRepository: OAuthRepository = new GmailRepository(),
-    private readonly evidenceRepository: AccountRepository = new EvidenceRepository()
+    private readonly gmailRepository: OAuthRepository = new GmailRepository()
   ) {}
 
   async createAuthorizationUrl(userId: string, returnPath?: string): Promise<string> {
@@ -94,50 +91,21 @@ export class GmailAuthorizationService {
       await this.provider.revoke(exchanged.refreshToken).catch(() => undefined);
       throw new GmailProviderError(502, 'INVALID_GMAIL_PROFILE');
     }
-    const proposedCredentialId = randomUUID();
-    const credentialReference = `gmail-credential:${proposedCredentialId}`;
-    const connectedAccountId = await this.evidenceRepository.upsertConnectedAccount({
+    const activated = await this.gmailRepository.activateConnection({
+      activationId: randomUUID(),
+      credentialId: randomUUID(),
       userId,
-      provider: 'gmail',
       providerAccountId: emailAddress,
       emailAddress,
-      connectionState: 'ERROR',
-      grantedCapabilities: [],
-      credentialReference
-    });
-    const encryptedPayload = this.cipher.encrypt(
-      exchanged satisfies GmailTokenSet,
-      `gmail-token:${userId}:${connectedAccountId}`
-    );
-    const persistedCredentialId = await this.gmailRepository.putCredential({
-      id: proposedCredentialId,
-      userId,
-      connectedAccountId,
-      encryptedPayload,
+      encryptPayload: (connectedAccountId) => this.cipher.encrypt(
+        exchanged satisfies GmailTokenSet,
+        `gmail-token:${userId}:${connectedAccountId}`
+      ),
       keyVersion: this.environment.credentialKeyVersion,
-      grantedScopes: scopes
-    });
-    await this.evidenceRepository.upsertConnectedAccount({
-      userId,
-      provider: 'gmail',
-      providerAccountId: emailAddress,
-      emailAddress,
-      connectionState: 'CONNECTED',
+      grantedScopes: scopes,
       grantedCapabilities: grantedCapabilities(scopes),
-      credentialReference: `gmail-credential:${persistedCredentialId}`
     });
-    await this.evidenceRepository.upsertProviderSyncState({
-      userId,
-      connectedAccountId,
-      status: 'PENDING',
-      syncGeneration: 0
-    });
-    await this.gmailRepository.enqueueSignal({
-      connectedAccountId,
-      deliveryKey: `initial:${connectedAccountId}:${persistedCredentialId}`,
-      reason: 'INITIAL'
-    });
-    return {connectedAccountId, returnPath: oauthState.returnPath, userId};
+    return {connectedAccountId: activated.connectedAccountId, returnPath: oauthState.returnPath, userId};
   }
 }
 

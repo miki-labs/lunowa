@@ -8,6 +8,13 @@
       "when": 1788501164594,
       "tag": "0000_mushy_thor_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788512207697,
+      "tag": "0001_parallel_drax",
+      "breakpoints": true
     }
   ]
 }

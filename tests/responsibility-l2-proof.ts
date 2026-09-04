@@ -710,9 +710,9 @@ async function runReviewAndIdempotencyCases(pool: Pool): Promise<void> {
     const fixtures = await seed(pool);
     const source = "same-source";
     const candidate = "same-candidate";
-    await insertReview(pool, fixtures, { source, candidate });
+    await insertReview(pool, fixtures, { source, candidate, basis: 1 });
     await expectPgError(
-      () => insertReview(pool, fixtures, { source, candidate }),
+      () => insertReview(pool, fixtures, { source, candidate, basis: 2 }),
       "23505",
       "responsibility_admission_reviews_open_source_candidate_uq",
     );
@@ -785,7 +785,7 @@ async function runReviewAndIdempotencyCases(pool: Pool): Promise<void> {
     await insertReview(pool, fixtures, { status: "RESOLVED", resolution: "TRACK", actor: "USER", resolvedAt: new Date("2030-01-02T00:00:00Z"), responsibilityId });
     await expectPgError(
       () => pool.query("DELETE FROM responsibilities WHERE id = $1", [responsibilityId]),
-      "23503",
+      "23001",
       "responsibility_admission_reviews_admitted_account_fk",
     );
     const result = await pool.query<{ count: string }>("SELECT count(*)::text AS count FROM responsibility_admission_reviews WHERE admitted_responsibility_id = $1", [responsibilityId]);
@@ -1058,7 +1058,7 @@ async function runDeleteAndSemanticCases(pool: Pool): Promise<void> {
     await insertProvenance(pool, fixtures, { responsibilityId, messageId: fixtures.message1 });
     await expectPgError(
       () => pool.query("DELETE FROM p13_fixture_messages WHERE id = $1", [fixtures.message1]),
-      "23503",
+      "23001",
       "responsibility_provenance_refs_message_account_fk",
     );
     await pool.query("DELETE FROM responsibility_provenance_refs WHERE responsibility_id = $1", [responsibilityId]);

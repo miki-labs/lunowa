@@ -13,16 +13,30 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function expectedDatabaseError(error: unknown, constraint: string): void {
+function expectedDatabaseError(
+  error: unknown,
+  constraint: string,
+  allowedCodes: readonly string[] = ['23514', '23503']
+): void {
   const databaseError = error as {code?: string; constraint?: string};
-  assert(databaseError.code === '23514' || databaseError.code === '23503', `expected PostgreSQL integrity error, got ${databaseError.code ?? 'unknown'}`);
-  assert(databaseError.constraint === constraint, `expected ${constraint}, got ${databaseError.constraint ?? 'unknown'}`);
+  assert(
+    databaseError.code !== undefined && allowedCodes.includes(databaseError.code),
+    `expected PostgreSQL integrity error ${allowedCodes.join('/')}, got ${databaseError.code ?? 'unknown'}`
+  );
+  assert(
+    databaseError.constraint === constraint,
+    `expected ${constraint}, got ${databaseError.constraint ?? 'unknown'}`
+  );
 }
 
 const databaseUrl = process.env.G19_DATABASE_URL;
 assert(databaseUrl, 'G19_DATABASE_URL is required; no mock or fallback database is accepted.');
 
-const pool = new Pool({connectionString: databaseUrl, max: 8, application_name: 'lunowa-g19-evidence-foundation'});
+const pool = new Pool({
+  connectionString: databaseUrl,
+  max: 8,
+  application_name: 'lunowa-g19-evidence-foundation'
+});
 const db = drizzle(pool, {schema: databaseSchema});
 const migrationFolder = resolve(import.meta.dirname, '../drizzle/migrations');
 
@@ -30,24 +44,72 @@ try {
   const version = await pool.query<{server_version_num: string; version: string}>(
     "SELECT current_setting('server_version_num') AS server_version_num, version()"
   );
-  assert(version.rows[0]?.server_version_num === '180006', 'G19 integration requires PostgreSQL 18.6.');
+  assert(
+    version.rows[0]?.server_version_num === '180006',
+    'G19 integration requires PostgreSQL 18.6.'
+  );
 
   const preexisting = await pool.query<{table_name: string}>(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
   );
   assert(
     preexisting.rowCount === 0,
-    `G19 integration requires a clean database; found ${preexisting.rows.map(({table_name}) => table_name).join(', ')}.`
+    `G19 integration requires a clean database; found ${preexisting.rows
+      .map(({table_name}) => table_name)
+      .join(', ')}.`
   );
   await migrate(db, {migrationsFolder: migrationFolder});
+
+  const requiredPrerequisiteConstraints = [
+    'connected_accounts_id_user_uq',
+    'conversations_id_account_uq',
+    'participant_identities_id_user_uq',
+    'messages_id_account_uq',
+    'messages_account_provider_message_uq'
+  ];
+  const prerequisiteConstraints = await pool.query<{conname: string}>(
+    `SELECT conname
+       FROM pg_constraint
+      WHERE conname = ANY($1::text[])
+      ORDER BY conname`,
+    [requiredPrerequisiteConstraints]
+  );
+  assert(
+    new Set(prerequisiteConstraints.rows.map(({conname}) => conname)).size ===
+      requiredPrerequisiteConstraints.length,
+    `production prerequisite constraints are incomplete: ${JSON.stringify(
+      prerequisiteConstraints.rows
+    )}`
+  );
+
+  const participantIndex = await pool.query<{indexdef: string}>(
+    `SELECT indexdef
+       FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'participant_identities'
+        AND indexname = 'participant_identities_user_idx'`
+  );
+  assert(
+    participantIndex.rowCount === 1 &&
+      participantIndex.rows[0]?.indexdef.includes('(user_id, last_seen_at)'),
+    'ParticipantIdentity ownership index is missing or malformed'
+  );
 
   const firstUser = randomUUID();
   const secondUser = randomUUID();
   const accountId = randomUUID();
   const secondAccountId = randomUUID();
   await db.insert(user).values([
-    {id: firstUser, name: 'G19 first user', email: `g19-first-${firstUser}@example.invalid`},
-    {id: secondUser, name: 'G19 second user', email: `g19-second-${secondUser}@example.invalid`}
+    {
+      id: firstUser,
+      name: 'G19 first user',
+      email: `g19-first-${firstUser}@example.invalid`
+    },
+    {
+      id: secondUser,
+      name: 'G19 second user',
+      email: `g19-second-${secondUser}@example.invalid`
+    }
   ]);
 
   const repository = new EvidenceRepository(db);
@@ -78,13 +140,24 @@ try {
   const firstIngestion = await repository.upsertNormalizedMessage(
     normalizedEvidenceFixture(firstUser, persistedAccountId)
   );
-  assert(firstIngestion.changed && firstIngestion.evidenceRevision === 1, 'first normalized ingestion did not advance evidence revision');
+  assert(
+    firstIngestion.changed && firstIngestion.evidenceRevision === 1,
+    'first normalized ingestion did not advance evidence revision'
+  );
   const secondIngestion = await repository.upsertNormalizedMessage(
     normalizedEvidenceFixture(firstUser, persistedAccountId)
   );
-  assert(!secondIngestion.changed && secondIngestion.evidenceRevision === 1, 'duplicate normalized ingestion was not idempotent');
+  assert(
+    !secondIngestion.changed && secondIngestion.evidenceRevision === 1,
+    'duplicate normalized ingestion was not idempotent'
+  );
 
-  const counts = await pool.query<{messages: string; attachments: string; participants: string; edges: string}>(`
+  const counts = await pool.query<{
+    messages: string;
+    attachments: string;
+    participants: string;
+    edges: string;
+  }>(`
     SELECT
       (SELECT count(*)::text FROM messages) AS messages,
       (SELECT count(*)::text FROM attachments) AS attachments,
@@ -99,7 +172,11 @@ try {
     `normalized evidence counts are incorrect: ${JSON.stringify(counts.rows[0])}`
   );
 
-  const conversationId = normalizedEvidenceFixture(firstUser, persistedAccountId).conversation.id;
+  const conversationId = normalizedEvidenceFixture(
+    firstUser,
+    persistedAccountId
+  ).conversation.id;
+
   try {
     await pool.query(
       'INSERT INTO conversations (id, user_id, connected_account_id) VALUES ($1, $2, $3)',
@@ -107,7 +184,12 @@ try {
     );
     throw new Error('cross-user conversation ownership was accepted');
   } catch (error) {
-    if (error instanceof Error && error.message === 'cross-user conversation ownership was accepted') throw error;
+    if (
+      error instanceof Error &&
+      error.message === 'cross-user conversation ownership was accepted'
+    ) {
+      throw error;
+    }
     expectedDatabaseError(error, 'conversations_account_owner_fk');
   }
 
@@ -116,51 +198,209 @@ try {
       `INSERT INTO messages
         (id, user_id, connected_account_id, conversation_id, provider_message_id, direction, subject, sent_at_or_received_at)
        VALUES ($1, $2, $3, $4, $5, 'INBOUND', 'cross-user', now())`,
-      [randomUUID(), secondUser, persistedAccountId, conversationId, 'cross-user-message']
+      [
+        randomUUID(),
+        secondUser,
+        persistedAccountId,
+        conversationId,
+        'cross-user-message'
+      ]
     );
     throw new Error('cross-user message ownership was accepted');
   } catch (error) {
-    if (error instanceof Error && error.message === 'cross-user message ownership was accepted') throw error;
+    if (
+      error instanceof Error &&
+      error.message === 'cross-user message ownership was accepted'
+    ) {
+      throw error;
+    }
     expectedDatabaseError(error, 'messages_account_owner_fk');
   }
 
   try {
-    await pool.query('UPDATE conversations SET semantic_evidence_revision = 0 WHERE id = $1', [conversationId]);
+    await pool.query(
+      `INSERT INTO messages
+        (id, user_id, connected_account_id, conversation_id, provider_message_id, direction, subject, sent_at_or_received_at)
+       VALUES ($1, $2, $3, $4, $5, 'INBOUND', 'duplicate provider id', now())`,
+      [randomUUID(), firstUser, persistedAccountId, conversationId, 'provider-message-001']
+    );
+    throw new Error('duplicate provider message ID was accepted');
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === 'duplicate provider message ID was accepted'
+    ) {
+      throw error;
+    }
+    expectedDatabaseError(error, 'messages_account_provider_message_uq', ['23505']);
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO conversations
+        (id, user_id, connected_account_id, semantic_evidence_revision)
+       VALUES ($1, $2, $3, -1)`,
+      [randomUUID(), firstUser, persistedAccountId]
+    );
+    throw new Error('negative conversation evidence revision was accepted');
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === 'negative conversation evidence revision was accepted'
+    ) {
+      throw error;
+    }
+    expectedDatabaseError(error, 'conversations_revision_nonnegative', ['23514']);
+  }
+
+  const secondConversationId = randomUUID();
+  const secondProviderThreadId = `provider-thread-${secondConversationId}`;
+  const secondUserIngestion = await repository.upsertNormalizedMessage(
+    normalizedEvidenceFixture(secondUser, secondPersistedAccountId, {
+      conversation: {
+        id: secondConversationId,
+        providerThreadId: secondProviderThreadId,
+        normalizedSubject: 'second user evidence'
+      },
+      providerMessageId: `provider-message-${randomUUID()}`,
+      providerThreadId: secondProviderThreadId,
+      sender: {email: 'second-sender@example.com'},
+      recipients: [{email: 'second-owner@example.com'}],
+      subject: 'Second user evidence',
+      attachments: []
+    })
+  );
+  assert(
+    secondUserIngestion.changed && secondUserIngestion.evidenceRevision === 1,
+    'second-user fixture did not persist independently'
+  );
+
+  const firstParticipant = await pool.query<{id: string}>(
+    `SELECT id
+       FROM participant_identities
+      WHERE user_id = $1
+      ORDER BY canonical_email
+      LIMIT 1`,
+    [firstUser]
+  );
+  const firstParticipantId = firstParticipant.rows[0]?.id;
+  assert(firstParticipantId, 'first-user ParticipantIdentity was not persisted');
+
+  try {
+    await pool.query(
+      'UPDATE messages SET sender_participant_id = $1 WHERE id = $2',
+      [firstParticipantId, secondUserIngestion.messageId]
+    );
+    throw new Error('cross-user sender ParticipantIdentity was accepted');
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === 'cross-user sender ParticipantIdentity was accepted'
+    ) {
+      throw error;
+    }
+    expectedDatabaseError(error, 'messages_sender_participant_owner_fk');
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO message_participants
+        (id, user_id, connected_account_id, message_id, participant_id, role)
+       VALUES ($1, $2, $3, $4, $5, 'TO')`,
+      [
+        randomUUID(),
+        secondUser,
+        secondPersistedAccountId,
+        secondUserIngestion.messageId,
+        firstParticipantId
+      ]
+    );
+    throw new Error('cross-user recipient ParticipantIdentity was accepted');
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === 'cross-user recipient ParticipantIdentity was accepted'
+    ) {
+      throw error;
+    }
+    expectedDatabaseError(error, 'message_participants_participant_owner_fk');
+  }
+
+  try {
+    await pool.query(
+      'UPDATE conversations SET semantic_evidence_revision = 0 WHERE id = $1',
+      [conversationId]
+    );
     throw new Error('conversation evidence revision decreased');
   } catch (error) {
-    if (error instanceof Error && error.message === 'conversation evidence revision decreased') throw error;
+    if (
+      error instanceof Error &&
+      error.message === 'conversation evidence revision decreased'
+    ) {
+      throw error;
+    }
     expectedDatabaseError(error, 'conversations_revision_monotonic');
   }
 
   const revisions = await Promise.all([
-    repository.advanceConversationEvidenceRevision({userId: firstUser, connectedAccountId: persistedAccountId, conversationId}),
-    repository.advanceConversationEvidenceRevision({userId: firstUser, connectedAccountId: persistedAccountId, conversationId})
+    repository.advanceConversationEvidenceRevision({
+      userId: firstUser,
+      connectedAccountId: persistedAccountId,
+      conversationId
+    }),
+    repository.advanceConversationEvidenceRevision({
+      userId: firstUser,
+      connectedAccountId: persistedAccountId,
+      conversationId
+    })
   ]);
-  assert(new Set(revisions).size === 2 && revisions.every((revision) => revision >= 2), 'concurrent evidence revision advances were not serialized');
+  assert(
+    new Set(revisions).size === 2 && revisions.every((revision) => revision >= 2),
+    'concurrent evidence revision advances were not serialized'
+  );
 
   const finalRevision = await pool.query<{semantic_evidence_revision: string}>(
     'SELECT semantic_evidence_revision::text FROM conversations WHERE id = $1',
     [conversationId]
   );
-  assert(finalRevision.rows[0]?.semantic_evidence_revision === '3', 'final evidence revision is not monotonic or expected');
-  assert(secondPersistedAccountId !== persistedAccountId, 'fixture accounts unexpectedly shared an ID');
+  assert(
+    finalRevision.rows[0]?.semantic_evidence_revision === '3',
+    'final evidence revision is not monotonic or expected'
+  );
+  assert(
+    secondPersistedAccountId !== persistedAccountId,
+    'fixture accounts unexpectedly shared an ID'
+  );
 
-  console.log(JSON.stringify({
-    kind: 'g19-evidence-foundation-result-v1',
-    postgres: version.rows[0]?.version,
-    versions: {'drizzle-orm': '0.45.2', 'drizzle-kit': '0.31.10', pg: '8.23.0'},
-    checks: [
-      'clean migration',
-      'production G10 UUID user foreign keys',
-      'cross-user account/conversation/message rejection',
-      'provider-message idempotent re-ingestion',
-      'participant ownership and normalized edges',
-      'attachment metadata persistence',
-      'database monotonic revision trigger',
-      'concurrent revision advances'
-    ],
-    status: 'PASS'
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        kind: 'g19-evidence-foundation-result-v2',
+        postgres: version.rows[0]?.version,
+        versions: {
+          'drizzle-orm': '0.45.2',
+          'drizzle-kit': '0.31.10',
+          pg: '8.23.0'
+        },
+        checks: [
+          'clean migration',
+          'production G10 UUID user foreign keys',
+          'all P13 upstream prerequisite uniqueness constraints',
+          'cross-user account/conversation/message rejection',
+          'database provider-message uniqueness',
+          'provider-message idempotent re-ingestion',
+          'ParticipantIdentity ownership FKs and index',
+          'attachment metadata persistence',
+          'database non-negative revision check',
+          'database monotonic revision trigger',
+          'concurrent revision advances'
+        ],
+        status: 'PASS'
+      },
+      null,
+      2
+    )
+  );
 } finally {
   await pool.end();
 }

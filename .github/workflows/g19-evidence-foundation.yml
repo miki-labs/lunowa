@@ -1,0 +1,195 @@
+name: G19 Evidence Foundation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/g19-evidence-foundation.yml"
+      - "drizzle/**"
+      - "drizzle.config.ts"
+      - "src/server/db/**"
+      - "src/server/evidence/**"
+      - "tests/evidence-foundation*.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  g19-evidence:
+    name: PostgreSQL 18.6 evidence acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: lunowa_g19_clean
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55419:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lunowa_g19_clean"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.20.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify committed production migration is current
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- drizzle drizzle.config.ts src/server/db/schema
+          test -z "$(git ls-files --others --exclude-standard -- drizzle)"
+
+      - name: Run clean rebuild and G19 runtime acceptance
+        env:
+          G19_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55419/lunowa_g19_clean
+        run: pnpm test:evidence-foundation
+
+      - name: Create accepted-prior-state upgrade database
+        env:
+          ADMIN_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55419/postgres
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+
+          const client = new pg.Client({connectionString: process.env.ADMIN_DATABASE_URL});
+          await client.connect();
+          try {
+            await client.query('CREATE DATABASE lunowa_g19_upgrade');
+          } finally {
+            await client.end();
+          }
+          NODE
+
+      - name: Verify accepted G10 to G19 upgrade path
+        env:
+          G19_UPGRADE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55419/lunowa_g19_upgrade
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFile, readdir} from 'node:fs/promises';
+          import pg from 'pg';
+
+          const client = new pg.Client({connectionString: process.env.G19_UPGRADE_DATABASE_URL});
+          await client.connect();
+          try {
+            const version = await client.query(
+              "SELECT current_setting('server_version_num') AS server_version_num, version()"
+            );
+            if (version.rows[0]?.server_version_num !== '180006') {
+              throw new Error(`upgrade proof requires PostgreSQL 18.6, got ${version.rows[0]?.server_version_num ?? 'unknown'}`);
+            }
+
+            const preexisting = await client.query(
+              "SELECT count(*)::int AS count FROM information_schema.tables WHERE table_schema = 'public'"
+            );
+            if (preexisting.rows[0]?.count !== 0) {
+              throw new Error('upgrade proof database must start empty');
+            }
+
+            const files = (await readdir('drizzle/migrations'))
+              .filter((name) => name.endsWith('.sql'))
+              .sort();
+            if (files.length !== 2 || !files[0]?.startsWith('0000_') || !files[1]?.startsWith('0001_')) {
+              throw new Error(`expected accepted G10 0000 plus G19 0001 migrations, got ${files.join(', ')}`);
+            }
+
+            const apply = async (path) => {
+              await client.query('BEGIN');
+              try {
+                await client.query(await readFile(path, 'utf8'));
+                await client.query('COMMIT');
+              } catch (error) {
+                await client.query('ROLLBACK');
+                throw error;
+              }
+            };
+
+            await apply(`drizzle/migrations/${files[0]}`);
+            const prior = await client.query(`
+              SELECT
+                to_regclass('public."user"') IS NOT NULL AS user_exists,
+                to_regclass('public.connected_accounts') IS NULL AS evidence_absent
+            `);
+            if (!prior.rows[0]?.user_exists || !prior.rows[0]?.evidence_absent) {
+              throw new Error('accepted G10 prior state was not established before G19 migration');
+            }
+
+            await apply(`drizzle/migrations/${files[1]}`);
+
+            const requiredTables = [
+              'attachments',
+              'connected_accounts',
+              'conversations',
+              'message_participants',
+              'messages',
+              'participant_identities',
+              'provider_sync_states'
+            ];
+            const tables = await client.query(
+              `SELECT table_name
+                 FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = ANY($1::text[])
+                ORDER BY table_name`,
+              [requiredTables]
+            );
+            if (new Set(tables.rows.map(({table_name}) => table_name)).size !== requiredTables.length) {
+              throw new Error(`G19 upgrade tables are incomplete: ${JSON.stringify(tables.rows)}`);
+            }
+
+            const requiredConstraints = [
+              'connected_accounts_id_user_uq',
+              'conversations_id_account_uq',
+              'participant_identities_id_user_uq',
+              'messages_id_account_uq',
+              'messages_account_provider_message_uq'
+            ];
+            const constraints = await client.query(
+              `SELECT conname
+                 FROM pg_constraint
+                WHERE conname = ANY($1::text[])
+                ORDER BY conname`,
+              [requiredConstraints]
+            );
+            if (new Set(constraints.rows.map(({conname}) => conname)).size !== requiredConstraints.length) {
+              throw new Error(`G19 upgrade constraints are incomplete: ${JSON.stringify(constraints.rows)}`);
+            }
+
+            const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
+            console.log(JSON.stringify({
+              kind: 'g19-accepted-prior-state-upgrade-v1',
+              postgres: version.rows[0]?.version,
+              versions: {
+                'drizzle-orm': packageJson.dependencies?.['drizzle-orm'],
+                'drizzle-kit': packageJson.devDependencies?.['drizzle-kit'],
+                pg: packageJson.dependencies?.pg
+              },
+              migrations: files,
+              status: 'PASS'
+            }, null, 2));
+          } finally {
+            await client.end();
+          }
+          NODE

@@ -1,6 +1,9 @@
 import {expect, test} from '@playwright/test';
 
 const nav = (page: import('@playwright/test').Page, label: string) => page.getByRole('button', {name: `${label}を表示`});
+const waitForAuthenticatedShell = async (page: import('@playwright/test').Page) => {
+  await expect(page.getByTestId('lunowa-shell')).toBeVisible();
+};
 const appSession = {
   session: {
     id: '735cad1c-a617-4985-9e18-8ff3c8fc5190',
@@ -56,6 +59,7 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
   for (const width of [1600, 1440, 1180, 900, 768, 720, 430, 390]) {
     await page.setViewportSize({width, height: 900});
     await page.goto('/ja');
+    await waitForAuthenticatedShell(page);
     const geometry = await page.evaluate(() => {
       const shell = document.querySelector<HTMLElement>('.app-shell')!;
       const header = document.querySelector<HTMLElement>('.mobile-header')!;
@@ -91,6 +95,7 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
 
   await page.setViewportSize({width: 900, height: 844});
   await page.goto('/ja');
+  await waitForAuthenticatedShell(page);
   await nav(page, '会話').focus();
   await expect(page.locator('.nav-tooltip', {hasText: '会話'})).toBeVisible();
 });
@@ -144,6 +149,7 @@ test('returns focus to compact conversation-entry controls', async ({page}) => {
 
 test('does not activate global search for editable input or Japanese IME composition boundary events', async ({page}) => {
   await page.goto('/ja');
+  await waitForAuthenticatedShell(page);
   await page.keyboard.press('/');
   await expect(page.getByRole('heading', {name: '検索'})).toBeVisible();
   await nav(page, 'ホーム').click();

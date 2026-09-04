@@ -20,8 +20,12 @@ const session: AuthenticatedAppSession = {
 describe('production auth contract', () => {
   it('keeps the P14 UUID schema and migration as the production FK target', () => {
     const migrations = readdirSync(resolve(process.cwd(), 'drizzle/migrations'))
-      .filter((name) => name.endsWith('.sql'));
+      .filter((name) => name.endsWith('.sql'))
+      .sort();
     expect(migrations).toHaveLength(3);
+    expect(migrations[0]).toMatch(/^0000_/);
+    expect(migrations[1]).toMatch(/^0001_/);
+    expect(migrations[2]).toMatch(/^0002_/);
 
     const authSql = readFileSync(
       resolve(process.cwd(), 'drizzle/migrations', migrations.find((name) => name.startsWith('0000_'))!),

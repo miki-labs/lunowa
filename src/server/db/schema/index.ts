@@ -9,6 +9,17 @@ export {
   providerSyncStates
 } from './evidence';
 export {
+  aiInterpretationRuns,
+  responsibilities,
+  responsibilityAdmissionReviews,
+  responsibilityDomainEvents,
+  responsibilityExpectedEvents,
+  responsibilityFieldDecisions,
+  responsibilityObligationLegs,
+  responsibilityProvenanceRefs,
+  responsibilityTemporalFacts
+} from './responsibility';
+export {
   gmailOauthStates,
   gmailProviderCredentials,
   gmailSyncSignals,

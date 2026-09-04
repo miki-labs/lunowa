@@ -22,6 +22,7 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "test:auth-production": "node --import tsx tests/auth-production-integration.ts",
     "test:evidence-foundation": "node --import tsx tests/evidence-foundation-integration.ts",
+    "test:responsibility-production": "node --import tsx tests/responsibility-production-integration.ts",
     "test:gmail-provider": "vitest run tests/gmail-provider.test.ts",
     "test:gmail-production": "node --import tsx tests/gmail-provider-integration.ts",
     "proof:auth-uuid:schema": "auth generate --config proofs/better-auth-uuid/auth.ts --output proofs/better-auth-uuid/auth-schema.ts --yes && drizzle-kit generate --config proofs/better-auth-uuid/drizzle.config.ts",

@@ -6,7 +6,9 @@ import {drizzle} from 'drizzle-orm/node-postgres';
 import {Pool} from 'pg';
 
 import * as schema from '../src/server/db/schema';
+import {EvidenceRepository} from '../src/server/db/repositories/evidence';
 import {ResponsibilityRepository} from '../src/server/db/repositories/responsibility';
+import {normalizedEvidenceFixture} from '../src/server/evidence/fixtures';
 import type {
   ObligationLeg,
   ResponsibilityInterpretationCandidate,
@@ -22,12 +24,13 @@ assert(databaseUrl, 'G31_DATABASE_URL is required; no mock or fallback database 
 
 const pool = new Pool({connectionString: databaseUrl, max: 4, application_name: 'lunowa-g31-reducer'});
 const database = drizzle(pool, {schema});
+const evidenceRepository = new EvidenceRepository(database);
 const repository = new ResponsibilityRepository(database);
 
 const userId = randomUUID();
 const accountId = randomUUID();
 const conversationId = randomUUID();
-const messageId = randomUUID();
+let messageId: string;
 const legId = randomUUID();
 
 const userLeg = (id: string, actionCode: string): ObligationLeg => ({
@@ -93,16 +96,20 @@ try {
      VALUES ($1, $2, 'fixture-provider', 'g31-account', 'g31@example.invalid', 'credential-ref:g31')`,
     [accountId, userId]
   );
-  await pool.query(
-    `INSERT INTO conversations (id, user_id, connected_account_id, semantic_evidence_revision)
-     VALUES ($1, $2, $3, 1)`,
-    [conversationId, userId, accountId]
+  const normalized = await evidenceRepository.upsertNormalizedMessage(
+    normalizedEvidenceFixture(userId, accountId, {
+      conversation: {
+        id: conversationId,
+        providerThreadId: 'g31-thread',
+        normalizedSubject: 'g31 reducer fixture',
+        semanticTopic: 'g31 reducer fixture'
+      },
+      providerMessageId: 'g31-message',
+      subject: 'G31 reducer fixture'
+    })
   );
-  await pool.query(
-    `INSERT INTO messages (id, user_id, connected_account_id, conversation_id, provider_message_id, direction, subject, sent_at_or_received_at)
-     VALUES ($1, $2, $3, $4, 'g31-message', 'INBOUND', 'G31 reducer fixture', now())`,
-    [messageId, userId, accountId, conversationId]
-  );
+  messageId = normalized.messageId;
+  assert(normalized.evidenceRevision === 1 && normalized.changed, 'normalized evidence fixture was not admitted as the current basis.');
 
   const sourceDue: TemporalFact = {
     id: randomUUID(),
@@ -120,6 +127,14 @@ try {
   assert(firstState.obligationLegs[0]?.bearer === 'USER', 'CREATE did not preserve USER obligation ownership.');
   assert(firstState.temporalFacts[0]?.temporalKind === 'SOURCE_DUE', 'CREATE lost SOURCE_DUE semantics.');
   assert(firstState.acceptedEvidenceRevision === 1, 'CREATE stored the wrong evidence revision.');
+
+  const ungrounded = await repository.reduceCandidate(candidate({
+    sourceEventKey: 'g31-ungrounded',
+    candidateKey: 'g31-ungrounded',
+    applicationKey: 'g31-ungrounded-application',
+    provenance: undefined
+  }));
+  assert(ungrounded.status === 'REJECTED', 'candidate without normalized provenance was admitted.');
 
   const retry = await repository.reduceCandidate(candidate({temporalFacts: [sourceDue]}));
   assert(retry.status === 'APPLIED' && retry.effects[0]?.changed === true, 'idempotent replay did not return the applied domain event.');
@@ -146,12 +161,14 @@ try {
       operation: 'UPDATE',
       responsibilityRef: firstState.id,
       effectKey: 'due-correction',
-      patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [correctionFact], authorityKind: 'USER_CORRECTION'}]}
+      patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [correctionFact], authorityKind: 'USER_CORRECTION', provenance: [{evidenceKind: 'USER_ASSERTION', messageId}]}]}
     }]
   }));
   const correctedState = stateFrom(correction);
   assert(correctedState.temporalFacts.some((fact) => fact.currentnessStatus === 'SUPERSEDED'), 'field correction erased prior temporal evidence.');
   assert(correctedState.temporalFacts.some((fact) => fact.resolvedDate === '2026-09-07' && fact.currentnessStatus === 'ACCEPTED_CURRENT'), 'field correction did not become current.');
+  const reloadedCorrection = await repository.getResponsibility({userId, connectedAccountId: accountId, responsibilityId: firstState.id});
+  assert(reloadedCorrection?.state.provenance.some((item) => item.fieldKey === 'temporalFacts.SOURCE_DUE' && item.evidenceKind === 'USER_ASSERTION'), 'persisted field correction provenance was not reloaded.');
 
   await pool.query('UPDATE conversations SET semantic_evidence_revision = 3 WHERE id = $1', [conversationId]);
   const review = await repository.reduceCandidate(candidate({
@@ -159,7 +176,7 @@ try {
     candidateKey: 'g31-review',
     applicationKey: 'g31-review-application',
     evidenceRevision: 3,
-    admission: {decision: 'NEEDS_REVIEW', reasonCodes: ['MATERIAL_CONFLICT'], candidateSummary: {field: 'SOURCE_DUE'}}
+    admission: {decision: 'NEEDS_REVIEW', reasonCodes: ['PRAGMATIC_AMBIGUITY'], candidateSummary: {field: 'SOURCE_DUE'}}
   }));
   assert(review.status === 'APPLIED' && review.admissionReview?.status === 'OPEN', 'NEEDS_REVIEW did not create an admission review.');
   assert(review.responsibilities.length === 0, 'NEEDS_REVIEW created a fake Responsibility.');

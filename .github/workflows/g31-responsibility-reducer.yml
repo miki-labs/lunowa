@@ -8,6 +8,7 @@ on:
       - 'src/server/db/repositories/responsibility.ts'
       - 'src/server/db/schema/**'
       - 'tests/responsibility-reducer.test.ts'
+      - 'tests/responsibility-g31-corpus.test.ts'
       - 'tests/responsibility-reducer-production-integration.ts'
       - 'drizzle/**'
       - 'drizzle.config.ts'
@@ -64,8 +65,8 @@ jobs:
           git diff --exit-code -- drizzle drizzle.config.ts src/server/db/schema package.json
           test -z "$(git ls-files --others --exclude-standard -- drizzle)"
 
-      - name: Run deterministic domain suite
-        run: pnpm exec vitest run tests/responsibility-reducer.test.ts
+      - name: Run deterministic domain suite and canonical corpus
+        run: pnpm exec vitest run tests/responsibility-reducer.test.ts tests/responsibility-g31-corpus.test.ts
 
       - name: Run production-shaped persistence suite
         env:

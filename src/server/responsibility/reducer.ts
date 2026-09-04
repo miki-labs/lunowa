@@ -1,6 +1,6 @@
+import {admitResponsibilityCandidate} from './admission';
 import {projectAdmissionReview, projectResponsibility} from './projection';
 import {
-  ADMISSION_DECISIONS,
   EFFECT_OPERATIONS,
   RESOLUTION_REASONS,
   type AdmissionReviewState,
@@ -9,6 +9,7 @@ import {
   type FieldChange,
   type ObligationLeg,
   type ResponsibilityDetails,
+  type ResponsibilityEvidenceBasis,
   type ResponsibilityEffectInput,
   type ResponsibilityInterpretationCandidate,
   type ResponsibilityPatch,
@@ -23,6 +24,7 @@ export const RESPONSIBILITY_REDUCER_VERSION = 'responsibility-reducer-v1';
 
 type ReducerOptions = {
   currentEvidenceRevision?: number;
+  evidenceBasis?: ResponsibilityEvidenceBasis;
   existingResponsibilities?: readonly ResponsibilityState[];
   now?: Date;
   idFactory?: (candidate: ResponsibilityInterpretationCandidate, effect: ResponsibilityEffectInput, index: number) => string;
@@ -42,19 +44,6 @@ function deterministicId(candidate: ResponsibilityInterpretationCandidate, effec
 
 function iso(now: Date): string {
   return new Date(now.getTime()).toISOString();
-}
-
-function sourceProvenance(candidate: ResponsibilityInterpretationCandidate) {
-  const provenance = clone(candidate.provenance ?? []);
-  if (candidate.sourceMessageId && !provenance.some((item) => item.messageId === candidate.sourceMessageId)) {
-    provenance.push({
-      fieldKey: 'source',
-      supportRole: 'source-event',
-      evidenceKind: 'PROVIDER_MESSAGE_OBSERVED',
-      messageId: candidate.sourceMessageId
-    });
-  }
-  return provenance;
 }
 
 function detailsFromCandidate(candidate: ResponsibilityInterpretationCandidate): ResponsibilityDetails {
@@ -95,10 +84,11 @@ function createState(
     temporalFacts: clone(candidate.temporalFacts ?? []),
     details: detailsFromCandidate(candidate),
     fieldDecisions: [],
-    provenance: sourceProvenance(candidate),
+    provenance: clone(candidate.provenance ?? []),
     resolutionHistory: []
   };
   applyPatch(state, effect.patch, candidate.evidenceRevision, now, candidate.semanticTime);
+  state.provenance.push(...clone(effect.provenance ?? []));
   if (state.resolutionStatus !== 'OPEN') throw new Error('CREATE cannot insert a resolved Responsibility');
   validateState(state);
   return state;
@@ -405,23 +395,12 @@ function candidateEffects(candidate: ResponsibilityInterpretationCandidate): Res
         }
       : undefined,
     resolutionEvidence: candidate.resolutionEvidence,
-    provenance: candidate.provenance
+    provenance: undefined
   }];
 }
 
 function reject(candidate: ResponsibilityInterpretationCandidate, reason: string, responsibilities: ResponsibilityState[]): ReductionResult {
   return {status: 'REJECTED', admission: candidate.admission.decision, reason, effects: [], responsibilities};
-}
-
-function validateCandidate(candidate: ResponsibilityInterpretationCandidate): string | undefined {
-  if (!ADMISSION_DECISIONS.includes(candidate.admission.decision)) return 'unknown admission decision';
-  if (!candidate.sourceEventKey.trim() || !candidate.candidateKey.trim()) return 'sourceEventKey and candidateKey are required';
-  if (!Number.isSafeInteger(candidate.evidenceRevision) || candidate.evidenceRevision < 0) return 'evidenceRevision must be a non-negative integer';
-  if (candidate.semanticTime && Number.isNaN(Date.parse(candidate.semanticTime))) return 'semanticTime must be a valid timestamp';
-  if (!candidate.userId || !candidate.connectedAccountId || !candidate.conversationId) return 'tenant scope is required';
-  if (candidate.admission.reasonCodes.length === 0) return 'admission requires at least one reason code';
-  if (candidate.admission.decision === 'TRACK' && !candidate.effects?.length && !candidate.operationalOutcome?.trim()) return 'TRACK requires an operational outcome';
-  return undefined;
 }
 
 /**
@@ -434,8 +413,6 @@ export function reduceResponsibility(
   options: ReducerOptions = {}
 ): ReductionResult {
   const existing = options.existingResponsibilities?.map(clone) ?? [];
-  const validationError = validateCandidate(candidate);
-  if (validationError) return reject(candidate, validationError, existing);
   if (options.currentEvidenceRevision !== undefined && candidate.evidenceRevision !== options.currentEvidenceRevision) {
     return {
       status: 'STALE',
@@ -446,10 +423,14 @@ export function reduceResponsibility(
     };
   }
 
-  if (candidate.admission.decision === 'DO_NOT_TRACK') {
+  const admission = admitResponsibilityCandidate(candidate, {evidenceBasis: options.evidenceBasis});
+  if (admission.status === 'INVALID_CANDIDATE') return reject(candidate, admission.reason, existing);
+  const admittedDecision = admission.decision;
+
+  if (admittedDecision === 'DO_NOT_TRACK') {
     return {status: 'APPLIED', admission: 'DO_NOT_TRACK', effects: [], responsibilities: existing};
   }
-  if (candidate.admission.decision === 'NEEDS_REVIEW') {
+  if (admittedDecision === 'NEEDS_REVIEW') {
     const review: AdmissionReviewState = {
       userId: candidate.userId,
       connectedAccountId: candidate.connectedAccountId,
@@ -507,11 +488,15 @@ export function reduceResponsibility(
       const next = clone(state);
       applyPatch(next, effect.patch, candidate.evidenceRevision, now, candidate.semanticTime);
       next.acceptedEvidenceRevision = candidate.evidenceRevision;
+      next.provenance.push(...clone(candidate.provenance ?? []));
       if (effect.provenance?.length) next.provenance.push(...clone(effect.provenance));
       if (effect.operation === 'REOPEN') {
         if (next.resolutionStatus !== 'RESOLVED') throw new Error('REOPEN requires a resolved Responsibility');
-        if (!effect.resolutionEvidence || effect.resolutionEvidence.strength !== 'SUFFICIENT') throw new Error('REOPEN requires sufficient contradictory/failure evidence');
-        next.resolutionHistory.push({reason: next.resolutionReason as ResolutionReason, at: next.resolvedAt as string, basisEvidenceRevision: state.acceptedEvidenceRevision});
+        if (
+          !effect.resolutionEvidence ||
+          effect.resolutionEvidence.strength !== 'SUFFICIENT' ||
+          !effect.resolutionEvidence.kinds.some((kind) => ['EXTERNAL_AUTHORITATIVE_FACT', 'PROVIDER_NON_DELIVERY'].includes(kind))
+        ) throw new Error('REOPEN requires sufficient contradictory/failure evidence');
         next.resolutionStatus = 'OPEN';
         delete next.resolutionReason;
         delete next.resolvedAt;

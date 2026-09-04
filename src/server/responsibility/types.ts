@@ -65,6 +65,17 @@ export type ProvenanceInput = {
   sourceExcerptShort?: string;
 };
 
+/**
+ * The evidence set a reducer invocation is authorized to use.  A source
+ * event key is only an idempotency/trace key; it is deliberately not an
+ * evidence reference by itself.
+ */
+export type ResponsibilityEvidenceBasis = {
+  evidenceRevision: number;
+  sourceEventKey: string;
+  references: readonly ProvenanceInput[];
+};
+
 export type ObligationLeg = {
   id: string;
   bearer: 'USER' | 'PARTICIPANT' | 'OTHER_PARTY' | 'EXTERNAL';

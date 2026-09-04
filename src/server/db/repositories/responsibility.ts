@@ -1,9 +1,7 @@
 import {and, asc, eq, inArray, sql} from 'drizzle-orm';
 
 import {getDatabase} from '../index';
-import {
-  conversations
-} from '../schema/evidence';
+import {conversations, messages} from '../schema/evidence';
 import {
   responsibilities,
   responsibilityAdmissionReviews,
@@ -16,6 +14,7 @@ import {
 } from '../schema/responsibility';
 import type {ResponsibilitySemanticDetailsV1} from '../schema/responsibility';
 import {
+  admitResponsibilityCandidate,
   projectResponsibility,
   reduceResponsibility,
   RESPONSIBILITY_REDUCER_VERSION
@@ -23,7 +22,9 @@ import {
 import type {
   AdmissionReviewState,
   ObligationLeg,
+  ProvenanceInput,
   ResponsibilityDetails,
+  ResponsibilityEvidenceBasis,
   ResponsibilityEffectInput,
   ResponsibilityInterpretationCandidate,
   ResponsibilityState,
@@ -74,8 +75,22 @@ function effectsFor(candidate: ResponsibilityInterpretationCandidate): Responsib
         operation: candidate.responsibilityRef ? 'UPDATE' : 'CREATE',
         responsibilityRef: candidate.responsibilityRef,
         effectKey: `${candidate.candidateKey}-0`,
+        patch: candidate.responsibilityRef ? {
+          operationalOutcome: candidate.operationalOutcome,
+          liveTrackingState: candidate.liveTrackingState,
+          attentionMode: candidate.attentionMode,
+          obligationLegs: candidate.obligationLegs,
+          expectedEvents: candidate.expectedEvents,
+          temporalFacts: candidate.temporalFacts,
+          completionCriteria: candidate.completionCriteria,
+          constraints: candidate.constraints,
+          pendingProposals: candidate.pendingProposals,
+          agreedFacts: candidate.agreedFacts,
+          uncertainties: candidate.uncertainties,
+          riskDetails: candidate.riskDetails
+        } : undefined,
         resolutionEvidence: candidate.resolutionEvidence,
-        provenance: candidate.provenance
+        provenance: undefined
       }];
 }
 
@@ -89,7 +104,8 @@ function stateFromRow(
   events: readonly typeof responsibilityExpectedEvents.$inferSelect[],
   temporalFacts: readonly typeof responsibilityTemporalFacts.$inferSelect[],
   fieldDecisions: readonly typeof responsibilityFieldDecisions.$inferSelect[],
-  domainEvents: readonly typeof responsibilityDomainEvents.$inferSelect[]
+  domainEvents: readonly typeof responsibilityDomainEvents.$inferSelect[],
+  provenanceRefs: readonly typeof responsibilityProvenanceRefs.$inferSelect[]
 ): ResponsibilityState {
   const rawDetails = (row.semanticDetails ?? {}) as Partial<ResponsibilityDetails>;
   return {
@@ -175,7 +191,16 @@ function stateFromRow(
         : {}),
       provenance: []
     })),
-    provenance: [],
+    provenance: provenanceRefs.map((reference): ProvenanceInput => ({
+      ...(reference.fieldKey ? {fieldKey: reference.fieldKey} : {}),
+      ...(reference.supportRole ? {supportRole: reference.supportRole} : {}),
+      evidenceKind: reference.evidenceKind,
+      ...(reference.messageId ? {messageId: reference.messageId} : {}),
+      ...(reference.providerObservationKey ? {providerObservationKey: reference.providerObservationKey} : {}),
+      ...(reference.interpretationRunId ? {interpretationRunId: reference.interpretationRunId} : {}),
+      ...(reference.sourceLocator ? {sourceLocator: reference.sourceLocator} : {}),
+      ...(reference.sourceExcerptShort ? {sourceExcerptShort: reference.sourceExcerptShort} : {})
+    })),
     resolutionHistory: domainEvents
       .filter((event) => ['RESOLVE', 'SUPERSEDE', 'INVALIDATE'].includes(event.operation))
       .map((event) => ({
@@ -191,14 +216,15 @@ async function loadState(tx: Parameters<Parameters<Database['transaction']>[0]>[
   const rows = lock ? await query.for('update') : await query;
   const row = rows[0];
   if (!row) return undefined;
-  const [legs, events, temporalFacts, fieldDecisions, domainEvents] = await Promise.all([
+  const [legs, events, temporalFacts, fieldDecisions, domainEvents, provenanceRefs] = await Promise.all([
     tx.select().from(responsibilityObligationLegs).where(eq(responsibilityObligationLegs.responsibilityId, responsibilityId)).orderBy(asc(responsibilityObligationLegs.createdAt), asc(responsibilityObligationLegs.id)),
     tx.select().from(responsibilityExpectedEvents).where(eq(responsibilityExpectedEvents.responsibilityId, responsibilityId)).orderBy(asc(responsibilityExpectedEvents.createdAt), asc(responsibilityExpectedEvents.id)),
     tx.select().from(responsibilityTemporalFacts).where(eq(responsibilityTemporalFacts.responsibilityId, responsibilityId)).orderBy(asc(responsibilityTemporalFacts.createdAt), asc(responsibilityTemporalFacts.id)),
     tx.select().from(responsibilityFieldDecisions).where(eq(responsibilityFieldDecisions.responsibilityId, responsibilityId)).orderBy(asc(responsibilityFieldDecisions.createdAt), asc(responsibilityFieldDecisions.id)),
-    tx.select().from(responsibilityDomainEvents).where(eq(responsibilityDomainEvents.responsibilityId, responsibilityId)).orderBy(asc(responsibilityDomainEvents.occurredAt), asc(responsibilityDomainEvents.id))
+    tx.select().from(responsibilityDomainEvents).where(eq(responsibilityDomainEvents.responsibilityId, responsibilityId)).orderBy(asc(responsibilityDomainEvents.occurredAt), asc(responsibilityDomainEvents.id)),
+    tx.select().from(responsibilityProvenanceRefs).where(eq(responsibilityProvenanceRefs.responsibilityId, responsibilityId)).orderBy(asc(responsibilityProvenanceRefs.createdAt), asc(responsibilityProvenanceRefs.id))
   ]);
-  return stateFromRow(row, legs, events, temporalFacts, fieldDecisions, domainEvents);
+  return stateFromRow(row, legs, events, temporalFacts, fieldDecisions, domainEvents, provenanceRefs);
 }
 
 function persistedStateIds(state: ResponsibilityState): ResponsibilityState {
@@ -256,6 +282,71 @@ function safeSourceLocator(provenance: {sourceLocator?: Record<string, unknown>}
 
 function canReferenceMessage(value: string | undefined): string | null {
   return isUuid(value) ? value : null;
+}
+
+function candidateProvenance(candidate: ResponsibilityInterpretationCandidate): ProvenanceInput[] {
+  return [
+    ...(candidate.provenance ?? []),
+    ...(candidate.effects?.flatMap((effect) => [
+      ...(effect.provenance ?? []),
+      ...(effect.patch?.fieldChanges?.flatMap((change) => change.provenance ?? []) ?? [])
+    ]) ?? [])
+  ];
+}
+
+function explicitAuthorityReference(provenance: ProvenanceInput): string | undefined {
+  const value = provenance.sourceLocator?.authorityReference;
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function isAuthorizedDirectEvidence(provenance: ProvenanceInput): boolean {
+  return (
+    provenance.evidenceKind === 'USER_ASSERTION' ||
+    provenance.evidenceKind === 'USER_OFF_CHANNEL_ASSERTION' ||
+    provenance.evidenceKind === 'EXTERNAL_AUTHORITATIVE_FACT'
+  ) && provenance.sourceLocator?.authorized === true && Boolean(explicitAuthorityReference(provenance));
+}
+
+/**
+ * Resolve candidate pointers against the already-persisted normalized
+ * evidence. A sourceEventKey is intentionally not sufficient: it is a
+ * caller/idempotency label, not a provider observation.
+ */
+async function evidenceBasisForCandidate(
+  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+  candidate: ResponsibilityInterpretationCandidate
+): Promise<ResponsibilityEvidenceBasis | undefined> {
+  const provenance = candidateProvenance(candidate);
+  const messageIds = [...new Set(
+    provenance
+      .map((item) => item.messageId)
+      .filter((value): value is string => Boolean(value))
+  )];
+  const directReferences = provenance.filter(isAuthorizedDirectEvidence);
+  const references: ProvenanceInput[] = [...directReferences];
+
+  if (messageIds.length > 0) {
+    if (messageIds.some((id) => !isUuid(id))) return undefined;
+    const rows = await tx
+      .select({id: messages.id})
+      .from(messages)
+      .where(and(
+        eq(messages.userId, candidate.userId),
+        eq(messages.connectedAccountId, candidate.connectedAccountId),
+        eq(messages.conversationId, candidate.conversationId),
+        inArray(messages.id, messageIds)
+      ));
+    if (rows.length !== messageIds.length) return undefined;
+    references.push(...rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id})));
+  } else if (directReferences.length === 0) {
+    return undefined;
+  }
+
+  return {
+    evidenceRevision: candidate.evidenceRevision,
+    sourceEventKey: candidate.sourceEventKey,
+    references
+  };
 }
 
 export class ResponsibilityRepository {
@@ -316,13 +407,25 @@ export class ResponsibilityRepository {
         };
       }
 
+      const evidenceBasis = await evidenceBasisForCandidate(tx, candidate);
+      const admission = admitResponsibilityCandidate(candidate, {evidenceBasis});
+      if (admission.status === 'INVALID_CANDIDATE') {
+        return {
+          status: 'REJECTED',
+          admission: candidate.admission.decision,
+          reason: admission.reason,
+          effects: [],
+          responsibilities: []
+        };
+      }
+
       const candidateEffects = effectsFor(candidate);
       const applicationKey = (candidate.applicationKey?.trim() || candidate.sourceEventKey.trim());
       const effectKeys = candidateEffects.map((effect, index) => effectKey(effect, candidate, index));
       if (!applicationKey || applicationKey.length > 128 || effectKeys.some((key) => !key || key.length > 128)) {
         return {
           status: 'REJECTED',
-          admission: candidate.admission.decision,
+          admission: admission.decision,
           reason: 'application and effect keys must be non-empty and at most 128 characters',
           effects: [],
           responsibilities: []
@@ -343,7 +446,7 @@ export class ResponsibilityRepository {
         const states = (await Promise.all([...new Set(ids)].map((id) => loadState(tx, id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
         return {
           status: 'APPLIED',
-          admission: candidate.admission.decision,
+          admission: admission.decision,
           effects: effectKeys.map((key) => {
             const event = priorEvents.find((item) => item.effectKey === key) as typeof priorEvents[number];
             return {
@@ -357,7 +460,7 @@ export class ResponsibilityRepository {
         };
       }
 
-      if (candidate.admission.decision === 'DO_NOT_TRACK') {
+      if (admission.decision === 'DO_NOT_TRACK') {
         await tx.update(responsibilityAdmissionReviews).set({
           reviewStatus: 'RESOLVED',
           resolution: 'DO_NOT_TRACK',
@@ -374,7 +477,7 @@ export class ResponsibilityRepository {
         return {status: 'APPLIED', admission: 'DO_NOT_TRACK', effects: [], responsibilities: []};
       }
 
-      if (candidate.admission.decision === 'NEEDS_REVIEW') {
+      if (admission.decision === 'NEEDS_REVIEW') {
         const [sameRevision] = await tx
           .select()
           .from(responsibilityAdmissionReviews)
@@ -453,6 +556,7 @@ export class ResponsibilityRepository {
       const existingStates = (await Promise.all([...new Set(targetIds)].map((id) => loadState(tx, id)))).filter((state): state is ResponsibilityState => Boolean(state));
       const pureResult = reduceResponsibility(candidate, {
         currentEvidenceRevision: conversation.semanticEvidenceRevision,
+        evidenceBasis,
         existingResponsibilities: existingStates,
         idFactory: (source, effect, index) => stableUuid(`${source.connectedAccountId}:responsibility:${source.sourceEventKey}:${effectKey(effect, source, index)}`),
         now: new Date()
@@ -597,9 +701,7 @@ export class ResponsibilityRepository {
   }
 
   private async writeReviewProvenance(tx: Parameters<Parameters<Database['transaction']>[0]>[0], reviewId: string, candidate: ResponsibilityInterpretationCandidate): Promise<void> {
-    const provenance = candidate.provenance?.length
-      ? candidate.provenance
-      : [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: candidate.sourceMessageId, providerObservationKey: candidate.sourceMessageId ? undefined : candidate.sourceEventKey, sourceLocator: {sourceEventKey: candidate.sourceEventKey}}];
+    const provenance = candidate.provenance ?? [];
     await tx.insert(responsibilityProvenanceRefs).values(provenance.map((item, index) => ({
       id: stableUuid(`${reviewId}:provenance:${index}`),
       userId: candidate.userId,
@@ -611,7 +713,7 @@ export class ResponsibilityRepository {
       supportRole: item.supportRole ?? null,
       evidenceKind: item.evidenceKind,
       messageId: canReferenceMessage(item.messageId),
-      providerObservationKey: item.providerObservationKey ?? (canReferenceMessage(item.messageId) ? null : candidate.sourceEventKey),
+      providerObservationKey: item.providerObservationKey ?? null,
       interpretationRunId: nullableUuid(item.interpretationRunId ?? candidate.interpretationRunId),
       sourceLocator: safeSourceLocator(item),
       sourceExcerptShort: item.sourceExcerptShort ?? null,
@@ -626,11 +728,18 @@ export class ResponsibilityRepository {
     candidate: ResponsibilityInterpretationCandidate,
     effect: ResponsibilityEffectInput | undefined
   ): Promise<void> {
-    const provenance = [...(candidate.provenance ?? []), ...(effect?.provenance ?? [])];
-    const items = provenance.length
-      ? provenance
-      : [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: candidate.sourceMessageId, providerObservationKey: candidate.sourceMessageId ? undefined : candidate.sourceEventKey, sourceLocator: {sourceEventKey: candidate.sourceEventKey}}];
-    await tx.insert(responsibilityProvenanceRefs).values(items.map((item, index) => ({
+    const fieldProvenance = effect?.patch?.fieldChanges?.flatMap((change) =>
+      (change.provenance ?? []).map((item) => ({
+        ...item,
+        fieldKey: item.fieldKey ?? change.fieldKey
+      }))
+    ) ?? [];
+    const provenance = [
+      ...(candidate.provenance ?? []),
+      ...(effect?.provenance ?? []),
+      ...fieldProvenance
+    ];
+    await tx.insert(responsibilityProvenanceRefs).values(provenance.map((item, index) => ({
       id: stableUuid(`${domainEventId}:provenance:${index}`),
       userId: state.userId,
       connectedAccountId: state.connectedAccountId,
@@ -640,7 +749,7 @@ export class ResponsibilityRepository {
       fieldKey: item.fieldKey ?? null,
       supportRole: item.supportRole ?? null,
       evidenceKind: item.evidenceKind,
-      messageId: canReferenceMessage(item.messageId ?? candidate.sourceMessageId),
+      messageId: canReferenceMessage(item.messageId),
       providerObservationKey: item.providerObservationKey ?? null,
       interpretationRunId: nullableUuid(item.interpretationRunId ?? candidate.interpretationRunId),
       domainEventId,

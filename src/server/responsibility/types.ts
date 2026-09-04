@@ -43,6 +43,7 @@ export type EvidenceKind =
   | 'USER_ASSERTION'
   | 'USER_OFF_CHANNEL_ASSERTION'
   | 'COUNTERPART_EXPLICIT_CLOSURE'
+  | 'COUNTERPART_FAILURE_REPORT'
   | 'EXPLICIT_COMPLETION'
   | 'ALL_CRITERIA_SATISFIED'
   | 'READ'
@@ -279,6 +280,7 @@ export type ResponsibilityPatch = {
 export type ResponsibilityEffectInput = {
   operation: EffectOperation;
   responsibilityRef?: string | null;
+  expectedAggregateVersion?: number;
   effectKey?: string;
   reasonCodes?: string[];
   reason?: string;
@@ -287,7 +289,80 @@ export type ResponsibilityEffectInput = {
   provenance?: ProvenanceInput[];
 };
 
+/**
+ * Structured, but untrusted, interpretation output.  This shape deliberately
+ * has no admission decision, domain operation, Responsibility identifier,
+ * tracking/defer state, resolution evidence, or provider-observation truth.
+ * Those values belong to the trusted boundary below.
+ */
+export type CandidateIdentityRelation = {
+  kind: 'NEW' | 'CONTINUES' | 'REPLACES' | 'SAME_UNSATISFIED_OUTCOME' | 'NEW_EPISODE';
+  priorOperationalOutcome?: string;
+};
+
+export type CandidateTerminalSignal = {
+  kind: 'NONE' | 'COMPLETED' | 'DECLINED' | 'CANCELLED' | 'INVALIDATED';
+  provenance: ProvenanceInput[];
+};
+
+export type CandidateFieldCorrection = {
+  fieldKey: Exclude<FieldChange['fieldKey'], 'liveTrackingState' | 'attentionMode'>;
+  value: unknown;
+  semanticTime?: string;
+  relation: 'CORRECTION' | 'SUPERSEDES' | 'CONFLICT';
+  provenance: ProvenanceInput[];
+};
+
+export type CandidateObligationLeg = Omit<ObligationLeg, 'bearer' | 'status' | 'closureReason' | 'actionability' | 'conditionSatisfied' | 'closedAt'> & {
+  bearerCandidate: ObligationLeg['bearer'];
+  blockedByCondition?: boolean;
+};
+
+export type CandidateExpectedEvent = Omit<ExpectedEvent, 'status' | 'closureReason' | 'satisfiedAt' | 'closedAt'>;
+export type CandidateCompletionCriterion = Omit<CompletionCriterion, 'status' | 'satisfiedAt'>;
+export type CandidateConstraint = Omit<Constraint, 'status'>;
+export type CandidatePendingProposal = Omit<PendingProposal, 'status'> & {candidateStatus?: 'PENDING' | 'REJECTED'};
+export type CandidateAgreedFact = Omit<AgreedFact, 'status'>;
+export type CandidateTemporalFact = Omit<TemporalFact, 'currentnessStatus' | 'supersededAt'> & {conflictCandidate?: boolean};
+
+export type CandidateResponsibilitySemantics = {
+  candidateUnitKey: string;
+  materiality: 'MATERIAL' | 'NOT_MATERIAL' | 'UNCERTAIN';
+  operationalOutcome?: string;
+  identityRelation?: CandidateIdentityRelation;
+  obligationLegs?: CandidateObligationLeg[];
+  expectedEvents?: CandidateExpectedEvent[];
+  temporalFacts?: CandidateTemporalFact[];
+  completionCriteria?: CandidateCompletionCriterion[];
+  constraints?: CandidateConstraint[];
+  pendingProposals?: CandidatePendingProposal[];
+  agreedFacts?: CandidateAgreedFact[];
+  uncertainties?: Uncertainty[];
+  riskDetails?: RiskDetail[];
+  assignmentSemantics?: ResponsibilityDetails['assignmentSemantics'];
+  corrections?: CandidateFieldCorrection[];
+  terminalSignal?: CandidateTerminalSignal;
+  provenance: ProvenanceInput[];
+};
+
 export type ResponsibilityInterpretationCandidate = ResponsibilityScope & {
+  sourceEventKey: string;
+  candidateKey: string;
+  evidenceRevision: number;
+  semantics: CandidateResponsibilitySemantics[];
+  admissionUncertainties?: Uncertainty[];
+  provenance: ProvenanceInput[];
+  interpretationRunId?: string;
+  sourceMessageId?: string;
+  semanticTime?: string;
+};
+
+/**
+ * Effect-bearing input for trusted system/user policy and deterministic tests.
+ * It is intentionally a different type from model interpretation output.
+ */
+export type TrustedResponsibilityCommand = ResponsibilityScope & {
+  commandSource: 'INTERPRETATION_BOUNDARY' | 'TRUSTED_SYSTEM' | 'TRUSTED_USER';
   sourceEventKey: string;
   candidateKey: string;
   evidenceRevision: number;

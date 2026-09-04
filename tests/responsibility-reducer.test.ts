@@ -1,12 +1,13 @@
 import {describe, expect, it} from 'vitest';
 
-import {projectResponsibility, reduceResponsibility} from '../src/server/responsibility';
+import {deriveResponsibilityCommand, projectResponsibility, reduceResponsibility} from '../src/server/responsibility';
 import type {
   ObligationLeg,
   ResponsibilityEvidenceBasis,
   ResponsibilityInterpretationCandidate,
   ResponsibilityState,
-  TemporalFact
+  TemporalFact,
+  TrustedResponsibilityCommand
 } from '../src/server/responsibility';
 
 const scope = {
@@ -27,9 +28,10 @@ function leg(id: string, bearer: ObligationLeg['bearer'], actionCode: string, ac
   };
 }
 
-function candidate(overrides: Partial<ResponsibilityInterpretationCandidate> = {}): ResponsibilityInterpretationCandidate {
+function candidate(overrides: Partial<TrustedResponsibilityCommand> = {}): TrustedResponsibilityCommand {
   return {
     ...scope,
+    commandSource: 'TRUSTED_SYSTEM',
     sourceEventKey: 'message-1',
     candidateKey: 'candidate-1',
     evidenceRevision: 1,
@@ -41,9 +43,31 @@ function candidate(overrides: Partial<ResponsibilityInterpretationCandidate> = {
   };
 }
 
+function interpretationCandidate(overrides: Partial<ResponsibilityInterpretationCandidate> = {}): ResponsibilityInterpretationCandidate {
+  const provenance = [{evidenceKind: 'COMMUNICATED_CLAIM' as const, messageId: 'message-1', sourceLocator: {zone: 'CURRENT_AUTHORED'}}];
+  return {
+    ...scope,
+    sourceEventKey: 'message-1',
+    candidateKey: 'interpretation-1',
+    evidenceRevision: 1,
+    provenance,
+    semantics: [{
+      candidateUnitKey: 'open-loop-1',
+      materiality: 'MATERIAL',
+      operationalOutcome: 'send the revised document',
+      obligationLegs: [{
+        id: 'user-send', bearerCandidate: 'USER', actionCode: 'SEND_REVISED_DOCUMENT',
+        basisKind: 'COMMUNICATED_REQUEST', provenance
+      }],
+      provenance
+    }],
+    ...overrides
+  };
+}
+
 type ReducerOptions = NonNullable<Parameters<typeof reduceResponsibility>[1]>;
 
-function reduce(candidateInput: ResponsibilityInterpretationCandidate, options: ReducerOptions = {}) {
+function reduce(candidateInput: TrustedResponsibilityCommand, options: ReducerOptions = {}) {
   const evidenceBasis: ResponsibilityEvidenceBasis = {
     evidenceRevision: candidateInput.evidenceRevision,
     sourceEventKey: candidateInput.sourceEventKey,
@@ -67,6 +91,54 @@ function created(result: ReturnType<typeof reduceResponsibility>): Responsibilit
 }
 
 describe('deterministic Responsibility admission and reducer', () => {
+  it('mechanically separates untrusted interpretation from admission, identity, effects, and provider truth', () => {
+    const input = interpretationCandidate() as ResponsibilityInterpretationCandidate & Record<string, unknown>;
+    input.admission = {decision: 'DO_NOT_TRACK'};
+    input.effects = [{operation: 'INVALIDATE', responsibilityRef: 'foreign-id'}];
+    const result = deriveResponsibilityCommand(input, {
+      evidenceBasis: {evidenceRevision: 1, sourceEventKey: 'message-1', references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'}]}
+    });
+    expect(result).toMatchObject({status: 'REJECTED'});
+    if (result.status === 'REJECTED') expect(result.reason).toContain('cannot supply trusted authority field');
+
+    const providerClaim = interpretationCandidate({
+      provenance: [{evidenceKind: 'PROVIDER_RECONCILED_SEND', messageId: 'message-1'}],
+      semantics: []
+    });
+    expect(deriveResponsibilityCommand(providerClaim, {
+      evidenceBasis: {evidenceRevision: 1, sourceEventKey: 'message-1', references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'}]}
+    })).toMatchObject({status: 'REJECTED'});
+  });
+
+  it('derives admission and scoped identity effects from semantic units', () => {
+    const basis: ResponsibilityEvidenceBasis = {
+      evidenceRevision: 1,
+      sourceEventKey: 'message-1',
+      references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'}]
+    };
+    const create = deriveResponsibilityCommand(interpretationCandidate(), {evidenceBasis: basis});
+    expect(create.status, create.status === 'REJECTED' ? create.reason : '').toBe('DERIVED');
+    if (create.status !== 'DERIVED') return;
+    expect(create.command.admission.decision).toBe('TRACK');
+    expect(create.command.effects?.map((effect) => effect.operation)).toEqual(['CREATE']);
+
+    const initial = created(reduce(create.command));
+    const continuation = interpretationCandidate({
+      candidateKey: 'continuation',
+      semantics: [{
+        candidateUnitKey: 'clarification', materiality: 'MATERIAL',
+        operationalOutcome: initial.operationalOutcome,
+        identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: initial.operationalOutcome},
+        constraints: [{id: 'pdf', code: 'FORMAT_PDF', provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1'}]}],
+        provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1'}]
+      }]
+    });
+    const derived = deriveResponsibilityCommand(continuation, {evidenceBasis: basis, existingResponsibilities: [initial]});
+    expect(derived.status).toBe('DERIVED');
+    if (derived.status === 'DERIVED') {
+      expect(derived.command.effects?.[0]).toMatchObject({operation: 'UPDATE', responsibilityRef: initial.id});
+    }
+  });
   it('rejects ungrounded candidates instead of manufacturing source provenance', () => {
     const ungrounded = candidate({sourceMessageId: 'message-1', provenance: undefined});
     const result = reduceResponsibility(ungrounded, {
@@ -208,6 +280,36 @@ describe('deterministic Responsibility admission and reducer', () => {
       effects: [{operation: 'RESOLVE', responsibilityRef: initial.id, effectKey: 'send', reason: 'SATISFIED', patch: {obligationLegs: [closedLeg]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['PROVIDER_RECONCILED_SEND']}}]
     }), {currentEvidenceRevision: 3, existingResponsibilities: [initial]});
     expect(created(resolved).resolutionReason).toBe('SATISFIED');
+  });
+
+  it.each([
+    ['RESOLVE', 'DECLINED'],
+    ['RESOLVE', 'CANCELLED'],
+    ['RESOLVE', 'USER_CLOSED'],
+    ['RESOLVE', 'DUPLICATE'],
+    ['SUPERSEDE', 'SUPERSEDED'],
+    ['INVALIDATE', 'INVALIDATED']
+  ] as const)('%s/%s resolves without falsifying pending criteria as satisfied', (operation, reason) => {
+    const initial = created(reduce(candidate({
+      completionCriteria: [{id: 'criterion', code: 'REAL_COMPLETION', status: 'PENDING', provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1'}]}]
+    })));
+    const result = reduce(candidate({
+      sourceEventKey: `terminal-${reason}`,
+      candidateKey: `terminal-${reason}`,
+      evidenceRevision: 2,
+      responsibilityRef: initial.id,
+      effects: [{
+        operation,
+        responsibilityRef: initial.id,
+        effectKey: reason,
+        ...(operation === 'RESOLVE' ? {reason} : {}),
+        resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['USER_ASSERTION']}
+      }]
+    }), {currentEvidenceRevision: 2, existingResponsibilities: [initial]});
+    const terminal = created(result);
+    expect(terminal.resolutionReason).toBe(reason);
+    expect(terminal.details.completionCriteria[0]).toMatchObject({status: 'PENDING'});
+    expect(terminal.details.completionCriteria[0]?.satisfiedAt).toBeUndefined();
   });
 
   it('supports a supersede plus replacement CREATE from one evidence event', () => {

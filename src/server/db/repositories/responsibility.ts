@@ -1,8 +1,10 @@
 import {and, asc, eq, inArray, sql} from 'drizzle-orm';
+import {createHash} from 'node:crypto';
 
 import {getDatabase} from '../index';
-import {conversations, messages} from '../schema/evidence';
+import {attachments, conversations, messages, participantIdentities} from '../schema/evidence';
 import {
+  aiInterpretationRuns,
   responsibilities,
   responsibilityAdmissionReviews,
   responsibilityDomainEvents,
@@ -14,12 +16,14 @@ import {
 } from '../schema/responsibility';
 import type {ResponsibilitySemanticDetailsV1} from '../schema/responsibility';
 import {
-  admitResponsibilityCandidate,
+  admitTrustedResponsibilityCommand,
+  deriveResponsibilityCommand,
   projectResponsibility,
   reduceResponsibility,
   RESPONSIBILITY_REDUCER_VERSION
 } from '../../responsibility';
 import type {
+  AdmissionDecision,
   AdmissionReviewState,
   ObligationLeg,
   ProvenanceInput,
@@ -29,7 +33,8 @@ import type {
   ResponsibilityInterpretationCandidate,
   ResponsibilityState,
   TemporalFact,
-  ReductionResult
+  ReductionResult,
+  TrustedResponsibilityCommand
 } from '../../responsibility';
 
 type Database = ReturnType<typeof getDatabase>;
@@ -60,6 +65,12 @@ function stableUuid(seed: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+function scopedMachineKey(kind: 'app' | 'fx', parts: readonly string[]): string {
+  const hash = createHash('sha256');
+  for (const part of parts) hash.update(`${Buffer.byteLength(part, 'utf8')}:`).update(part);
+  return `${kind}:${hash.digest('hex')}`;
+}
+
 function nullableUuid(value: string | undefined): string | null {
   return isUuid(value) ? value : null;
 }
@@ -68,7 +79,7 @@ function nullableText(value: string | undefined): string | null {
   return value ?? null;
 }
 
-function effectsFor(candidate: ResponsibilityInterpretationCandidate): ResponsibilityEffectInput[] {
+function effectsFor(candidate: TrustedResponsibilityCommand): ResponsibilityEffectInput[] {
   return candidate.effects?.length
     ? candidate.effects
     : [{
@@ -94,7 +105,7 @@ function effectsFor(candidate: ResponsibilityInterpretationCandidate): Responsib
       }];
 }
 
-function effectKey(effect: ResponsibilityEffectInput, candidate: ResponsibilityInterpretationCandidate, index: number): string {
+function effectKey(effect: ResponsibilityEffectInput, candidate: TrustedResponsibilityCommand, index: number): string {
   return effect.effectKey?.trim() || `${candidate.candidateKey}-${index}`;
 }
 
@@ -108,6 +119,21 @@ function stateFromRow(
   provenanceRefs: readonly typeof responsibilityProvenanceRefs.$inferSelect[]
 ): ResponsibilityState {
   const rawDetails = (row.semanticDetails ?? {}) as Partial<ResponsibilityDetails>;
+  const provenanceInput = (reference: typeof responsibilityProvenanceRefs.$inferSelect): ProvenanceInput => ({
+    ...(reference.fieldKey ? {fieldKey: reference.fieldKey} : {}),
+    ...(reference.supportRole ? {supportRole: reference.supportRole} : {}),
+    evidenceKind: reference.evidenceKind,
+    ...(reference.messageId ? {messageId: reference.messageId} : {}),
+    ...(reference.providerObservationKey ? {providerObservationKey: reference.providerObservationKey} : {}),
+    ...(reference.interpretationRunId ? {interpretationRunId: reference.interpretationRunId} : {}),
+    ...(reference.sourceLocator ? {sourceLocator: reference.sourceLocator} : {}),
+    ...(reference.sourceExcerptShort ? {sourceExcerptShort: reference.sourceExcerptShort} : {})
+  });
+  const provenanceFor = (targetKind: string, targetId?: string, fieldKey?: string): ProvenanceInput[] => provenanceRefs
+    .filter((reference) => reference.targetKind === targetKind &&
+      (targetId === undefined || reference.targetId === targetId) &&
+      (fieldKey === undefined || reference.fieldKey === fieldKey))
+    .map(provenanceInput);
   return {
     id: row.id,
     userId: row.userId,
@@ -135,7 +161,7 @@ function stateFromRow(
       ...(leg.authorityStatus ? {authorityStatus: leg.authorityStatus} : {}),
       ...(leg.activationEventId ? {activationEventId: leg.activationEventId} : {}),
       ...(leg.closedAt ? {closedAt: leg.closedAt.toISOString()} : {}),
-      provenance: []
+      provenance: provenanceFor('OBLIGATION_LEG', leg.id)
     })),
     expectedEvents: events.map((event) => ({
       id: event.id,
@@ -149,7 +175,7 @@ function stateFromRow(
       ...(event.expectationStrength ? {expectationStrength: event.expectationStrength} : {}),
       ...(event.satisfiedAt ? {satisfiedAt: event.satisfiedAt.toISOString()} : {}),
       ...(event.closedAt ? {closedAt: event.closedAt.toISOString()} : {}),
-      provenance: []
+      provenance: provenanceFor('EXPECTED_EVENT', event.id)
     })),
     temporalFacts: temporalFacts.map((fact) => ({
       id: fact.id,
@@ -168,16 +194,16 @@ function stateFromRow(
       currentnessStatus: fact.currentnessStatus as TemporalFact['currentnessStatus'],
       ...(fact.authorityStatus ? {authorityStatus: fact.authorityStatus} : {}),
       ...(fact.supersededAt ? {supersededAt: fact.supersededAt.toISOString()} : {}),
-      provenance: []
+      provenance: provenanceFor('TEMPORAL_FACT', fact.id)
     })),
     details: {
-      completionCriteria: (rawDetails.completionCriteria ?? []).map((item) => ({...item, provenance: item.provenance ?? []})),
-      constraints: (rawDetails.constraints ?? []).map((item) => ({...item, provenance: item.provenance ?? []})),
-      pendingProposals: (rawDetails.pendingProposals ?? []).map((item) => ({...item, provenance: item.provenance ?? []})),
-      agreedFacts: (rawDetails.agreedFacts ?? []).map((item) => ({...item, provenance: item.provenance ?? []})),
-      uncertainties: (rawDetails.uncertainties ?? []).map((item) => ({...item, provenance: item.provenance ?? []})),
+      completionCriteria: (rawDetails.completionCriteria ?? []).map((item) => ({...item, provenance: provenanceFor('COMPLETION_CRITERION', undefined, `completionCriteria/${item.id}`)})),
+      constraints: (rawDetails.constraints ?? []).map((item) => ({...item, provenance: provenanceFor('CONSTRAINT', undefined, `constraints/${item.id}`)})),
+      pendingProposals: (rawDetails.pendingProposals ?? []).map((item) => ({...item, provenance: provenanceFor('PENDING_PROPOSAL', undefined, `pendingProposals/${item.id}`)})),
+      agreedFacts: (rawDetails.agreedFacts ?? []).map((item) => ({...item, provenance: provenanceFor('AGREED_FACT', undefined, `agreedFacts/${item.id}`)})),
+      uncertainties: (rawDetails.uncertainties ?? []).map((item) => ({...item, provenance: provenanceFor('UNCERTAINTY', undefined, `uncertainties/${item.id}`)})),
       assignmentSemantics: rawDetails.assignmentSemantics,
-      riskDetails: (rawDetails.riskDetails ?? []).map((item) => ({...item, provenance: item.provenance ?? []}))
+      riskDetails: (rawDetails.riskDetails ?? []).map((item) => ({...item, provenance: provenanceFor('RISK_DETAIL', undefined, `riskDetails/${item.id}`)}))
     },
     fieldDecisions: fieldDecisions.map((decision) => ({
       fieldKey: decision.fieldKey,
@@ -189,18 +215,9 @@ function stateFromRow(
       ...(typeof decision.valueJsonb === 'object' && decision.valueJsonb !== null && (decision.valueJsonb as {__lunowaFieldDecision?: unknown}).__lunowaFieldDecision === true && typeof (decision.valueJsonb as {semanticTime?: unknown}).semanticTime === 'string'
         ? {semanticTime: (decision.valueJsonb as {semanticTime: string}).semanticTime}
         : {}),
-      provenance: []
+      provenance: provenanceFor('FIELD_DECISION', decision.id, decision.fieldKey)
     })),
-    provenance: provenanceRefs.map((reference): ProvenanceInput => ({
-      ...(reference.fieldKey ? {fieldKey: reference.fieldKey} : {}),
-      ...(reference.supportRole ? {supportRole: reference.supportRole} : {}),
-      evidenceKind: reference.evidenceKind,
-      ...(reference.messageId ? {messageId: reference.messageId} : {}),
-      ...(reference.providerObservationKey ? {providerObservationKey: reference.providerObservationKey} : {}),
-      ...(reference.interpretationRunId ? {interpretationRunId: reference.interpretationRunId} : {}),
-      ...(reference.sourceLocator ? {sourceLocator: reference.sourceLocator} : {}),
-      ...(reference.sourceExcerptShort ? {sourceExcerptShort: reference.sourceExcerptShort} : {})
-    })),
+    provenance: provenanceFor('RESPONSIBILITY'),
     resolutionHistory: domainEvents
       .filter((event) => ['RESOLVE', 'SUPERSEDE', 'INVALIDATE'].includes(event.operation))
       .map((event) => ({
@@ -284,13 +301,83 @@ function canReferenceMessage(value: string | undefined): string | null {
   return isUuid(value) ? value : null;
 }
 
-function candidateProvenance(candidate: ResponsibilityInterpretationCandidate): ProvenanceInput[] {
+function candidateProvenance(candidate: TrustedResponsibilityCommand): ProvenanceInput[] {
+  const patchProvenance = (patch: ResponsibilityEffectInput['patch']): ProvenanceInput[] => patch ? [
+    ...(patch.obligationLegs?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.expectedEvents?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.temporalFacts?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.completionCriteria?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.constraints?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.pendingProposals?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.agreedFacts?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.uncertainties?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.riskDetails?.flatMap((item) => item.provenance) ?? []),
+    ...(patch.fieldChanges?.flatMap((change) => change.provenance ?? []) ?? [])
+  ] : [];
   return [
     ...(candidate.provenance ?? []),
+    ...(candidate.obligationLegs?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.expectedEvents?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.temporalFacts?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.completionCriteria?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.constraints?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.pendingProposals?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.agreedFacts?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.uncertainties?.flatMap((item) => item.provenance) ?? []),
+    ...(candidate.riskDetails?.flatMap((item) => item.provenance) ?? []),
     ...(candidate.effects?.flatMap((effect) => [
       ...(effect.provenance ?? []),
-      ...(effect.patch?.fieldChanges?.flatMap((change) => change.provenance ?? []) ?? [])
+      ...patchProvenance(effect.patch)
     ]) ?? [])
+  ];
+}
+
+function commandChildrenAreGrounded(candidate: TrustedResponsibilityCommand): boolean {
+  const arrays = [
+    candidate.obligationLegs, candidate.expectedEvents, candidate.temporalFacts,
+    candidate.completionCriteria, candidate.constraints, candidate.pendingProposals,
+    candidate.agreedFacts, candidate.uncertainties, candidate.riskDetails,
+    ...(candidate.effects?.flatMap((effect) => [
+      effect.patch?.obligationLegs, effect.patch?.expectedEvents, effect.patch?.temporalFacts,
+      effect.patch?.completionCriteria, effect.patch?.constraints, effect.patch?.pendingProposals,
+      effect.patch?.agreedFacts, effect.patch?.uncertainties, effect.patch?.riskDetails
+    ]) ?? [])
+  ];
+  if (arrays.some((items) => items?.some((item) => item.provenance.length === 0))) return false;
+  return !(candidate.effects?.some((effect) => effect.patch?.fieldChanges?.some((change) => !change.provenance?.length)) ?? false);
+}
+
+function commandAuthorityIsConsistent(candidate: TrustedResponsibilityCommand): boolean {
+  const changes = candidate.effects?.flatMap((effect) => effect.patch?.fieldChanges ?? []) ?? [];
+  if (changes.some((change) => change.authorityKind === 'USER_CORRECTION') && candidate.commandSource !== 'TRUSTED_USER') return false;
+  if (changes.some((change) => change.authorityKind === 'EXTERNAL_AUTHORITATIVE_FACT') && candidate.commandSource !== 'TRUSTED_SYSTEM') return false;
+  const evidenceKinds = [
+    ...(candidate.resolutionEvidence?.kinds ?? []),
+    ...(candidate.effects?.flatMap((effect) => effect.resolutionEvidence?.kinds ?? []) ?? [])
+  ];
+  if (evidenceKinds.some((kind) => kind === 'USER_ASSERTION' || kind === 'USER_OFF_CHANNEL_ASSERTION') && candidate.commandSource !== 'TRUSTED_USER') return false;
+  if (evidenceKinds.some((kind) => kind.startsWith('PROVIDER_')) && candidate.commandSource !== 'TRUSTED_SYSTEM') return false;
+  return true;
+}
+
+function interpretationProvenance(candidate: ResponsibilityInterpretationCandidate): ProvenanceInput[] {
+  return [
+    ...candidate.provenance,
+    ...candidate.semantics.flatMap((unit) => [
+      ...unit.provenance,
+      ...(unit.terminalSignal?.provenance ?? []),
+      ...(unit.corrections?.flatMap((change) => change.provenance) ?? []),
+      ...(unit.obligationLegs?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.expectedEvents?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.temporalFacts?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.completionCriteria?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.constraints?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.pendingProposals?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.agreedFacts?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.uncertainties?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.riskDetails?.flatMap((item) => item.provenance) ?? [])
+    ]),
+    ...(candidate.admissionUncertainties?.flatMap((item) => item.provenance) ?? [])
   ];
 }
 
@@ -314,21 +401,32 @@ function isAuthorizedDirectEvidence(provenance: ProvenanceInput): boolean {
  */
 async function evidenceBasisForCandidate(
   tx: Parameters<Parameters<Database['transaction']>[0]>[0],
-  candidate: ResponsibilityInterpretationCandidate
+  candidate: TrustedResponsibilityCommand
 ): Promise<ResponsibilityEvidenceBasis | undefined> {
+  if (!commandChildrenAreGrounded(candidate) || !commandAuthorityIsConsistent(candidate)) return undefined;
   const provenance = candidateProvenance(candidate);
   const messageIds = [...new Set(
     provenance
       .map((item) => item.messageId)
       .filter((value): value is string => Boolean(value))
   )];
-  const directReferences = provenance.filter(isAuthorizedDirectEvidence);
-  const references: ProvenanceInput[] = [...directReferences];
+  const directReferences = provenance.filter((item) => isAuthorizedDirectEvidence(item) && (
+    ((item.evidenceKind === 'USER_ASSERTION' || item.evidenceKind === 'USER_OFF_CHANNEL_ASSERTION') && candidate.commandSource === 'TRUSTED_USER') ||
+    (item.evidenceKind === 'EXTERNAL_AUTHORITATIVE_FACT' && candidate.commandSource === 'TRUSTED_SYSTEM')
+  ));
+  const providerReferences = provenance.filter((item) =>
+    candidate.commandSource === 'TRUSTED_SYSTEM' &&
+    (item.evidenceKind === 'PROVIDER_NON_DELIVERY' || item.evidenceKind === 'EXTERNAL_AUTHORITATIVE_FACT') &&
+    Boolean(item.providerObservationKey) &&
+    item.sourceLocator?.authorized === true &&
+    Boolean(explicitAuthorityReference(item))
+  );
+  const references: ProvenanceInput[] = [...directReferences, ...providerReferences];
 
   if (messageIds.length > 0) {
     if (messageIds.some((id) => !isUuid(id))) return undefined;
     const rows = await tx
-      .select({id: messages.id})
+      .select({id: messages.id, direction: messages.direction})
       .from(messages)
       .where(and(
         eq(messages.userId, candidate.userId),
@@ -337,8 +435,11 @@ async function evidenceBasisForCandidate(
         inArray(messages.id, messageIds)
       ));
     if (rows.length !== messageIds.length) return undefined;
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+    if (provenance.some((item) => item.evidenceKind === 'PROVIDER_RECONCILED_SEND' && item.messageId && rowsById.get(item.messageId)?.direction !== 'OUTBOUND')) return undefined;
+    if (provenance.some((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY' && !item.providerObservationKey)) return undefined;
     references.push(...rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id})));
-  } else if (directReferences.length === 0) {
+  } else if (directReferences.length === 0 && providerReferences.length === 0) {
     return undefined;
   }
 
@@ -346,6 +447,70 @@ async function evidenceBasisForCandidate(
     evidenceRevision: candidate.evidenceRevision,
     sourceEventKey: candidate.sourceEventKey,
     references
+  };
+}
+
+async function evidenceBasisForInterpretation(
+  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+  candidate: ResponsibilityInterpretationCandidate
+): Promise<ResponsibilityEvidenceBasis | undefined> {
+  const provenance = interpretationProvenance(candidate);
+  const messageIds = [...new Set(provenance.map((item) => item.messageId).filter((value): value is string => Boolean(value)))];
+  if (messageIds.length === 0 || messageIds.some((id) => !isUuid(id))) return undefined;
+  const rows = await tx.select({
+    id: messages.id,
+    subject: messages.subject,
+    textBody: messages.textBody,
+    direction: messages.direction
+  }).from(messages).where(and(
+    eq(messages.userId, candidate.userId),
+    eq(messages.connectedAccountId, candidate.connectedAccountId),
+    eq(messages.conversationId, candidate.conversationId),
+    inArray(messages.id, messageIds)
+  ));
+  if (rows.length !== messageIds.length) return undefined;
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  for (const item of provenance) {
+    const row = item.messageId ? rowsById.get(item.messageId) : undefined;
+    if (!row) return undefined;
+    if (item.sourceExcerptShort && !`${row.subject}\n${row.textBody ?? ''}`.includes(item.sourceExcerptShort)) return undefined;
+    if (item.sourceLocator?.messageId && item.sourceLocator.messageId !== item.messageId) return undefined;
+    const zone = item.sourceLocator?.zone;
+    if (zone !== undefined && !['CURRENT_AUTHORED', 'QUOTED', 'FORWARDED'].includes(String(zone))) return undefined;
+    const attachmentReference = item.sourceLocator?.attachmentId ?? item.sourceLocator?.providerAttachmentId;
+    if (attachmentReference !== undefined) {
+      const attachmentRows = await tx.select({id: attachments.id, providerAttachmentId: attachments.providerAttachmentId})
+        .from(attachments).where(and(eq(attachments.messageId, row.id), eq(attachments.connectedAccountId, candidate.connectedAccountId)));
+      if (!attachmentRows.some((attachment) => attachment.id === attachmentReference || attachment.providerAttachmentId === attachmentReference)) return undefined;
+    }
+  }
+  const participantIds = [...new Set(candidate.semantics.flatMap((unit) => [
+    ...(unit.obligationLegs ?? []).map((leg) => leg.participantId),
+    ...(unit.expectedEvents ?? []).map((event) => event.participantId),
+    ...(unit.assignmentSemantics?.candidateParticipantIds ?? []),
+    unit.assignmentSemantics?.selectedParticipantId
+  ]).filter((value): value is string => Boolean(value)))];
+  if (participantIds.length > 0) {
+    if (participantIds.some((id) => !isUuid(id))) return undefined;
+    const participantRows = await tx.select({id: participantIdentities.id}).from(participantIdentities).where(and(
+      eq(participantIdentities.userId, candidate.userId), inArray(participantIdentities.id, participantIds)
+    ));
+    if (participantRows.length !== participantIds.length) return undefined;
+  }
+  if (candidate.interpretationRunId) {
+    if (!isUuid(candidate.interpretationRunId)) return undefined;
+    const [run] = await tx.select().from(aiInterpretationRuns).where(and(
+      eq(aiInterpretationRuns.id, candidate.interpretationRunId),
+      eq(aiInterpretationRuns.userId, candidate.userId),
+      eq(aiInterpretationRuns.conversationId, candidate.conversationId),
+      eq(aiInterpretationRuns.basisEvidenceRevision, candidate.evidenceRevision)
+    ));
+    if (!run || (candidate.sourceMessageId && run.messageId !== candidate.sourceMessageId)) return undefined;
+  }
+  return {
+    evidenceRevision: candidate.evidenceRevision,
+    sourceEventKey: candidate.sourceEventKey,
+    references: rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id}))
   };
 }
 
@@ -380,11 +545,56 @@ export class ResponsibilityRepository {
   }
 
   /**
+   * Production interpretation lane. It can submit language-level semantics,
+   * never admission/effect/identity/provider authority. The trusted command is
+   * derived only after scope, current revision, and evidence references resolve.
+   */
+  public async reduceCandidate(candidate: ResponsibilityInterpretationCandidate): Promise<ReductionResult> {
+    const prepared = await this.db.transaction(async (tx) => {
+      const [conversation] = await tx.select().from(conversations).where(and(
+        eq(conversations.id, candidate.conversationId),
+        eq(conversations.userId, candidate.userId),
+        eq(conversations.connectedAccountId, candidate.connectedAccountId)
+      )).for('update');
+      if (!conversation) throw new Error('conversation is not owned by the current user and connected account');
+      const provisionalAdmission: AdmissionDecision = candidate.admissionUncertainties?.some((item) => item.material && item.reviewRequired) || candidate.semantics.some((unit) => unit.materiality === 'UNCERTAIN')
+        ? 'NEEDS_REVIEW'
+        : candidate.semantics.some((unit) => unit.materiality === 'MATERIAL') ? 'TRACK' : 'DO_NOT_TRACK';
+      if (candidate.evidenceRevision !== conversation.semanticEvidenceRevision) {
+        return {kind: 'result' as const, result: {
+          status: 'STALE' as const,
+          admission: provisionalAdmission,
+          reason: `candidate basis revision ${candidate.evidenceRevision} is not current revision ${conversation.semanticEvidenceRevision}`,
+          effects: [] as [],
+          responsibilities: []
+        }};
+      }
+      const evidenceBasis = await evidenceBasisForInterpretation(tx, candidate);
+      if (!evidenceBasis) return {kind: 'result' as const, result: {
+        status: 'REJECTED' as const, admission: provisionalAdmission,
+        reason: 'candidate provenance does not resolve in the authorized conversation evidence', effects: [] as [], responsibilities: []
+      }};
+      const rows = await tx.select({id: responsibilities.id}).from(responsibilities).where(and(
+        eq(responsibilities.userId, candidate.userId),
+        eq(responsibilities.connectedAccountId, candidate.connectedAccountId),
+        eq(responsibilities.conversationId, candidate.conversationId)
+      ));
+      const states = (await Promise.all(rows.map((row) => loadState(tx, row.id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
+      const derived = deriveResponsibilityCommand(candidate, {evidenceBasis, existingResponsibilities: states});
+      if (derived.status === 'REJECTED') return {kind: 'result' as const, result: {
+        status: 'REJECTED' as const, admission: derived.admission, reason: derived.reason, effects: [] as [], responsibilities: []
+      }};
+      return {kind: 'command' as const, command: derived.command};
+    });
+    return prepared.kind === 'result' ? prepared.result : this.applyTrustedCommand(prepared.command);
+  }
+
+  /**
    * Applies one accepted candidate atomically. The Conversation row is the
    * evidence-revision serialization point; all effects from one source event
    * share the transaction and either all commit or none do.
    */
-  public async reduceCandidate(candidate: ResponsibilityInterpretationCandidate): Promise<ReductionResult> {
+  public async applyTrustedCommand(candidate: TrustedResponsibilityCommand): Promise<ReductionResult> {
     return this.db.transaction(async (tx) => {
       const [conversation] = await tx
         .select()
@@ -408,7 +618,7 @@ export class ResponsibilityRepository {
       }
 
       const evidenceBasis = await evidenceBasisForCandidate(tx, candidate);
-      const admission = admitResponsibilityCandidate(candidate, {evidenceBasis});
+      const admission = admitTrustedResponsibilityCommand(candidate, {evidenceBasis});
       if (admission.status === 'INVALID_CANDIDATE') {
         return {
           status: 'REJECTED',
@@ -420,30 +630,43 @@ export class ResponsibilityRepository {
       }
 
       const candidateEffects = effectsFor(candidate);
-      const applicationKey = (candidate.applicationKey?.trim() || candidate.sourceEventKey.trim());
-      const effectKeys = candidateEffects.map((effect, index) => effectKey(effect, candidate, index));
-      if (!applicationKey || applicationKey.length > 128 || effectKeys.some((key) => !key || key.length > 128)) {
+      const externalApplicationKey = (candidate.applicationKey?.trim() || candidate.sourceEventKey.trim());
+      const externalEffectKeys = candidateEffects.map((effect, index) => effectKey(effect, candidate, index));
+      if (!externalApplicationKey || externalApplicationKey.length > 128 || externalEffectKeys.some((key) => !key || key.length > 128) || new Set(externalEffectKeys).size !== externalEffectKeys.length) {
         return {
           status: 'REJECTED',
           admission: admission.decision,
-          reason: 'application and effect keys must be non-empty and at most 128 characters',
+          reason: 'application/effect keys must be unique, non-empty, and at most 128 characters',
           effects: [],
           responsibilities: []
         };
       }
+      // Frozen L2 deliberately keeps global uniqueness. Runtime keys therefore
+      // encode tenant/account scope before they reach that global constraint.
+      const applicationKey = scopedMachineKey('app', [candidate.userId, candidate.connectedAccountId, externalApplicationKey]);
+      const effectKeys = externalEffectKeys.map((key) => scopedMachineKey('fx', [candidate.userId, candidate.connectedAccountId, externalApplicationKey, key]));
 
       const priorEvents = await tx
         .select()
         .from(responsibilityDomainEvents)
-        .where(and(eq(responsibilityDomainEvents.applicationKey, applicationKey), inArray(responsibilityDomainEvents.effectKey, effectKeys)));
-      if (priorEvents.length > 0 && priorEvents.length !== effectKeys.length) {
-        throw new Error('incomplete idempotency record for one application; refusing a partial effect replay');
+        .where(eq(responsibilityDomainEvents.applicationKey, applicationKey));
+      const priorEffectKeys = new Set(priorEvents.map((event) => event.effectKey));
+      if (priorEvents.length > 0 && (priorEvents.length !== effectKeys.length || effectKeys.some((key) => !priorEffectKeys.has(key)))) {
+        throw new Error('idempotency application effect set differs from its durable record; refusing partial or altered replay');
       }
       if (priorEvents.length === effectKeys.length) {
+        if (priorEvents.some((event) => event.userId !== candidate.userId)) {
+          throw new Error('idempotency replay scope mismatch');
+        }
         const ids = priorEvents
           .map((event) => (event.changeSummary as {responsibilityId?: string}).responsibilityId)
           .filter((id): id is string => Boolean(id));
         const states = (await Promise.all([...new Set(ids)].map((id) => loadState(tx, id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
+        if (states.length !== new Set(ids).size || states.some((state) =>
+          state.userId !== candidate.userId ||
+          state.connectedAccountId !== candidate.connectedAccountId ||
+          state.conversationId !== candidate.conversationId
+        )) throw new Error('idempotency replay result is outside the authorized scope');
         return {
           status: 'APPLIED',
           admission: admission.decision,
@@ -452,8 +675,8 @@ export class ResponsibilityRepository {
             return {
             operation: event.operation as ResponsibilityEffectInput['operation'],
             responsibilityId: (event.changeSummary as {responsibilityId?: string}).responsibilityId,
-            changed: event.mutatesState,
-            reason: 'idempotent effect already applied'
+            changed: false,
+            reason: 'idempotent effect replay performed no mutation'
             };
           }),
           responsibilities: states
@@ -671,8 +894,8 @@ export class ResponsibilityRepository {
     return this.reduceCandidate(candidate);
   }
 
-  public async applyAcceptedCandidate(candidate: ResponsibilityInterpretationCandidate): Promise<ReductionResult> {
-    return this.reduceCandidate(candidate);
+  public async applyAcceptedCandidate(candidate: TrustedResponsibilityCommand): Promise<ReductionResult> {
+    return this.applyTrustedCommand(candidate);
   }
 
   public async resolveAdmissionReview(input: {
@@ -700,7 +923,7 @@ export class ResponsibilityRepository {
     });
   }
 
-  private async writeReviewProvenance(tx: Parameters<Parameters<Database['transaction']>[0]>[0], reviewId: string, candidate: ResponsibilityInterpretationCandidate): Promise<void> {
+  private async writeReviewProvenance(tx: Parameters<Parameters<Database['transaction']>[0]>[0], reviewId: string, candidate: TrustedResponsibilityCommand): Promise<void> {
     const provenance = candidate.provenance ?? [];
     await tx.insert(responsibilityProvenanceRefs).values(provenance.map((item, index) => ({
       id: stableUuid(`${reviewId}:provenance:${index}`),
@@ -708,7 +931,7 @@ export class ResponsibilityRepository {
       connectedAccountId: candidate.connectedAccountId,
       admissionReviewId: reviewId,
       targetKind: 'ADMISSION_REVIEW',
-      targetId: nullableUuid(item.messageId),
+      targetId: reviewId,
       fieldKey: item.fieldKey ?? null,
       supportRole: item.supportRole ?? null,
       evidenceKind: item.evidenceKind,
@@ -725,28 +948,57 @@ export class ResponsibilityRepository {
     tx: Parameters<Parameters<Database['transaction']>[0]>[0],
     state: ResponsibilityState,
     domainEventId: string,
-    candidate: ResponsibilityInterpretationCandidate,
+    candidate: TrustedResponsibilityCommand,
     effect: ResponsibilityEffectInput | undefined
   ): Promise<void> {
-    const fieldProvenance = effect?.patch?.fieldChanges?.flatMap((change) =>
-      (change.provenance ?? []).map((item) => ({
-        ...item,
-        fieldKey: item.fieldKey ?? change.fieldKey
-      }))
-    ) ?? [];
-    const provenance = [
-      ...(candidate.provenance ?? []),
-      ...(effect?.provenance ?? []),
-      ...fieldProvenance
-    ];
-    await tx.insert(responsibilityProvenanceRefs).values(provenance.map((item, index) => ({
+    const mapped: Array<{item: ProvenanceInput; targetKind: string; targetId?: string; fieldKey?: string}> = [];
+    const add = (items: readonly ProvenanceInput[], targetKind: string, targetId?: string, fieldKey?: string) => {
+      for (const item of items) mapped.push({item, targetKind, targetId, fieldKey});
+    };
+    add(candidate.provenance ?? [], 'RESPONSIBILITY', state.id);
+    add(effect?.provenance ?? [], 'RESPONSIBILITY', state.id);
+    for (const change of effect?.patch?.fieldChanges ?? []) {
+      const fieldDecisionId = stableUuid(`${state.id}:field:${change.fieldKey}:${candidate.evidenceRevision}:${change.semanticTime ?? ''}`);
+      add(change.provenance ?? [], 'FIELD_DECISION', fieldDecisionId, change.fieldKey);
+    }
+    for (const leg of state.obligationLegs) add(leg.provenance, 'OBLIGATION_LEG', leg.id, `obligationLegs/${leg.id}`);
+    for (const event of state.expectedEvents) add(event.provenance, 'EXPECTED_EVENT', event.id, `expectedEvents/${event.id}`);
+    for (const fact of state.temporalFacts) add(fact.provenance, 'TEMPORAL_FACT', fact.id, `temporalFacts/${fact.id}`);
+    for (const item of state.details.completionCriteria) add(item.provenance, 'COMPLETION_CRITERION', undefined, `completionCriteria/${item.id}`);
+    for (const item of state.details.constraints) add(item.provenance, 'CONSTRAINT', undefined, `constraints/${item.id}`);
+    for (const item of state.details.pendingProposals) add(item.provenance, 'PENDING_PROPOSAL', undefined, `pendingProposals/${item.id}`);
+    for (const item of state.details.agreedFacts) add(item.provenance, 'AGREED_FACT', undefined, `agreedFacts/${item.id}`);
+    for (const item of state.details.uncertainties) add(item.provenance, 'UNCERTAINTY', undefined, `uncertainties/${item.id}`);
+    for (const item of state.details.riskDetails) add(item.provenance, 'RISK_DETAIL', undefined, `riskDetails/${item.id}`);
+    if (mapped.length === 0) return;
+    const signature = (value: {item: ProvenanceInput; targetKind: string; targetId?: string; fieldKey?: string}) => JSON.stringify([
+      value.targetKind, value.targetId ?? null, value.fieldKey ?? value.item.fieldKey ?? null,
+      value.item.supportRole ?? null, value.item.evidenceKind, value.item.messageId ?? null,
+      value.item.providerObservationKey ?? null, value.item.interpretationRunId ?? candidate.interpretationRunId ?? null,
+      value.item.sourceLocator ?? {}, value.item.sourceExcerptShort ?? null
+    ]);
+    const existing = await tx.select().from(responsibilityProvenanceRefs).where(eq(responsibilityProvenanceRefs.responsibilityId, state.id));
+    const existingSignatures = new Set(existing.map((reference) => JSON.stringify([
+      reference.targetKind, reference.targetId, reference.fieldKey, reference.supportRole,
+      reference.evidenceKind, reference.messageId, reference.providerObservationKey,
+      reference.interpretationRunId, reference.sourceLocator, reference.sourceExcerptShort
+    ])));
+    const seen = new Set<string>();
+    const novel = mapped.filter((value) => {
+      const key = signature(value);
+      if (existingSignatures.has(key) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (novel.length === 0) return;
+    await tx.insert(responsibilityProvenanceRefs).values(novel.map(({item, targetKind, targetId, fieldKey}, index) => ({
       id: stableUuid(`${domainEventId}:provenance:${index}`),
       userId: state.userId,
       connectedAccountId: state.connectedAccountId,
       responsibilityId: state.id,
-      targetKind: 'RESPONSIBILITY',
-      targetId: state.id,
-      fieldKey: item.fieldKey ?? null,
+      targetKind,
+      targetId: nullableUuid(targetId),
+      fieldKey: fieldKey ?? item.fieldKey ?? null,
       supportRole: item.supportRole ?? null,
       evidenceKind: item.evidenceKind,
       messageId: canReferenceMessage(item.messageId),

@@ -3,7 +3,7 @@ import {
   type AdmissionDecision,
   type ProvenanceInput,
   type ResponsibilityEvidenceBasis,
-  type ResponsibilityInterpretationCandidate
+  type TrustedResponsibilityCommand
 } from './types';
 
 export type AdmissionResult =
@@ -36,6 +36,7 @@ const GROUNDING_EVIDENCE_KINDS = new Set([
   'ALL_CRITERIA_SATISFIED',
   'COMMUNICATED_CLAIM',
   'COUNTERPART_EXPLICIT_CLOSURE',
+  'COUNTERPART_FAILURE_REPORT',
   'EXPLICIT_COMPLETION',
   'EXTERNAL_AUTHORITATIVE_FACT',
   'PROVIDER_MESSAGE_OBSERVED',
@@ -45,7 +46,7 @@ const GROUNDING_EVIDENCE_KINDS = new Set([
   'USER_OFF_CHANNEL_ASSERTION'
 ]);
 
-function candidateProvenance(candidate: ResponsibilityInterpretationCandidate): ProvenanceInput[] {
+function commandProvenance(candidate: TrustedResponsibilityCommand): ProvenanceInput[] {
   return [
     ...(candidate.provenance ?? []),
     ...(candidate.effects?.flatMap((effect) => [
@@ -75,7 +76,7 @@ function hasAuthorizedDirectEvidence(provenance: ProvenanceInput): boolean {
 }
 
 function validateEvidenceBasis(
-  candidate: ResponsibilityInterpretationCandidate,
+  candidate: TrustedResponsibilityCommand,
   basis: ResponsibilityEvidenceBasis | undefined
 ): string | undefined {
   if (!basis) return 'a current normalized evidence basis is required';
@@ -85,7 +86,7 @@ function validateEvidenceBasis(
   const basisKeys = new Set(basis.references.map(evidenceReferenceKey).filter((key): key is string => Boolean(key)));
   if (basisKeys.size === 0) return 'evidence basis must contain a concrete normalized reference';
 
-  const provenance = candidateProvenance(candidate);
+  const provenance = commandProvenance(candidate);
   if (provenance.length === 0) return 'candidate provenance is required; sourceEventKey alone is not evidence';
   if (provenance.some((item) => !evidenceReferenceKey(item))) return 'every provenance entry needs a concrete evidence reference';
   if (provenance.some((item) => !basisKeys.has(evidenceReferenceKey(item) as string))) {
@@ -103,11 +104,11 @@ function validateEvidenceBasis(
   return undefined;
 }
 
-function hasEffectCommand(candidate: ResponsibilityInterpretationCandidate): boolean {
+function hasEffectCommand(candidate: TrustedResponsibilityCommand): boolean {
   return Boolean(candidate.responsibilityRef || candidate.effects?.length);
 }
 
-function hasMaterialOpenLoop(candidate: ResponsibilityInterpretationCandidate): boolean {
+function hasMaterialOpenLoop(candidate: TrustedResponsibilityCommand): boolean {
   if (hasEffectCommand(candidate)) return true;
   if (candidate.operationalOutcome?.trim()) return true;
   return Boolean(
@@ -119,7 +120,7 @@ function hasMaterialOpenLoop(candidate: ResponsibilityInterpretationCandidate): 
   );
 }
 
-function deterministicDecision(candidate: ResponsibilityInterpretationCandidate): AdmissionDecision {
+function deterministicDecision(candidate: TrustedResponsibilityCommand): AdmissionDecision {
   // Admission ambiguity is a pre-Responsibility condition.  Candidate
   // fields may be retained as review context, but cannot cause a fake state
   // to be created.  A command/effect targeting an existing state is already
@@ -130,14 +131,14 @@ function deterministicDecision(candidate: ResponsibilityInterpretationCandidate)
   return hasMaterialOpenLoop(candidate) ? 'TRACK' : 'DO_NOT_TRACK';
 }
 
-export function validateResponsibilityCandidateEvidence(
-  candidate: ResponsibilityInterpretationCandidate,
+export function validateTrustedResponsibilityCommandEvidence(
+  candidate: TrustedResponsibilityCommand,
   basis?: ResponsibilityEvidenceBasis
 ): string | undefined {
   return validateEvidenceBasis(candidate, basis);
 }
 
-export function determineResponsibilityAdmission(candidate: ResponsibilityInterpretationCandidate): AdmissionDecision {
+export function determineResponsibilityAdmission(candidate: TrustedResponsibilityCommand): AdmissionDecision {
   return deterministicDecision(candidate);
 }
 
@@ -147,12 +148,15 @@ export function determineResponsibilityAdmission(candidate: ResponsibilityInterp
  * interpretation candidate must carry semantic facts and evidence references;
  * this gate derives the accepted decision and the reducer applies it.
  */
-export function admitResponsibilityCandidate(
-  candidate: ResponsibilityInterpretationCandidate,
+export function admitTrustedResponsibilityCommand(
+  candidate: TrustedResponsibilityCommand,
   options: AdmissionOptions = {}
 ): AdmissionResult {
   if (!candidate.userId || !candidate.connectedAccountId || !candidate.conversationId) {
     return {status: 'INVALID_CANDIDATE', decision: null, reason: 'tenant scope is required'};
+  }
+  if (!['INTERPRETATION_BOUNDARY', 'TRUSTED_SYSTEM', 'TRUSTED_USER'].includes(candidate.commandSource)) {
+    return {status: 'INVALID_CANDIDATE', decision: null, reason: 'trusted command source is required'};
   }
   if (!candidate.sourceEventKey.trim() || !candidate.candidateKey.trim()) {
     return {status: 'INVALID_CANDIDATE', decision: null, reason: 'sourceEventKey and candidateKey are required'};
@@ -186,4 +190,4 @@ export function admitResponsibilityCandidate(
   };
 }
 
-export const admitCandidate = admitResponsibilityCandidate;
+export const admitCommand = admitTrustedResponsibilityCommand;

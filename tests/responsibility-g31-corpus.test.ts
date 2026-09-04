@@ -11,9 +11,9 @@ import type {
   ObligationLeg,
   ProvenanceInput,
   ResponsibilityEvidenceBasis,
-  ResponsibilityInterpretationCandidate,
   ResponsibilityState,
-  TemporalFact
+  TemporalFact,
+  TrustedResponsibilityCommand
 } from '../src/server/responsibility';
 
 const scope = {
@@ -45,9 +45,10 @@ function leg(
   };
 }
 
-function candidate(overrides: Partial<ResponsibilityInterpretationCandidate> = {}): ResponsibilityInterpretationCandidate {
+function candidate(overrides: Partial<TrustedResponsibilityCommand> = {}): TrustedResponsibilityCommand {
   return {
     ...scope,
+    commandSource: 'TRUSTED_SYSTEM',
     sourceEventKey: 'corpus-message-event',
     candidateKey: 'corpus-candidate',
     evidenceRevision: 1,
@@ -59,7 +60,7 @@ function candidate(overrides: Partial<ResponsibilityInterpretationCandidate> = {
   };
 }
 
-function reduce(candidateInput: ResponsibilityInterpretationCandidate, options: ReducerOptions = {}) {
+function reduce(candidateInput: TrustedResponsibilityCommand, options: ReducerOptions = {}) {
   const evidenceBasis: ResponsibilityEvidenceBasis = {
     evidenceRevision: candidateInput.evidenceRevision,
     sourceEventKey: candidateInput.sourceEventKey,
@@ -83,9 +84,9 @@ function stateOf(result: ReturnType<typeof reduceResponsibility>, effectIndex = 
 
 function updateCandidate(
   state: ResponsibilityState,
-  effect: ResponsibilityInterpretationCandidate['effects'] extends readonly (infer T)[] | undefined ? T : never,
-  overrides: Partial<ResponsibilityInterpretationCandidate> = {}
-): ResponsibilityInterpretationCandidate {
+  effect: TrustedResponsibilityCommand['effects'] extends readonly (infer T)[] | undefined ? T : never,
+  overrides: Partial<TrustedResponsibilityCommand> = {}
+): TrustedResponsibilityCommand {
   return candidate({
     sourceEventKey: `${state.id}-event-${state.acceptedEvidenceRevision + 1}`,
     candidateKey: `${state.id}-candidate-${state.acceptedEvidenceRevision + 1}`,
@@ -98,8 +99,8 @@ function updateCandidate(
 
 function reduceUpdate(
   state: ResponsibilityState,
-  effect: ResponsibilityInterpretationCandidate['effects'] extends readonly (infer T)[] | undefined ? T : never,
-  overrides: Partial<ResponsibilityInterpretationCandidate> = {}
+  effect: TrustedResponsibilityCommand['effects'] extends readonly (infer T)[] | undefined ? T : never,
+  overrides: Partial<TrustedResponsibilityCommand> = {}
 ) {
   return reduce(updateCandidate(state, effect, overrides), {existingResponsibilities: [state]});
 }
@@ -126,6 +127,7 @@ const completion = (id: string, status: CompletionCriterion['status'] = 'PENDING
   id,
   code: id.toUpperCase(),
   status,
+  ...(status === 'SATISFIED' ? {satisfiedAt: '2026-01-02T00:00:00.000Z'} : {}),
   provenance: [source()]
 });
 
@@ -533,30 +535,68 @@ type TransitionCase = {id: (typeof TRANSITION_ORACLE_IDS)[number]; run: () => vo
 
 const transitionCases: TransitionCase[] = [
   {id: 'T01', run: () => {
-    const initial = stateOf(reduce(candidate()));
-    const updated = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {attentionMode: 'PRESENT'}}));
+    const initial = stateOf(reduce(candidate({temporalFacts: [due('friday-report', '2026-09-04')]})));
+    const updated = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {constraints: [{id: 'pdf-format', code: 'FORMAT_PDF', status: 'ACTIVE', provenance: [source()]}]}}));
+    expect(updated.id).toBe(initial.id);
+    expect(updated.temporalFacts.find((fact) => fact.id === 'friday-report')?.resolvedDate).toBe('2026-09-04');
+    expect(updated.details.constraints[0]?.code).toBe('FORMAT_PDF');
     const closed = {...updated.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-02T00:00:00.000Z'};
-    expect(stateOf(reduceUpdate(updated, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [closed]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['EXPLICIT_COMPLETION']}})).resolutionStatus).toBe('RESOLVED');
+    expect(stateOf(reduceUpdate(updated, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [closed]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['PROVIDER_RECONCILED_SEND']}})).resolutionStatus).toBe('RESOLVED');
   }},
   {id: 'T02', run: () => {
-    const initial = stateOf(reduce(candidate({obligationLegs: [leg('user-send', 'USER', 'SEND_RESULT')]})));
+    const confirmation = expectedEvent('counterpart-confirmation');
+    const initial = stateOf(reduce(candidate({obligationLegs: [leg('user-send', 'USER', 'SEND_RESULT')], expectedEvents: [confirmation]})));
     const completedUserLeg = {...initial.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-02T00:00:00.000Z'};
-    const waiting = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [completedUserLeg, leg('other-wait', 'OTHER_PARTY', 'RESPOND_RESULT')]}}));
+    const waiting = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [completedUserLeg]}}));
+    expect(waiting.resolutionStatus).toBe('OPEN');
     expect(projectResponsibility(waiting).bucket).toBe('WAITING');
+    const confirmed = {...waiting.expectedEvents[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', satisfiedAt: '2026-01-03T00:00:00.000Z', closedAt: '2026-01-03T00:00:00.000Z'};
+    const done = stateOf(reduceUpdate(waiting, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {expectedEvents: [confirmed]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}}));
+    expect(projectResponsibility(done).bucket).toBe('DONE');
+    expect(done.id).toBe(initial.id);
   }},
   {id: 'T03', run: () => {
     const initial = stateOf(reduce(candidate()));
+    const ambiguous = stateOf(reduceUpdate(initial, {operation: 'NO_OP', effectKey: 'ambiguous-send'}));
+    expect(ambiguous.resolutionStatus).toBe('OPEN');
     const closed = {...initial.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-02T00:00:00.000Z'};
-    expect(stateOf(reduceUpdate(initial, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [closed]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['PROVIDER_RECONCILED_SEND']}})).resolutionStatus).toBe('RESOLVED');
+    expect(stateOf(reduceUpdate(ambiguous, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [closed]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['PROVIDER_RECONCILED_SEND']}})).resolutionStatus).toBe('RESOLVED');
   }},
   {id: 'T04', run: () => {
     const initial = stateOf(reduce(candidate({obligationLegs: [leg('other-wait', 'OTHER_PARTY', 'APPROVE_RESULT')]})));
-    const state = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [leg('follow-up', 'USER', 'FOLLOW_UP')]}}));
-    expect(projectResponsibility(state).bucket).toBe('MY_TURN');
+    expect(projectResponsibility(initial).bucket).toBe('WAITING');
+    const followUp = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [leg('follow-up', 'USER', 'FOLLOW_UP')]}}));
+    expect(projectResponsibility(followUp).bucket).toBe('MY_TURN');
+    const sentFollowUp = {...followUp.obligationLegs.find((item) => item.id === 'follow-up')!, status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-03T00:00:00.000Z'};
+    const waiting = stateOf(reduceUpdate(followUp, {operation: 'UPDATE', patch: {obligationLegs: [sentFollowUp]}}));
+    expect(projectResponsibility(waiting).bucket).toBe('WAITING');
+    const approval = {...waiting.obligationLegs.find((item) => item.id === 'other-wait')!, status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-04T00:00:00.000Z'};
+    const done = stateOf(reduceUpdate(waiting, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [approval]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}}));
+    expect(projectResponsibility(done).bucket).toBe('DONE');
+    expect(done.id).toBe(initial.id);
   }},
   {id: 'T05', run: () => {
-    const state = stateOf(reduce(candidate({operationalOutcome: 'agree on a meeting time', pendingProposals: [{id: 'proposal', kind: 'MEETING_TIME', value: 'Friday 17:00', status: 'PENDING', provenance: [source()]}]})));
-    expect(state.details.pendingProposals[0]?.status).toBe('PENDING');
+    const initial = stateOf(reduce(candidate({operationalOutcome: 'agree on a meeting time', obligationLegs: [leg('user-response', 'USER', 'RESPOND_TO_PROPOSAL')], pendingProposals: [{id: 'proposal-17', kind: 'MEETING_TIME', value: 'Friday 17:00', status: 'PENDING', provenance: [source()]}]})));
+    expect(initial.details.agreedFacts).toHaveLength(0);
+    const userClosed = {...initial.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'COUNTERPROPOSED', closedAt: '2026-01-02T00:00:00.000Z'};
+    const waiting = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {
+      obligationLegs: [userClosed],
+      expectedEvents: [expectedEvent('counterproposal-response')],
+      pendingProposals: [
+        {id: 'proposal-17', kind: 'MEETING_TIME', value: 'Friday 17:00', status: 'REJECTED', provenance: [source()]},
+        {id: 'proposal-18', kind: 'MEETING_TIME', value: 'Friday 18:00', status: 'PENDING', provenance: [source()]}
+      ]
+    }}));
+    expect(projectResponsibility(waiting).bucket).toBe('WAITING');
+    expect(waiting.details.agreedFacts).toHaveLength(0);
+    const response = {...waiting.expectedEvents[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', satisfiedAt: '2026-01-03T00:00:00.000Z', closedAt: '2026-01-03T00:00:00.000Z'};
+    const done = stateOf(reduceUpdate(waiting, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {
+      expectedEvents: [response],
+      pendingProposals: [{id: 'proposal-18', kind: 'MEETING_TIME', value: 'Friday 18:00', status: 'SUPERSEDED', provenance: [source()]}],
+      agreedFacts: [{id: 'agreed-18', kind: 'MEETING_TIME', value: 'Friday 18:00', status: 'CURRENT', provenance: [source()]}]
+    }, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}}));
+    expect(done.details.agreedFacts[0]?.value).toBe('Friday 18:00');
+    expect(projectResponsibility(done).bucket).toBe('DONE');
   }},
   {id: 'T06', run: () => {
     const initial = stateOf(reduce(candidate({pendingProposals: [{id: 'proposal', kind: 'MEETING_TIME', value: 'Friday 17:00', status: 'PENDING', provenance: [source()]}]})));
@@ -565,21 +605,41 @@ const transitionCases: TransitionCase[] = [
     expect(state.resolutionStatus).toBe('OPEN');
   }},
   {id: 'T07', run: () => {
-    const initial = stateOf(reduce(candidate()));
+    const initial = stateOf(reduce(candidate({operationalOutcome: 'send the final contract'})));
     const blocked = {...initial.obligationLegs[0], actionability: 'BLOCKED' as const};
-    const waiting = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [blocked]}}));
+    const hold = {id: 'legal-hold', code: 'DO_NOT_PROCEED', status: 'ACTIVE' as const, provenance: [source()]};
+    const approval = expectedEvent('legal-clearance');
+    const waiting = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [blocked], constraints: [hold], expectedEvents: [approval]}}));
     expect(projectResponsibility(waiting).bucket).toBe('WAITING');
-    const active = stateOf(reduceUpdate(waiting, {operation: 'UPDATE', patch: {obligationLegs: [{...blocked, actionability: 'ACTIONABLE', conditionSatisfied: true}]}}));
+    expect(waiting.resolutionStatus).toBe('OPEN');
+    const cleared = {...approval, status: 'CLOSED' as const, closureReason: 'SATISFIED', satisfiedAt: '2026-01-03T00:00:00.000Z', closedAt: '2026-01-03T00:00:00.000Z'};
+    const active = stateOf(reduceUpdate(waiting, {operation: 'UPDATE', patch: {
+      obligationLegs: [{...blocked, actionability: 'ACTIONABLE', conditionSatisfied: true}],
+      expectedEvents: [cleared], constraints: [{...hold, status: 'SATISFIED'}], temporalFacts: [due('monday', '2026-09-07')]
+    }}));
     expect(projectResponsibility(active).bucket).toBe('MY_TURN');
+    const sent = {...active.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-04T00:00:00.000Z'};
+    const done = stateOf(reduceUpdate(active, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [sent]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['PROVIDER_RECONCILED_SEND']}}));
+    expect(projectResponsibility(done).bucket).toBe('DONE');
   }},
   {id: 'T08', run: () => {
-    const initial = stateOf(reduce(candidate()));
-    expect(stateOf(reduceUpdate(initial, {operation: 'RESOLVE', reason: 'CANCELLED', resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}})).resolutionReason).toBe('CANCELLED');
+    const initial = stateOf(reduce(candidate({completionCriteria: [completion('actual-work')]})));
+    const cancelled = stateOf(reduceUpdate(initial, {operation: 'RESOLVE', reason: 'CANCELLED', resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}}));
+    expect(cancelled.resolutionReason).toBe('CANCELLED');
+    expect(cancelled.details.completionCriteria[0]).toMatchObject({status: 'PENDING'});
+    expect(cancelled.details.completionCriteria[0]?.satisfiedAt).toBeUndefined();
   }},
   {id: 'T09', run: () => {
-    const initial = stateOf(reduce(candidate()));
-    const state = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [leg('delegated', 'OTHER_PARTY', 'SEND_RESULT')]}}));
-    expect(state.id).toBe(initial.id);
+    const initial = stateOf(reduce(candidate({operationalOutcome: 'obtain requested figures from Tanaka', obligationLegs: [leg('obtain', 'USER', 'OBTAIN_FIGURES')]})));
+    const intended = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {agreedFacts: [{id: 'delegation-intent', kind: 'DELEGATION_INTENT', value: 'Tanaka', status: 'CURRENT', provenance: [source()]}]}}));
+    expect(projectResponsibility(intended).bucket).toBe('MY_TURN');
+    const delegated = {...intended.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'EFFECTIVELY_DELEGATED', closedAt: '2026-01-03T00:00:00.000Z'};
+    const waiting = stateOf(reduceUpdate(intended, {operation: 'UPDATE', patch: {obligationLegs: [delegated, leg('tanaka', 'OTHER_PARTY', 'SEND_FIGURES')]}}));
+    expect(projectResponsibility(waiting).bucket).toBe('WAITING');
+    const received = {...waiting.obligationLegs.find((item) => item.id === 'tanaka')!, status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-04T00:00:00.000Z'};
+    const done = stateOf(reduceUpdate(waiting, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [received]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}}));
+    expect(done.id).toBe(initial.id);
+    expect(projectResponsibility(done).bucket).toBe('DONE');
   }},
   {id: 'T10', run: () => {
     const initial = stateOf(reduce(candidate()));
@@ -588,9 +648,13 @@ const transitionCases: TransitionCase[] = [
     expect(stateOf(reduceUpdate(resolved, {operation: 'REOPEN', patch: {obligationLegs: [leg('remedial', 'USER', 'RESEND_RESULT')]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['PROVIDER_NON_DELIVERY']}})).resolutionStatus).toBe('OPEN');
   }},
   {id: 'T11', run: () => {
-    const first = stateOf(reduce(candidate({candidateKey: 'episode-one'})));
-    const second = stateOf(reduce(candidate({candidateKey: 'episode-two', sourceEventKey: 'new-episode'}), {existingResponsibilities: [first]}));
+    const firstOpen = stateOf(reduce(candidate({candidateKey: 'episode-one'})));
+    const closedLeg = {...firstOpen.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-02T00:00:00.000Z'};
+    const first = stateOf(reduceUpdate(firstOpen, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [closedLeg]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}}));
+    const second = stateOf(reduce(candidate({candidateKey: 'episode-two', sourceEventKey: 'new-episode', evidenceRevision: 3}), {currentEvidenceRevision: 3, existingResponsibilities: [first]}));
     expect(second.id).not.toBe(first.id);
+    expect(first.resolutionStatus).toBe('RESOLVED');
+    expect(second.resolutionStatus).toBe('OPEN');
   }},
   {id: 'T12', run: () => {
     const first = stateOf(reduce(candidate({candidateKey: 'old-episode'})));
@@ -603,23 +667,39 @@ const transitionCases: TransitionCase[] = [
   }},
   {id: 'T13', run: () => {
     const initial = stateOf(reduce(candidate({temporalFacts: [due('friday', '2026-09-04')]})));
-    const state = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [due('monday', '2026-09-07')], authorityKind: 'USER_CORRECTION', relation: 'CORRECTION', provenance: [source('USER_ASSERTION')]}]}}));
+    const conflicted = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {fieldChanges: [{fieldKey: 'uncertainties', value: [{id: 'due-conflict', fieldKey: 'temporalFacts.SOURCE_DUE', reasonCode: 'UNKNOWN_OVERRIDE_AUTHORITY', material: true, reviewRequired: true, provenance: [source()]}], authorityKind: 'INTERPRETATION', provenance: [source()]}]}}));
+    expect(projectResponsibility(conflicted).bucket).toBe('REVIEW');
+    expect(conflicted.temporalFacts.find((fact) => fact.id === 'friday')?.currentnessStatus).toBe('ACCEPTED_CURRENT');
+    const state = stateOf(reduceUpdate(conflicted, {operation: 'UPDATE', patch: {fieldChanges: [
+      {fieldKey: 'temporalFacts.SOURCE_DUE', value: [due('monday', '2026-09-07')], authorityKind: 'USER_CORRECTION', relation: 'CORRECTION', provenance: [source('USER_ASSERTION')]},
+      {fieldKey: 'uncertainties', value: [], authorityKind: 'USER_CORRECTION', provenance: [source('USER_ASSERTION')]}
+    ]}}));
     expect(state.temporalFacts.some((fact) => fact.currentnessStatus === 'SUPERSEDED')).toBe(true);
+    expect(projectResponsibility(state).bucket).toBe('MY_TURN');
   }},
   {id: 'T14', run: () => {
-    const created = stateOf(reduce(candidate()));
-    const initial = stateOf(reduceUpdate(created, {operation: 'UPDATE', patch: {temporalFacts: [due('monday', '2026-09-07')]}}, {semanticTime: '2026-01-02T10:05:00.000Z'}));
+    const created = stateOf(reduce(candidate({temporalFacts: []})));
+    const initial = stateOf(reduceUpdate(created, {operation: 'UPDATE', patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [due('monday', '2026-09-07')], authorityKind: 'INTERPRETATION', semanticTime: '2026-01-02T10:05:00.000Z', relation: 'CORRECTION'}]}}, {semanticTime: '2026-01-02T10:05:00.000Z'}));
     const late = reduceUpdate(initial, {operation: 'UPDATE', patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [due('friday', '2026-09-04')], authorityKind: 'INTERPRETATION', semanticTime: '2026-01-02T10:00:00.000Z'}]}}, {semanticTime: '2026-01-02T10:00:00.000Z'});
     expect(late.status).toBe('REJECTED');
+    expect(initial.temporalFacts.find((fact) => fact.currentnessStatus === 'ACCEPTED_CURRENT')?.resolvedDate).toBe('2026-09-07');
+    const chronological = stateOf(reduce(candidate({candidateKey: 'chronological', sourceEventKey: 'chronological', temporalFacts: [due('friday-normal', '2026-09-04')]})));
+    const corrected = stateOf(reduceUpdate(chronological, {operation: 'UPDATE', patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [due('monday-normal', '2026-09-07')], authorityKind: 'INTERPRETATION', semanticTime: '2026-01-02T10:05:00.000Z', relation: 'CORRECTION', provenance: [source()]}]}}, {semanticTime: '2026-01-02T10:05:00.000Z'}));
+    expect(corrected.temporalFacts.find((fact) => fact.currentnessStatus === 'ACCEPTED_CURRENT')?.resolvedDate)
+      .toBe(initial.temporalFacts.find((fact) => fact.currentnessStatus === 'ACCEPTED_CURRENT')?.resolvedDate);
   }},
   {id: 'T15', run: () => {
     expect(reduce(candidate(), {currentEvidenceRevision: 2}).status).toBe('STALE');
+    expect(reduce(candidate({evidenceRevision: 2, sourceEventKey: 'revision-2', candidateKey: 'revision-2'}), {currentEvidenceRevision: 2}).status).toBe('APPLIED');
   }},
   {id: 'T16', run: () => {
     const initial = stateOf(reduce(candidate({obligationLegs: [leg('user-sign', 'USER', 'SIGN'), leg('other-sign', 'OTHER_PARTY', 'SIGN')]})));
     const userClosed = {...initial.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-02T00:00:00.000Z'};
     const state = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {obligationLegs: [userClosed]}}));
     expect(projectResponsibility(state).bucket).toBe('WAITING');
+    const otherClosed = {...state.obligationLegs[1], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-03T00:00:00.000Z'};
+    const done = stateOf(reduceUpdate(state, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [otherClosed]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['EXTERNAL_AUTHORITATIVE_FACT']}}));
+    expect(projectResponsibility(done).bucket).toBe('DONE');
   }},
   {id: 'T17', run: () => {
     const initial = stateOf(reduce(candidate({completionCriteria: [completion('front'), completion('back')]})));
@@ -633,6 +713,8 @@ const transitionCases: TransitionCase[] = [
     const initial = stateOf(reduce(candidate({obligationLegs: [leg('sign', 'USER', 'SIGN', 'BLOCKED')], expectedEvents: [approval]})));
     const state = stateOf(reduceUpdate(initial, {operation: 'UPDATE', patch: {expectedEvents: [{...approval, status: 'CLOSED', closureReason: 'SATISFIED', closedAt: '2026-01-02T00:00:00.000Z'}], obligationLegs: [{...initial.obligationLegs[0], actionability: 'ACTIONABLE', conditionSatisfied: true}]}}));
     expect(projectResponsibility(state).bucket).toBe('MY_TURN');
+    const signed = {...state.obligationLegs[0], status: 'CLOSED' as const, closureReason: 'SATISFIED', closedAt: '2026-01-03T00:00:00.000Z'};
+    expect(projectResponsibility(stateOf(reduceUpdate(state, {operation: 'RESOLVE', reason: 'SATISFIED', patch: {obligationLegs: [signed]}, resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['EXTERNAL_AUTHORITATIVE_FACT']}}))).bucket).toBe('DONE');
   }},
   {id: 'T19', run: () => {
     const anchored = {...due('anchor', '2026-09-04'), originalExpression: 'one hour before Meeting-X', anchorKind: 'CALENDAR_EVENT', anchorReference: 'Meeting-X'};
@@ -646,8 +728,100 @@ const transitionCases: TransitionCase[] = [
     expect(projectResponsibility(historical).bucket).toBe('NONE');
     const active = stateOf(reduceUpdate(historical, {operation: 'UPDATE', patch: {fieldChanges: [{fieldKey: 'liveTrackingState', value: 'TRACKING_ACTIVE', authorityKind: 'USER_CORRECTION', provenance: [source('USER_ASSERTION')]}]}}));
     expect(projectResponsibility(active).bucket).toBe('MY_TURN');
+    const closed = stateOf(reduceUpdate(historical, {operation: 'RESOLVE', reason: 'USER_CLOSED', resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['USER_ASSERTION']}}));
+    expect(closed.resolutionReason).toBe('USER_CLOSED');
+    expect(closed.obligationLegs[0]?.closureReason).toBe('USER_CLOSED');
   }}
 ];
+
+type CanonicalBinding = {
+  id: string;
+  sourceStep: string;
+  executableCase: string;
+  invariant: string;
+  forbidden: string;
+};
+
+// This is intentionally explicit rather than inferred from matching IDs.  It
+// binds each canonical focal oracle to the reducer-owned executable consequence
+// and records the invariant and forbidden mutant that the case must kill.
+const tier0Bindings: CanonicalBinding[] = [
+  {id: 'T0-001', sourceStep: 'direction/request inbound', executableCase: 'PG-03', invariant: 'inbound request creates USER obligation and SOURCE_DUE without exact-time inflation', forbidden: 'date word alone cannot change bearer or invent clock precision'},
+  {id: 'T0-002', sourceStep: 'direction/commitment inbound', executableCase: 'PG-01', invariant: 'counterpart commitment is waiting evidence, not USER due', forbidden: 'must not project MY_TURN from tomorrow alone'},
+  {id: 'T0-003', sourceStep: 'direction/request outbound', executableCase: 'PG-01', invariant: 'outbound request assigns OTHER party', forbidden: 'must not assign outbound request back to USER'},
+  {id: 'T0-004', sourceStep: 'direction/commitment outbound', executableCase: 'PG-03', invariant: 'outbound commitment retains USER bearer', forbidden: 'same wording must not inherit inbound bearer'},
+  {id: 'T0-005', sourceStep: 'commitment-force plan', executableCase: 'PG-02', invariant: 'plan may update expectation without resolving', forbidden: 'plan must not become firm completion'},
+  {id: 'T0-006', sourceStep: 'commitment-force intention', executableCase: 'PG-02', invariant: 'intention remains weaker than commitment', forbidden: 'intention must not resolve or transfer authority'},
+  {id: 'T0-007', sourceStep: 'commitment-force tentative', executableCase: 'PG-02', invariant: 'tentative future orientation preserves open state', forbidden: 'tentative language must not become firm promise'},
+  {id: 'T0-008', sourceStep: 'commitment-force capability', executableCase: 'PG-43', invariant: 'capability alone preserves accepted loop', forbidden: 'capability must not become authoritative expected completion'},
+  {id: 'T0-009', sourceStep: 'proposal', executableCase: 'T05', invariant: 'proposed term stays pending until acceptance', forbidden: 'proposal must not become agreed fact'},
+  {id: 'T0-010', sourceStep: 'agreement', executableCase: 'T05', invariant: 'accepted term becomes agreed fact', forbidden: 'agreement must not claim future meeting occurred'},
+  {id: 'T0-011', sourceStep: 'preference', executableCase: 'PG-12', invariant: 'preference without decision context remains uncertain', forbidden: 'preference must not silently become agreement'},
+  {id: 'T0-012', sourceStep: 'review commitment', executableCase: 'PG-03', invariant: 'review/check is actionable work', forbidden: 'review must not inflate to approval'},
+  {id: 'T0-013', sourceStep: 'approval claim', executableCase: 'PG-05', invariant: 'approval satisfaction still requires sufficient authority evidence', forbidden: 'semantic approval alone must not bypass authority'},
+  {id: 'T0-014', sourceStep: 'hold', executableCase: 'T07', invariant: 'hold blocks action while Responsibility stays open', forbidden: 'hold must not resolve as cancellation or defer'},
+  {id: 'T0-015', sourceStep: 'cancellation', executableCase: 'T08', invariant: 'cancellation has a non-satisfaction resolution reason', forbidden: 'cancelled criteria must not become SATISFIED'},
+  {id: 'T0-016', sourceStep: 'delegation intent', executableCase: 'T09', invariant: 'intent does not transfer ownership before communication', forbidden: 'Tanaka must not own work before receiving request'},
+  {id: 'T0-017', sourceStep: 'effective delegation', executableCase: 'T09', invariant: 'reconciled request to recipient moves current work to waiting', forbidden: 'delegation must not create a separate outcome'},
+  {id: 'T0-018', sourceStep: 'polite material request', executableCase: 'PG-03', invariant: 'politeness is orthogonal to obligation strength', forbidden: 'polite request must not become optional'},
+  {id: 'T0-019', sourceStep: 'courtesy offer', executableCase: 'PG-60', invariant: 'valid grounded communication can admit DO_NOT_TRACK', forbidden: 'No Responsibility must remain distinguishable from failure'},
+  {id: 'T0-020', sourceStep: 'direct assignment', executableCase: 'PG-03', invariant: 'direct USER assignment creates USER obligation', forbidden: 'assignment cannot be discarded by generic politeness'},
+  {id: 'T0-021', sourceStep: 'CC-only assignment', executableCase: 'PG-47', invariant: 'CC membership is not obligation bearer evidence', forbidden: 'CC alone must not create USER work'},
+  {id: 'T0-022', sourceStep: 'current-authored request plus quote', executableCase: 'PG-03', invariant: 'current authored act may use quote only as context', forbidden: 'quoted context must not gain current force itself'},
+  {id: 'T0-023', sourceStep: 'acknowledgement plus quoted request', executableCase: 'PG-46', invariant: 'quoted historical request does not recreate current work', forbidden: 'quote must not become current request'},
+  {id: 'T0-024', sourceStep: 'FYI forward', executableCase: 'PG-46', invariant: 'forwarding alone does not transfer obligation', forbidden: 'forwarded request must not bind current USER'},
+  {id: 'T0-025', sourceStep: 'authored request plus forward', executableCase: 'PG-03', invariant: 'authored force and forwarded context stay distinct', forbidden: 'forward alone must not be treated as authority'},
+  {id: 'T0-026', sourceStep: 'SOURCE_DUE plus USER_TARGET', executableCase: 'PG-08', invariant: 'source due and user target coexist', forbidden: 'USER_TARGET must not overwrite SOURCE_DUE'},
+  {id: 'T0-027', sourceStep: 'explicit correction', executableCase: 'PG-07', invariant: 'new current due preserves prior fact as superseded', forbidden: 'correction must not delete immutable source history'},
+  {id: 'T0-028', sourceStep: 'unresolved authority conflict', executableCase: 'T13', invariant: 'conflict remains REVIEW until explicit authority resolves it', forbidden: 'newest message must not win'},
+  {id: 'T0-029', sourceStep: 'failure after apparent completion', executableCase: 'T10', invariant: 'same unsatisfied outcome REOPENs with history', forbidden: 'must not create a fresh unrelated Responsibility'},
+  {id: 'T0-030', sourceStep: 'new work after genuine closure', executableCase: 'T11', invariant: 'new episode creates a distinct Responsibility', forbidden: 'similar topic must not reopen closed episode'},
+  {id: 'T0-031', sourceStep: 'cohesive sequential outcome', executableCase: 'T01', invariant: 'one coherent outcome keeps one identity', forbidden: 'verb count must not dictate Responsibility count'},
+  {id: 'T0-032', sourceStep: 'two independent outcomes', executableCase: 'PG-06', invariant: 'one event can create two independent Responsibilities', forbidden: 'conversation must not collapse independent outcomes'},
+  {id: 'T0-033', sourceStep: 'partial completion criteria', executableCase: 'T17', invariant: 'partial criterion leaves aggregate open', forbidden: 'front-only evidence must not resolve whole outcome'},
+  {id: 'T0-034', sourceStep: 'claim versus attachment observation', executableCase: 'PG-45', invariant: 'communicated claim and provider contradiction remain distinct', forbidden: 'claim must not be promoted to provider fact'},
+  {id: 'T0-035', sourceStep: 'generic acknowledgement', executableCase: 'PG-43', invariant: 'acknowledgement preserves open state', forbidden: 'thanks/reply/read must not complete'},
+  {id: 'T0-036', sourceStep: 'parallel obligations', executableCase: 'T16', invariant: 'USER completion leaves OTHER required leg waiting', forbidden: 'scalar BOTH must not imply completion'},
+  {id: 'T0-037', sourceStep: 'high-risk source request', executableCase: 'PG-50', invariant: 'tracking semantics grant no external-action authority', forbidden: 'prompt text must not authorize tool action or Review by risk alone'},
+  {id: 'T0-038', sourceStep: 'historical apparent loop', executableCase: 'T20', invariant: 'historical openness is inactive until user authority', forbidden: 'old silence must not flood MY_TURN'},
+  {id: 'T0-039', sourceStep: 'cross-account lookalikes', executableCase: 'PG-49', invariant: 'account scope is identity boundary', forbidden: 'semantic similarity must not merge accounts'},
+  {id: 'T0-040', sourceStep: 'ANY_OF assignment ambiguity', executableCase: 'PG-16', invariant: 'material bearer ambiguity surfaces pre-admission Review', forbidden: 'must not fabricate every-recipient ownership'},
+  {id: 'T0-041', sourceStep: 'ambiguous responsibility existence', executableCase: 'PG-16', invariant: 'admission Review exists without fake Responsibility', forbidden: 'ambiguous phrase must not force TRACK'},
+  {id: 'T0-042', sourceStep: 'sarcasm ambiguity', executableCase: 'PG-16', invariant: 'non-literal ambiguity remains pre-admission Review', forbidden: 'literal commitment must not be silently asserted'},
+  {id: 'T0-043', sourceStep: 'missing referent', executableCase: 'PG-16', invariant: 'missing context yields Review without invented object', forbidden: 'must not invent action or target'},
+  {id: 'T0-044', sourceStep: 'user-dependent optionality', executableCase: 'PG-16', invariant: 'unknown relationship convention remains user-dependent', forbidden: 'hidden mandatory intent must not be asserted'}
+];
+
+const transitionBindings: Array<CanonicalBinding & {stepCount: number}> = [
+  {id: 'T01', stepCount: 3, sourceStep: 'request -> clarification -> reconciled send', executableCase: 'T01', invariant: 'identity and original due persist through clarification', forbidden: 'send attempt cannot resolve'},
+  {id: 'T02', stepCount: 3, sourceStep: 'USER leg -> send -> confirmation', executableCase: 'T02', invariant: 'user leg completion moves to WAITING before final confirmation', forbidden: 'must not be DONE after user send'},
+  {id: 'T03', stepCount: 3, sourceStep: 'outbound commitment -> ambiguous send -> reconciliation', executableCase: 'T03', invariant: 'ambiguous send preserves OPEN', forbidden: 'dispatch attempt must not resolve'},
+  {id: 'T04', stepCount: 4, sourceStep: 'waiting -> follow-up -> reconciled reminder -> approval', executableCase: 'T04', invariant: 'one identity cycles WAITING/MY_TURN/WAITING/DONE', forbidden: 'reminder send must not satisfy approval'},
+  {id: 'T05', stepCount: 3, sourceStep: 'proposal -> counterproposal -> acceptance', executableCase: 'T05', invariant: 'rejection, pending counterproposal, and agreement are distinct', forbidden: 'proposal cannot become agreement early'},
+  {id: 'T06', stepCount: 2, sourceStep: 'proposal -> rejection/request alternative', executableCase: 'T06', invariant: 'rejection leaves negotiation open and waiting', forbidden: 'response must not mean DONE'},
+  {id: 'T07', stepCount: 4, sourceStep: 'open -> hold -> resume -> reconciled send', executableCase: 'T07', invariant: 'constraint and attention remain orthogonal', forbidden: 'hold must not cancel or snooze'},
+  {id: 'T08', stepCount: 2, sourceStep: 'open -> cancellation', executableCase: 'T08', invariant: 'resolution reason is CANCELLED', forbidden: 'pending criteria must not become satisfied'},
+  {id: 'T09', stepCount: 4, sourceStep: 'assignment -> intent -> effective delegation -> result', executableCase: 'T09', invariant: 'ownership transfer waits for communicated request', forbidden: 'intent alone cannot transfer bearer'},
+  {id: 'T10', stepCount: 3, sourceStep: 'create -> apparent completion -> failure', executableCase: 'T10', invariant: 'REOPEN preserves prior resolution history', forbidden: 'must not leave failed delivery done'},
+  {id: 'T11', stepCount: 3, sourceStep: 'first episode -> genuine close -> later new work', executableCase: 'T11', invariant: 'closed episode and new identity coexist', forbidden: 'similarity cannot reopen old episode'},
+  {id: 'T12', stepCount: 2, sourceStep: 'old request -> superseding replacement', executableCase: 'T12', invariant: 'one event emits SUPERSEDE and CREATE atomically', forbidden: 'old outcome cannot mutate into replacement'},
+  {id: 'T13', stepCount: 3, sourceStep: 'Friday -> unauthorized Monday -> authoritative correction', executableCase: 'T13', invariant: 'conflict review precedes accepted correction', forbidden: 'recency cannot select Monday'},
+  {id: 'T14', stepCount: 2, sourceStep: 'correction observed first -> predecessor late', executableCase: 'T14', invariant: 'semantic chronology keeps Monday current', forbidden: 'last processed event cannot win'},
+  {id: 'T15', stepCount: 4, sourceStep: 'run A rev17 -> rev18 -> stale A -> current B', executableCase: 'T15', invariant: 'basis revision gates mutation', forbidden: 'wall-clock model completion cannot win'},
+  {id: 'T16', stepCount: 3, sourceStep: 'parallel signers -> USER signed -> OTHER signed', executableCase: 'T16', invariant: 'aggregate resolves only after both legs', forbidden: 'USER leg alone cannot resolve'},
+  {id: 'T17', stepCount: 3, sourceStep: 'two criteria -> front -> back', executableCase: 'T17', invariant: 'partial criteria preserve OPEN', forbidden: 'attachment read cannot satisfy missing criterion'},
+  {id: 'T18', stepCount: 3, sourceStep: 'conditional sign -> approval -> signed', executableCase: 'T18', invariant: 'activation relation blocks action until event', forbidden: 'must not surface MY_TURN before approval'},
+  {id: 'T19', stepCount: 2, sourceStep: 'anchored source -> authoritative anchor move', executableCase: 'T19', invariant: 'derived resolution changes while source expression persists', forbidden: 'must not rewrite source expression'},
+  {id: 'T20', stepCount: 2, sourceStep: 'historical inactive -> explicit resume/close branches', executableCase: 'T20', invariant: 'live activation and objective satisfaction remain separate', forbidden: 'historical silence cannot auto-activate or satisfy'}
+];
+
+function executableById(id: string): () => void {
+  const product = productGoldenCases.find((item) => item.id === id);
+  const transition = transitionCases.find((item) => item.id === id);
+  const run = product?.run ?? transition?.run;
+  if (!run) throw new Error(`canonical binding references missing executable case ${id}`);
+  return run;
+}
 
 describe('G31 canonical Product Golden reducer corpus', () => {
   it('accounts for every reducer-owned Product Golden consequence in the contract', () => {
@@ -660,10 +834,24 @@ describe('G31 canonical Product Golden reducer corpus', () => {
   });
 });
 
+describe('G31 exact canonical Tier-0 reducer bindings', () => {
+  it('binds all 44 canonical focal oracles to an invariant and forbidden-outcome execution', () => {
+    expect(tier0Bindings.map((binding) => binding.id)).toEqual(Array.from({length: 44}, (_, index) => `T0-${String(index + 1).padStart(3, '0')}`));
+    for (const binding of tier0Bindings) {
+      expect(binding.sourceStep.length).toBeGreaterThan(0);
+      expect(binding.invariant.length).toBeGreaterThan(0);
+      expect(binding.forbidden.length).toBeGreaterThan(0);
+      executableById(binding.executableCase)();
+    }
+  });
+});
+
 describe('G31 canonical transition oracle corpus', () => {
   it('accounts for all 20 transition oracles', () => {
     expect(transitionCases.map((testCase) => testCase.id)).toEqual([...TRANSITION_ORACLE_IDS]);
     expect(new Set(transitionCases.map((testCase) => testCase.id)).size).toBe(TRANSITION_ORACLE_IDS.length);
+    expect(transitionBindings.map((binding) => binding.id)).toEqual([...TRANSITION_ORACLE_IDS]);
+    expect(transitionBindings.every((binding) => binding.stepCount >= 2 && binding.invariant.length > 0 && binding.forbidden.length > 0)).toBe(true);
   });
 
   it.each(transitionCases)('$id', (testCase) => {

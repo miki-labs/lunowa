@@ -1,4 +1,4 @@
-import {admitResponsibilityCandidate} from './admission';
+import {admitTrustedResponsibilityCommand} from './admission';
 import {projectAdmissionReview, projectResponsibility} from './projection';
 import {
   EFFECT_OPERATIONS,
@@ -11,13 +11,13 @@ import {
   type ResponsibilityDetails,
   type ResponsibilityEvidenceBasis,
   type ResponsibilityEffectInput,
-  type ResponsibilityInterpretationCandidate,
   type ResponsibilityPatch,
   type ResponsibilityState,
   type ResolutionEvidence,
   type ResolutionReason,
   type ReductionResult,
-  type TemporalFact
+  type TemporalFact,
+  type TrustedResponsibilityCommand
 } from './types';
 
 export const RESPONSIBILITY_REDUCER_VERSION = 'responsibility-reducer-v1';
@@ -27,12 +27,12 @@ type ReducerOptions = {
   evidenceBasis?: ResponsibilityEvidenceBasis;
   existingResponsibilities?: readonly ResponsibilityState[];
   now?: Date;
-  idFactory?: (candidate: ResponsibilityInterpretationCandidate, effect: ResponsibilityEffectInput, index: number) => string;
+  idFactory?: (candidate: TrustedResponsibilityCommand, effect: ResponsibilityEffectInput, index: number) => string;
 };
 
 const clone = <T>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
 
-function deterministicId(candidate: ResponsibilityInterpretationCandidate, effect: ResponsibilityEffectInput, index: number): string {
+function deterministicId(candidate: TrustedResponsibilityCommand, effect: ResponsibilityEffectInput, index: number): string {
   const source = `${candidate.userId}|${candidate.connectedAccountId}|${candidate.conversationId}|${candidate.candidateKey}|${effect.effectKey ?? index}`;
   let hash = 2166136261;
   for (let index = 0; index < source.length; index += 1) {
@@ -46,7 +46,7 @@ function iso(now: Date): string {
   return new Date(now.getTime()).toISOString();
 }
 
-function detailsFromCandidate(candidate: ResponsibilityInterpretationCandidate): ResponsibilityDetails {
+function detailsFromCandidate(candidate: TrustedResponsibilityCommand): ResponsibilityDetails {
   return {
     completionCriteria: clone(candidate.completionCriteria ?? []),
     constraints: clone(candidate.constraints ?? []),
@@ -59,7 +59,7 @@ function detailsFromCandidate(candidate: ResponsibilityInterpretationCandidate):
 }
 
 function createState(
-  candidate: ResponsibilityInterpretationCandidate,
+  candidate: TrustedResponsibilityCommand,
   effect: ResponsibilityEffectInput,
   id: string,
   now: Date
@@ -291,7 +291,7 @@ function closeOpenItems(state: ResponsibilityState, now: Date, reason: string): 
     }
   }
   for (const criterion of state.details.completionCriteria) {
-    if (criterion.status === 'PENDING') {
+    if (reason === 'SATISFIED' && criterion.status === 'PENDING') {
       criterion.status = 'SATISFIED';
       criterion.satisfiedAt = iso(now);
     }
@@ -368,10 +368,24 @@ function validateState(state: ResponsibilityState): void {
   if (state.resolutionStatus === 'RESOLVED' && (!state.resolutionReason || !state.resolvedAt)) throw new Error('resolved Responsibility requires reason and time');
   if (state.liveTrackingState === 'HISTORICAL_INACTIVE' && state.attentionMode !== 'PRESENT') throw new Error('historical Responsibility cannot be deferred');
   if (state.attentionMode === 'DEFERRED' && (state.resolutionStatus !== 'OPEN' || state.liveTrackingState !== 'TRACKING_ACTIVE')) throw new Error('only active open Responsibilities can be deferred');
+  for (const leg of state.obligationLegs) {
+    if (leg.status === 'OPEN' && (leg.closureReason || leg.closedAt)) throw new Error(`open obligation leg ${leg.id} cannot have closure fields`);
+    if (leg.status === 'CLOSED' && (!leg.closureReason || !leg.closedAt)) throw new Error(`closed obligation leg ${leg.id} needs closure truth`);
+    if (!['ACTIONABLE', 'BLOCKED'].includes(leg.actionability)) throw new Error(`obligation leg ${leg.id} has invalid actionability`);
+  }
+  for (const event of state.expectedEvents) {
+    if (event.status === 'PENDING' && (event.closureReason || event.closedAt || event.satisfiedAt)) throw new Error(`pending expected event ${event.id} cannot have closure fields`);
+    if (event.status === 'CLOSED' && (!event.closureReason || !event.closedAt)) throw new Error(`closed expected event ${event.id} needs closure truth`);
+    if (event.satisfiedAt && event.closureReason !== 'SATISFIED') throw new Error(`expected event ${event.id} has false satisfaction time`);
+  }
+  for (const criterion of state.details.completionCriteria) {
+    if (criterion.status === 'SATISFIED' && !criterion.satisfiedAt) throw new Error(`satisfied completion criterion ${criterion.id} needs genuine satisfaction time`);
+    if (criterion.status !== 'SATISFIED' && criterion.satisfiedAt) throw new Error(`non-satisfied completion criterion ${criterion.id} cannot have satisfiedAt`);
+  }
   for (const fact of state.temporalFacts) validateTemporalFact(fact);
 }
 
-function candidateEffects(candidate: ResponsibilityInterpretationCandidate): ResponsibilityEffectInput[] {
+function candidateEffects(candidate: TrustedResponsibilityCommand): ResponsibilityEffectInput[] {
   if (candidate.effects?.length) return clone(candidate.effects);
   const operation: EffectOperation = candidate.responsibilityRef ? 'UPDATE' : 'CREATE';
   return [{
@@ -399,7 +413,7 @@ function candidateEffects(candidate: ResponsibilityInterpretationCandidate): Res
   }];
 }
 
-function reject(candidate: ResponsibilityInterpretationCandidate, reason: string, responsibilities: ResponsibilityState[]): ReductionResult {
+function reject(candidate: TrustedResponsibilityCommand, reason: string, responsibilities: ResponsibilityState[]): ReductionResult {
   return {status: 'REJECTED', admission: candidate.admission.decision, reason, effects: [], responsibilities};
 }
 
@@ -409,7 +423,7 @@ function reject(candidate: ResponsibilityInterpretationCandidate, reason: string
  * not call a model, inspect message order, or infer identity from similarity.
  */
 export function reduceResponsibility(
-  candidate: ResponsibilityInterpretationCandidate,
+  candidate: TrustedResponsibilityCommand,
   options: ReducerOptions = {}
 ): ReductionResult {
   const existing = options.existingResponsibilities?.map(clone) ?? [];
@@ -423,7 +437,7 @@ export function reduceResponsibility(
     };
   }
 
-  const admission = admitResponsibilityCandidate(candidate, {evidenceBasis: options.evidenceBasis});
+  const admission = admitTrustedResponsibilityCommand(candidate, {evidenceBasis: options.evidenceBasis});
   if (admission.status === 'INVALID_CANDIDATE') return reject(candidate, admission.reason, existing);
   const admittedDecision = admission.decision;
 
@@ -480,6 +494,9 @@ export function reduceResponsibility(
       const state = byId.get(requiredTargetId);
       if (!state) throw new Error(`Responsibility ${requiredTargetId} was not found; matching must be explicit`);
       if (state.userId !== candidate.userId || state.connectedAccountId !== candidate.connectedAccountId || state.conversationId !== candidate.conversationId) throw new Error('Responsibility matching cannot cross user, account, or conversation boundaries');
+      if (effect.expectedAggregateVersion !== undefined && effect.expectedAggregateVersion !== state.aggregateVersion) {
+        throw new Error(`Responsibility ${requiredTargetId} changed after interpretation; re-derive against current accepted state`);
+      }
       if (effect.operation === 'NO_OP') {
         results.push({operation: 'NO_OP', responsibilityId: state.id, changed: false, state: clone(state), reason: 'accepted evidence causes no state change', projection: projectResponsibility(state)});
         continue;
@@ -495,7 +512,7 @@ export function reduceResponsibility(
         if (
           !effect.resolutionEvidence ||
           effect.resolutionEvidence.strength !== 'SUFFICIENT' ||
-          !effect.resolutionEvidence.kinds.some((kind) => ['EXTERNAL_AUTHORITATIVE_FACT', 'PROVIDER_NON_DELIVERY'].includes(kind))
+          !effect.resolutionEvidence.kinds.some((kind) => ['COUNTERPART_FAILURE_REPORT', 'EXTERNAL_AUTHORITATIVE_FACT', 'PROVIDER_NON_DELIVERY'].includes(kind))
         ) throw new Error('REOPEN requires sufficient contradictory/failure evidence');
         next.resolutionStatus = 'OPEN';
         delete next.resolutionReason;

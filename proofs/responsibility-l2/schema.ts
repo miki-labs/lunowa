@@ -336,12 +336,12 @@ export const responsibilities = pgTable(
       sql`${table.aggregateVersion} >= 1`,
     ),
     index("responsibilities_live_open_user_idx")
-      .on(table.userId, table.updatedAt, table.id)
+      .on(table.userId, table.updatedAt.desc(), table.id)
       .where(
         sql`${table.liveTrackingState} = 'TRACKING_ACTIVE' AND ${table.resolutionStatus} = 'OPEN'`,
       ),
     index("responsibilities_live_done_user_idx")
-      .on(table.userId, table.resolvedAt, table.id)
+      .on(table.userId, table.resolvedAt.desc(), table.id)
       .where(
         sql`${table.liveTrackingState} = 'TRACKING_ACTIVE' AND ${table.resolutionStatus} = 'RESOLVED'`,
       ),
@@ -352,7 +352,7 @@ export const responsibilities = pgTable(
     ),
     index("responsibilities_account_updated_idx").on(
       table.connectedAccountId,
-      table.updatedAt,
+      table.updatedAt.desc(),
       table.id,
     ),
   ],
@@ -823,11 +823,11 @@ export const responsibilityAdmissionReviews = pgTable(
       sql`char_length(btrim(${table.candidateKey})) BETWEEN 1 AND 128`,
     ),
     index("responsibility_admission_reviews_open_user_idx")
-      .on(table.userId, table.createdAt, table.id)
+      .on(table.userId, table.createdAt.desc(), table.id)
       .where(sql`${table.reviewStatus} = 'OPEN'`),
     index("responsibility_admission_reviews_conversation_idx").on(
       table.conversationId,
-      table.createdAt,
+      table.createdAt.desc(),
       table.id,
     ),
   ],
@@ -934,7 +934,7 @@ export const responsibilityDomainEvents = pgTable(
     ),
     index("responsibility_domain_events_history_idx").on(
       table.responsibilityId,
-      table.occurredAt,
+      table.occurredAt.desc(),
       table.id,
     ),
     index("responsibility_domain_events_correlation_idx").on(
@@ -943,7 +943,7 @@ export const responsibilityDomainEvents = pgTable(
     ),
     index("responsibility_domain_events_source_idx").on(
       table.sourceEventKey,
-      table.occurredAt,
+      table.occurredAt.desc(),
       table.id,
     ),
   ],

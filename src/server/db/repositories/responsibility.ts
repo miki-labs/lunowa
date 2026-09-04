@@ -476,7 +476,7 @@ async function evidenceBasisForInterpretation(
     if (item.sourceExcerptShort && !`${row.subject}\n${row.textBody ?? ''}`.includes(item.sourceExcerptShort)) return undefined;
     if (item.sourceLocator?.messageId && item.sourceLocator.messageId !== item.messageId) return undefined;
     const zone = item.sourceLocator?.zone;
-    if (zone !== undefined && !['CURRENT_AUTHORED', 'QUOTED', 'FORWARDED'].includes(String(zone))) return undefined;
+    if (zone !== undefined && !['AUTHORED_CURRENT', 'QUOTED_HISTORY', 'FORWARDED_CONTENT', 'SIGNATURE', 'DISCLAIMER', 'STRUCTURED_METADATA'].includes(String(zone))) return undefined;
     const attachmentReference = item.sourceLocator?.attachmentId ?? item.sourceLocator?.providerAttachmentId;
     if (attachmentReference !== undefined) {
       const attachmentRows = await tx.select({id: attachments.id, providerAttachmentId: attachments.providerAttachmentId})

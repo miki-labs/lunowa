@@ -44,7 +44,7 @@ function candidate(overrides: Partial<TrustedResponsibilityCommand> = {}): Trust
 }
 
 function interpretationCandidate(overrides: Partial<ResponsibilityInterpretationCandidate> = {}): ResponsibilityInterpretationCandidate {
-  const provenance = [{evidenceKind: 'COMMUNICATED_CLAIM' as const, messageId: 'message-1', sourceLocator: {zone: 'CURRENT_AUTHORED'}}];
+  const provenance = [{evidenceKind: 'COMMUNICATED_CLAIM' as const, messageId: 'message-1', sourceLocator: {zone: 'AUTHORED_CURRENT'}}];
   return {
     ...scope,
     sourceEventKey: 'message-1',
@@ -129,14 +129,103 @@ describe('deterministic Responsibility admission and reducer', () => {
         candidateUnitKey: 'clarification', materiality: 'MATERIAL',
         operationalOutcome: initial.operationalOutcome,
         identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: initial.operationalOutcome},
-        constraints: [{id: 'pdf', code: 'FORMAT_PDF', provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1'}]}],
-        provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1'}]
+        constraints: [{id: 'pdf', code: 'FORMAT_PDF', provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1', sourceLocator: {zone: 'AUTHORED_CURRENT'}}]}],
+        provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1', sourceLocator: {zone: 'AUTHORED_CURRENT'}}]
       }]
     });
     const derived = deriveResponsibilityCommand(continuation, {evidenceBasis: basis, existingResponsibilities: [initial]});
     expect(derived.status).toBe('DERIVED');
     if (derived.status === 'DERIVED') {
       expect(derived.command.effects?.[0]).toMatchObject({operation: 'UPDATE', responsibilityRef: initial.id});
+    }
+  });
+
+  it.each(['QUOTED_HISTORY', 'FORWARDED_CONTENT'])(
+    'rejects %s as the sole source of current-turn semantic authority',
+    (zone) => {
+      const provenance = [{
+        evidenceKind: 'COMMUNICATED_CLAIM' as const,
+        messageId: 'message-1',
+        sourceLocator: {zone}
+      }];
+      const result = deriveResponsibilityCommand(interpretationCandidate({
+        provenance,
+        semantics: [{
+          candidateUnitKey: `context-only-${zone}`,
+          materiality: 'MATERIAL',
+          operationalOutcome: 'perform the historical request',
+          obligationLegs: [{
+            id: 'historical-work', bearerCandidate: 'USER', actionCode: 'HISTORICAL_WORK',
+            basisKind: 'COMMUNICATED_REQUEST', provenance
+          }],
+          provenance
+        }]
+      }), {
+        evidenceBasis: {evidenceRevision: 1, sourceEventKey: 'message-1', references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'}]}
+      });
+      expect(result).toMatchObject({status: 'REJECTED'});
+      if (result.status === 'REJECTED') expect(result.reason).toContain('cannot supply current-turn communicative authority');
+    }
+  );
+
+  it('rejects material semantics with missing or non-canonical source zoning', () => {
+    for (const zone of [undefined, 'CURRENT_AUTHORED', 'QUOTED', 'FORWARDED']) {
+      const provenance = [{
+        evidenceKind: 'COMMUNICATED_CLAIM' as const,
+        messageId: 'message-1',
+        ...(zone ? {sourceLocator: {zone}} : {})
+      }];
+      const result = deriveResponsibilityCommand(interpretationCandidate({
+        provenance,
+        semantics: [{
+          candidateUnitKey: `invalid-zone-${zone ?? 'missing'}`,
+          materiality: 'MATERIAL', operationalOutcome: 'perform work', provenance
+        }]
+      }), {
+        evidenceBasis: {evidenceRevision: 1, sourceEventKey: 'message-1', references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'}]}
+      });
+      expect(result).toMatchObject({status: 'REJECTED'});
+      if (result.status === 'REJECTED') expect(result.reason).toContain('explicit canonical source zone');
+    }
+  });
+
+  it('rejects persistence-incompatible participant semantics before accepted reduction', () => {
+    const provenance = [{
+      evidenceKind: 'COMMUNICATED_CLAIM' as const,
+      messageId: 'message-1',
+      sourceLocator: {zone: 'AUTHORED_CURRENT'}
+    }];
+    for (const bearerCandidate of ['PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const) {
+      const result = deriveResponsibilityCommand(interpretationCandidate({
+        semantics: [{
+          candidateUnitKey: `missing-bearer-${bearerCandidate}`,
+          materiality: 'MATERIAL', operationalOutcome: 'receive the result',
+          obligationLegs: [{
+            id: 'other-work', bearerCandidate, actionCode: 'SEND_RESULT',
+            basisKind: 'COMMUNICATED_REQUEST', provenance
+          }],
+          provenance
+        }]
+      }), {
+        evidenceBasis: {evidenceRevision: 1, sourceEventKey: 'message-1', references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'}]}
+      });
+      expect(result).toMatchObject({status: 'REJECTED'});
+      if (result.status === 'REJECTED') expect(result.reason).toContain('invalid obligation candidate');
+    }
+
+    for (const actor of ['PARTICIPANT', 'OTHER_PARTY'] as const) {
+      const result = deriveResponsibilityCommand(interpretationCandidate({
+        semantics: [{
+          candidateUnitKey: `missing-actor-${actor}`,
+          materiality: 'MATERIAL', operationalOutcome: 'receive the result',
+          expectedEvents: [{id: 'result', actor, eventCode: 'RESULT_RECEIVED', provenance}],
+          provenance
+        }]
+      }), {
+        evidenceBasis: {evidenceRevision: 1, sourceEventKey: 'message-1', references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'}]}
+      });
+      expect(result).toMatchObject({status: 'REJECTED'});
+      if (result.status === 'REJECTED') expect(result.reason).toContain('invalid expected-event candidate');
     }
   });
   it('rejects ungrounded candidates instead of manufacturing source provenance', () => {
@@ -281,6 +370,34 @@ describe('deterministic Responsibility admission and reducer', () => {
     }), {currentEvidenceRevision: 3, existingResponsibilities: [initial]});
     expect(created(resolved).resolutionReason).toBe('SATISFIED');
   });
+
+  it.each(['COUNTERPART_EXPLICIT_CLOSURE', 'EXPLICIT_COMPLETION', 'USER_OFF_CHANNEL_ASSERTION'] as const)(
+    'does not treat generic %s as blanket proof for pending completion criteria',
+    (kind) => {
+      const initial = created(reduce(candidate({
+        completionCriteria: [
+          {id: 'front', code: 'FRONT_COMPLETE', status: 'PENDING', provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1'}]},
+          {id: 'back', code: 'BACK_COMPLETE', status: 'PENDING', provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1'}]}
+        ]
+      })));
+      const result = reduce(candidate({
+        sourceEventKey: `generic-completion-${kind}`,
+        candidateKey: `generic-completion-${kind}`,
+        evidenceRevision: 2,
+        responsibilityRef: initial.id,
+        effects: [{
+          operation: 'RESOLVE', responsibilityRef: initial.id, effectKey: kind,
+          reason: 'SATISFIED', resolutionEvidence: {strength: 'SUFFICIENT', kinds: [kind]}
+        }]
+      }), {currentEvidenceRevision: 2, existingResponsibilities: [initial]});
+      expect(result.status).toBe('REJECTED');
+      expect(initial.details.completionCriteria).toEqual([
+        expect.objectContaining({id: 'front', status: 'PENDING'}),
+        expect.objectContaining({id: 'back', status: 'PENDING'})
+      ]);
+      expect(initial.details.completionCriteria.every((criterion) => criterion.satisfiedAt === undefined)).toBe(true);
+    }
+  );
 
   it.each([
     ['RESOLVE', 'DECLINED'],

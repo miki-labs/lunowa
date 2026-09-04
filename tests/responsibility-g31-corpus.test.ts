@@ -1,12 +1,14 @@
 import {describe, expect, it} from 'vitest';
 
 import {
+  deriveResponsibilityCommand,
   projectAdmissionReview,
   projectResponsibility,
   reduceResponsibility
 } from '../src/server/responsibility';
 import type {
   CompletionCriterion,
+  ResponsibilityInterpretationCandidate,
   ExpectedEvent,
   ObligationLeg,
   ProvenanceInput,
@@ -740,7 +742,220 @@ type CanonicalBinding = {
   executableCase: string;
   invariant: string;
   forbidden: string;
+  run?: () => void;
 };
+
+const canonicalParticipantId = '11111111-1111-4111-8111-111111111111';
+
+function interpretationSource(
+  zone: 'AUTHORED_CURRENT' | 'QUOTED_HISTORY' | 'FORWARDED_CONTENT',
+  supportRole: 'COMMUNICATIVE_FORCE' | 'OBJECT_CONTEXT' = 'COMMUNICATIVE_FORCE'
+): ProvenanceInput {
+  return {
+    evidenceKind: 'COMMUNICATED_CLAIM',
+    messageId: 'canonical-message',
+    supportRole,
+    sourceLocator: {zone}
+  };
+}
+
+function deriveCanonical(
+  input: ResponsibilityInterpretationCandidate,
+  existingResponsibilities: readonly ResponsibilityState[] = []
+) {
+  return deriveResponsibilityCommand(input, {
+    evidenceBasis: {
+      evidenceRevision: input.evidenceRevision,
+      sourceEventKey: input.sourceEventKey,
+      references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'canonical-message'}]
+    },
+    existingResponsibilities
+  });
+}
+
+function canonicalInterpretation(
+  semantics: ResponsibilityInterpretationCandidate['semantics'],
+  provenance: ProvenanceInput[],
+  key: string
+): ResponsibilityInterpretationCandidate {
+  return {
+    ...scope,
+    sourceEventKey: `canonical-${key}`,
+    candidateKey: `canonical-${key}`,
+    evidenceRevision: 2,
+    semantics,
+    provenance
+  };
+}
+
+function runCommitmentForceOracle(
+  id: 'T0-005' | 'T0-006' | 'T0-007',
+  basisKind: 'PLAN' | 'INTENTION' | 'TENTATIVE_INTENTION',
+  expectationStrength: 'PLANNED' | 'INTENDED' | 'TENTATIVE'
+): void {
+  const outcome = 'receive revised document from counterpart';
+  const initialEvent: ExpectedEvent = {
+    id: 'revised-document', actor: 'EXTERNAL', eventCode: 'REVISED_DOCUMENT_RECEIVED',
+    status: 'PENDING', provenance: [source()]
+  };
+  const initial = stateOf(reduce(candidate({
+    operationalOutcome: outcome,
+    obligationLegs: [leg('counterpart-send', 'OTHER_PARTY', 'SEND_REVISED_DOCUMENT')],
+    expectedEvents: [initialEvent]
+  })));
+  const authored = interpretationSource('AUTHORED_CURRENT');
+  const interpreted = canonicalInterpretation([{
+    candidateUnitKey: id,
+    materiality: 'MATERIAL',
+    operationalOutcome: outcome,
+    identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: outcome},
+    expectedEvents: [{
+      id: initialEvent.id,
+      actor: 'OTHER_PARTY',
+      participantId: canonicalParticipantId,
+      eventCode: initialEvent.eventCode,
+      basisKind,
+      expectationStrength,
+      provenance: [authored]
+    }],
+    temporalFacts: [{
+      id: `${id}-expected-time`,
+      temporalKind: 'EXPECTED_EVENT_TIME',
+      expectedEventId: initialEvent.id,
+      originalExpression: '明日',
+      valueKind: 'DATE',
+      resolvedDate: '2026-09-06',
+      precisionCode: 'DATE',
+      provenance: [authored]
+    }],
+    provenance: [authored]
+  }], [authored], id);
+  const derived = deriveCanonical(interpreted, [initial]);
+  expect(derived.status, derived.status === 'REJECTED' ? derived.reason : '').toBe('DERIVED');
+  if (derived.status !== 'DERIVED') return;
+  const updated = stateOf(reduce(derived.command, {existingResponsibilities: [initial]}));
+  expect(updated.id).toBe(initial.id);
+  expect(updated.resolutionStatus).toBe('OPEN');
+  expect(updated.expectedEvents[0]).toMatchObject({status: 'PENDING', basisKind, expectationStrength});
+  expect(updated.temporalFacts[0]).toMatchObject({temporalKind: 'EXPECTED_EVENT_TIME', originalExpression: '明日'});
+  expect(updated.temporalFacts.some((fact) => fact.temporalKind === 'SOURCE_DUE')).toBe(false);
+  expect(projectResponsibility(updated).bucket).toBe('WAITING');
+}
+
+function runCapabilityOracle(): void {
+  const outcome = 'receive revised document from counterpart';
+  const initialEvent: ExpectedEvent = {
+    id: 'revised-document', actor: 'EXTERNAL', eventCode: 'REVISED_DOCUMENT_RECEIVED',
+    status: 'PENDING', provenance: [source()]
+  };
+  const initial = stateOf(reduce(candidate({
+    operationalOutcome: outcome,
+    obligationLegs: [leg('counterpart-send', 'OTHER_PARTY', 'SEND_REVISED_DOCUMENT')],
+    expectedEvents: [initialEvent]
+  })));
+  const authored = interpretationSource('AUTHORED_CURRENT');
+  const interpreted = canonicalInterpretation([{
+    candidateUnitKey: 'T0-008',
+    materiality: 'MATERIAL',
+    operationalOutcome: outcome,
+    identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: outcome},
+    expectedEvents: [{
+      id: initialEvent.id,
+      actor: 'OTHER_PARTY',
+      participantId: canonicalParticipantId,
+      eventCode: initialEvent.eventCode,
+      basisKind: 'CAPABILITY_OR_FEASIBILITY',
+      expectationStrength: 'POSSIBLE',
+      provenance: [authored]
+    }],
+    provenance: [authored]
+  }], [authored], 'T0-008');
+  const derived = deriveCanonical(interpreted, [initial]);
+  expect(derived.status, derived.status === 'REJECTED' ? derived.reason : '').toBe('DERIVED');
+  if (derived.status !== 'DERIVED') return;
+  const updated = stateOf(reduce(derived.command, {existingResponsibilities: [initial]}));
+  expect(updated.id).toBe(initial.id);
+  expect(updated.resolutionStatus).toBe('OPEN');
+  expect(updated.expectedEvents[0]).toMatchObject({
+    status: 'PENDING', basisKind: 'CAPABILITY_OR_FEASIBILITY', expectationStrength: 'POSSIBLE'
+  });
+  expect(updated.temporalFacts).toEqual([]);
+  expect(projectResponsibility(updated).bucket).toBe('WAITING');
+}
+
+function runContextAuthorityOracle(
+  id: 'T0-022' | 'T0-025',
+  contextZone: 'QUOTED_HISTORY' | 'FORWARDED_CONTENT'
+): void {
+  const authored = interpretationSource('AUTHORED_CURRENT', 'COMMUNICATIVE_FORCE');
+  const context = interpretationSource(contextZone, 'OBJECT_CONTEXT');
+  const actionCode = contextZone === 'QUOTED_HISTORY' ? 'CREATE_CUSTOMER_QUOTATION' : 'CREATE_CUSTOMER_RESPONSE_DRAFT';
+  const interpreted = canonicalInterpretation([{
+    candidateUnitKey: id,
+    materiality: 'MATERIAL',
+    operationalOutcome: contextZone === 'QUOTED_HISTORY'
+      ? 'create the customer quotation requested in the current turn'
+      : 'create the customer response draft currently requested by the manager',
+    obligationLegs: [{
+      id: `${id}-user-work`, bearerCandidate: 'USER', actionCode,
+      basisKind: 'COMMUNICATED_REQUEST', provenance: [authored, context]
+    }],
+    provenance: [authored]
+  }], [authored, context], id);
+  const derived = deriveCanonical(interpreted);
+  expect(derived.status, derived.status === 'REJECTED' ? derived.reason : '').toBe('DERIVED');
+  if (derived.status !== 'DERIVED') return;
+  expect(derived.command.admission.decision).toBe('TRACK');
+  expect(derived.command.effects).toHaveLength(1);
+  const state = stateOf(reduce(derived.command, {currentEvidenceRevision: 2}));
+  expect(projectResponsibility(state).bucket).toBe('MY_TURN');
+  expect(state.obligationLegs).toHaveLength(1);
+  expect(state.obligationLegs[0]?.provenance).toEqual(expect.arrayContaining([
+    expect.objectContaining({supportRole: 'COMMUNICATIVE_FORCE', sourceLocator: {zone: 'AUTHORED_CURRENT'}}),
+    expect.objectContaining({supportRole: 'OBJECT_CONTEXT', sourceLocator: {zone: contextZone}})
+  ]));
+
+  const contextOnly = canonicalInterpretation([{
+    candidateUnitKey: `${id}-context-only`, materiality: 'MATERIAL',
+    operationalOutcome: 'perform the old contextual request',
+    obligationLegs: [{
+      id: `${id}-context-work`, bearerCandidate: 'USER', actionCode,
+      basisKind: 'COMMUNICATED_REQUEST', provenance: [context]
+    }],
+    provenance: [context]
+  }], [context], `${id}-context-only`);
+  expect(deriveCanonical(contextOnly)).toMatchObject({status: 'REJECTED'});
+}
+
+function runContextOnlyAbstentionOracle(
+  id: 'T0-023' | 'T0-024',
+  contextZone: 'QUOTED_HISTORY' | 'FORWARDED_CONTENT'
+): void {
+  const authored = interpretationSource('AUTHORED_CURRENT');
+  const context = interpretationSource(contextZone, 'OBJECT_CONTEXT');
+  const interpreted = canonicalInterpretation([
+    {candidateUnitKey: `${id}-ack-or-fyi`, materiality: 'NOT_MATERIAL', provenance: [authored]},
+    {candidateUnitKey: `${id}-historical-request`, materiality: 'NOT_MATERIAL', provenance: [context]}
+  ], [authored, context], id);
+  const derived = deriveCanonical(interpreted);
+  expect(derived.status).toBe('DERIVED');
+  if (derived.status !== 'DERIVED') return;
+  expect(derived.command).toMatchObject({admission: {decision: 'DO_NOT_TRACK'}, effects: []});
+  expect(reduce(derived.command, {currentEvidenceRevision: 2})).toMatchObject({
+    status: 'APPLIED', admission: 'DO_NOT_TRACK', responsibilities: []
+  });
+
+  const authorityMutant = canonicalInterpretation([{
+    candidateUnitKey: `${id}-authority-mutant`, materiality: 'MATERIAL',
+    operationalOutcome: 'perform the historical request',
+    obligationLegs: [{
+      id: `${id}-mutant-work`, bearerCandidate: 'USER', actionCode: 'PERFORM_HISTORICAL_REQUEST',
+      basisKind: 'COMMUNICATED_REQUEST', provenance: [context]
+    }],
+    provenance: [context]
+  }], [context], `${id}-authority-mutant`);
+  expect(deriveCanonical(authorityMutant)).toMatchObject({status: 'REJECTED'});
+}
 
 // This is intentionally explicit rather than inferred from matching IDs.  It
 // binds each canonical focal oracle to the reducer-owned executable consequence
@@ -750,10 +965,10 @@ const tier0Bindings: CanonicalBinding[] = [
   {id: 'T0-002', sourceStep: 'direction/commitment inbound', executableCase: 'PG-01', invariant: 'counterpart commitment is waiting evidence, not USER due', forbidden: 'must not project MY_TURN from tomorrow alone'},
   {id: 'T0-003', sourceStep: 'direction/request outbound', executableCase: 'PG-01', invariant: 'outbound request assigns OTHER party', forbidden: 'must not assign outbound request back to USER'},
   {id: 'T0-004', sourceStep: 'direction/commitment outbound', executableCase: 'PG-03', invariant: 'outbound commitment retains USER bearer', forbidden: 'same wording must not inherit inbound bearer'},
-  {id: 'T0-005', sourceStep: 'commitment-force plan', executableCase: 'PG-02', invariant: 'plan may update expectation without resolving', forbidden: 'plan must not become firm completion'},
-  {id: 'T0-006', sourceStep: 'commitment-force intention', executableCase: 'PG-02', invariant: 'intention remains weaker than commitment', forbidden: 'intention must not resolve or transfer authority'},
-  {id: 'T0-007', sourceStep: 'commitment-force tentative', executableCase: 'PG-02', invariant: 'tentative future orientation preserves open state', forbidden: 'tentative language must not become firm promise'},
-  {id: 'T0-008', sourceStep: 'commitment-force capability', executableCase: 'PG-43', invariant: 'capability alone preserves accepted loop', forbidden: 'capability must not become authoritative expected completion'},
+  {id: 'T0-005', sourceStep: 'commitment-force plan', executableCase: 'PG-02', invariant: 'plan may update expectation without resolving', forbidden: 'plan must not become firm completion', run: () => runCommitmentForceOracle('T0-005', 'PLAN', 'PLANNED')},
+  {id: 'T0-006', sourceStep: 'commitment-force intention', executableCase: 'PG-02', invariant: 'intention remains weaker than commitment', forbidden: 'intention must not resolve or transfer authority', run: () => runCommitmentForceOracle('T0-006', 'INTENTION', 'INTENDED')},
+  {id: 'T0-007', sourceStep: 'commitment-force tentative', executableCase: 'PG-02', invariant: 'tentative future orientation preserves open state', forbidden: 'tentative language must not become firm promise', run: () => runCommitmentForceOracle('T0-007', 'TENTATIVE_INTENTION', 'TENTATIVE')},
+  {id: 'T0-008', sourceStep: 'commitment-force capability', executableCase: 'PG-43', invariant: 'capability alone preserves accepted loop', forbidden: 'capability must not become authoritative expected completion', run: runCapabilityOracle},
   {id: 'T0-009', sourceStep: 'proposal', executableCase: 'T05', invariant: 'proposed term stays pending until acceptance', forbidden: 'proposal must not become agreed fact'},
   {id: 'T0-010', sourceStep: 'agreement', executableCase: 'T05', invariant: 'accepted term becomes agreed fact', forbidden: 'agreement must not claim future meeting occurred'},
   {id: 'T0-011', sourceStep: 'preference', executableCase: 'PG-12', invariant: 'preference without decision context remains uncertain', forbidden: 'preference must not silently become agreement'},
@@ -767,10 +982,10 @@ const tier0Bindings: CanonicalBinding[] = [
   {id: 'T0-019', sourceStep: 'courtesy offer', executableCase: 'PG-60', invariant: 'valid grounded communication can admit DO_NOT_TRACK', forbidden: 'No Responsibility must remain distinguishable from failure'},
   {id: 'T0-020', sourceStep: 'direct assignment', executableCase: 'PG-03', invariant: 'direct USER assignment creates USER obligation', forbidden: 'assignment cannot be discarded by generic politeness'},
   {id: 'T0-021', sourceStep: 'CC-only assignment', executableCase: 'PG-47', invariant: 'CC membership is not obligation bearer evidence', forbidden: 'CC alone must not create USER work'},
-  {id: 'T0-022', sourceStep: 'current-authored request plus quote', executableCase: 'PG-03', invariant: 'current authored act may use quote only as context', forbidden: 'quoted context must not gain current force itself'},
-  {id: 'T0-023', sourceStep: 'acknowledgement plus quoted request', executableCase: 'PG-46', invariant: 'quoted historical request does not recreate current work', forbidden: 'quote must not become current request'},
-  {id: 'T0-024', sourceStep: 'FYI forward', executableCase: 'PG-46', invariant: 'forwarding alone does not transfer obligation', forbidden: 'forwarded request must not bind current USER'},
-  {id: 'T0-025', sourceStep: 'authored request plus forward', executableCase: 'PG-03', invariant: 'authored force and forwarded context stay distinct', forbidden: 'forward alone must not be treated as authority'},
+  {id: 'T0-022', sourceStep: 'current-authored request plus quote', executableCase: 'PG-03', invariant: 'current authored act may use quote only as context', forbidden: 'quoted context must not gain current force itself', run: () => runContextAuthorityOracle('T0-022', 'QUOTED_HISTORY')},
+  {id: 'T0-023', sourceStep: 'acknowledgement plus quoted request', executableCase: 'PG-46', invariant: 'quoted historical request does not recreate current work', forbidden: 'quote must not become current request', run: () => runContextOnlyAbstentionOracle('T0-023', 'QUOTED_HISTORY')},
+  {id: 'T0-024', sourceStep: 'FYI forward', executableCase: 'PG-46', invariant: 'forwarding alone does not transfer obligation', forbidden: 'forwarded request must not bind current USER', run: () => runContextOnlyAbstentionOracle('T0-024', 'FORWARDED_CONTENT')},
+  {id: 'T0-025', sourceStep: 'authored request plus forward', executableCase: 'PG-03', invariant: 'authored force and forwarded context stay distinct', forbidden: 'forward alone must not be treated as authority', run: () => runContextAuthorityOracle('T0-025', 'FORWARDED_CONTENT')},
   {id: 'T0-026', sourceStep: 'SOURCE_DUE plus USER_TARGET', executableCase: 'PG-08', invariant: 'source due and user target coexist', forbidden: 'USER_TARGET must not overwrite SOURCE_DUE'},
   {id: 'T0-027', sourceStep: 'explicit correction', executableCase: 'PG-07', invariant: 'new current due preserves prior fact as superseded', forbidden: 'correction must not delete immutable source history'},
   {id: 'T0-028', sourceStep: 'unresolved authority conflict', executableCase: 'T13', invariant: 'conflict remains REVIEW until explicit authority resolves it', forbidden: 'newest message must not win'},
@@ -835,14 +1050,14 @@ describe('G31 canonical Product Golden reducer corpus', () => {
 });
 
 describe('G31 exact canonical Tier-0 reducer bindings', () => {
-  it('binds all 44 canonical focal oracles to an invariant and forbidden-outcome execution', () => {
+  it('accounts for all 44 canonical focal oracles', () => {
     expect(tier0Bindings.map((binding) => binding.id)).toEqual(Array.from({length: 44}, (_, index) => `T0-${String(index + 1).padStart(3, '0')}`));
-    for (const binding of tier0Bindings) {
-      expect(binding.sourceStep.length).toBeGreaterThan(0);
-      expect(binding.invariant.length).toBeGreaterThan(0);
-      expect(binding.forbidden.length).toBeGreaterThan(0);
-      executableById(binding.executableCase)();
-    }
+  });
+
+  it.each(tier0Bindings)('$id — $sourceStep', (binding) => {
+    expect(binding.invariant.length).toBeGreaterThan(0);
+    expect(binding.forbidden.length).toBeGreaterThan(0);
+    (binding.run ?? executableById(binding.executableCase))();
   });
 });
 

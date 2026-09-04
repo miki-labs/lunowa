@@ -35,6 +35,7 @@ const conversationId = randomUUID();
 const secondUserId = randomUUID();
 const secondAccountId = randomUUID();
 const secondConversationId = randomUUID();
+const secondParticipantId = randomUUID();
 let messageId: string;
 let secondMessageId: string;
 const legId = randomUUID();
@@ -126,6 +127,10 @@ try {
      VALUES ($1, $2, 'fixture-provider', 'g31-account', 'g31-second@example.invalid', 'credential-ref:g31-second')`,
     [secondAccountId, secondUserId]
   );
+  await pool.query(
+    `INSERT INTO participant_identities (id, user_id, canonical_email) VALUES ($1, $2, 'foreign-participant@example.invalid')`,
+    [secondParticipantId, secondUserId]
+  );
   const secondNormalized = await evidenceRepository.upsertNormalizedMessage(
     normalizedEvidenceFixture(secondUserId, secondAccountId, {
       conversation: {
@@ -196,6 +201,80 @@ try {
   };
   const noResponsibility = await repository.reduceCandidate(noResponsibilityInterpretation);
   assert(noResponsibility.status === 'APPLIED' && noResponsibility.admission === 'DO_NOT_TRACK', 'trusted boundary did not derive valid No Responsibility.');
+  const materialSource = {
+    evidenceKind: 'COMMUNICATED_CLAIM' as const,
+    messageId,
+    sourceExcerptShort: 'current status',
+    sourceLocator: {zone: 'AUTHORED_CURRENT'}
+  };
+  const missingParticipant = await repository.reduceCandidate({
+    ...noResponsibilityInterpretation,
+    sourceEventKey: 'g31-missing-participant',
+    candidateKey: 'g31-missing-participant',
+    provenance: [materialSource],
+    semantics: [{
+      candidateUnitKey: 'missing-participant', materiality: 'MATERIAL',
+      operationalOutcome: 'receive a participant result',
+      obligationLegs: [{
+        id: randomUUID(), bearerCandidate: 'OTHER_PARTY', actionCode: 'SEND_RESULT',
+        basisKind: 'COMMUNICATED_REQUEST', provenance: [materialSource]
+      }],
+      provenance: [materialSource]
+    }]
+  });
+  assert(missingParticipant.status === 'REJECTED', 'missing non-USER participant reached accepted reduction/persistence.');
+  for (const zone of ['QUOTED_HISTORY', 'FORWARDED_CONTENT'] as const) {
+    const contextOnly = {...materialSource, sourceLocator: {zone}};
+    const result = await repository.reduceCandidate({
+      ...noResponsibilityInterpretation,
+      sourceEventKey: `g31-context-only-${zone}`,
+      candidateKey: `g31-context-only-${zone}`,
+      provenance: [contextOnly],
+      semantics: [{
+        candidateUnitKey: `context-only-${zone}`, materiality: 'MATERIAL',
+        operationalOutcome: 'perform the historical contextual request',
+        obligationLegs: [{
+          id: randomUUID(), bearerCandidate: 'USER', actionCode: 'PERFORM_HISTORICAL_REQUEST',
+          basisKind: 'COMMUNICATED_REQUEST', provenance: [contextOnly]
+        }],
+        provenance: [contextOnly]
+      }]
+    });
+    assert(result.status === 'REJECTED', `${zone} gained current-turn authority in production admission.`);
+  }
+  const missingZone = {...materialSource, sourceLocator: undefined};
+  const missingZoneResult = await repository.reduceCandidate({
+    ...noResponsibilityInterpretation,
+    sourceEventKey: 'g31-missing-zone',
+    candidateKey: 'g31-missing-zone',
+    provenance: [missingZone],
+    semantics: [{
+      candidateUnitKey: 'missing-zone', materiality: 'MATERIAL',
+      operationalOutcome: 'perform unzoned work',
+      obligationLegs: [{
+        id: randomUUID(), bearerCandidate: 'USER', actionCode: 'PERFORM_UNZONED_WORK',
+        basisKind: 'COMMUNICATED_REQUEST', provenance: [missingZone]
+      }],
+      provenance: [missingZone]
+    }]
+  });
+  assert(missingZoneResult.status === 'REJECTED', 'missing source zone gained current-turn authority in production admission.');
+  const foreignParticipant = await repository.reduceCandidate({
+    ...noResponsibilityInterpretation,
+    sourceEventKey: 'g31-foreign-participant',
+    candidateKey: 'g31-foreign-participant',
+    provenance: [materialSource],
+    semantics: [{
+      candidateUnitKey: 'foreign-participant', materiality: 'MATERIAL',
+      operationalOutcome: 'receive a participant result',
+      expectedEvents: [{
+        id: randomUUID(), actor: 'PARTICIPANT', participantId: secondParticipantId,
+        eventCode: 'RESULT_RECEIVED', provenance: [materialSource]
+      }],
+      provenance: [materialSource]
+    }]
+  });
+  assert(foreignParticipant.status === 'REJECTED', 'another tenant participant was accepted in the current scope.');
   const interpretedLegId = randomUUID();
   const trackedInterpretation = await repository.reduceCandidate({
     ...noResponsibilityInterpretation,
@@ -210,9 +289,9 @@ try {
         bearerCandidate: 'USER',
         actionCode: 'REVIEW_CURRENT_STATUS',
         basisKind: 'COMMUNICATED_REQUEST',
-        provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId, sourceExcerptShort: 'current status'}]
+        provenance: [materialSource]
       }],
-      provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId, sourceExcerptShort: 'current status'}]
+      provenance: [materialSource]
     }]
   });
   const trackedInterpretationState = stateFrom(trackedInterpretation);
@@ -309,6 +388,22 @@ try {
   assert(stateFrom(replacement, 0).resolutionReason === 'SUPERSEDED', 'SUPERSEDE did not terminate the old Responsibility with its reason.');
   assert(replacementState.operationalOutcome === 'create a termination notice', 'replacement CREATE mutated the old operational identity.');
 
+  const blanketSatisfaction = await repository.applyTrustedCommand(candidate({
+    sourceEventKey: 'g31-blanket-satisfaction',
+    candidateKey: 'g31-blanket-satisfaction',
+    applicationKey: 'g31-blanket-satisfaction',
+    evidenceRevision: 4,
+    responsibilityRef: replacementState.id,
+    effects: [{
+      operation: 'RESOLVE', responsibilityRef: replacementState.id, effectKey: 'generic-close', reason: 'SATISFIED',
+      resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['COUNTERPART_EXPLICIT_CLOSURE']}
+    }]
+  }));
+  assert(blanketSatisfaction.status === 'REJECTED', 'generic outcome closure blanket-satisfied a pending completion criterion.');
+  const afterBlanketAttempt = await repository.getResponsibility({userId, connectedAccountId: accountId, responsibilityId: replacementState.id});
+  assert(afterBlanketAttempt?.state.resolutionStatus === 'OPEN', 'rejected blanket satisfaction mutated durable resolution state.');
+  assert(afterBlanketAttempt?.state.details.completionCriteria[0]?.status === 'PENDING' && !afterBlanketAttempt.state.details.completionCriteria[0]?.satisfiedAt, 'rejected blanket satisfaction mutated durable criterion truth.');
+
   const cancelled = await repository.applyTrustedCommand(candidate({
     commandSource: 'TRUSTED_USER',
     sourceEventKey: 'g31-cancelled-not-satisfied',
@@ -354,7 +449,7 @@ try {
   console.log(JSON.stringify({
     kind: 'g31-responsibility-reducer-production-result-v1',
     postgres: version.rows[0]?.version,
-    checks: ['production migration targets', 'untrusted interpretation boundary', 'two-tenant identical-key isolation', 'restart replay changed:false', 'trusted provider-fact validation', 'field/child provenance reconstruction', 'non-satisfaction criterion truth', 'revision-serialized admission', 'admission Review separation', 'composite SUPERSEDE plus CREATE', 'audited NO_OP', 'stale revision rejection'],
+    checks: ['production migration targets', 'untrusted interpretation boundary', 'canonical current-authored zoning', 'quoted/forwarded/missing-zone rejection', 'bounded participant validation', 'two-tenant identical-key isolation', 'restart replay changed:false', 'trusted provider-fact validation', 'field/child provenance reconstruction', 'criterion-scoped satisfaction truth', 'non-satisfaction criterion truth', 'revision-serialized admission', 'admission Review separation', 'composite SUPERSEDE plus CREATE', 'audited NO_OP', 'stale revision rejection'],
     status: 'PASS'
   }, null, 2));
 } finally {

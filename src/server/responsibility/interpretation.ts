@@ -27,6 +27,18 @@ const STRONG_COMMUNICATED_COMPLETION = new Set([
   'EXPLICIT_COMPLETION'
 ]);
 
+const CANONICAL_SOURCE_ZONES = new Set([
+  'AUTHORED_CURRENT',
+  'QUOTED_HISTORY',
+  'FORWARDED_CONTENT',
+  'SIGNATURE',
+  'DISCLAIMER',
+  'STRUCTURED_METADATA'
+]);
+
+const CURRENT_TURN_AUTHORITY_ZONE = 'AUTHORED_CURRENT';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const FORBIDDEN_AUTHORITY_KEYS = new Set([
   'admission',
   'effects',
@@ -117,13 +129,28 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
     if (unit.terminalSignal && !['NONE', 'COMPLETED', 'DECLINED', 'CANCELLED', 'INVALIDATED'].includes(unit.terminalSignal.kind)) return `semantic unit ${unit.candidateUnitKey} has invalid terminal signal`;
     if (unit.materiality === 'MATERIAL' && !unit.operationalOutcome?.trim()) return `material unit ${unit.candidateUnitKey} needs an operational outcome`;
     if (unit.operationalOutcome && unit.operationalOutcome.trim().length > 2048) return `semantic unit ${unit.candidateUnitKey} outcome is too long`;
-    if (unit.obligationLegs?.some((leg) => !['USER', 'PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'].includes(leg.bearerCandidate) || !leg.id?.trim() || !leg.actionCode?.trim())) return `semantic unit ${unit.candidateUnitKey} has an invalid obligation candidate`;
-    if (unit.expectedEvents?.some((event) => !['PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'].includes(event.actor) || !event.id?.trim() || !event.eventCode?.trim())) return `semantic unit ${unit.candidateUnitKey} has an invalid expected-event candidate`;
+    if (unit.obligationLegs?.some((leg) =>
+      !['USER', 'PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'].includes(leg.bearerCandidate) ||
+      !leg.id?.trim() ||
+      !leg.actionCode?.trim() ||
+      (leg.bearerCandidate !== 'USER' && !UUID.test(leg.participantId ?? ''))
+    )) return `semantic unit ${unit.candidateUnitKey} has an invalid obligation candidate`;
+    if (unit.expectedEvents?.some((event) =>
+      !['PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'].includes(event.actor) ||
+      !event.id?.trim() ||
+      !event.eventCode?.trim() ||
+      (event.actor !== 'EXTERNAL' && !UUID.test(event.participantId ?? ''))
+    )) return `semantic unit ${unit.candidateUnitKey} has an invalid expected-event candidate`;
     const childArrays = [unit.obligationLegs, unit.expectedEvents, unit.temporalFacts, unit.completionCriteria, unit.constraints, unit.pendingProposals, unit.agreedFacts, unit.uncertainties, unit.riskDetails];
     if (childArrays.some((items) => items?.some((item) => item.provenance.length === 0))) return `semantic unit ${unit.candidateUnitKey} has an ungrounded child semantic`;
     if (unit.materiality === 'MATERIAL' && unit.provenance.length === 0) return `material unit ${unit.candidateUnitKey} needs source provenance`;
-    if (unit.materiality === 'MATERIAL' && unitProvenance(unit).every((item) => ['QUOTED', 'FORWARDED'].includes(String(item.sourceLocator?.zone)))) {
-      return 'quoted or forwarded context cannot supply current-turn communicative authority';
+    if (unit.materiality === 'MATERIAL') {
+      const semanticProvenance = unitProvenance(unit);
+      const invalidZone = semanticProvenance.find((item) => !CANONICAL_SOURCE_ZONES.has(String(item.sourceLocator?.zone ?? '')));
+      if (invalidZone) return `material semantic unit ${unit.candidateUnitKey} needs an explicit canonical source zone`;
+      if (!semanticProvenance.some((item) => item.sourceLocator?.zone === CURRENT_TURN_AUTHORITY_ZONE)) {
+        return 'quoted, forwarded, boilerplate, or metadata context cannot supply current-turn communicative authority';
+      }
     }
     if (unit.identityRelation && unit.identityRelation.kind !== 'NEW' && unit.identityRelation.kind !== 'NEW_EPISODE' && !unit.identityRelation.priorOperationalOutcome?.trim()) {
       return `identity relation ${unit.identityRelation?.kind} needs a prior operational outcome, not a Responsibility identifier`;

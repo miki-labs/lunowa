@@ -290,12 +290,6 @@ function closeOpenItems(state: ResponsibilityState, now: Date, reason: string): 
       event.closedAt = iso(now);
     }
   }
-  for (const criterion of state.details.completionCriteria) {
-    if (reason === 'SATISFIED' && criterion.status === 'PENDING') {
-      criterion.status = 'SATISFIED';
-      criterion.satisfiedAt = iso(now);
-    }
-  }
 }
 
 const strongResolutionKinds = new Set([
@@ -336,6 +330,9 @@ function resolveState(
     const evidenceClosesOutcome = evidence?.explicitlySatisfiesOutcome || evidence?.kinds.some((kind) =>
       ['EXPLICIT_COMPLETION', 'COUNTERPART_EXPLICIT_CLOSURE', 'USER_OFF_CHANNEL_ASSERTION'].includes(kind)
     );
+    // Outcome-level completion can close open legs/events, but it is not
+    // criterion-scoped proof. Criteria become SATISFIED only through an
+    // accepted patch that names and timestamps the actually proven items.
     if (evidenceClosesOutcome) closeOpenItems(state, now, 'SATISFIED');
     if (hasOpenClosureRequirements(state)) {
       throw new Error('satisfaction evidence does not cover every open obligation, event, or completion criterion');

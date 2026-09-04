@@ -111,9 +111,14 @@ jobs:
             const files = (await readdir('drizzle/migrations'))
               .filter((name) => name.endsWith('.sql'))
               .sort();
-            if (files.length !== 2 || !files[0]?.startsWith('0000_') || !files[1]?.startsWith('0001_')) {
-              throw new Error(`expected accepted G10 0000 plus G19 0001 migrations, got ${files.join(', ')}`);
+            const g10Files = files.filter((name) => /^0000_.*\.sql$/.test(name));
+            const g19Files = files.filter((name) => /^0001_.*\.sql$/.test(name));
+            if (g10Files.length !== 1 || g19Files.length !== 1) {
+              throw new Error(
+                `expected exactly one accepted G10 0000 and one G19 0001 migration; got ${files.join(', ')}`
+              );
             }
+            const acceptedFiles = [g10Files[0], g19Files[0]];
 
             const apply = async (path) => {
               await client.query('BEGIN');
@@ -126,7 +131,7 @@ jobs:
               }
             };
 
-            await apply(`drizzle/migrations/${files[0]}`);
+            await apply(`drizzle/migrations/${acceptedFiles[0]}`);
             const prior = await client.query(`
               SELECT
                 to_regclass('public."user"') IS NOT NULL AS user_exists,
@@ -136,7 +141,7 @@ jobs:
               throw new Error('accepted G10 prior state was not established before G19 migration');
             }
 
-            await apply(`drizzle/migrations/${files[1]}`);
+            await apply(`drizzle/migrations/${acceptedFiles[1]}`);
 
             const requiredTables = [
               'attachments',
@@ -186,7 +191,7 @@ jobs:
                 'drizzle-kit': packageJson.devDependencies?.['drizzle-kit'],
                 pg: packageJson.dependencies?.pg
               },
-              migrations: files,
+              migrations: acceptedFiles,
               status: 'PASS'
             }, null, 2));
           } finally {

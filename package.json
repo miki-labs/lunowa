@@ -23,6 +23,8 @@
     "test:auth-production": "node --import tsx tests/auth-production-integration.ts",
     "proof:auth-uuid:schema": "auth generate --config proofs/better-auth-uuid/auth.ts --output proofs/better-auth-uuid/auth-schema.ts --yes && drizzle-kit generate --config proofs/better-auth-uuid/drizzle.config.ts",
     "test:auth-uuid": "node --import tsx tests/better-auth-uuid-proof.ts",
+    "proof:responsibility-l2:schema": "drizzle-kit generate --config proofs/responsibility-l2/proof-config.ts && node --import tsx tests/responsibility-l2-schema-check.ts",
+    "test:responsibility-l2": "node --import tsx tests/responsibility-l2-proof.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test e2e/deployed-preview-smoke.spec.ts",

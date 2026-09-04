@@ -81,7 +81,7 @@ attention_mode:
   present vs intentionally deferred
 ```
 
-Exact production enum names/cardinality remain open.
+Exact production runtime enum names/cardinality beyond the frozen DDL v0.4 representation remain open.
 
 ### Compatibility rule for existing detailed oracles
 
@@ -203,7 +203,7 @@ optional independent defer -> LATER
 # 7. CA-05 — historical semantic openness is not live activation
 
 **Severity:** CRITICAL
-**Status:** RESOLVED semantically; physical enum/schema OPEN
+**Status:** RESOLVED semantically; L2 physical enum/schema FROZEN at DDL v0.4; production runtime remains unauthorized
 
 ```text
 appears unresolved in historical evidence
@@ -492,7 +492,7 @@ My Turn / Waiting / Later / Done / Review = projections
 multiple obligation legs allowed
 follow-up = action/reason
 one event may have effects[]
-physical schema still open
+physical schema was still open when ADR 0008 was recorded; DDL v0.4 now freezes the L2 representation
 no generic workflow engine
 ```
 

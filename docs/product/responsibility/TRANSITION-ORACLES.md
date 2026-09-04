@@ -522,7 +522,7 @@ Then the trace branches on explicit user authority.
 
 ### Must hold
 
-This trace exposes a semantic dimension not captured by a naive `OPEN/RESOLVED` pair alone: an apparent historical open loop can exist without being activated as live work. Exact physical representation remains open.
+This trace exposes a semantic dimension not captured by a naive `OPEN/RESOLVED` pair alone: an apparent historical open loop can exist without being activated as live work. Exact physical representation is frozen by DDL v0.4; runtime implementation remains separately unauthorized.
 
 ### Forbidden
 

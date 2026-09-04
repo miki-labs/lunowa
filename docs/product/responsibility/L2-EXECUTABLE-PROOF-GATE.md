@@ -2,22 +2,22 @@
 
 ## Status
 
-**Accepted execution gate for promoting the Responsibility PostgreSQL / Drizzle schema from static candidate to L2 freeze.**
+**Accepted execution gate for promoting the Responsibility PostgreSQL / Drizzle schema from static candidate to L2 freeze; completed with PASS/FREEZE at DDL v0.4.**
 
-This document does not freeze L2 and does not authorize migrations.
+This document defines the evidence gate. The final L2 decision is recorded in [ADR 0010](../../decisions/0010-responsibility-l2-exact-schema-freeze.md); it does not authorize migrations.
 
 Current state:
 
 ```text
 L0 semantic model                         FROZEN v0.1
 L1 logical persistence boundary           FROZEN v0.1
-L2 exact PostgreSQL/Drizzle candidate      v0.4 STATIC REVIEW COMPLETE
-L2 executable proof                        PENDING
-L2 final freeze                            BLOCKED
-L3 migrations/runtime                      NOT AUTHORIZED
+L2 exact PostgreSQL/Drizzle schema         FROZEN — DDL v0.4
+L2 executable proof                        PASS (60/60 acceptance IDs)
+L2 final freeze                            PASS/FREEZE through Issue #15
+L3 migrations/runtime                      NOT AUTHORIZED by this freeze
 ```
 
-The executable proof is split into two independent implementation tasks followed by one independent review task:
+The executable proof was split into two independent implementation tasks followed by one independent review task:
 
 ```text
 Issue #13 — PostgreSQL 18 / Drizzle schema proof
@@ -98,17 +98,17 @@ Track B must also use real PostgreSQL 18.
 
 Production OAuth/provider credentials are forbidden.
 
-## Track C — Issue #15
+## Track C — Issue #15 (completed)
 
 Runs only after A and B have concrete evidence.
 
-Track C is independent review, not builder self-approval.
+Track C was independent review, not builder self-approval.
 
 It decides:
 
 ```text
-PASS -> freeze exact L2 through durable decision/ADR
-FAIL -> keep L2 open and issue the smallest corrective task
+PASS -> freeze exact L2 through durable decision/ADR (completed in ADR 0010)
+FAIL -> keep L2 open and issue the smallest corrective task (not the accepted outcome)
 ```
 
 L3 migration work requires a separate later Issue even after L2 passes.
@@ -389,6 +389,8 @@ Issue #15 may freeze L2 only when all of the following are true:
 12. L3 production migration/runtime work remains a separate task.
 ```
 
+The accepted #13/#14 evidence and the Issue #15 independent audit satisfied these criteria and recorded **PASS / FREEZE** for DDL v0.4. The durable decision is [ADR 0010](../../decisions/0010-responsibility-l2-exact-schema-freeze.md).
+
 If v0.4 must change during proof, call the corrected design v0.5+ and rerun all acceptance IDs affected by the change. Static audit history remains preserved.
 
 ---
@@ -416,12 +418,12 @@ Most failures should be repaired inside L2 without inventing new semantic tables
 
 ---
 
-# 14. Current task routing
+# 14. Historical task routing and provenance
 
-Use:
+The completed evidence was produced through:
 
-- `https://github.com/miki-thecat/lunowa/issues/13` for PostgreSQL/Drizzle executable proof;
-- `https://github.com/miki-thecat/lunowa/issues/14` for Better Auth UUID proof;
-- `https://github.com/miki-thecat/lunowa/issues/15` only after both builders produce concrete evidence.
+- `https://github.com/miki-labs/lunowa/issues/13` for PostgreSQL/Drizzle executable proof;
+- `https://github.com/miki-labs/lunowa/issues/14` for Better Auth UUID proof;
+- `https://github.com/miki-labs/lunowa/issues/15` for the independent combined review after both builders produced concrete evidence.
 
-Codex handoffs should stay short. The Issues and repository docs carry task-specific/durable context.
+The accepted final decision and provenance are recorded in [ADR 0010](../../decisions/0010-responsibility-l2-exact-schema-freeze.md).

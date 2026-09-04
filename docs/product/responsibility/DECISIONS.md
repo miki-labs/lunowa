@@ -5,6 +5,7 @@
 - **FIXED** — normative for v0.1 unless stronger evidence or a scenario counterexample supersedes it.
 - **STRONG DIRECTION** — preferred implementation/modeling direction, but physical representation may still change before schema freeze.
 - **OPEN** — deliberately unresolved.
+- **FROZEN** — the stated versioned representation is accepted for its layer; later changes require an explicit superseding decision.
 - **SUPERSEDED** — prior direction retained for history but no longer current.
 
 ---
@@ -15,7 +16,7 @@
 |---|---|---|
 | Preserve original sent/received communication as immutable evidence | FIXED | Normalization/AI interpretation must never rewrite what was actually communicated. |
 | Message, Conversation, and Responsibility are distinct concepts | FIXED | A thread can contain multiple independent responsibility loops. |
-| `Responsibility` is the canonical semantic concept name | FIXED | Waiting periods and other-party obligations are still part of the same loop; physical entity name remains open. |
+| `Responsibility` is the canonical semantic concept name | FIXED | Waiting periods and other-party obligations are still part of the same loop; DDL v0.4 uses Responsibility-owned physical tables. |
 | Responsibility identity follows the smallest communication-bounded operational outcome with coherent closure | FIXED | Prevents both message-level fragmentation and giant project-sized responsibilities. |
 | Communication-act detection does not automatically create a Responsibility | FIXED | Courtesy, FYI, reported requests, and irrelevant third-party acts would otherwise create false tasks. |
 | Admission has `TRACK / DO_NOT_TRACK / NEEDS_REVIEW` semantics | FIXED | Allows abstention and product relevance to be explicit. |
@@ -91,10 +92,10 @@
 
 | Decision | Status | Notes |
 |---|---|---|
-| Physical `ActionItem` entity should eventually be renamed to `Responsibility` or equivalent | STRONG DIRECTION | Semantics fit better; exact physical naming should be chosen during schema design, not kept by inertia. |
-| Physical persistence should implement the fixed orthogonal semantic dimensions rather than the existing single lifecycle enum | STRONG DIRECTION | Exact tables/columns/enums remain open even though the semantic separation is fixed. |
-| Replace `active + state + completed_at` with a less contradictory resolution/activation/attention model | STRONG DIRECTION | Exact fields/enums not frozen. |
-| Persist surfaced admission-level Review as a narrow accepted pre-Responsibility artifact rather than a fake Responsibility | STRONG DIRECTION | Batch 3 demonstrates a real product/domain boundary; exact table name/shape still belongs to schema-freeze review. |
+| Physical `ActionItem` entity should eventually be renamed to `Responsibility` or equivalent | STRONG DIRECTION | DDL v0.4 uses Responsibility-owned physical tables; production implementation remains a separate L3 task. |
+| Physical persistence should implement the fixed orthogonal semantic dimensions rather than the existing single lifecycle enum | STRONG DIRECTION | DDL v0.4 freezes the exact representation while preserving the fixed semantic separation. |
+| Replace `active + state + completed_at` with a less contradictory resolution/activation/attention model | STRONG DIRECTION | DDL v0.4 defines the accepted fields/checks; runtime activation remains separate. |
+| Persist surfaced admission-level Review as a narrow accepted pre-Responsibility artifact rather than a fake Responsibility | STRONG DIRECTION | Batch 3 demonstrates the product/domain boundary; DDL v0.4 freezes its exact representation. |
 | Current explicit field-authority decisions should be directly queryable | STRONG DIRECTION | Prevents stale AI or unrelated evidence from silently overriding user-resolved fields; exact physical representation remains under audit. |
 | Maintain pending proposals and agreed facts separately | STRONG DIRECTION | Necessary for scheduling/negotiation; physical representation remains open. |
 | Use selective extra inference/validation for ambiguous or high-risk cases rather than default multi-run inference | STRONG DIRECTION | Balances cost, latency, and stability. |
@@ -103,12 +104,12 @@
 
 ---
 
-## Open questions
+## Open questions / frozen exact representation
 
-| Question | Status | Why open |
+| Question | Status | Why open / basis |
 |---|---|---|
-| Exact physical schema for Responsibility / obligation legs / expected events / completion criteria / admission review | OPEN | Scenario/transition semantics are clearer than the minimal physical representation. |
-| Exact enum names for resolution status, live-tracking activation, attention, obligation status/actionability | OPEN | Semantics are fixed; naming/cardinality are not. |
+| Exact physical schema for Responsibility / obligation legs / expected events / completion criteria / admission review | FROZEN | DDL v0.4 is the exact L2 authority; see ADR 0010. |
+| Exact enum/check representation for resolution status, live-tracking activation, attention, obligation status/actionability | FROZEN | DDL v0.4 records the accepted physical representation; broader runtime registries remain implementation concerns. |
 | Exact communication-act subtypes/modality enum | OPEN | Avoid taxonomy explosion before evidence. |
 | Exact obligation-strength enum | OPEN | Dimension is required; labels need scenario validation. |
 | Cross-thread Responsibility identity/continuation | OPEN | False merge and complexity may outweigh benefit in MVP. |
@@ -170,6 +171,10 @@ CONSISTENCY-AUDIT.md
 PHYSICAL-MODEL-DESIGN.md
 PHYSICAL-MODEL-AUDIT.md
 PHYSICAL-MODEL-AUDIT-BATCH-3.md
+PHYSICAL-SCHEMA-FREEZE-REVIEW.md
+POSTGRESQL-DRIZZLE-DDL-DESIGN.md
+L2-EXECUTABLE-PROOF-GATE.md
+ADR 0010 — Responsibility L2 exact schema freeze
 ```
 
 Coverage mapping is design-complete for all mandatory rule/contrast/interaction/mutant/metamorphic/high-harm/ambiguity/transition inventories. Detailed Tier-0 expansion is currently 28/44. This is not implementation or pass evidence.
@@ -183,12 +188,6 @@ docs/product/CONTRACTS.md
 docs/design/INTERACTIONS.md
 ```
 
-The remaining pre-schema work is to:
-
-- expand the remaining schema-falsifier Tier-0 cases into full layered oracles;
-- normalize legacy oracle aliases/errata into executable fixtures;
-- pressure-test the current hybrid Responsibility aggregate plus narrow pre-admission Review boundary;
-- perform a schema-freeze review that maps every proposed persisted structure to concrete oracle/query/invariant pressure;
-- only then write Drizzle/PostgreSQL migrations.
+The L2 pre-schema work produced DDL v0.4 and the independent executable PASS/FREEZE recorded in ADR 0010. Remaining implementation work is separately authorized L3 production ownership/topology, migration, and runtime activation; proof fixtures do not substitute for those production tasks.
 
 Any scenario or production evidence that breaks a FIXED principle must trigger an explicit versioned decision review rather than an ad-hoc exception.

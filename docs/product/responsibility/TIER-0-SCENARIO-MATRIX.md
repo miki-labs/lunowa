@@ -346,4 +346,4 @@ The base-oracle expansion gate is complete. Remaining promotion work is:
 
 Tier 0 remains intentionally **44 base cases, not 40**.
 
-All 44 are now fully layered at the specification level. The next responsibility-persistence design step is governed by `PHYSICAL-SCHEMA-FREEZE-REVIEW.md`: the L1 logical persistence boundary is frozen, while exact PostgreSQL/Drizzle DDL remains open pending an L2 design/review.
+All 44 are now fully layered at the specification level. The responsibility-persistence design step was governed by `PHYSICAL-SCHEMA-FREEZE-REVIEW.md`: the L1 logical persistence boundary is frozen, and the exact PostgreSQL/Drizzle DDL is now frozen at DDL v0.4 after the independent executable-proof review. Production migration/runtime remains separately unauthorized.

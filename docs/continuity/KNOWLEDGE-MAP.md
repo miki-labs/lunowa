@@ -14,7 +14,7 @@ current main / implementation frontier / blocker / current PR・CIは `CURRENT.m
 | UI/UXのcanonical behavior | `docs/design/DESIGN.md`, `docs/design/INTERACTIONS.md`, `docs/design/RESPONSIVE.md` | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | runtime UIはrendered/browser evidenceも確認 |
 | v1 UI implementation contract | `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md` | design trio + Golden Scenarios | accepted contract。current task statusはlive Issue/PRで確認 |
 | visual direction | `docs/design/references/README.md` + five active references | textual Product/UI authority | imageはtextual semanticsをoverrideしない |
-| Responsibility semantics / eval / persistence proof | `docs/product/responsibility/` | ADR 0008/0009, executable evidence | static review != executable proof |
+| Responsibility semantics / eval / persistence proof | `docs/product/responsibility/` | ADR 0008/0009/0010, executable evidence | static review != executable proof; DDL v0.4 L2 freeze is recorded in ADR 0010 |
 | architecture / data / module contract | `docs/product/ARCHITECTURE.md`, `docs/product/DATA-MODEL.md`, `docs/product/CONTRACTS.md` | ADRs, implementation evidence | executable evidenceでstale intentが判明したらreconcile |
 | accepted technology / hosting choice | `docs/product/TECH-STACK.md` | official vendor docs | volatile factsはactivation時に再確認 |
 | high-level implementation sequence | `docs/product/IMPLEMENTATION-PLAN.md` | `CURRENT.md` | overviewのみ |

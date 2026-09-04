@@ -248,11 +248,13 @@ Acceptance: generated schema/catalog proves UUID; local user/session/account rel
 
 Class: `SERIAL_GATE`; existing Issue #15.
 
+Status: **COMPLETE — PASS/FREEZE at DDL v0.4**, recorded in `docs/decisions/0010-responsibility-l2-exact-schema-freeze.md`.
+
 Depends: concrete final P13 + P14 evidence.
 
 Purpose/scope: independent full 01–60 audit of generated SQL/real PostgreSQL/concurrency/UUID evidence and current external prerequisite coverage.
 
-Acceptance: explicit `PASS/FREEZE` or `FAIL/REVISE`; only PASS/FREEZE unblocks production Responsibility migration.
+Acceptance: explicit `PASS/FREEZE` or `FAIL/REVISE`; PASS/FREEZE establishes the exact L2 authority, but production Responsibility migration still requires a separate explicitly authorized L3 task.
 
 ## G10 — Application session/auth production activation
 

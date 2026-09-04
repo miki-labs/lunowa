@@ -266,7 +266,7 @@ async function seed(pool: Pool, revision = 1): Promise<Fixtures> {
     [ids.message1, ids.message2, ids.account1, ids.account2, ids.conversation1, ids.conversation2, revision, revision, "message-one", "message-two"],
   );
   await pool.query(
-    "INSERT INTO p13_fixture_ai_interpretation_runs (id, user_id, basis_evidence_revision, context_manifest) VALUES ($1, $3, $5, $7), ($2, $4, $5, $8)",
+    "INSERT INTO p13_fixture_ai_interpretation_runs (id, user_id, basis_evidence_revision, context_manifest) VALUES ($1, $3, $5, $6), ($2, $4, $5, $7)",
     [ids.run1, ids.run2, ids.user1, ids.user2, revision, JSON.stringify({ messageIds: [ids.message1] }), JSON.stringify({ messageIds: [ids.message2] })],
   );
   return ids;

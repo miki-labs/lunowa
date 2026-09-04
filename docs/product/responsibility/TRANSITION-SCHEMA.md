@@ -189,7 +189,7 @@ safety/actionability
 projection
 ```
 
-Exact physical enum/table representation remains open.
+Exact physical enum/table representation is frozen by DDL v0.4; this semantic trace contract does not authorize production migration/runtime implementation.
 
 Existing transition notes that use legacy `tracking_status: OPEN/RESOLVED` should be interpreted as resolution-status shorthand only.
 

@@ -2,28 +2,28 @@
 
 ## Status
 
-**Accepted Responsibility v0.1 semantic baseline and accepted v0.1 logical persistence boundary. Exact L2 DDL is a statically reviewed v0.4 candidate awaiting executable proof.**
+**Accepted Responsibility v0.1 semantic baseline, L1 logical persistence boundary, and L2 exact PostgreSQL/Drizzle schema frozen at DDL v0.4.**
 
 Freeze/proof levels:
 
 ```text
 L0 semantic model                         FROZEN v0.1 baseline
 L1 logical persistence boundary           FROZEN v0.1 baseline
-L2 exact PostgreSQL/Drizzle DDL            v0.4 STATIC REVIEW COMPLETE
-L2 executable proof                        PENDING
-L2 final freeze                            BLOCKED
-L3 migrations/runtime                     NOT AUTHORIZED
+L2 exact PostgreSQL/Drizzle schema         FROZEN — DDL v0.4
+L2 executable proof                        PASS (60/60 acceptance IDs)
+L2 final freeze                            PASS/FREEZE through Issue #15
+L3 migrations/runtime                      NOT AUTHORIZED by this freeze
 ```
 
 `FROZEN` means “versioned baseline that requires an explicit superseding decision if stronger evidence breaks it.” It does not mean immutable forever.
 
-The L2 v0.4 label means only that three static adversarial audits have no known CRITICAL blocker. It is **not migration authority**.
+The DDL v0.4 freeze is exact-schema authority earned through the accepted executable proof and independent Issue #15 audit. It is **not migration authority**.
 
 ---
 
 ## Scope and precedence
 
-This directory is normative for Responsibility semantics, annotation/evaluation behavior, the L1 persistence-boundary decision, and the current L2 proof contract.
+This directory is normative for Responsibility semantics, annotation/evaluation behavior, the frozen L1 persistence boundary, the frozen L2 schema, and its proof contract.
 
 Broader documents such as:
 
@@ -39,7 +39,7 @@ have been reconciled against v0.1. If a future contradiction appears, treat it a
 This directory still does **not** authorize:
 
 - production migrations;
-- runtime reducer implementation merely from the DDL candidate;
+- runtime reducer implementation merely from the frozen DDL;
 - provider/AI activation;
 - cross-thread Responsibility merging;
 - recurring Responsibility machinery;
@@ -78,12 +78,13 @@ The following also remain implementation/runtime decisions rather than frozen gl
 - `PHYSICAL-MODEL-AUDIT.md` — first adversarial physical-model pass.
 - `PHYSICAL-MODEL-AUDIT-BATCH-3.md` — second pass; adds pre-admission Review and narrows several structures.
 - `PHYSICAL-MODEL-AUDIT-BATCH-4.md` — final Tier-0 falsifier pass; finds no new aggregate/table requirement and adds expected-event/provenance metadata pressure.
-- `PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — authoritative L1 freeze decision and acceptance matrix.
-- `POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact L2 PostgreSQL/Drizzle candidate, currently v0.4 after three static adversarial audits.
+- `PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — authoritative L1 freeze decision, final L2 decision, and acceptance matrix.
+- `POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — exact L2 PostgreSQL/Drizzle schema authority, frozen at DDL v0.4.
 - `POSTGRESQL-DRIZZLE-DDL-AUDIT.md` — first exact-DDL adversarial audit; initial candidate failed and was corrected.
 - `POSTGRESQL-DRIZZLE-DDL-AUDIT-PASS-2.md` — second exact-DDL pass, including CREATE freshness / Conversation evidence-revision pressure.
 - `POSTGRESQL-DRIZZLE-DDL-AUDIT-PASS-3.md` — third exact-DDL pass, including tenant/AI-run/reference hardening.
-- `L2-EXECUTABLE-PROOF-GATE.md` — authoritative execution/evidence gate before exact L2 may be frozen.
+- `L2-EXECUTABLE-PROOF-GATE.md` — authoritative execution/evidence gate and completed proof record for exact L2.
+- `../../decisions/0010-responsibility-l2-exact-schema-freeze.md` — durable L2 PASS/FREEZE decision and provenance.
 
 ---
 
@@ -239,9 +240,9 @@ Normalization is added later only when real query/FK/concurrency/authorization/s
 
 ---
 
-## Current L2 candidate
+## Current L2 frozen schema
 
-The v0.4 exact candidate uses exactly eight Responsibility-owned tables:
+The frozen v0.4 exact schema uses exactly eight Responsibility-owned tables:
 
 ```text
 responsibilities
@@ -268,13 +269,13 @@ AdmissionReview prevents same-revision stale resurrection
 semantic_details is typed/versioned and runtime validated
 ```
 
-The actual Drizzle-generated SQL must prove these statements rather than being assumed from TypeScript definitions.
+The accepted Drizzle-generated SQL and PostgreSQL evidence prove these statements rather than relying on TypeScript definitions.
 
 ---
 
-## L2 executable proof routing
+## L2 executable proof and freeze record
 
-Current tasks:
+The proof and independent review are complete:
 
 ```text
 Issue #13
@@ -286,7 +287,7 @@ Issue #14
   acceptance IDs 47–49
 
 Issue #15
-  independent combined review and L2 PASS/FREEZE vs FAIL/REVISE decision
+  independent combined review — PASS/FREEZE recorded in ADR 0010
 ```
 
 Authoritative execution/evidence rules live in `L2-EXECUTABLE-PROOF-GATE.md`.
@@ -297,28 +298,17 @@ No test may be considered PASS from mocks or builder summary alone when the gate
 
 ## Current implementation gate
 
-The next authorized work is **executable proof**, not more speculative schema-table invention and not production migration.
+The L2 proof/freeze gate is complete. The next production work, when separately authorized, is an L3 implementation task; the freeze itself does not authorize migrations or runtime.
 
-Allowed now:
-
-```text
-isolated Drizzle/PostgreSQL schema spike
-real PostgreSQL 18 acceptance tests
-concurrency/idempotency/delete tests
-Better Auth UUID compatibility spike
-generated SQL inspection
-independent result review
-```
-
-Not authorized yet:
+The freeze leaves these implementation boundaries in force:
 
 ```text
-production Drizzle migrations
-production Responsibility reducer/persistence implementation
-schema freeze based only on static reasoning
+production ownership/prerequisite tables must be supplied by their owning tasks
+external FK/index contracts must be preserved in production topology
+production migration/runtime requires separate explicit L3 authorization
 ```
 
-L2 may be frozen only after `L2-EXECUTABLE-PROOF-GATE.md` passes through Issue #15.
+The exact schema must not be reopened by proof-fixture topology or implementation convenience. A later exact-DDL defect requires an explicit versioned decision and appropriate re-proof.
 
 ---
 

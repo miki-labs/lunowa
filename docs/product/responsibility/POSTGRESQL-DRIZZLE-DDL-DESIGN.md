@@ -2,15 +2,15 @@
 
 ## Status
 
-**Corrected L2 candidate after three static adversarial audits. Static structural review is complete; migration authority remains BLOCKED until the concrete Drizzle-generated schema is instantiated against PostgreSQL 18 and the executable L2 acceptance suite passes.**
+**Accepted exact L2 schema after the independent Issue #15 audit. DDL v0.4 is FROZEN; production migration/runtime authority remains NOT AUTHORIZED by this freeze.**
 
 Freeze levels:
 
 ```text
-L0 semantic truth                           FROZEN v0.1
+L0 semantic model                           FROZEN v0.1 baseline
 L1 logical persistence boundary             FROZEN v0.1
-L2 exact PostgreSQL/Drizzle representation  CANDIDATE v0.4 — STATIC REVIEW COMPLETE
-L3 migrations/runtime                       NOT AUTHORIZED
+L2 exact PostgreSQL/Drizzle schema          FROZEN — DDL v0.4
+L3 migrations/runtime                       NOT AUTHORIZED by this freeze
 ```
 
 v0.4 incorporates all required findings from:
@@ -43,7 +43,7 @@ PostgreSQL—not TypeScript inference—is the authority for database constraint
 
 ## 1.1 Better Auth UUID gate
 
-All Phase-2 ownership IDs in this candidate use PostgreSQL `uuid`.
+All Phase-2 ownership IDs in this frozen DDL v0.4 representation use PostgreSQL `uuid`.
 
 Before any migration is accepted, verify the current Better Auth + PostgreSQL/Drizzle configuration with its supported UUID ID strategy so the actual application-user primary key is PostgreSQL `uuid`.
 
@@ -1361,7 +1361,7 @@ Generated SQL must be reviewed against this contract. Type hints / `$type` are n
 
 # 18. L2 executable acceptance suite
 
-Before L2 freeze/migration authorization, instantiate the Drizzle-generated schema on temporary PostgreSQL 18 and prove:
+The L2 proof instantiated the Drizzle-generated schema on temporary PostgreSQL 18 and proved:
 
 ## Parent/state
 
@@ -1528,13 +1528,12 @@ They are bounded/tested in trusted code. Freezing their complete vocabulary befo
 # 21. Static-review verdict
 
 ```text
-L0 semantics                         FROZEN v0.1
-L1 logical persistence boundary      FROZEN v0.1
-L2 exact DDL candidate               v0.4 STATIC REVIEW COMPLETE
-Known static CRITICAL blockers       NONE
-PostgreSQL/Drizzle executable proof  PENDING
-L2 final freeze                      NOT YET
-L3 migrations/runtime                NOT AUTHORIZED
+L0 semantic model                    FROZEN v0.1 baseline
+L1 logical persistence boundary      FROZEN v0.1 baseline
+L2 exact PostgreSQL/Drizzle schema   FROZEN — DDL v0.4
+L2 executable proof                  PASS (60/60 acceptance IDs)
+L2 final freeze                      PASS/FREEZE through Issue #15
+L3 migrations/runtime                NOT AUTHORIZED by this freeze
 ```
 
-No further table invention is justified by the current corpus/static audit. The next work is executable proof: generate the temporary Drizzle/PostgreSQL schema, inspect generated SQL, run the 60-item acceptance matrix, and only then decide whether exact L2 earns an ADR/freeze.
+No further table invention is justified by the current corpus/static or executable audit. DDL v0.4 is the exact-schema authority; production migration and runtime work remain a separate explicitly authorized L3 task.

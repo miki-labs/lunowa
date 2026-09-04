@@ -36,17 +36,17 @@ Issue #55 is **complete**, not the current execution gate.
 
 ## 3. Responsibility authority
 
-`responsibility/` is primary authority for canonical Responsibility semantics, evals, L1 persistence boundary, current exact L2 candidate and executable proof gate.
+`responsibility/` is primary authority for canonical Responsibility semantics, evals, the frozen L1 persistence boundary, frozen exact L2 schema, and executable proof record.
 
 Current freeze state:
 
 ```text
 L0 semantics                              FROZEN v0.1
 L1 logical persistence                    FROZEN v0.1
-L2 PostgreSQL/Drizzle candidate            v0.4 STATIC REVIEW COMPLETE
-L2 executable proof                       PENDING (#13/#14)
-L2 final freeze                           BLOCKED (#15)
-L3 production Responsibility runtime      NOT AUTHORIZED
+L2 PostgreSQL/Drizzle schema              FROZEN — DDL v0.4
+L2 executable proof                       PASS (60/60 acceptance IDs)
+L2 final freeze                           PASS/FREEZE through Issue #15
+L3 production Responsibility runtime      NOT AUTHORIZED by this freeze
 ```
 
 Product/UI vocabulary does not create new persistence aggregates/enums/permissions.
@@ -89,10 +89,10 @@ Completed gates:
 #61 / PR #76  minimal five-reference visual freeze
 ```
 
-Current runtime gate:
+Completed framework/security gate:
 
 ```text
-#60 / G00 framework security baseline
+#60 / G00 framework security baseline — COMPLETE
 -> clean frozen install
 -> pnpm verify + Playwright smoke
 -> exact-head GitHub CI
@@ -100,12 +100,13 @@ Current runtime gate:
 -> merge only on PASS
 ```
 
-After G00 PASS/merge, the first safe parallel execution wave is:
+Responsibility L2 proof/freeze state:
 
 ```text
-P13 / #13  Responsibility PostgreSQL/Drizzle executable proof
-P14 / #14  Better Auth UUID persistence proof
-G11 / #63  structural UI/read-model/accessibility harness
+P13 / #13  PASS — PostgreSQL/Drizzle executable proof
+P14 / #14  PASS — Better Auth UUID persistence proof
+P15 / #15  PASS/FREEZE — DDL v0.4 exact schema
+L3          separate authorization still required
 ```
 
 Parallel execution does not imply parallel merge. Root dependency/lock assets remain serialized when touched concurrently.
@@ -118,11 +119,11 @@ The core implementation doctrine is:
 
 ## 6. Persistence / proof routing
 
-Current bounded proof gates:
+Completed Responsibility proof/freeze chain:
 
-- Issue #13 — real PostgreSQL 18 / Drizzle L2 executable proof;
-- Issue #14 — Better Auth UUID persistence proof;
-- Issue #15 — independent combined review/freeze.
+- Issue #13 — real PostgreSQL 18 / Drizzle L2 executable proof, 57/57 assigned acceptance IDs PASS;
+- Issue #14 — Better Auth UUID persistence proof, 3/3 assigned acceptance IDs PASS;
+- Issue #15 — independent combined review/freeze, PASS/FREEZE recorded in `docs/decisions/0010-responsibility-l2-exact-schema-freeze.md`.
 
 Current production dependency principles:
 
@@ -130,7 +131,7 @@ Current production dependency principles:
 - every frozen L2 external FK target needs explicit production ownership/order;
 - `ParticipantIdentity` belongs to the provider-neutral evidence foundation, not CRM scope;
 - minimal `AIInterpretationRun` production prerequisite may exist before AI runtime; table existence != model authority;
-- production Responsibility tables remain blocked until P15 PASS/FREEZE.
+- production Responsibility tables/runtime remain unauthorized by this L2 freeze and require a separate L3 implementation task.
 
 Exact writer/order authority belongs to `IMPLEMENTATION-GRAPH.md`.
 

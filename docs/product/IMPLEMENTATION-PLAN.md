@@ -134,9 +134,9 @@ This preserves useful parallelism without treating worktree/runtime isolation as
 
 ## 7. P15 — Responsibility L2 independent freeze
 
-After P13 + P14 concrete evidence.
+**COMPLETE — PASS/FREEZE at DDL v0.4 after the independent cumulative audit recorded in ADR 0010.**
 
-No production Responsibility-owned migrations/runtime before explicit P15 `PASS/FREEZE`.
+P13 + P14 concrete evidence was independently reviewed. The result freezes the exact L2 schema but does not authorize production Responsibility-owned migrations/runtime; those remain a separate explicitly authorized L3 task.
 
 ## 8. G10 — application session/auth activation
 

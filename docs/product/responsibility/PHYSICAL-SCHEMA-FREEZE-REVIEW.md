@@ -2,7 +2,7 @@
 
 ## Status
 
-**PASS — freeze the logical persistence boundary; DO NOT freeze exact PostgreSQL/Drizzle DDL yet.**
+**L1 PASS — the logical persistence boundary was frozen by this review. The later independent executable audit also earned L2 PASS/FREEZE at DDL v0.4; production migration/runtime remains unauthorized.**
 
 This review is the decision point after:
 
@@ -32,13 +32,13 @@ L2 — exact physical DDL / enum / indexes / JSON schema
 L3 — migrations + production implementation
 ```
 
-Current result:
+L1 result at the time of this review, with the current L2 disposition shown for navigation:
 
 ```text
 L0 semantic model                         FROZEN v0.1 baseline
 L1 logical persistence boundary           FROZEN v0.1 baseline
-L2 exact DDL                              OPEN
-L3 migrations/runtime                     NOT STARTED
+L2 exact PostgreSQL/Drizzle schema        FROZEN — DDL v0.4
+L3 migrations/runtime                     NOT AUTHORIZED by this freeze
 ```
 
 A stronger canonical/production counterexample may still supersede L0/L1 through an explicit versioned decision.
@@ -386,15 +386,15 @@ AIInterpretationRun as durable Review product truth
 
 ---
 
-# 8. Critical L2 requirements before exact DDL approval
+# 8. L2 exact-DDL requirements carried forward from the L1 review
 
-Although L1 is frozen, exact DDL is not approved until a concrete proposal demonstrates these constraints.
+Although L1 is frozen, the exact DDL required an independent proof of these constraints. The DDL v0.4 proof and final decision are recorded in §14.
 
 ## 8.1 Idempotency
 
 Where stable source identity exists, duplicate delivery must not duplicate semantic effects.
 
-Candidate enforcement must be mechanical, for example via a uniqueness boundary equivalent to:
+Enforcement must be mechanical, for example via a uniqueness boundary equivalent to:
 
 ```text
 (responsibility_id, source_event_key, effect_discriminator)
@@ -421,7 +421,7 @@ A matching revision is necessary, not sufficient, for AI result application.
 
 At most one accepted active decision per supported semantic field/Responsibility should exist unless the field explicitly supports a conflict set.
 
-Exact DB/index strategy is L2.
+The exact DB/index strategy is fixed by DDL v0.4 and the executable proof.
 
 ## 8.4 Temporal conflict support
 
@@ -496,7 +496,7 @@ explicit send/reply account identity
 | vague/missing/user-dependent admission | AdmissionReview | T0-041/T0-043/T0-044 | PASS |
 | sarcasm/non-literal material ambiguity | AdmissionReview | T0-042 | PASS |
 | stale AI | evidence revision + FieldDecision/transaction rules | T15 | PASS at L1 |
-| duplicate source application | DomainEvent/idempotency boundary | V16 | PASS at L1; L2 constraint pending |
+| duplicate source application | DomainEvent/idempotency boundary | V16 | PASS at L1; PASS at L2 through the Issue #13 executable proof |
 | supersession composite effect | per-aggregate DomainEvent + correlation | T12 | PASS |
 | moving event-relative time | TemporalFact anchor/provenance | T19 | PASS |
 
@@ -579,17 +579,58 @@ That step should:
 7. independently review the proposed DDL before migration code
 ```
 
-Do not create migrations until that L2 review passes.
+The L2 review has passed. This does not authorize production migrations; those remain a separate L3 task.
 
 ---
 
-# 13. Final verdict
+# 13. L1 final verdict
 
 ```text
 Responsibility semantics                 FROZEN v0.1 baseline
 Logical persistence boundary             FROZEN v0.1 baseline
-Exact PostgreSQL/Drizzle schema          NOT FROZEN
-Migrations                               NOT AUTHORIZED YET
+Exact PostgreSQL/Drizzle schema          L2 decision deferred to the executable-proof gate below
+Migrations/runtime                        NOT AUTHORIZED
 ```
 
-The v0.1 persistence architecture has now earned a freeze at the logical-boundary level through scenario/transition falsification rather than by design preference.
+The v0.1 persistence architecture earned its L1 freeze through scenario/transition falsification rather than by design preference. The exact L2 decision was intentionally left to the independent executable-proof gate, not decided by this original L1 review.
+
+# 14. Final L2 executable-proof decision — DDL v0.4
+
+The original L1 review above and the later L2 decision are separate freeze levels. Following the final index-order correction in Issue #102 / PR #103, Issue #15 independently reviewed the complete cumulative evidence from Issues #13 and #14 and recorded **PASS / FREEZE** for the exact Responsibility PostgreSQL/Drizzle schema at **DDL v0.4**.
+
+Accepted evidence chain:
+
+| Evidence | Accepted result |
+| --- | --- |
+| [Issue #13](https://github.com/miki-labs/lunowa/issues/13) / [PR #100](https://github.com/miki-labs/lunowa/pull/100), final accepted head `b8ec0e28780e1439eb1152dc80db8933f16969f0`, merge `c91ae14882f4be63fde726d0b7c5f723fb623aa4` | Real PostgreSQL 18.6 P13 proof; acceptance IDs 01–46 and 50–60: 57/57 PASS, including exact Drizzle/generated-SQL, external-FK prerequisite, concurrency/idempotency/privacy/tenant evidence. |
+| [Issue #14](https://github.com/miki-labs/lunowa/issues/14) / [PR #99](https://github.com/miki-labs/lunowa/pull/99), final accepted head `5e96f4334b07a7274d03f93a237eb813c35b58a8`, merge `a0fbf2619fa00fac28a141392983a9dd32e59f1a` | Better Auth 1.7.2 UUID/PostgreSQL proof; acceptance IDs 47–49: 3/3 PASS. |
+| [Issue #102](https://github.com/miki-labs/lunowa/issues/102) / [PR #103](https://github.com/miki-labs/lunowa/pull/103), final accepted head `4ae650199fb66d9d309a67fcfc7185ec1ca9bff8`, merge `a589179a04f9b2020e9063e2be238b81844ca102` | All seven canonical mixed-order timestamp indexes retain timestamp `DESC`; the deterministic oracle verifies all 27 canonical Responsibility indexes for table, uniqueness, ordered expressions/directions, and predicates. Exact-head `P13 Responsibility L2 PostgreSQL Proof` run `33852869699` PASS on PostgreSQL 18.6; ordinary CI PASS. |
+| [Issue #15](https://github.com/miki-labs/lunowa/issues/15) independent audit | Reviewed the cumulative #13 + #14 candidates/evidence, identified the seven lost `DESC` directions as the material exact-DDL blocker, and accepted #102/#103 as resolving it without reopening L0/L1 semantics. |
+
+Pinned proof basis:
+
+```text
+PostgreSQL 18.6 (server_version_num=180006)
+Better Auth 1.7.2
+auth CLI 1.7.2
+drizzle-orm 0.45.2
+drizzle-kit 0.31.10
+pg 8.23.0
+```
+
+The resulting levels are:
+
+```text
+L0 semantic model                         FROZEN v0.1 baseline
+L1 logical persistence boundary           FROZEN v0.1 baseline
+L2 exact PostgreSQL/Drizzle schema        FROZEN — DDL v0.4
+L3 migrations/runtime                     NOT AUTHORIZED by this freeze
+```
+
+The exact table/column/FK/check/unique/index/partial-index/typed-details representation in `POSTGRESQL-DRIZZLE-DDL-DESIGN.md` is now the versioned physical-schema authority for the Responsibility v0.1 implementation basis. This decision does not make P13 proof fixtures production topology: `p13_fixture_*` and the P14 proof-only domain table are evidence scaffolding only. Later production ownership/prerequisite tasks must supply real FK targets and satisfy the proven external-FK/index contracts.
+
+The seven mixed-order indexes remain canonical with timestamp keys `DESC`; PR #103 aligned generated Drizzle SQL with that authority. Drizzle 0.45.2 emits `DESC NULLS LAST` for `.desc()`. Under the accepted constraints this does not change the frozen semantics: six timestamp keys are `NOT NULL`, and `responsibilities_live_done_user_idx` is partial on `resolution_status='RESOLVED'`, whose consistency constraint requires `resolved_at IS NOT NULL`.
+
+Optional `AIInterpretationRun` composite tenant links retain the reviewed fallback of `ON DELETE NO ACTION` plus explicit retention/privacy cleanup. The pinned Drizzle representation does not cleanly emit PostgreSQL column-list `SET NULL` without risking nulling `user_id`; this is an accepted v0.4 implementation reconciliation, not a new semantic decision.
+
+This final L2 decision does not activate Responsibility production migrations, runtime behavior, AI calls, or any other L3 implementation. It does not reopen ADR 0008 or ADR 0009. The durable rationale and provenance are also recorded in [ADR 0010](../../decisions/0010-responsibility-l2-exact-schema-freeze.md).

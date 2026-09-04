@@ -6,7 +6,7 @@
 
 ## Checkpoint metadata
 
-- Last reconciled: **2026-09-03**
+- Last reconciled: **2026-09-04**
 - Last accepted **Product/runtime capability boundary**: `6a71b79abdc22ea7bc68deafdc925d51b32a8a1b`（G11）
 - Latest accepted **preview/developer-visibility boundary** at reconcile: Issue #91 / PR #92, merge `5e390371c7ad8f5fe829b627051a169c8ee25e99`
 - Framework/security baseline: Next.js **16.3.3**（G00）
@@ -63,7 +63,7 @@ G11/preview foundationは**本物のGmail/DB/domain runtimeを接続したとい
 | Evidence Foundation / G19 | ✅ | ❌ | ❌ | ❌ | P13 #13 + G10待ち |
 | Gmail Sync / G20 | ✅ | ❌ | ❌ | ❌ | real Gmail OAuth/watch/history未実装 |
 | Source / Search / G21 | ✅ | 🟡 G11 shellのみ | ❌ | ❌ | structural Source surfaceはあるがreal Source/search未接続 |
-| Responsibility Persistence / G30 | ✅ | ❌ | ❌ | ❌ | P15 freeze + G19待ち |
+| Responsibility Persistence / G30 | ✅ | ❌ | ❌ | ❌ | L2 freeze済み、G19 + separate L3 authorization待ち |
 | Responsibility Reducer / G31 | ✅ | ❌ | ❌ | ❌ | deterministic accepted-state runtime未実装 |
 | Attention / Temporal / G32 | ✅ | ❌ | ❌ | ❌ | durable reconsideration未実装 |
 | Product Surfaces / G40 | ✅ | 🟡 G11 shellのみ | ❌ | ❌ | structural surfacesはあるがreal state未接続 |
@@ -86,19 +86,14 @@ accepted contract
 
 ### Current implementation frontier
 
-**G00 / G11 / preview foundation / execution-control reconciliationは完了しています。** 次の実装frontierはL2 prerequisite proofです。
+**G00 / G11 / preview foundation / execution-control reconciliationは完了しています。** Responsibility L2 executable proof and independent freeze are also complete; production ownership, migration, and runtime activation remain separate L3 work.
 
 1. **P14 / Issue #14 — Better Auth UUID persistence proof**
-   - 2026-09-03にcurrent ACP向けtask contractをfresh化済み。
-   - stale failed PR #86は再利用しない。次はcurrent accepted `main`から`model-fresh`。
-   - trusted `P14 Auth UUID Proof` + `P14 Trusted Evidence Packaging` workflowはaccepted `main`に存在。
-   - current pre-admission vendor basisは Better Auth/CLI 1.7.2、Drizzle ORM 0.45.2、Kit 0.31.10、pg 8.23.0、PostgreSQL 18.6。
+   - accepted: Better Auth 1.7.2 UUID/PostgreSQL proof, acceptance IDs 47–49: 3/3 PASS。
 2. **P13 / Issue #13 — Responsibility PostgreSQL/Drizzle executable proof**
-   - 2026-09-03にcurrent ACP workerとreal-PostgreSQL evidenceの境界をfresh化済み。
-   - P14後に実行し、root dependency/lock refreshを減らす。
+   - accepted: real PostgreSQL 18.6 proof, acceptance IDs 01–46 and 50–60: 57/57 PASS。
 3. **P15 / Issue #15 — independent L2 freeze**
-   - P13/P14両方のfinal concrete evidence後。
-   - builder/model self-approval taskではなく、独立full acceptance audit gate。
+   - accepted: independent full acceptance audit recorded PASS/FREEZE for DDL v0.4。
 
 ### ACP compatibility gate
 
@@ -115,7 +110,7 @@ Issue #95で、pre-created implementation DAG × current ACP code/one-shot contr
 - real DB/browser/Gmail/provider/deployment等は、必要に応じてpublication後のexact-head trusted CI/host/provider evidenceで閉じる;
 - current model routingは Luna-first、security/high-impact external-effectだけSol critical escalation。
 
-**P14 #14は、current main / current Issue contract / blocked_by / vendor checkpoint / trusted external-evidence laneを確認するbounded activation auditにPASSした後だけ`agent:ready`へ進める。**
+**P13 / P14 / P15のaccepted evidenceとDDL v0.4 PASS/FREEZEは[ADR 0010](../decisions/0010-responsibility-l2-exact-schema-freeze.md)に記録済み。L3 production migration/runtimeは、このfreezeだけではauthorizedにならず、別Issueの明示的承認を要します。**
 
 ---
 
@@ -139,10 +134,8 @@ Issue #95で、pre-created implementation DAG × current ACP code/one-shot contr
 
 ### Next
 
-- P14 #14をcurrent mainに対してbounded activation auditし、PASSならfresh `model-fresh`としてready化する。
-- P14 PASS/merge後、P13 #13をcurrent mainへrefreshしてready化する。
-- P13/P14両証拠が揃った後、P15 #15でL2を独立freezeする。
-- G10はP14 PASS後、G19はP13 PASS + G10後に進める。
+- G10/G19/G30は、それぞれのproduction ownership/topology・migration・runtime契約を満たす別の明示的承認タスクとして進める。
+- DDL v0.4のexact-schema authority、proof-only fixture境界、L3 non-authorizationを維持する。
 
 ### Still not real
 
@@ -170,9 +163,9 @@ Lunowa
 │  └─ G40  Product Surfaces
 │
 ├─ Prerequisite proofs
-│  ├─ P14  Better Auth UUID proof     ← current frontier
-│  ├─ P13  PostgreSQL/Drizzle proof   ← その次
-│  └─ P15  L2 independent freeze
+│  ├─ P14  Better Auth UUID proof     ✓ PASS
+│  ├─ P13  PostgreSQL/Drizzle proof   ✓ PASS
+│  └─ P15  L2 independent freeze      ✓ PASS/FREEZE — DDL v0.4
 │
 ├─ Evidence / メールの事実
 │  ├─ G19  Evidence Foundation

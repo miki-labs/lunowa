@@ -2,9 +2,9 @@
 
 ## Status
 
-**Accepted conceptual model, reconciled with Responsibility v0.1 and the frozen L1 logical persistence boundary; exact L2 PostgreSQL/Drizzle remains a statically reviewed candidate awaiting executable proof/final freeze.**
+**Accepted conceptual model, reconciled with Responsibility v0.1 and the frozen L1 logical persistence boundary; exact L2 PostgreSQL/Drizzle schema is frozen at DDL v0.4 by ADR 0010.**
 
-This document defines durable data concepts, ownership, relationships, and invariants that should constrain implementation. Table names, child-table choices, SQL types, indexes, ORM syntax, and exact enums may change during schema design as long as the accepted semantics remain intact.
+This document defines durable data concepts, ownership, relationships, and invariants that should constrain implementation. The exact Responsibility physical representation is now governed by frozen DDL v0.4; broader conceptual capabilities below do not authorize production schema or runtime activation.
 
 This is deliberately a **conceptual capability superset**, not implementation authorization. Current Product scope is owned by `PRODUCT.md` / `PRODUCT-CONTENT.md`; current activation, dependency and writer order are owned by `IMPLEMENTATION-GRAPH.md` + live GitHub Issues. A concept appearing below does not require its table/fields to exist in the current one-provider Minimum Complete Delegation Loop.
 
@@ -18,8 +18,9 @@ Responsibility semantics and persistence boundaries are constrained by:
 - `responsibility/SCENARIO-SCHEMA.md`;
 - `responsibility/TRANSITION-SCHEMA.md`;
 - `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md` — authoritative frozen L1 logical persistence boundary;
-- `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — current exact L2 candidate, not production-migration authority;
-- `responsibility/L2-EXECUTABLE-PROOF-GATE.md` — evidence required before final L2 freeze.
+- `responsibility/POSTGRESQL-DRIZZLE-DDL-DESIGN.md` — frozen exact L2 schema authority, not production-migration authority;
+- `responsibility/L2-EXECUTABLE-PROOF-GATE.md` — completed evidence gate for the L2 freeze;
+- `../decisions/0010-responsibility-l2-exact-schema-freeze.md` — durable L2 PASS/FREEZE decision.
 
 Related broader sources:
 
@@ -331,11 +332,11 @@ Responsibility {
 
   operational_outcome
 
-  resolution_status          // semantic dimension; exact enum not frozen
+  resolution_status          // semantic dimension; exact DDL v0.4 check representation is frozen
   resolution_reason?
 
-  live_tracking_state        // semantic dimension; exact enum not frozen
-  attention_mode             // semantic dimension; exact enum not frozen
+  live_tracking_state        // semantic dimension; exact DDL v0.4 check representation is frozen
+  attention_mode             // semantic dimension; exact DDL v0.4 check representation is frozen
 
   risk?
 
@@ -359,7 +360,7 @@ INVALIDATED
 DUPLICATE
 ```
 
-Exact enum names remain open.
+The exact L2 check representation is frozen in DDL v0.4; this conceptual document does not define broader runtime vocabulary.
 
 ### 12.2 Live tracking is separate
 
@@ -466,7 +467,7 @@ CompletionCriterion {
 
 Example: identity-document FRONT + BACK are usually criteria in one Responsibility.
 
-Exact storage representation remains open.
+The exact storage representation is frozen in DDL v0.4; this conceptual document does not restate that authority.
 
 ---
 
@@ -660,7 +661,7 @@ DomainEvent {
 }
 ```
 
-This is conceptual. Exact columns/constraints belong to the current L2 candidate and are not frozen by this document.
+This is conceptual. Exact columns/constraints belong to frozen L2 DDL v0.4 and are not made production migration authority by this document.
 
 Important rules:
 
@@ -1060,8 +1061,8 @@ Use uniqueness constraints, transactions, compare-and-set/versioning, or locking
 
 Before implementing the first real Responsibility schema:
 
-1. start from the frozen L1 boundary in `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`, the current exact L2 candidate, `responsibility/DECISIONS.md`, `CONSISTENCY-AUDIT.md`, canonical scenarios, transition oracles, and the executable proof gate;
-2. preserve the fixed semantic dimensions while proving the smallest relational representation that satisfies required queries/invariants;
+1. start from the frozen L1 boundary in `responsibility/PHYSICAL-SCHEMA-FREEZE-REVIEW.md`, frozen exact L2 DDL v0.4, `responsibility/DECISIONS.md`, `CONSISTENCY-AUDIT.md`, canonical scenarios, transition oracles, and the executable proof gate;
+2. preserve the fixed semantic dimensions while using the frozen L2 representation for the accepted queries/invariants;
 3. do **not** resurrect the superseded seven-state lifecycle, scalar `BOTH` owner, one `deadline_at`, `ResponsibilityTransition` as a second persistence-boundary authority, or whole-item override as canonical truth;
 4. use native relational constraints for ownership/idempotency where appropriate;
 5. avoid generic polymorphic workflow/EAV structures merely for flexibility;
@@ -1069,6 +1070,6 @@ Before implementing the first real Responsibility schema:
 7. index actual activated flows: account sync, conversation list/projection, active Responsibility work, temporal triggers, drafts, immediate sends, search;
 8. keep migrations staged/reversible once user data exists;
 9. add only the child structures proven necessary by scenario/transition evidence and current activation authority;
-10. do not accept production migrations until the L2 executable gate produces an explicit PASS/FREEZE through its owning review flow.
+10. do not accept production migrations from the L2 freeze alone; require a separate explicitly authorized L3 implementation task and its production-topology evidence.
 
 An implementation change that removes a high-value invariant or activates a deferred conceptual capability must trigger an explicit Product/task/decision update rather than silently changing the model.

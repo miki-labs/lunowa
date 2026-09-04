@@ -191,6 +191,60 @@ export class EvidenceRepository {
       });
   }
 
+  public async listProviderMessageIds(input: {
+    userId: string;
+    connectedAccountId: string;
+  }): Promise<readonly string[]> {
+    const rows = await this.db
+      .select({providerMessageId: messages.providerMessageId})
+      .from(messages)
+      .where(
+        and(
+          eq(messages.userId, input.userId),
+          eq(messages.connectedAccountId, input.connectedAccountId)
+        )
+      );
+    return rows.map(({providerMessageId}) => providerMessageId);
+  }
+
+  /** Provider deletion is evidence change, never Responsibility resolution. */
+  public async deleteNormalizedMessage(input: {
+    userId: string;
+    connectedAccountId: string;
+    providerMessageId: string;
+  }): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({id: messages.id, conversationId: messages.conversationId})
+        .from(messages)
+        .where(
+          and(
+            eq(messages.userId, input.userId),
+            eq(messages.connectedAccountId, input.connectedAccountId),
+            eq(messages.providerMessageId, input.providerMessageId)
+          )
+        )
+        .for('update');
+      if (!existing) return false;
+
+      await tx.delete(messages).where(eq(messages.id, existing.id));
+      await tx
+        .update(conversations)
+        .set({
+          semanticEvidenceRevision: sql`${conversations.semanticEvidenceRevision} + 1`,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(conversations.id, existing.conversationId),
+            eq(conversations.userId, input.userId),
+            eq(conversations.connectedAccountId, input.connectedAccountId)
+          )
+        );
+      return true;
+    });
+  }
+
   /**
    * Advances evidence under the conversation row lock. The migration trigger
    * independently rejects direct SQL attempts to decrease the revision.

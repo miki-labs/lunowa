@@ -8,3 +8,9 @@ export {
   participantIdentities,
   providerSyncStates
 } from './evidence';
+export {
+  gmailOauthStates,
+  gmailProviderCredentials,
+  gmailSyncSignals,
+  gmailWatchStates
+} from './gmail';

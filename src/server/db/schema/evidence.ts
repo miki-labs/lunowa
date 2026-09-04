@@ -227,6 +227,8 @@ export const messages = pgTable(
     readState: text('read_state'),
     mailboxStateSnapshot: jsonb('mailbox_state_snapshot').$type<Record<string, unknown>>(),
     rawProviderMetadata: jsonb('raw_provider_metadata').$type<Record<string, unknown>>(),
+    /** Provider absence is mutable mailbox state; observed communication remains Source evidence. */
+    providerDeletedAt: optionalInstant('provider_deleted_at'),
     createdAt: instant('created_at'),
     updatedAt: updatedInstant()
   },

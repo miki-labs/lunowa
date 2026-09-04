@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto';
+
 import {EvidenceRepository} from '@/server/db/repositories/evidence';
 import {GmailRepository, type ClaimedGmailSignal} from '@/server/db/repositories/gmail';
 
@@ -24,6 +26,9 @@ type SyncRepository = Pick<
   | 'claimSignals'
   | 'completeSignal'
   | 'failSignal'
+  | 'getBootstrapState'
+  | 'saveBootstrapState'
+  | 'deleteBootstrapState'
 >;
 
 function changedMessageIds(history: readonly GmailHistory[]): {changed: Set<string>; deleted: Set<string>} {
@@ -65,7 +70,7 @@ export class GmailSyncService {
       }));
     } catch (error) {
       if (error instanceof GmailProviderError && error.status === 404) {
-        await this.evidence.deleteNormalizedMessage({
+        await this.evidence.markNormalizedMessageAbsent({
           userId: context.userId,
           connectedAccountId: context.connectedAccountId,
           providerMessageId: messageId
@@ -96,31 +101,86 @@ export class GmailSyncService {
     accessToken: string,
     baselineHistoryId: string
   ): Promise<void> {
-    let pageToken: string | undefined;
-    let count = 0;
-    do {
-      const page = await this.provider.listMessages(accessToken, pageToken);
-      for (const {id} of page.messages ?? []) {
-        if (count >= INITIAL_SYNC_LIMIT) break;
-        await this.ingestMessage(context, accessToken, id);
-        count += 1;
+    const saved = await this.repository.getBootstrapState(context.connectedAccountId);
+    const bootstrap = saved ?? {
+      baselineHistoryId,
+      pageToken: null,
+      pageOffset: 0,
+      processedMessageCount: 0
+    };
+    if (!saved) await this.repository.saveBootstrapState({connectedAccountId: context.connectedAccountId, ...bootstrap});
+
+    let pageToken = bootstrap.pageToken;
+    let pageOffset = bootstrap.pageOffset;
+    let processedTotal = bootstrap.processedMessageCount;
+    let processedThisRun = 0;
+    while (processedThisRun < INITIAL_SYNC_LIMIT) {
+      const requestedPageToken = pageToken;
+      const page = await this.provider.listMessages(accessToken, requestedPageToken ?? undefined);
+      const pageMessages = page.messages ?? [];
+      if (pageOffset > pageMessages.length) throw new GmailProviderError(502, 'INVALID_BOOTSTRAP_STATE');
+
+      for (let index = pageOffset; index < pageMessages.length; index += 1) {
+        const item = pageMessages[index];
+        if (!item?.id) throw new GmailProviderError(502, 'INVALID_MESSAGE_LIST');
+        await this.ingestMessage(context, accessToken, item.id);
+        processedThisRun += 1;
+        processedTotal += 1;
+        if (processedThisRun === INITIAL_SYNC_LIMIT) {
+          pageToken = index + 1 < pageMessages.length
+            ? requestedPageToken
+            : page.nextPageToken ?? null;
+          pageOffset = index + 1 < pageMessages.length ? index + 1 : 0;
+          break;
+        }
       }
-      pageToken = count >= INITIAL_SYNC_LIMIT ? undefined : page.nextPageToken;
-    } while (pageToken);
-    const advanced = await this.repository.advanceCursor({
+
+      if (processedThisRun === INITIAL_SYNC_LIMIT) {
+        if (pageOffset === 0 && !page.nextPageToken) {
+          await this.historySync(context, accessToken, bootstrap.baselineHistoryId, null);
+          await this.repository.deleteBootstrapState(context.connectedAccountId);
+          return;
+        }
+        break;
+      }
+      if (!page.nextPageToken) {
+        // Listing completion is not enough: replay every change since the
+        // watch baseline, then atomically CAS the first healthy cursor.
+        await this.historySync(context, accessToken, bootstrap.baselineHistoryId, null);
+        await this.repository.deleteBootstrapState(context.connectedAccountId);
+        return;
+      }
+      pageToken = page.nextPageToken;
+      pageOffset = 0;
+    }
+
+    await this.repository.saveBootstrapState({
+      connectedAccountId: context.connectedAccountId,
+      baselineHistoryId: bootstrap.baselineHistoryId,
+      pageToken,
+      pageOffset,
+      processedMessageCount: processedTotal
+    });
+    await this.repository.setSyncStatus({
       userId: context.userId,
       connectedAccountId: context.connectedAccountId,
-      expectedCursor: null,
-      nextCursor: baselineHistoryId,
-      full: false
+      status: 'RECONCILIATION_REQUIRED',
+      lastErrorCode: 'BOOTSTRAP_INCOMPLETE'
     });
-    if (!advanced) throw new GmailProviderError(409, 'CURSOR_CONFLICT');
+    const continuation = createHash('sha256')
+      .update(`${pageToken ?? '<first>'}:${pageOffset}:${processedTotal}`)
+      .digest('hex');
+    await this.repository.enqueueSignal({
+      connectedAccountId: context.connectedAccountId,
+      deliveryKey: `bootstrap:${context.connectedAccountId}:${continuation}`,
+      reason: 'INITIAL'
+    });
   }
 
   private async fullRecovery(
     context: {userId: string; connectedAccountId: string; emailAddress: string},
     accessToken: string,
-    expectedCursor: string
+    expectedCursor: string | null
   ): Promise<void> {
     // Snapshot the baseline before listing. Changes after it are intentionally
     // replayed by the next history reconciliation, even if already observed.
@@ -152,7 +212,7 @@ export class GmailSyncService {
     });
     for (const id of localIds) {
       if (!providerIds.has(id)) {
-        await this.evidence.deleteNormalizedMessage({
+        await this.evidence.markNormalizedMessageAbsent({
           userId: context.userId,
           connectedAccountId: context.connectedAccountId,
           providerMessageId: id
@@ -172,7 +232,8 @@ export class GmailSyncService {
   private async historySync(
     context: {userId: string; connectedAccountId: string; emailAddress: string},
     accessToken: string,
-    cursor: string
+    cursor: string,
+    expectedCursor: string | null = cursor
   ): Promise<void> {
     const history: GmailHistory[] = [];
     let nextCursor = cursor;
@@ -194,7 +255,7 @@ export class GmailSyncService {
           status: 'RECONCILIATION_REQUIRED',
           lastErrorCode: 'STALE_HISTORY'
         });
-        await this.fullRecovery(context, accessToken, cursor);
+        await this.fullRecovery(context, accessToken, expectedCursor);
         return;
       }
       throw error;
@@ -203,7 +264,7 @@ export class GmailSyncService {
     const ids = changedMessageIds(history);
     for (const id of [...ids.changed].sort()) await this.ingestMessage(context, accessToken, id);
     for (const id of [...ids.deleted].sort()) {
-      await this.evidence.deleteNormalizedMessage({
+      await this.evidence.markNormalizedMessageAbsent({
         userId: context.userId,
         connectedAccountId: context.connectedAccountId,
         providerMessageId: id
@@ -212,7 +273,7 @@ export class GmailSyncService {
     const advanced = await this.repository.advanceCursor({
       userId: context.userId,
       connectedAccountId: context.connectedAccountId,
-      expectedCursor: cursor,
+      expectedCursor,
       nextCursor,
       full: false
     });
@@ -229,8 +290,11 @@ export class GmailSyncService {
     });
     try {
       const accessToken = await this.credentials.getAccessToken(context.userId, context.connectedAccountId);
+      const bootstrap = !context.cursor
+        ? await this.repository.getBootstrapState(context.connectedAccountId)
+        : null;
       const renew =
-        signal.reason === 'INITIAL' ||
+        (signal.reason === 'INITIAL' && !bootstrap) ||
         signal.reason === 'WATCH_RENEWAL' ||
         !context.watchExpirationAt ||
         context.watchExpirationAt.getTime() <= Date.now() + WATCH_RENEWAL_WINDOW_MS;
@@ -238,9 +302,16 @@ export class GmailSyncService {
         ? await this.renewWatch(context.connectedAccountId, accessToken)
         : null;
       if (!context.cursor) {
-        await this.initialSync(context, accessToken, watchHistoryId ?? (await this.provider.getProfile(accessToken)).historyId);
+        await this.initialSync(
+          context,
+          accessToken,
+          bootstrap?.baselineHistoryId ?? watchHistoryId ?? (await this.provider.getProfile(accessToken)).historyId
+        );
       } else {
         await this.historySync(context, accessToken, context.cursor);
+        // A published cursor proves bootstrap completion. Clear a stale row
+        // left by a crash after cursor CAS but before bootstrap cleanup.
+        await this.repository.deleteBootstrapState(context.connectedAccountId);
       }
     } catch (error) {
       if (error instanceof GmailProviderError && error.status === 401) {

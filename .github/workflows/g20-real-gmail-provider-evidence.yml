@@ -1,0 +1,73 @@
+name: G20 real Gmail provider evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact 40-character candidate commit SHA
+        required: true
+        type: string
+      external_evidence_reference:
+        description: Trusted OAuth consent and Pub/Sub delivery evidence reference
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  real-gmail:
+    name: Credential-bound OAuth, history, watch and attachment proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: gmail-provider-evidence
+
+    steps:
+      - name: Validate exact candidate input
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: '[[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]'
+
+      - name: Checkout requested exact candidate
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Bind evidence to exact head
+        env:
+          EXPECTED_SHA: ${{ inputs.candidate_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install pnpm and exact dependencies
+        run: |
+          npm install --global pnpm@11.20.0
+          pnpm install --frozen-lockfile
+
+      - name: Exercise real Gmail provider without emitting credentials or mailbox content
+        env:
+          G20_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          G20_EXTERNAL_EVIDENCE_REFERENCE: ${{ inputs.external_evidence_reference }}
+          G20_REAL_GOOGLE_CLIENT_ID: ${{ secrets.G20_REAL_GOOGLE_CLIENT_ID }}
+          G20_REAL_GOOGLE_CLIENT_SECRET: ${{ secrets.G20_REAL_GOOGLE_CLIENT_SECRET }}
+          G20_REAL_GOOGLE_REFRESH_TOKEN: ${{ secrets.G20_REAL_GOOGLE_REFRESH_TOKEN }}
+          G20_REAL_PUBSUB_TOPIC: ${{ secrets.G20_REAL_PUBSUB_TOPIC }}
+          G20_REAL_START_HISTORY_ID: ${{ secrets.G20_REAL_START_HISTORY_ID }}
+          G20_REAL_MESSAGE_ID: ${{ secrets.G20_REAL_MESSAGE_ID }}
+          G20_REAL_ATTACHMENT_ID: ${{ secrets.G20_REAL_ATTACHMENT_ID }}
+        run: pnpm test:gmail-real-provider > g20-real-provider-evidence.json
+
+      - name: Upload exact-head sanitized provider evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: g20-real-gmail-provider-${{ inputs.candidate_sha }}
+          path: g20-real-provider-evidence.json
+          if-no-files-found: error
+          retention-days: 14

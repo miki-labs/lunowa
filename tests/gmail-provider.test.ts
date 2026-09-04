@@ -1,14 +1,15 @@
 import {generateKeyPairSync, randomBytes, sign} from 'node:crypto';
-import {readFileSync} from 'node:fs';
+import {readdirSync, readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 import {describe, expect, it, vi} from 'vitest';
 
-import {GmailAttachmentService} from '@/server/gmail/attachments';
+import {GmailAttachmentService, safeDownloadFilename, safeDownloadMimeType} from '@/server/gmail/attachments';
 import {GmailAuthorizationService, GmailCredentialService} from '@/server/gmail/authorization';
 import type {GmailEnvironment} from '@/server/gmail/config';
 import {GmailCredentialCipher, sha256} from '@/server/gmail/crypto';
 import {normalizeGmailMessage} from '@/server/gmail/normalize';
+import {assertOauthBrowserBinding, oauthBrowserCookie} from '@/server/gmail/oauth-browser-binding';
 import {GmailPushIngress, GooglePubSubJwtVerifier} from '@/server/gmail/pubsub';
 import {GmailSyncService} from '@/server/gmail/sync';
 import type {
@@ -85,10 +86,12 @@ function provider(overrides: Partial<GmailProviderClient> = {}): GmailProviderCl
 
 describe('G20 Gmail credential and authorization boundary', () => {
   it('persists ciphertext only behind the composite account ownership FK', () => {
-    const migration = readFileSync(
-      resolve(process.cwd(), 'drizzle/migrations/0002_keen_thunderbolt_ross.sql'),
-      'utf8'
-    );
+    const migrationName = readdirSync(resolve(process.cwd(), 'drizzle/migrations'))
+      .filter((name) => name.endsWith('.sql'))
+      .find((name) => readFileSync(resolve(process.cwd(), 'drizzle/migrations', name), 'utf8')
+        .includes('CREATE TABLE "gmail_provider_credentials"'));
+    expect(migrationName).toBeDefined();
+    const migration = readFileSync(resolve(process.cwd(), 'drizzle/migrations', migrationName!), 'utf8');
     expect(migration).toContain('CREATE TABLE "gmail_provider_credentials"');
     expect(migration).toContain('"encrypted_payload" text NOT NULL');
     expect(migration).toContain('"gmail_provider_credentials_account_owner_fk" FOREIGN KEY ("connected_account_id","user_id")');
@@ -120,9 +123,9 @@ describe('G20 Gmail credential and authorization boundary', () => {
     const credentials: {encryptedPayload?: string; scopes?: readonly string[]} = {};
     const gmailRepository = {
       createOauthState: vi.fn(async (input: {stateDigest: string}) => { states.set(input.stateDigest, input as never); }),
-      consumeOauthState: vi.fn(async (input: {stateDigest: string; userId: string}) => {
+      consumeOauthState: vi.fn(async (input: {stateDigest: string}) => {
         const row = states.get(input.stateDigest) as {userId: string; consumed?: boolean} | undefined;
-        if (!row || row.userId !== input.userId || row.consumed) return null;
+        if (!row || row.consumed) return null;
         row.consumed = true;
         return row as never;
       }),
@@ -152,17 +155,26 @@ describe('G20 Gmail credential and authorization boundary', () => {
     const persistedState = states.get(sha256(state))!;
     expect(String(persistedState.encryptedCodeVerifier)).not.toContain('refresh-token');
     const result = await service.completeAuthorization({
-      userId: '00000000-0000-4000-8000-000000000001',
       state,
       code: 'authorization-code'
     });
     expect(result.returnPath).toBe('/');
+    expect(result.userId).toBe('00000000-0000-4000-8000-000000000001');
     expect(credentials.encryptedPayload).not.toContain('access-token');
     expect(credentials.encryptedPayload).not.toContain('refresh-token');
     expect(credentials.scopes).toEqual([GMAIL_READONLY_SCOPE]);
     await expect(service.completeAuthorization({
-      userId: '00000000-0000-4000-8000-000000000001', state, code: 'again'
+      state, code: 'again'
     })).rejects.toMatchObject({code: 'INVALID_OAUTH_STATE'});
+  });
+
+  it('keeps callback CSRF binding independent of app-session expiry or account switching', () => {
+    const state = 'one-time-oauth-state';
+    const binding = oauthBrowserCookie(state);
+    expect(() => assertOauthBrowserBinding(state, `${binding.name}=${binding.value}`)).not.toThrow();
+    expect(() => assertOauthBrowserBinding('swapped-state', `${binding.name}=${binding.value}`))
+      .toThrow(/INVALID_OAUTH_BROWSER_BINDING/);
+    expect(() => assertOauthBrowserBinding(state, null)).toThrow(/INVALID_OAUTH_BROWSER_BINDING/);
   });
 
   it('checks user and account ownership before decrypting or refreshing', async () => {
@@ -250,12 +262,61 @@ describe('G20 Gmail normalization', () => {
     });
     expect('sanitizedHtmlBody' in first).toBe(false);
   });
+
+  it('sanitizes hostile filenames, MIME types, subjects and snippets at the provider boundary', () => {
+    const normalized = normalizeGmailMessage({
+      userId: '00000000-0000-4000-8000-000000000001',
+      connectedAccountId: '00000000-0000-4000-8000-000000000002',
+      accountEmail: 'owner@example.com',
+      message: message('message-hostile', {
+        snippet: 'safe\r\nX-Injected: yes\u202e.exe',
+        payload: {
+          mimeType: 'multipart/mixed',
+          headers: [
+            {name: 'From', value: 'Sender <sender@example.com>'},
+            {name: 'To', value: 'Owner <owner@example.com>'},
+            {name: 'Subject', value: 'Invoice\r\nX-Injected: yes'}
+          ],
+          parts: [{
+            partId: '2',
+            mimeType: 'text/html\r\nX-Evil: yes',
+            filename: '../../invoice\r\nContent-Type: text/html.exe',
+            body: {attachmentId: 'attachment-hostile', size: 12}
+          }]
+        }
+      })
+    });
+    expect(normalized.subject).toBe('Invoice X-Injected: yes');
+    expect(normalized.rawProviderMetadata.snippet).toBe('safe X-Injected: yes .exe');
+    expect(normalized.attachments[0]).toMatchObject({
+      filename: 'html.exe',
+      mimeType: 'application/octet-stream',
+      contentDisposition: 'attachment'
+    });
+    expect(normalized.attachments[0]!.contentReference).not.toContain('..');
+  });
+
+  it('rejects control-character address injection and malformed mailbox addresses', () => {
+    expect(() => normalizeGmailMessage({
+      userId: '00000000-0000-4000-8000-000000000001',
+      connectedAccountId: '00000000-0000-4000-8000-000000000002',
+      accountEmail: 'owner@example.com',
+      message: message('message-address', {
+        payload: {
+          headers: [
+            {name: 'From', value: 'sender@example.com\r\nBcc: victim@example.com'},
+            {name: 'To', value: 'not-an-address'}
+          ]
+        }
+      })
+    })).toThrow(/unsafe metadata|invalid participant/);
+  });
 });
 
 describe('G20 authenticated Pub/Sub ingress', () => {
-  function jwt(audience: string) {
+  function jwt(audience: string, kid = 'key-1') {
     const {privateKey, publicKey} = generateKeyPairSync('rsa', {modulusLength: 2048});
-    const header = Buffer.from(JSON.stringify({alg: 'RS256', kid: 'key-1'})).toString('base64url');
+    const header = Buffer.from(JSON.stringify({alg: 'RS256', kid})).toString('base64url');
     const now = Math.floor(Date.now() / 1000);
     const payload = Buffer.from(JSON.stringify({
       iss: 'https://accounts.google.com',
@@ -268,7 +329,7 @@ describe('G20 authenticated Pub/Sub ingress', () => {
     const signature = sign('RSA-SHA256', Buffer.from(`${header}.${payload}`), privateKey).toString('base64url');
     return {
       token: `${header}.${payload}.${signature}`,
-      jwk: {...publicKey.export({format: 'jwk'}), kid: 'key-1', alg: 'RS256', use: 'sig'}
+      jwk: {...publicKey.export({format: 'jwk'}), kid, alg: 'RS256', use: 'sig'}
     };
   }
 
@@ -314,10 +375,55 @@ describe('G20 authenticated Pub/Sub ingress', () => {
       code: 'INVALID_PUBSUB_JWT_CLAIMS'
     });
   });
+
+  it('refreshes cached Google keys once when a rotated kid first appears', async () => {
+    const old = jwt(environment.pubsubAudience, 'old-key');
+    const rotated = jwt(environment.pubsubAudience, 'rotated-key');
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({keys: [old.jwk]}), {
+        status: 200, headers: {'cache-control': 'max-age=3600'}
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({keys: [rotated.jwk]}), {
+        status: 200, headers: {'cache-control': 'max-age=3600'}
+      }));
+    const verifier = new GooglePubSubJwtVerifier(
+      environment.pubsubAudience,
+      environment.pubsubServiceAccount,
+      request
+    );
+    await expect(verifier.verify(`Bearer ${rotated.token}`)).resolves.toMatchObject({
+      email: environment.pubsubServiceAccount
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails shut after one JWKS refresh when an unknown kid remains unknown', async () => {
+    const known = jwt(environment.pubsubAudience, 'known-key');
+    const unknown = jwt(environment.pubsubAudience, 'unknown-key');
+    const request = vi.fn(async () => new Response(JSON.stringify({keys: [known.jwk]}), {status: 200}));
+    const verifier = new GooglePubSubJwtVerifier(
+      environment.pubsubAudience,
+      environment.pubsubServiceAccount,
+      request
+    );
+    await expect(verifier.verify(`Bearer ${unknown.token}`)).rejects.toMatchObject({
+      code: 'UNKNOWN_PUBSUB_JWT_KEY'
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
 });
 
 function syncRepository(cursor: string | null = '100') {
-  const state = {cursor, contextCalls: 0};
+  const state: {
+    cursor: string | null;
+    contextCalls: number;
+    bootstrap: {
+      baselineHistoryId: string;
+      pageToken: string | null;
+      pageOffset: number;
+      processedMessageCount: number;
+    } | null;
+  } = {cursor, contextCalls: 0, bootstrap: null};
   return {
     state,
     getSyncContext: vi.fn(async () => ({
@@ -341,22 +447,42 @@ function syncRepository(cursor: string | null = '100') {
     listDueAccountIds: vi.fn(async (): Promise<readonly {id: string; reason: 'SAFETY' | 'WATCH_RENEWAL'}[]> => []),
     claimSignals: vi.fn(async () => []),
     completeSignal: vi.fn(async () => undefined),
-    failSignal: vi.fn(async () => undefined)
+    failSignal: vi.fn(async () => undefined),
+    getBootstrapState: vi.fn(async () => state.bootstrap),
+    saveBootstrapState: vi.fn(async (input: {
+      baselineHistoryId: string;
+      pageToken: string | null;
+      pageOffset: number;
+      processedMessageCount: number;
+    }) => {
+      state.bootstrap = {
+        baselineHistoryId: input.baselineHistoryId,
+        pageToken: input.pageToken,
+        pageOffset: input.pageOffset,
+        processedMessageCount: input.processedMessageCount
+      };
+    }),
+    deleteBootstrapState: vi.fn(async () => { state.bootstrap = null; })
   };
 }
 
 function evidenceWriter(events: string[] = []) {
   const ids = new Set<string>();
+  const absent = new Set<string>();
   return {
     ids,
+    absent,
     upsertNormalizedMessage: vi.fn(async (input: {providerMessageId: string}) => {
       events.push(`upsert:${input.providerMessageId}`);
       ids.add(input.providerMessageId);
+      absent.delete(input.providerMessageId);
     }),
     listProviderMessageIds: vi.fn(async () => [...ids]),
-    deleteNormalizedMessage: vi.fn(async ({providerMessageId}: {providerMessageId: string}) => {
-      events.push(`delete:${providerMessageId}`);
-      return ids.delete(providerMessageId);
+    markNormalizedMessageAbsent: vi.fn(async ({providerMessageId}: {providerMessageId: string}) => {
+      events.push(`absent:${providerMessageId}`);
+      if (!ids.has(providerMessageId)) return false;
+      absent.add(providerMessageId);
+      return true;
     })
   };
 }
@@ -407,7 +533,7 @@ describe('G20 watch/history reconciliation oracles', () => {
     expect(repository.state.cursor).toBe('105');
   });
 
-  it('performs explicit complete recovery on stale history and removes missing Source evidence', async () => {
+  it('performs explicit complete recovery on stale history and tombstones missing Source evidence', async () => {
     const repository = syncRepository('stale-100');
     const evidence = evidenceWriter();
     evidence.ids.add('deleted-message');
@@ -418,8 +544,9 @@ describe('G20 watch/history reconciliation oracles', () => {
     });
     const service = new GmailSyncService(environment.pubsubTopic, providerClient, credentials() as never, repository as never, evidence as never);
     await service.reconcile(signal('SAFETY'));
-    expect(evidence.ids).toEqual(new Set(['current-message']));
-    expect(evidence.deleteNormalizedMessage).toHaveBeenCalledWith(expect.objectContaining({providerMessageId: 'deleted-message'}));
+    expect(evidence.ids).toEqual(new Set(['deleted-message', 'current-message']));
+    expect(evidence.absent).toEqual(new Set(['deleted-message']));
+    expect(evidence.markNormalizedMessageAbsent).toHaveBeenCalledWith(expect.objectContaining({providerMessageId: 'deleted-message'}));
     expect(repository.state.cursor).toBe('200');
     expect(repository.setSyncStatus).toHaveBeenCalledWith(expect.objectContaining({
       status: 'RECONCILIATION_REQUIRED', lastErrorCode: 'STALE_HISTORY'
@@ -431,7 +558,8 @@ describe('G20 watch/history reconciliation oracles', () => {
     const evidence = evidenceWriter();
     const providerClient = provider({
       watch: vi.fn(async (): Promise<GmailWatch> => ({historyId: '300', expiration: String(Date.now() + 86400_000)})),
-      listMessages: vi.fn(async () => ({messages: [{id: 'recent-1'}, {id: 'recent-2'}]}))
+      listMessages: vi.fn(async () => ({messages: [{id: 'recent-1'}, {id: 'recent-2'}]})),
+      listHistory: vi.fn(async () => ({historyId: '300'}))
     });
     const service = new GmailSyncService(environment.pubsubTopic, providerClient, credentials() as never, repository as never, evidence as never);
     await service.reconcile(signal('INITIAL'));
@@ -439,6 +567,54 @@ describe('G20 watch/history reconciliation oracles', () => {
     expect(evidence.ids).toEqual(new Set(['recent-1', 'recent-2']));
     expect(repository.state.cursor).toBe('300');
     expect(repository.saveWatch).toHaveBeenCalled();
+  });
+
+  it('persists incomplete bootstrap coverage and resumes before publishing a healthy cursor', async () => {
+    const repository = syncRepository(null);
+    const evidence = evidenceWriter();
+    const page = Array.from({length: 251}, (_, index) => ({id: `message-${index}`}));
+    const providerClient = provider({
+      watch: vi.fn(async (): Promise<GmailWatch> => ({historyId: '300', expiration: String(Date.now() + 86400_000)})),
+      listMessages: vi.fn(async () => ({messages: page})),
+      listHistory: vi.fn(async () => ({historyId: '305'}))
+    });
+    const service = new GmailSyncService(environment.pubsubTopic, providerClient, credentials() as never, repository as never, evidence as never);
+
+    await service.reconcile(signal('INITIAL'));
+    expect(evidence.ids.size).toBe(250);
+    expect(repository.state.cursor).toBeNull();
+    expect(repository.state.bootstrap).toMatchObject({
+      baselineHistoryId: '300', pageOffset: 250, processedMessageCount: 250
+    });
+    expect(repository.setSyncStatus).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'RECONCILIATION_REQUIRED', lastErrorCode: 'BOOTSTRAP_INCOMPLETE'
+    }));
+    expect(repository.enqueueSignal).toHaveBeenCalledWith(expect.objectContaining({reason: 'INITIAL'}));
+
+    await service.reconcile(signal('INITIAL'));
+    expect(evidence.ids.size).toBe(251);
+    expect(repository.state.bootstrap).toBeNull();
+    expect(repository.state.cursor).toBe('305');
+    expect(providerClient.watch).toHaveBeenCalledTimes(1);
+    expect(providerClient.listHistory).toHaveBeenCalledWith('access', '300', undefined);
+  });
+
+  it('finishes an exactly full final bootstrap batch without replaying it', async () => {
+    const repository = syncRepository(null);
+    const evidence = evidenceWriter();
+    const providerClient = provider({
+      watch: vi.fn(async (): Promise<GmailWatch> => ({historyId: '400', expiration: String(Date.now() + 86400_000)})),
+      listMessages: vi.fn(async () => ({
+        messages: Array.from({length: 250}, (_, index) => ({id: `exact-${index}`}))
+      })),
+      listHistory: vi.fn(async () => ({historyId: '401'}))
+    });
+    const service = new GmailSyncService(environment.pubsubTopic, providerClient, credentials() as never, repository as never, evidence as never);
+    await service.reconcile(signal('INITIAL'));
+    expect(evidence.ids.size).toBe(250);
+    expect(repository.state.cursor).toBe('401');
+    expect(repository.state.bootstrap).toBeNull();
+    expect(providerClient.listMessages).toHaveBeenCalledTimes(1);
   });
 
   it('periodically enqueues safety work even when push is dropped', async () => {
@@ -451,6 +627,13 @@ describe('G20 watch/history reconciliation oracles', () => {
 });
 
 describe('G20 attachment evidence access', () => {
+  it('defensively prevents response-header and path metadata injection', () => {
+    expect(safeDownloadFilename('../invoice\r\nContent-Type: text/html')).toBe('html');
+    expect(safeDownloadFilename('..')).toBe('attachment');
+    expect(safeDownloadMimeType('text/html\r\nX-Test: yes')).toBe('application/octet-stream');
+    expect(safeDownloadMimeType('Application/PDF')).toBe('application/pdf');
+  });
+
   it('checks ownership before provider access and preserves provider security blocks', async () => {
     const providerClient = provider({
       getAttachment: vi.fn(async () => { throw new GmailProviderError(403, 'FORBIDDEN'); })

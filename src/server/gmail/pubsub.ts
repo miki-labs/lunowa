@@ -1,30 +1,14 @@
-import {createPublicKey, verify} from 'node:crypto';
+import {createLocalJWKSet, errors, jwtVerify, type JSONWebKeySet, type JWTPayload} from 'jose';
 
 import {GmailRepository} from '@/server/db/repositories/gmail';
 
+import {isSafeMailboxAddress} from './normalize';
 import {GmailProviderError} from './types';
 
-type JwtHeader = {alg?: string; kid?: string; typ?: string};
-type JwtClaims = {
-  iss?: string;
-  aud?: string | string[];
-  exp?: number;
-  iat?: number;
-  email?: string;
-  email_verified?: boolean;
-};
-type GoogleJwk = JsonWebKey & {kid?: string; alg?: string; use?: string};
-
-function parseJsonSegment<T>(segment: string): T {
-  try {
-    return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8')) as T;
-  } catch {
-    throw new GmailProviderError(401, 'INVALID_PUBSUB_JWT');
-  }
-}
+type PubSubClaims = JWTPayload & {email?: string; email_verified?: boolean};
 
 export class GooglePubSubJwtVerifier {
-  private cached: {expiresAt: number; keys: GoogleJwk[]} | null = null;
+  private cached: {expiresAt: number; jwks: JSONWebKeySet} | null = null;
 
   constructor(
     private readonly audience: string,
@@ -33,48 +17,55 @@ export class GooglePubSubJwtVerifier {
     private readonly now: () => number = () => Date.now()
   ) {}
 
-  private async keys(): Promise<GoogleJwk[]> {
-    if (this.cached && this.cached.expiresAt > this.now()) return this.cached.keys;
+  private async keys(forceRefresh = false): Promise<JSONWebKeySet> {
+    if (!forceRefresh && this.cached && this.cached.expiresAt > this.now()) return this.cached.jwks;
     const response = await this.request('https://www.googleapis.com/oauth2/v3/certs');
     if (!response.ok) throw new GmailProviderError(503, 'PUBSUB_JWKS_UNAVAILABLE');
-    const payload = await response.json() as {keys?: GoogleJwk[]};
-    if (!payload.keys?.length) throw new GmailProviderError(503, 'PUBSUB_JWKS_UNAVAILABLE');
-    const maxAge = /max-age=(\d+)/i.exec(response.headers.get('cache-control') ?? '')?.[1];
-    this.cached = {
-      keys: payload.keys,
-      expiresAt: this.now() + Math.max(60, Number(maxAge ?? 300)) * 1000
-    };
-    return payload.keys;
+    const payload = await response.json() as JSONWebKeySet;
+    if (!Array.isArray(payload.keys) || payload.keys.length === 0) {
+      throw new GmailProviderError(503, 'PUBSUB_JWKS_UNAVAILABLE');
+    }
+    const configuredMaxAge = Number(/max-age=(\d+)/i.exec(response.headers.get('cache-control') ?? '')?.[1] ?? 300);
+    const maxAgeSeconds = Math.min(86_400, Math.max(60, configuredMaxAge));
+    this.cached = {jwks: payload, expiresAt: this.now() + maxAgeSeconds * 1000};
+    return payload;
   }
 
-  async verify(authorization: string | null): Promise<JwtClaims> {
+  private async verifiedPayload(token: string, refreshAttempted = false): Promise<PubSubClaims> {
+    try {
+      const {payload} = await jwtVerify(token, createLocalJWKSet(await this.keys(refreshAttempted)), {
+        algorithms: ['RS256'],
+        audience: this.audience,
+        issuer: ['accounts.google.com', 'https://accounts.google.com'],
+        clockTolerance: 60,
+        currentDate: new Date(this.now()),
+        maxTokenAge: '1h'
+      });
+      return payload as PubSubClaims;
+    } catch (error) {
+      if (error instanceof GmailProviderError) throw error;
+      if (error instanceof errors.JWKSNoMatchingKey && !refreshAttempted) {
+        // Google signing-key rotation can introduce a kid while the previous
+        // JWKS response is still cached. Refresh exactly once, then fail shut.
+        return this.verifiedPayload(token, true);
+      }
+      if (error instanceof errors.JWKSNoMatchingKey) {
+        throw new GmailProviderError(401, 'UNKNOWN_PUBSUB_JWT_KEY');
+      }
+      if (error instanceof errors.JWTClaimValidationFailed || error instanceof errors.JWTExpired) {
+        throw new GmailProviderError(401, 'INVALID_PUBSUB_JWT_CLAIMS');
+      }
+      throw new GmailProviderError(401, 'INVALID_PUBSUB_JWT');
+    }
+  }
+
+  async verify(authorization: string | null): Promise<PubSubClaims> {
     const token = authorization?.match(/^Bearer ([A-Za-z0-9._-]+)$/)?.[1];
     if (!token) throw new GmailProviderError(401, 'MISSING_PUBSUB_JWT');
-    const segments = token.split('.');
-    if (segments.length !== 3) throw new GmailProviderError(401, 'INVALID_PUBSUB_JWT');
-    const header = parseJsonSegment<JwtHeader>(segments[0]!);
-    const claims = parseJsonSegment<JwtClaims>(segments[1]!);
-    if (header.alg !== 'RS256' || !header.kid) throw new GmailProviderError(401, 'INVALID_PUBSUB_JWT');
-    const jwk = (await this.keys()).find((candidate) => candidate.kid === header.kid && candidate.alg === 'RS256');
-    if (!jwk) throw new GmailProviderError(401, 'UNKNOWN_PUBSUB_JWT_KEY');
-    const validSignature = verify(
-      'RSA-SHA256',
-      Buffer.from(`${segments[0]}.${segments[1]}`, 'ascii'),
-      createPublicKey({key: jwk as never, format: 'jwk'}),
-      Buffer.from(segments[2]!, 'base64url')
-    );
-    const nowSeconds = Math.floor(this.now() / 1000);
-    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    const valid =
-      validSignature &&
-      (claims.iss === 'accounts.google.com' || claims.iss === 'https://accounts.google.com') &&
-      audiences.includes(this.audience) &&
-      typeof claims.exp === 'number' && claims.exp > nowSeconds &&
-      typeof claims.iat === 'number' && claims.iat <= nowSeconds + 60 &&
-      claims.iat >= nowSeconds - 3600 &&
-      claims.email_verified === true &&
-      claims.email === this.serviceAccount;
-    if (!valid) throw new GmailProviderError(401, 'INVALID_PUBSUB_JWT_CLAIMS');
+    const claims = await this.verifiedPayload(token);
+    if (claims.email_verified !== true || claims.email !== this.serviceAccount) {
+      throw new GmailProviderError(401, 'INVALID_PUBSUB_JWT_CLAIMS');
+    }
     return claims;
   }
 }
@@ -91,7 +82,8 @@ export class GmailPushIngress {
     await this.verifier.verify(authorization);
     if (!body || typeof body !== 'object') throw new GmailProviderError(400, 'INVALID_PUBSUB_BODY');
     const message = (body as {message?: {messageId?: string; data?: string}}).message;
-    if (!message?.messageId || !message.data || message.data.length > 16_384) {
+    if (!message?.messageId || !/^[A-Za-z0-9._~+-]{1,512}$/.test(message.messageId) ||
+        !message.data || message.data.length > 16_384) {
       throw new GmailProviderError(400, 'INVALID_PUBSUB_BODY');
     }
     let notification: {emailAddress?: string; historyId?: string};
@@ -100,7 +92,8 @@ export class GmailPushIngress {
     } catch {
       throw new GmailProviderError(400, 'INVALID_PUBSUB_DATA');
     }
-    if (!notification.emailAddress || !/^\d+$/.test(notification.historyId ?? '')) {
+    if (!notification.emailAddress || !isSafeMailboxAddress(notification.emailAddress) ||
+        !/^\d+$/.test(notification.historyId ?? '')) {
       throw new GmailProviderError(400, 'INVALID_PUBSUB_DATA');
     }
     const accounts = await this.repository.findConnectedAccountsByEmail(notification.emailAddress);

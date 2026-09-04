@@ -207,15 +207,23 @@ export class EvidenceRepository {
     return rows.map(({providerMessageId}) => providerMessageId);
   }
 
-  /** Provider deletion is evidence change, never Responsibility resolution. */
-  public async deleteNormalizedMessage(input: {
+  /**
+   * Records current provider absence without erasing immutable communication
+   * evidence. Physical deletion belongs to a separate privacy/account-deletion
+   * authority, never to a Gmail history event.
+   */
+  public async markNormalizedMessageAbsent(input: {
     userId: string;
     connectedAccountId: string;
     providerMessageId: string;
   }): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const [existing] = await tx
-        .select({id: messages.id, conversationId: messages.conversationId})
+        .select({
+          id: messages.id,
+          conversationId: messages.conversationId,
+          providerDeletedAt: messages.providerDeletedAt
+        })
         .from(messages)
         .where(
           and(
@@ -226,8 +234,12 @@ export class EvidenceRepository {
         )
         .for('update');
       if (!existing) return false;
+      if (existing.providerDeletedAt) return false;
 
-      await tx.delete(messages).where(eq(messages.id, existing.id));
+      await tx
+        .update(messages)
+        .set({providerDeletedAt: new Date(), updatedAt: new Date()})
+        .where(eq(messages.id, existing.id));
       await tx
         .update(conversations)
         .set({
@@ -463,6 +475,7 @@ export class EvidenceRepository {
         readState: input.readState ?? null,
         mailboxStateSnapshot: input.mailboxStateSnapshot ?? null,
         rawProviderMetadata: input.rawProviderMetadata ?? null,
+        providerDeletedAt: null,
         updatedAt: new Date()
       };
       let messageId: string;
@@ -483,7 +496,8 @@ export class EvidenceRepository {
           !sameDate(existing.providerReceivedAt, messageValues.providerReceivedAt) ||
           existing.readState !== messageValues.readState ||
           JSON.stringify(existing.mailboxStateSnapshot) !== JSON.stringify(messageValues.mailboxStateSnapshot) ||
-          JSON.stringify(existing.rawProviderMetadata) !== JSON.stringify(messageValues.rawProviderMetadata);
+          JSON.stringify(existing.rawProviderMetadata) !== JSON.stringify(messageValues.rawProviderMetadata) ||
+          existing.providerDeletedAt !== null;
         if (messageChanged) {
           await tx.update(messages).set(messageValues).where(eq(messages.id, messageId));
         }

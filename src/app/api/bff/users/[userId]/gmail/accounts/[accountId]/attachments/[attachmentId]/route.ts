@@ -9,7 +9,10 @@ type RouteContext = {params: Promise<{userId: string; accountId: string; attachm
 
 function disposition(filename: string): string {
   const fallback = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_').slice(0, 150) || 'attachment';
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+  const encoded = encodeURIComponent(filename).replace(/['()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
 export async function GET(request: Request, context: RouteContext) {

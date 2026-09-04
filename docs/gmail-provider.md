@@ -46,24 +46,49 @@ is due, then drains bounded work. Delivery retries are safe: source upserts are
 idempotent and the history cursor advances with compare-and-set only after
 required evidence writes commit.
 
+Initial sync is bounded to 250 messages per worker run. Its watch baseline,
+page token, page offset, and processed count are durable. While more pages
+remain, the account is explicitly `RECONCILIATION_REQUIRED` with
+`BOOTSTRAP_INCOMPLETE`, has no published cursor, and queues another bounded
+continuation. Only after all historical pages and every change since the
+original watch baseline commit does the cursor become healthy.
+
 ## Recovery and evidence access
 
 - Gmail history HTTP 404 sets `RECONCILIATION_REQUIRED` and performs an
   explicit full mailbox comparison. A mailbox above the configured 10,000
   message recovery bound remains degraded; it is never reported as empty or
   healthy.
+- Gmail deletion/history absence sets `Message.provider_deleted_at`; it never
+  deletes observed communication, participants, or attachment metadata.
 - OAuth refresh invalidation sets the account to `RECONNECT_REQUIRED`.
 - Intentional disconnect best-effort revokes the provider grant, always deletes
   local ciphertext, and preserves already-ingested Source evidence.
 - Attachment bytes are fetched only after application-session and
   user/account/attachment ownership checks. Responses force download and
-  preserve Gmail 403/451 restrictions as `PROVIDER_SECURITY_BLOCK`.
+  preserve Gmail 403/451 restrictions as `PROVIDER_SECURITY_BLOCK`. Provider
+  filenames, MIME types, addresses, headers, and response headers are bounded
+  and sanitized or rejected before they cross the evidence/download boundary.
 
 ## Verification boundary
 
 `pnpm test:gmail-provider` deterministically covers encryption, ownership,
 OAuth state/PKCE, notification authentication/deduplication, initial/history
 sync, stale-cursor recovery, safety scheduling, auth loss, and attachment
-blocks. Real OAuth consent, Pub/Sub delivery, Gmail watch/history behavior and
-provider security responses require credential-bound exact-head host/provider
-evidence; local mocks do not establish those claims.
+blocks. `.github/workflows/g20-gmail-provider.yml` binds the generated migration
+and production-shaped ciphertext/ownership/dedup/bootstrap/tombstone/cursor
+invariants to the exact pull-request head on PostgreSQL 18.6.
+
+Mocks and PostgreSQL do not establish provider acceptance. Before accepting a
+candidate, a trusted operator must prepare a dedicated Gmail test account with
+a newly changed message containing a harmless attachment, record the history
+ID from before that change, and dispatch `G20 real Gmail provider evidence`
+against the exact 40-character candidate SHA. The protected
+`gmail-provider-evidence` environment supplies the client, refresh credential,
+topic, history ID, message ID, and attachment ID as secrets. The separately
+reviewed evidence reference must cover the actual OAuth consent/readonly scope
+and authenticated Pub/Sub delivery to the deployed callback. The workflow then
+uses the real refresh credential and Gmail API to prove profile, non-empty
+history interval, normalization, attachment fetch, and `users.watch`, and
+uploads only a sanitized exact-head JSON artifact. A missing, failing,
+different-head, or mock-only run is explicitly insufficient for Issue #65.

@@ -22,10 +22,11 @@ describe('production auth contract', () => {
     const migrations = readdirSync(resolve(process.cwd(), 'drizzle/migrations'))
       .filter((name) => name.endsWith('.sql'))
       .sort();
-    expect(migrations).toHaveLength(3);
+    expect(migrations).toHaveLength(4);
     expect(migrations[0]).toMatch(/^0000_/);
     expect(migrations[1]).toMatch(/^0001_/);
     expect(migrations[2]).toMatch(/^0002_/);
+    expect(migrations[3]).toMatch(/^0003_/);
 
     const authSql = readFileSync(
       resolve(process.cwd(), 'drizzle/migrations', migrations.find((name) => name.startsWith('0000_'))!),

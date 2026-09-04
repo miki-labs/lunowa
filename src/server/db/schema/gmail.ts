@@ -140,9 +140,37 @@ export const gmailWatchStates = pgTable(
   ]
 );
 
+/**
+ * A bounded bootstrap resumes page-by-page and never turns partial historical
+ * coverage into a healthy cursor. pageOffset permits a hard per-run bound even
+ * when a provider page straddles that bound.
+ */
+export const gmailBootstrapStates = pgTable(
+  'gmail_bootstrap_states',
+  {
+    connectedAccountId: uuid('connected_account_id')
+      .notNull()
+      .primaryKey()
+      .references(() => connectedAccounts.id, {onDelete: 'cascade'}),
+    baselineHistoryId: text('baseline_history_id').notNull(),
+    pageToken: text('page_token'),
+    pageOffset: integer('page_offset').notNull().default(0),
+    processedMessageCount: integer('processed_message_count').notNull().default(0),
+    createdAt: instant('created_at'),
+    updatedAt: instant('updated_at')
+  },
+  (table) => [
+    check('gmail_bootstrap_states_history_id_check', sql`${table.baselineHistoryId} ~ '^[0-9]+$'`),
+    check('gmail_bootstrap_states_page_offset_check', sql`${table.pageOffset} >= 0`),
+    check('gmail_bootstrap_states_processed_check', sql`${table.processedMessageCount} >= 0`),
+    index('gmail_bootstrap_states_updated_idx').on(table.updatedAt)
+  ]
+);
+
 export const gmailSchema = {
   gmailProviderCredentials,
   gmailOauthStates,
   gmailSyncSignals,
-  gmailWatchStates
+  gmailWatchStates,
+  gmailBootstrapStates
 };

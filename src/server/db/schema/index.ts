@@ -20,6 +20,7 @@ export {
   responsibilityTemporalFacts
 } from './responsibility';
 export {
+  gmailBootstrapStates,
   gmailOauthStates,
   gmailProviderCredentials,
   gmailSyncSignals,

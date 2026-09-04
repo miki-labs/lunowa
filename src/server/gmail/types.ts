@@ -70,7 +70,7 @@ export interface GmailProviderClient {
 export interface GmailEvidenceWriter {
   upsertNormalizedMessage(input: NormalizedProviderMessage): Promise<unknown>;
   listProviderMessageIds(input: {userId: string; connectedAccountId: string}): Promise<readonly string[]>;
-  deleteNormalizedMessage(input: {userId: string; connectedAccountId: string; providerMessageId: string}): Promise<boolean>;
+  markNormalizedMessageAbsent(input: {userId: string; connectedAccountId: string; providerMessageId: string}): Promise<boolean>;
 }
 
 export class GmailProviderError extends Error {

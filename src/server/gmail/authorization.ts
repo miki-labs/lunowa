@@ -6,6 +6,7 @@ import {GmailRepository} from '@/server/db/repositories/gmail';
 import type {GmailEnvironment} from './config';
 import {GMAIL_OAUTH_SCOPES} from './config';
 import {GmailCredentialCipher, pkceChallenge, randomUrlToken, sha256} from './crypto';
+import {isSafeMailboxAddress} from './normalize';
 import type {GmailProviderClient, GmailTokenSet} from './types';
 import {GmailProviderError, GMAIL_READONLY_SCOPE} from './types';
 
@@ -66,17 +67,20 @@ export class GmailAuthorizationService {
     return url.toString();
   }
 
-  async completeAuthorization(input: {userId: string; state: string; code: string}) {
+  async completeAuthorization(input: {state: string; code: string}) {
     const stateDigest = sha256(input.state);
     const oauthState = await this.gmailRepository.consumeOauthState({
       stateDigest,
-      userId: input.userId,
       now: new Date()
     });
     if (!oauthState) throw new GmailProviderError(400, 'INVALID_OAUTH_STATE');
+    // The single-use high-entropy state is the authoritative correlation to
+    // the initiating app user. A callback-time browser session may have
+    // expired, signed out, or switched users during external consent.
+    const userId = oauthState.userId;
     const codeVerifier = this.cipher.decrypt<string>(
       oauthState.encryptedCodeVerifier,
-      `oauth-state:${input.userId}:${stateDigest}`
+      `oauth-state:${userId}:${stateDigest}`
     );
     const exchanged = await this.provider.exchangeCode(input.code, codeVerifier);
     const scopes = exchanged.scope.split(/\s+/).filter(Boolean);
@@ -85,44 +89,45 @@ export class GmailAuthorizationService {
       throw new GmailProviderError(403, 'GMAIL_READ_SCOPE_NOT_GRANTED');
     }
     const profile = await this.provider.getProfile(exchanged.accessToken);
-    if (!profile.emailAddress.includes('@') || !/^\d+$/.test(profile.historyId)) {
+    const emailAddress = profile.emailAddress.trim().toLowerCase();
+    if (!isSafeMailboxAddress(emailAddress) || !/^\d+$/.test(profile.historyId)) {
       await this.provider.revoke(exchanged.refreshToken).catch(() => undefined);
       throw new GmailProviderError(502, 'INVALID_GMAIL_PROFILE');
     }
     const proposedCredentialId = randomUUID();
     const credentialReference = `gmail-credential:${proposedCredentialId}`;
     const connectedAccountId = await this.evidenceRepository.upsertConnectedAccount({
-      userId: input.userId,
+      userId,
       provider: 'gmail',
-      providerAccountId: profile.emailAddress.toLowerCase(),
-      emailAddress: profile.emailAddress,
+      providerAccountId: emailAddress,
+      emailAddress,
       connectionState: 'ERROR',
       grantedCapabilities: [],
       credentialReference
     });
     const encryptedPayload = this.cipher.encrypt(
       exchanged satisfies GmailTokenSet,
-      `gmail-token:${input.userId}:${connectedAccountId}`
+      `gmail-token:${userId}:${connectedAccountId}`
     );
     const persistedCredentialId = await this.gmailRepository.putCredential({
       id: proposedCredentialId,
-      userId: input.userId,
+      userId,
       connectedAccountId,
       encryptedPayload,
       keyVersion: this.environment.credentialKeyVersion,
       grantedScopes: scopes
     });
     await this.evidenceRepository.upsertConnectedAccount({
-      userId: input.userId,
+      userId,
       provider: 'gmail',
-      providerAccountId: profile.emailAddress.toLowerCase(),
-      emailAddress: profile.emailAddress,
+      providerAccountId: emailAddress,
+      emailAddress,
       connectionState: 'CONNECTED',
       grantedCapabilities: grantedCapabilities(scopes),
       credentialReference: `gmail-credential:${persistedCredentialId}`
     });
     await this.evidenceRepository.upsertProviderSyncState({
-      userId: input.userId,
+      userId,
       connectedAccountId,
       status: 'PENDING',
       syncGeneration: 0
@@ -132,7 +137,7 @@ export class GmailAuthorizationService {
       deliveryKey: `initial:${connectedAccountId}:${persistedCredentialId}`,
       reason: 'INITIAL'
     });
-    return {connectedAccountId, returnPath: oauthState.returnPath};
+    return {connectedAccountId, returnPath: oauthState.returnPath, userId};
   }
 }
 

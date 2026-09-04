@@ -6,6 +6,7 @@ import {getDatabase} from '../index';
 import {
   attachments,
   connectedAccounts,
+  gmailBootstrapStates,
   gmailOauthStates,
   gmailProviderCredentials,
   gmailSyncSignals,
@@ -38,7 +39,7 @@ export class GmailRepository {
     await this.db.insert(gmailOauthStates).values(input);
   }
 
-  async consumeOauthState(input: {stateDigest: string; userId: string; now: Date}) {
+  async consumeOauthState(input: {stateDigest: string; now: Date}) {
     return this.db.transaction(async (tx) => {
       const [row] = await tx
         .select()
@@ -46,7 +47,6 @@ export class GmailRepository {
         .where(
           and(
             eq(gmailOauthStates.stateDigest, input.stateDigest),
-            eq(gmailOauthStates.userId, input.userId),
             isNull(gmailOauthStates.consumedAt),
             gt(gmailOauthStates.expiresAt, input.now)
           )
@@ -400,6 +400,54 @@ export class GmailRepository {
         target: gmailWatchStates.connectedAccountId,
         set: {topicName: input.topicName, expirationAt: input.expirationAt, lastHistoryId: input.historyId, updatedAt: new Date()}
       });
+  }
+
+  async getBootstrapState(connectedAccountId: string): Promise<{
+    baselineHistoryId: string;
+    pageToken: string | null;
+    pageOffset: number;
+    processedMessageCount: number;
+  } | null> {
+    const [row] = await this.db
+      .select({
+        baselineHistoryId: gmailBootstrapStates.baselineHistoryId,
+        pageToken: gmailBootstrapStates.pageToken,
+        pageOffset: gmailBootstrapStates.pageOffset,
+        processedMessageCount: gmailBootstrapStates.processedMessageCount
+      })
+      .from(gmailBootstrapStates)
+      .where(eq(gmailBootstrapStates.connectedAccountId, connectedAccountId))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async saveBootstrapState(input: {
+    connectedAccountId: string;
+    baselineHistoryId: string;
+    pageToken: string | null;
+    pageOffset: number;
+    processedMessageCount: number;
+  }): Promise<void> {
+    const now = new Date();
+    await this.db
+      .insert(gmailBootstrapStates)
+      .values({...input, createdAt: now, updatedAt: now})
+      .onConflictDoUpdate({
+        target: gmailBootstrapStates.connectedAccountId,
+        set: {
+          baselineHistoryId: input.baselineHistoryId,
+          pageToken: input.pageToken,
+          pageOffset: input.pageOffset,
+          processedMessageCount: input.processedMessageCount,
+          updatedAt: now
+        }
+      });
+  }
+
+  async deleteBootstrapState(connectedAccountId: string): Promise<void> {
+    await this.db
+      .delete(gmailBootstrapStates)
+      .where(eq(gmailBootstrapStates.connectedAccountId, connectedAccountId));
   }
 
   async listDueAccountIds(now: Date, safetyBefore: Date, watchBefore: Date): Promise<readonly {id: string; reason: SignalReason}[]> {

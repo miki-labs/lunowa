@@ -1,5 +1,5 @@
-import {LunowaShell} from '@/components/lunowa-shell';
+import {AuthBoundary} from '@/components/auth-boundary';
 
 export default function HomePage() {
-  return <LunowaShell />;
+  return <AuthBoundary />;
 }

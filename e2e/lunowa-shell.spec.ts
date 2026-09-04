@@ -1,6 +1,28 @@
 import {expect, test} from '@playwright/test';
 
 const nav = (page: import('@playwright/test').Page, label: string) => page.getByRole('button', {name: `${label}を表示`});
+const appSession = {
+  session: {
+    id: '735cad1c-a617-4985-9e18-8ff3c8fc5190',
+    userId: 'f5ab470d-97e3-44d3-a1e1-2575744152a2',
+    token: 'browser-session-token',
+    expiresAt: '2030-01-02T00:00:00.000Z',
+    createdAt: '2030-01-01T00:00:00.000Z',
+    updatedAt: '2030-01-01T00:00:00.000Z'
+  },
+  user: {
+    id: 'f5ab470d-97e3-44d3-a1e1-2575744152a2',
+    name: 'Browser User',
+    email: 'browser@example.invalid',
+    emailVerified: false,
+    createdAt: '2030-01-01T00:00:00.000Z',
+    updatedAt: '2030-01-01T00:00:00.000Z'
+  }
+};
+
+test.beforeEach(async ({page}) => {
+  await page.route('**/api/auth/get-session**', (route) => route.fulfill({json: appSession}));
+});
 
 test('renders the shell and navigates a Needs You item to its Moment', async ({page}) => {
   const consoleErrors: string[] = [];
@@ -142,4 +164,45 @@ test('does not activate global search for editable input or Japanese IME composi
   await page.getByRole('button', {name: /佐藤ひろ子/}).click();
   await page.getByLabel('本文').press('/');
   await expect(page.getByRole('heading', {name: '来期の見積書について'})).toBeVisible();
+});
+
+test('expires, re-authenticates, and signs out without changing mailbox monitoring semantics', async ({page}) => {
+  await page.unroute('**/api/auth/get-session**');
+  let authenticated = true;
+  await page.route('**/api/auth/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/get-session')) {
+      await route.fulfill({json: authenticated ? appSession : null});
+      return;
+    }
+    if (path.endsWith('/sign-in/email')) {
+      authenticated = true;
+      await route.fulfill({json: {redirect: false, token: appSession.session.token, user: appSession.user}});
+      return;
+    }
+    if (path.endsWith('/sign-out')) {
+      authenticated = false;
+      await route.fulfill({json: {success: true}});
+      return;
+    }
+    await route.abort();
+  });
+
+  await page.goto('/ja');
+  await expect(page.getByTestId('lunowa-shell')).toBeVisible();
+
+  authenticated = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByRole('heading', {name: 'セッションの期限が切れました'})).toBeVisible();
+  await expect(page.getByText(/サーバー側の監視が停止したことは意味しません/)).toBeVisible();
+
+  await page.getByLabel('メールアドレス').fill('browser@example.invalid');
+  await page.getByLabel('パスワード').fill('password-123');
+  await page.getByRole('button', {name: 'サインインする'}).click();
+  await expect(page.getByTestId('lunowa-shell')).toBeVisible();
+
+  await nav(page, '設定').click();
+  await page.getByRole('button', {name: 'この端末からログアウト'}).click();
+  await expect(page.getByText(/この端末からログアウトしました。Lunowaの監視設定は変更されていません/)).toBeVisible();
+  await expect(page.getByRole('heading', {name: 'Lunowaにサインイン'})).toBeVisible();
 });

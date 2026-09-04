@@ -103,13 +103,21 @@ Requirements:
 
 - Node.js 24 LTS
 - pnpm 11.20.0
+- PostgreSQL 18
 
 ```bash
 pnpm install --frozen-lockfile
+cp .env.example .env.local
+# Set DATABASE_URL, BETTER_AUTH_SECRET, and BETTER_AUTH_URL, then apply the
+# committed SQL under drizzle/migrations/ to a clean/current database.
 pnpm dev
 pnpm verify
 pnpm test:e2e
 ```
+
+Lunowa application sign-in uses Better Auth local credentials. Mailbox OAuth,
+ConnectedAccount credentials, and monitoring authorization are intentionally a
+separate later boundary and are not configured by app sign-in or sign-out.
 
 GitHub Actionsは `Verify` と `E2E Smoke` を独立実行します。accepted integrationにはcurrent candidateにbindされたverification evidenceが必要です。
 

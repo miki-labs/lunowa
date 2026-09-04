@@ -1,0 +1,104 @@
+name: P13 Responsibility L2 PostgreSQL Proof
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "proofs/responsibility-l2/**"
+      - "tests/responsibility-l2-proof.ts"
+      - "tests/responsibility-l2-schema-check.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  p13-proof:
+    name: P13 PostgreSQL 18.6 acceptance matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: lunowa_issue_13
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55413:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lunowa_issue_13"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.20.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate and verify committed Drizzle artifacts
+        run: |
+          pnpm proof:responsibility-l2:schema
+          git diff --exit-code -- proofs/responsibility-l2
+          test -z "$(git ls-files --others --exclude-standard -- proofs/responsibility-l2)"
+
+      - name: Run P13 acceptance matrix
+        env:
+          P13_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55413/lunowa_issue_13
+        run: node --import tsx tests/responsibility-l2-proof.ts > "$RUNNER_TEMP/p13-runtime-result.json"
+
+      - name: Record checked-out exact head
+        run: echo "P13_EXACT_HEAD_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Bind result to exact head and environment
+        env:
+          P13_RESULT_PATH: ${{ runner.temp }}/p13-runtime-result.json
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const result = JSON.parse(readFileSync(process.env.P13_RESULT_PATH, 'utf8'));
+          if (result.postgresVersionNum !== '180006') {
+            throw new Error(`P13 result is not PostgreSQL 18.6: ${result.postgresVersionNum}`);
+          }
+          const owned = Object.entries(result.acceptance);
+          if (owned.length !== 57 || owned.some(([, item]) => item.status !== 'PASS')) {
+            throw new Error('P13 result does not contain PASS for all 57 owned acceptance IDs.');
+          }
+          const bound = {
+            ...result,
+            repository: process.env.GITHUB_REPOSITORY,
+            exactHeadSha: process.env.P13_EXACT_HEAD_SHA,
+            workflow: process.env.GITHUB_WORKFLOW,
+            runId: process.env.GITHUB_RUN_ID,
+            statement: 'Exact-head qualification output; Issue #15 remains the independent combined review/freeze gate.',
+          };
+          writeFileSync(process.env.P13_RESULT_PATH, `${JSON.stringify(bound, null, 2)}\n`, 'utf8');
+          NODE
+
+      - name: Upload machine-readable exact-head evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: p13-responsibility-l2-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/p13-runtime-result.json
+          if-no-files-found: error

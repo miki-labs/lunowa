@@ -1,11 +1,11 @@
 import {drizzle} from 'drizzle-orm/node-postgres';
 import {Pool} from 'pg';
 
-import * as authSchema from './schema/auth';
+import * as databaseSchema from './schema';
 
 const globalDatabase = globalThis as typeof globalThis & {
   lunowaPool?: Pool;
-  lunowaDatabase?: ReturnType<typeof drizzle<typeof authSchema>>;
+  lunowaDatabase?: ReturnType<typeof drizzle<typeof databaseSchema>>;
 };
 
 function requiredEnvironment(name: 'DATABASE_URL'): string {
@@ -27,7 +27,7 @@ export function getDatabasePool(): Pool {
 
 export function getDatabase() {
   if (!globalDatabase.lunowaDatabase) {
-    globalDatabase.lunowaDatabase = drizzle(getDatabasePool(), {schema: authSchema});
+    globalDatabase.lunowaDatabase = drizzle(getDatabasePool(), {schema: databaseSchema});
   }
   return globalDatabase.lunowaDatabase;
 }

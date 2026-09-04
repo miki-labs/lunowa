@@ -21,16 +21,26 @@ describe('production auth contract', () => {
   it('keeps the P14 UUID schema and migration as the production FK target', () => {
     const migrations = readdirSync(resolve(process.cwd(), 'drizzle/migrations'))
       .filter((name) => name.endsWith('.sql'));
-    expect(migrations).toHaveLength(1);
+    expect(migrations).toHaveLength(2);
 
-    const sql = readFileSync(resolve(process.cwd(), 'drizzle/migrations', migrations[0]), 'utf8');
-    expect(sql).toContain('CREATE TABLE "user"');
-    expect(sql).toContain('"id" uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid()');
-    expect(sql).toContain('CREATE TABLE "session"');
-    expect(sql).toContain('"user_id" uuid NOT NULL');
-    expect(sql).toContain('"session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id")');
-    expect(sql).not.toContain('connected_account');
-    expect(sql).not.toContain('gmail');
+    const authSql = readFileSync(
+      resolve(process.cwd(), 'drizzle/migrations', migrations.find((name) => name.startsWith('0000_'))!),
+      'utf8'
+    );
+    expect(authSql).toContain('CREATE TABLE "user"');
+    expect(authSql).toContain('"id" uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid()');
+    expect(authSql).toContain('CREATE TABLE "session"');
+    expect(authSql).toContain('"user_id" uuid NOT NULL');
+    expect(authSql).toContain('"session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id")');
+    expect(authSql).not.toContain('connected_account');
+    expect(authSql).not.toContain('gmail');
+
+    const evidenceSql = readFileSync(
+      resolve(process.cwd(), 'drizzle/migrations', migrations.find((name) => name.startsWith('0001_'))!),
+      'utf8'
+    );
+    expect(evidenceSql).toContain('REFERENCES "public"."user"("id")');
+    expect(evidenceSql).toContain('CREATE TABLE "connected_accounts"');
   });
 
   it('configures only local application credentials and the proven UUID generator', () => {

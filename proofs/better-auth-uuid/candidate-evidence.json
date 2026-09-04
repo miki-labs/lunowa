@@ -12,10 +12,16 @@
   },
   "configuration": {
     "advanced.database.generateId": "uuid",
-    "account.identityStrategy": "provider-id",
     "productionAuthActivated": false,
     "providerCredentialsUsed": false
   },
+  "v1.7.2LocalCredentialAccountSemantics": {
+    "providerId": "credential",
+    "issuer": "createLocalAccountIssuer(\"credential\")",
+    "accountId": "createdUser.id",
+    "userId": "createdUser.id"
+  },
+  "postgresVersionOracle": "server_version_num == \"180006\"; raw server_version and version() are recorded by the runtime proof",
   "artifacts": {
     "generatedSchema": "proofs/better-auth-uuid/auth-schema.ts",
     "generatedSql": "proofs/better-auth-uuid/migrations",

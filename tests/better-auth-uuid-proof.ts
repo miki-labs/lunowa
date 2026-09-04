@@ -6,10 +6,7 @@ import { createLocalAccountIssuer } from "better-auth";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
-import {
-  PROOF_ACCOUNT_IDENTITY_STRATEGY,
-  createProofAuth,
-} from "../proofs/better-auth-uuid/proof-config";
+import { createProofAuth } from "../proofs/better-auth-uuid/proof-config";
 
 const root = resolve(import.meta.dirname, "..");
 const proofRoot = resolve(root, "proofs/better-auth-uuid");
@@ -36,7 +33,7 @@ const acceptance: Record<
   },
   "48": {
     status: "NOT_RUN",
-    test: "Better Auth local sign-up/session + credential-account + domain FK roundtrip",
+    test: "Better Auth 1.7.2 local sign-up/session + credential-account + domain FK roundtrip",
   },
   "49": {
     status: "NOT_RUN",
@@ -60,14 +57,15 @@ const evidence = {
   },
   configuration: {
     "advanced.database.generateId": "uuid",
-    "account.identityStrategy": PROOF_ACCOUNT_IDENTITY_STRATEGY,
     productionAuthActivated: false,
     providerCredentialsUsed: false,
   },
   accountRelationship: null as {
-    strategy: typeof PROOF_ACCOUNT_IDENTITY_STRATEGY;
     providerId: string;
     issuer: string;
+    issuerMatchesLocalCredentialIssuer: boolean;
+    accountId: string;
+    userId: string;
     accountIdMatchesUserId: boolean;
     userIdMatchesUserId: boolean;
     mode: string;
@@ -188,9 +186,8 @@ async function run(): Promise<void> {
     evidence.postgresVersionNum = version.server_version_num;
     evidence.postgresFullVersion = version.full_version;
     assert(
-      version.server_version === expectedPostgresVersion &&
-        version.server_version_num === "180006",
-      `The proof requires PostgreSQL ${expectedPostgresVersion}; observed ${version.server_version} (${version.server_version_num}).`,
+      version.server_version_num === "180006",
+      `The proof requires PostgreSQL ${expectedPostgresVersion}; observed server_version=${version.server_version}, server_version_num=${version.server_version_num}.`,
     );
 
     const schema = { ...authSchema, ...domainSchema };
@@ -272,13 +269,6 @@ async function run(): Promise<void> {
     );
 
     const auth = createProofAuth(db, authSchema);
-    const configuredIdentityStrategy = (
-      auth.options.account as unknown as { identityStrategy?: unknown } | undefined
-    )?.identityStrategy;
-    assert(
-      configuredIdentityStrategy === PROOF_ACCOUNT_IDENTITY_STRATEGY,
-      "The proof auth configuration does not explicitly select provider-id account identity.",
-    );
     const socialProviders = (
       auth.options as unknown as {
         socialProviders?: Record<string, unknown>;
@@ -341,20 +331,24 @@ async function run(): Promise<void> {
     const credentialAccount = accountRows.rows.find(
       (account) => account.provider_id === "credential",
     );
+    const localCredentialIssuer = createLocalAccountIssuer("credential");
     assert(
       credentialAccount &&
         credentialAccount.account_id === createdUser.id &&
-        credentialAccount.issuer === createLocalAccountIssuer("credential") &&
+        credentialAccount.issuer === localCredentialIssuer &&
         credentialAccount.user_id === createdUser.id,
       "Better Auth did not persist a local credential account linked to the UUID user.",
     );
     evidence.accountRelationship = {
-      strategy: PROOF_ACCOUNT_IDENTITY_STRATEGY,
       providerId: credentialAccount.provider_id,
       issuer: credentialAccount.issuer,
+      issuerMatchesLocalCredentialIssuer:
+        credentialAccount.issuer === localCredentialIssuer,
+      accountId: credentialAccount.account_id,
+      userId: credentialAccount.user_id,
       accountIdMatchesUserId: credentialAccount.account_id === createdUser.id,
       userIdMatchesUserId: credentialAccount.user_id === createdUser.id,
-      mode: "Better Auth local email/password credential account; no OAuth link attempted",
+      mode: "Better Auth 1.7.2 local email/password credential account; no OAuth link attempted",
     };
 
     const [domainRow] = await db
@@ -377,7 +371,7 @@ async function run(): Promise<void> {
     setStatus(
       "48",
       "PASS",
-      "Better Auth local user/session and credential-account rows roundtripped, and the proof-only domain UUID FK returned the same user ID; no OAuth credentials were used.",
+      "Better Auth 1.7.2 local user/session and credential-account rows roundtripped, and the proof-only domain UUID FK returned the same user ID; no OAuth credentials were used.",
     );
 
     // Keep generated content in the result only as bounded paths/claims; never

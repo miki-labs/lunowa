@@ -15,6 +15,7 @@
 | ACP execution/recovery | admission / concurrency / model routing / scheduler / recovery / quarantine | `miki-labs/agent-control-plane` のcurrent repo + 必要なhost evidenceがauthority。Product semanticsは所有しない |
 | Human checkpoint / navigation | `AGENTS.md`, `CURRENT.md`, `KNOWLEDGE-MAP.md` | routeと要約だけ。canonical/live evidenceに負ける |
 | Actual behavior | code / schema / tests / runtime evidence | 実際に何が起きるかを示す。intentとの差はreconcileする |
+| Reusable upstream baseline | Blueprint + `BLUEPRINT-ADOPTION.md` | Lunowa固有authorityをoverrideしない |
 | Transient context | chats / Codex sessions / routine debugging | material decisionの唯一の保存先にしない |
 
 Authorityは「どの質問に答えるか」で決まります。万能な一列のpriority orderは作りません。
@@ -70,6 +71,19 @@ transient discussion / research
 
 brainstorm、捨てた案、routine debugging、recoverable chat detailは残しません。
 
+## 明示的に作らないもの
+
+実利用で不足が証明されるまでは、以下を追加しません。
+
+- status database
+- knowledge graph
+- chat archive
+- duplicated Issue/PR ledger
+- copied ACP handbook / scheduler-state database
+- 自動生成wikiを新しいauthorityにする仕組み
+- global status enum
+- continuity専用service
+
 ## Language policy
 
 - `CURRENT.md`、human-facing checkpoint、Issue/PRの短いHuman Summaryは **日本語第一**。
@@ -97,5 +111,6 @@ continuity layerを次のものにしてはいけません。
 - chat/session/reasoning archive
 - Responsibility conclusion store
 - 自動生成wikiを新しいauthorityにする仕組み
+- canonical docsがcontinuity summaryに依存するcircular authority
 
 迷ったら **追加するより削る / linkする / live sourceをqueryする** を優先します。

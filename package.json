@@ -23,6 +23,7 @@
     "test:auth-production": "node --import tsx tests/auth-production-integration.ts",
     "test:evidence-foundation": "node --import tsx tests/evidence-foundation-integration.ts",
     "test:responsibility-production": "node --import tsx tests/responsibility-production-integration.ts",
+    "test:responsibility-reducer-production": "node --import tsx tests/responsibility-reducer-production-integration.ts",
     "test:gmail-provider": "vitest run tests/gmail-provider.test.ts",
     "test:gmail-production": "node --import tsx tests/gmail-provider-integration.ts",
     "test:gmail-real-provider": "node --import tsx tests/gmail-real-provider-evidence.ts",

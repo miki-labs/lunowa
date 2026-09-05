@@ -18,7 +18,13 @@ export function getDatabasePool(): Pool {
   if (!globalDatabase.lunowaPool) {
     globalDatabase.lunowaPool = new Pool({
       connectionString: requiredEnvironment('DATABASE_URL'),
-      max: 10,
+      // Cloudflare Workers cannot safely reuse live TCP-backed pg clients across
+      // request contexts. Keep the Pool as a lightweight concurrency gate, but
+      // retire every checked-out client when it is released so no socket can be
+      // carried into a later Worker request.
+      max: 5,
+      maxUses: 1,
+      allowExitOnIdle: true,
       application_name: 'lunowa-application'
     });
   }

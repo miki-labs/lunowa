@@ -48,7 +48,7 @@
     "pg": "8.23.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "react-server-dom-webpack": "19.2.7",
+    "react-server-dom-webpack": "19.2.8",
     "sanitize-html": "2.17.7",
     "vinext": "1.0.0-beta.9"
   },

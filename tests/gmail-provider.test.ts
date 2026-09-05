@@ -11,6 +11,7 @@ import {GmailCredentialCipher, sha256} from '@/server/gmail/crypto';
 import {normalizeGmailMessage} from '@/server/gmail/normalize';
 import {assertOauthBrowserBinding, oauthBrowserCookie} from '@/server/gmail/oauth-browser-binding';
 import {GmailPushIngress, GooglePubSubJwtVerifier} from '@/server/gmail/pubsub';
+import {GoogleGmailClient} from '@/server/gmail/provider-client';
 import {GmailSyncService} from '@/server/gmail/sync';
 import type {
   GmailHistoryPage,
@@ -84,6 +85,33 @@ function provider(overrides: Partial<GmailProviderClient> = {}): GmailProviderCl
     ...overrides
   };
 }
+
+describe('G20 Gmail provider client runtime boundary', () => {
+  it('calls the Workers global fetch without rebinding its receiver', async () => {
+    const receivers: unknown[] = [];
+    vi.stubGlobal('fetch', function (this: unknown) {
+      receivers.push(this);
+      return Promise.resolve(new Response(JSON.stringify({historyId: '101', expiration: '1789214400000'}), {
+        status: 200,
+        headers: {'Content-Type': 'application/json'}
+      }));
+    } as typeof fetch);
+    try {
+      const client = new GoogleGmailClient({
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        redirectUri: 'https://app.example/api/providers/gmail/oauth/callback'
+      });
+      await expect(client.watch('access-token', 'projects/example/topics/gmail')).resolves.toEqual({
+        historyId: '101',
+        expiration: '1789214400000'
+      });
+      expect(receivers).toEqual([undefined]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe('G20 Gmail credential and authorization boundary', () => {
   it('persists ciphertext only behind the composite account ownership FK', () => {

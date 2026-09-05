@@ -57,7 +57,7 @@ export class GoogleGmailClient implements GmailProviderClient {
   private readonly request: typeof fetch;
 
   constructor(private readonly config: ProviderClientConfig) {
-    this.request = config.fetch ?? fetch;
+    this.request = config.fetch ?? ((input, init) => fetch(input, init));
   }
 
   private async json<T>(url: string, init: RequestInit = {}): Promise<T> {

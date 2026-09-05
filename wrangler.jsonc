@@ -2,8 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lunowa-preview",
   "compatibility_date": "2026-09-03",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "vinext/server/fetch-handler",
+  "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
+  "main": "src/worker.ts",
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
   "assets": {
     "directory": "dist/client",
     "not_found_handling": "none",

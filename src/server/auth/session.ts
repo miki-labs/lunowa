@@ -49,6 +49,15 @@ export async function getOwnedAppSession(headers: Headers, requestedUserId: stri
   return authorizeAppSession(candidate, requestedUserId);
 }
 
+export async function getCurrentAppSession(headers: Headers) {
+  const candidate = await getAppAuth().api.getSession({
+    headers,
+    query: {disableCookieCache: true, disableRefresh: true}
+  });
+  if (!candidate) throw new AppSessionAccessError(401, 'UNAUTHENTICATED');
+  return authorizeAppSession(candidate, candidate.user.id);
+}
+
 export function sessionAccessResponse(error: unknown): Response | null {
   if (!(error instanceof AppSessionAccessError)) return null;
   return Response.json({error: error.code}, {

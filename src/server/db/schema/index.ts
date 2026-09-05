@@ -19,3 +19,10 @@ export {
   responsibilityProvenanceRefs,
   responsibilityTemporalFacts
 } from './responsibility';
+export {
+  gmailBootstrapStates,
+  gmailOauthStates,
+  gmailProviderCredentials,
+  gmailSyncSignals,
+  gmailWatchStates
+} from './gmail';

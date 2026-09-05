@@ -22,5 +22,10 @@ production User/G19 evidence targets. Creating that table has no AI runtime
 side effect; G70 owns model invocation. The migration is intended for
 PostgreSQL `18` and is applied after the accepted G19 migration.
 
+The G20 migration follows the accepted G30 `0002` migration. It adds only the
+Gmail credential/OAuth/watch/signal/bootstrap tables and the provider-absence
+tombstone on G19 Message evidence. It preserves every accepted G30 object and
+does not physically delete observed Message content on Gmail mailbox deletion.
+
 Generate a migration after an authorized schema change with `pnpm db:generate`.
 Production and CI apply the committed SQL; they do not use a schema `push`.

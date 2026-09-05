@@ -191,6 +191,72 @@ export class EvidenceRepository {
       });
   }
 
+  public async listProviderMessageIds(input: {
+    userId: string;
+    connectedAccountId: string;
+  }): Promise<readonly string[]> {
+    const rows = await this.db
+      .select({providerMessageId: messages.providerMessageId})
+      .from(messages)
+      .where(
+        and(
+          eq(messages.userId, input.userId),
+          eq(messages.connectedAccountId, input.connectedAccountId)
+        )
+      );
+    return rows.map(({providerMessageId}) => providerMessageId);
+  }
+
+  /**
+   * Records current provider absence without erasing immutable communication
+   * evidence. Physical deletion belongs to a separate privacy/account-deletion
+   * authority, never to a Gmail history event.
+   */
+  public async markNormalizedMessageAbsent(input: {
+    userId: string;
+    connectedAccountId: string;
+    providerMessageId: string;
+  }): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({
+          id: messages.id,
+          conversationId: messages.conversationId,
+          providerDeletedAt: messages.providerDeletedAt
+        })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.userId, input.userId),
+            eq(messages.connectedAccountId, input.connectedAccountId),
+            eq(messages.providerMessageId, input.providerMessageId)
+          )
+        )
+        .for('update');
+      if (!existing) return false;
+      if (existing.providerDeletedAt) return false;
+
+      await tx
+        .update(messages)
+        .set({providerDeletedAt: new Date(), updatedAt: new Date()})
+        .where(eq(messages.id, existing.id));
+      await tx
+        .update(conversations)
+        .set({
+          semanticEvidenceRevision: sql`${conversations.semanticEvidenceRevision} + 1`,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(conversations.id, existing.conversationId),
+            eq(conversations.userId, input.userId),
+            eq(conversations.connectedAccountId, input.connectedAccountId)
+          )
+        );
+      return true;
+    });
+  }
+
   /**
    * Advances evidence under the conversation row lock. The migration trigger
    * independently rejects direct SQL attempts to decrease the revision.
@@ -409,6 +475,7 @@ export class EvidenceRepository {
         readState: input.readState ?? null,
         mailboxStateSnapshot: input.mailboxStateSnapshot ?? null,
         rawProviderMetadata: input.rawProviderMetadata ?? null,
+        providerDeletedAt: null,
         updatedAt: new Date()
       };
       let messageId: string;
@@ -429,7 +496,8 @@ export class EvidenceRepository {
           !sameDate(existing.providerReceivedAt, messageValues.providerReceivedAt) ||
           existing.readState !== messageValues.readState ||
           JSON.stringify(existing.mailboxStateSnapshot) !== JSON.stringify(messageValues.mailboxStateSnapshot) ||
-          JSON.stringify(existing.rawProviderMetadata) !== JSON.stringify(messageValues.rawProviderMetadata);
+          JSON.stringify(existing.rawProviderMetadata) !== JSON.stringify(messageValues.rawProviderMetadata) ||
+          existing.providerDeletedAt !== null;
         if (messageChanged) {
           await tx.update(messages).set(messageValues).where(eq(messages.id, messageId));
         }

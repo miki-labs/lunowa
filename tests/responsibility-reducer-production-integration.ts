@@ -78,9 +78,9 @@ function stateFrom(result: Awaited<ReturnType<ResponsibilityRepository['applyTru
 
 async function migrate(): Promise<void> {
   const files = (await readdir(resolve(import.meta.dirname, '../drizzle/migrations')))
-    .filter((name) => /^000[012]_.*\.sql$/.test(name))
+    .filter((name) => /^\d{4}_.*\.sql$/.test(name))
     .sort();
-  assert(files.length === 3, `expected G10/G19/G30 migrations, got ${files.join(', ')}`);
+  assert(files.length >= 4, `expected the current production migration chain, got ${files.join(', ')}`);
   for (const file of files) await pool.query(await readFile(resolve(import.meta.dirname, `../drizzle/migrations/${file}`), 'utf8'));
 }
 

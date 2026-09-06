@@ -78,6 +78,35 @@ One active implementation should own one task/worktree. Never run duplicate agen
 
 Add orchestration only after measured throughput, coordination, or recovery pressure justifies its lifecycle and failure cost. Do not turn direct execution into a new daemon, workflow database, automatic replay system, or SDK control plane by default.
 
+### Terminal control and bounded parallelism
+
+For Lunowa, the durable terminal control surface is `scripts/direct_agent_control.py`; `lw fleet` / `lw agent ...` are host convenience aliases. The script reads live GitHub `blocked_by`, PRs, worktrees, bounded process/log evidence, local resources, and observed Codex quota failures. It does not own Product state or introduce a scheduler/database.
+
+Operational defaults are deliberately small:
+
+- target about **3** concurrent top-level implementation lanes; hard-cap ordinary solo operation at **4** until measurement justifies more;
+- actual fresh dispatch is `min(independent ready work, candidate/review WIP capacity, quota, local resource capacity)`;
+- correction of an existing candidate consumes process capacity but does not create new WIP;
+- one Issue/worktree has one top-level write owner; use native subagents only for independent read-heavy exploration, research, hypothesis testing, or test/log analysis unless a task explicitly establishes disjoint write ownership;
+- review-ready candidates count against WIP. Drain review/integration before opening excess fresh branches;
+- stop/timeout/crash never grants retry authority. Inspect the worktree, logs, terminal event, PR head, and GitHub state first;
+- shared root assets, workflows, migrations, and schema ownership may require serial merge/revalidation even when implementation ran in parallel.
+
+Useful controller commands:
+
+```text
+python scripts/direct_agent_control.py fleet
+python scripts/direct_agent_control.py agent start ISSUE --dry-run
+python scripts/direct_agent_control.py agent start ISSUE --tool-profile docs --dry-run
+python scripts/direct_agent_control.py agent status [ISSUE]
+python scripts/direct_agent_control.py agent logs ISSUE
+python scripts/direct_agent_control.py agent stop ISSUE
+```
+
+The controller (normally ChatGPT plus Remote Desktop Commander) chooses which Issue to start, model/reasoning effort, external evidence, review order, and any privileged write. The terminal helper validates and executes that decision; it does not autonomously choose, retry, merge, deploy, or broaden tool authority.
+
+Direct-agent tool profiles are fail-closed: `repo` exposes no MCP/plugin integrations, `docs` adds Context7, `ui` adds Context7 + Next DevTools, and `browser-debug` additionally adds Chrome DevTools. Remote plugins and privileged external/provider MCPs remain disabled for coding-agent runs; the controller obtains or authorizes that evidence separately.
+
 ## Inspect before editing
 
 For non-trivial work, inspect the relevant subset of:

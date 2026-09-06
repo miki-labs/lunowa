@@ -184,6 +184,75 @@ try {
   assert(completedReplay.contract.status === 'RESOLVED', 'completed defer replay resurrected its contract.');
   assert(completedReplay.state.attentionMode === 'PRESENT', 'completed defer replay returned Responsibility to LATER.');
 
+  // T04: a due follow-up re-evaluates current evidence and adds a USER
+  // follow-up leg to the same Responsibility. It must not invent a new one.
+  const t04Initial = stateFrom(await responsibilityRepository.applyTrustedCommand(candidate({
+    sourceEventKey: 'g32-t04',
+    candidateKey: 'g32-t04',
+    applicationKey: 'g32-t04',
+    operationalOutcome: 'obtain approval from the counterpart',
+    obligationLegs: [{...otherPartyLeg(randomUUID()), provenance: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId}]}]
+  })));
+  const t04TriggerId = randomUUID();
+  const t04SiblingId = randomUUID();
+  const t04Contract = await temporalRepository.upsertTemporalContract(contractInput(t04Initial.id, now, [t04TriggerId, t04SiblingId]));
+  const beforeT04Count = await pool.query<{count: string}>(`SELECT count(*)::text AS count FROM responsibilities WHERE user_id = $1`, [userId]);
+  const followUpLeg: ObligationLeg = {
+    id: randomUUID(),
+    bearer: 'USER',
+    actionCode: 'FOLLOW_UP',
+    status: 'OPEN',
+    actionability: 'ACTIONABLE',
+    basisKind: 'COMMUNICATED_REQUEST',
+    provenance: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId}]
+  };
+  const t04 = await temporalRepository.processTemporalTrigger({
+    triggerId: t04TriggerId,
+    userId,
+    now,
+    loadEvidence: evidence,
+    evaluate: () => ({kind: 'APPLY', reasonCode: 'FOLLOW_UP_DUE', patch: {obligationLegs: [followUpLeg]}})
+  });
+  assert(t04.status === 'FIRED' && t04.state?.id === t04Initial.id, 'T04 follow-up did not update the same Responsibility.');
+  assert(t04.projection?.bucket === 'MY_TURN', 'T04 follow-up did not project MY_TURN after current evidence was re-evaluated.');
+  assert(t04.state?.obligationLegs.some((leg) => leg.id === followUpLeg.id && leg.bearer === 'USER' && leg.status === 'OPEN'), 'T04 follow-up USER leg was not persisted.');
+  assert(t04.state?.obligationLegs.some((leg) => leg.bearer === 'OTHER_PARTY' && leg.status === 'OPEN'), 'T04 follow-up incorrectly removed the original approval expectation.');
+  const afterT04Count = await pool.query<{count: string}>(`SELECT count(*)::text AS count FROM responsibilities WHERE user_id = $1`, [userId]);
+  assert(afterT04Count.rows[0]?.count === beforeT04Count.rows[0]?.count, 'T04 follow-up created a new Responsibility instead of updating the existing one.');
+  assert((await temporalRepository.getContract({id: t04Contract.id, userId}))?.status === 'RESOLVED', 'T04 APPLY left its consumed Temporal contract active.');
+  const t04Sibling = await pool.query<{trigger_status: string}>(`SELECT trigger_status FROM temporal_triggers WHERE id = $1`, [t04SiblingId]);
+  assert(t04Sibling.rows[0]?.trigger_status === 'CANCELLED', 'T04 APPLY left a sibling trigger live after the return condition was consumed.');
+
+  // The evaluator is trusted to interpret current evidence, but Temporal scope
+  // still binds its explicit command to the claimed Responsibility.
+  const crossScopeTriggerId = randomUUID();
+  await temporalRepository.upsertTemporalContract(contractInput(t04Initial.id, now, [crossScopeTriggerId]));
+  const unrelatedBefore = await responsibilityRepository.getResponsibility({userId, connectedAccountId: accountId, responsibilityId: initial.id});
+  assert(unrelatedBefore, 'cross-scope test target disappeared.');
+  const crossScopeCommand = candidate({
+    sourceEventKey: 'g32-cross-scope',
+    candidateKey: 'g32-cross-scope',
+    applicationKey: 'g32-cross-scope',
+    effects: [{
+      operation: 'UPDATE',
+      responsibilityRef: initial.id,
+      expectedAggregateVersion: unrelatedBefore.state.aggregateVersion,
+      effectKey: 'g32-cross-scope-update',
+      patch: {operationalOutcome: 'incorrect cross-scope mutation'},
+      provenance: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId}]
+    }]
+  });
+  const crossScope = await temporalRepository.processTemporalTrigger({
+    triggerId: crossScopeTriggerId,
+    userId,
+    now,
+    loadEvidence: evidence,
+    evaluate: () => ({kind: 'APPLY', reasonCode: 'CROSS_SCOPE_ATTEMPT', command: crossScopeCommand})
+  });
+  assert(crossScope.status === 'FAILED' && crossScope.error?.includes('claimed Responsibility'), 'Temporal APPLY accepted a command for another Responsibility.');
+  const unrelatedAfter = await responsibilityRepository.getResponsibility({userId, connectedAccountId: accountId, responsibilityId: initial.id});
+  assert(unrelatedAfter?.state.operationalOutcome === unrelatedBefore.state.operationalOutcome && unrelatedAfter.state.aggregateVersion === unrelatedBefore.state.aggregateVersion, 'cross-scope Temporal APPLY mutated the unrelated Responsibility.');
+
   const staleTriggerId = randomUUID();
   const staleReplacementId = randomUUID();
   await temporalRepository.upsertTemporalContract(contractInput(initial.id, now, [staleTriggerId]));

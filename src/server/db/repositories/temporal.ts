@@ -422,7 +422,7 @@ export class TemporalRepository {
         next = result.responsibilities[0];
       }
 
-      if (input.decision.kind === 'RETURN_ATTENTION') {
+      if (input.decision.kind !== 'NO_OP') {
         await this.retireActiveContractsInTransaction(tx, {
           userId: input.input.userId,
           connectedAccountId: input.claimed.trigger.connectedAccountId,

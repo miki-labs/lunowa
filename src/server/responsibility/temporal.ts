@@ -156,6 +156,28 @@ export function isTemporalTriggerEligible(trigger: TemporalTrigger, evidence: Te
   return true;
 }
 
+function validateTemporalApplyCommand(
+  context: TemporalEvaluationContext,
+  command: TrustedResponsibilityCommand
+): TrustedResponsibilityCommand {
+  if (command.commandSource !== 'TRUSTED_SYSTEM') throw new Error('Temporal APPLY command must come from TRUSTED_SYSTEM');
+  if (command.userId !== context.state.userId || command.connectedAccountId !== context.state.connectedAccountId || command.conversationId !== context.state.conversationId) {
+    throw new Error('Temporal APPLY command cannot cross user, account, or conversation scope');
+  }
+  if (command.evidenceRevision !== context.evidence.evidenceRevision) throw new Error('Temporal APPLY command must use the current evaluated evidence revision');
+  if (command.admission.decision !== 'TRACK') throw new Error('Temporal APPLY command cannot change Responsibility admission');
+  if (!command.effects?.length) throw new Error('Temporal APPLY command requires explicit effects on the claimed Responsibility');
+  for (const effect of command.effects) {
+    if (effect.operation === 'CREATE' || effect.responsibilityRef !== context.state.id) {
+      throw new Error('Temporal APPLY command is limited to the claimed Responsibility and cannot CREATE another Responsibility');
+    }
+    if (effect.expectedAggregateVersion !== undefined && effect.expectedAggregateVersion !== context.state.aggregateVersion) {
+      throw new Error('Temporal APPLY command must target the evaluated aggregate version');
+    }
+  }
+  return command;
+}
+
 export function createTemporalReconsiderationCommand(
   context: TemporalEvaluationContext,
   decision: TemporalDecision
@@ -177,7 +199,10 @@ export function createTemporalReconsiderationCommand(
         }
       }
     : decision;
-  if (acceptedDecision.command) return acceptedDecision.command;
+  if (acceptedDecision.command) {
+    if (acceptedDecision.kind !== 'APPLY') throw new Error('only Temporal APPLY may provide an explicit trusted command');
+    return validateTemporalApplyCommand(context, acceptedDecision.command);
+  }
   const provenance = context.evidence.references[0] ?? {
     evidenceKind: 'EXTERNAL_AUTHORITATIVE_FACT',
     providerObservationKey: `temporal:${context.trigger.id}`,
@@ -491,7 +516,7 @@ export class TemporalRuntime {
         next = result.effects[0].state;
         this.store.updateResponsibility(next);
       }
-      if (decision.kind === 'RETURN_ATTENTION') {
+      if (decision.kind !== 'NO_OP') {
         const timestamp = iso(now);
         for (const sibling of this.store.listTriggers()) {
           const siblingContract = this.store.getContract(sibling.temporalContractId);

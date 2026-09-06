@@ -182,6 +182,66 @@ describe('G32 attention and Temporal runtime', () => {
     expect(result.state?.attentionMode).toBe('PRESENT');
   });
 
+  it('implements T04 as one same-Responsibility follow-up transition and retires the consumed contract', async () => {
+    const now = new Date('2026-09-06T00:00:00.000Z');
+    const store = new InMemoryTemporalStore();
+    const initial = state();
+    store.setResponsibility(initial);
+    store.setEvidence(initial.id, {evidenceRevision: 1, references: [reference], userAttentionNeeded: true});
+    const contract = store.upsertContract({...contractInput(now), triggers: [
+      {id: 'follow-up-trigger', triggerType: 'TIME', triggerAt: now.toISOString()},
+      {id: 'follow-up-sibling', triggerType: 'TIME', triggerAt: now.toISOString()}
+    ]});
+    const runtime = new TemporalRuntime(store, {evaluate: () => ({
+      kind: 'APPLY',
+      reasonCode: 'FOLLOW_UP_DUE',
+      patch: {obligationLegs: [leg('follow-up-leg', 'USER')]}
+    })});
+    const result = await runtime.processTemporalTrigger('follow-up-trigger', now);
+    expect(result.status).toBe('FIRED');
+    expect(result.state?.id).toBe(initial.id);
+    expect(result.state?.obligationLegs.map(({id}) => id)).toEqual(expect.arrayContaining(['other-leg', 'follow-up-leg']));
+    expect(result.projection?.bucket).toBe('MY_TURN');
+    expect(store.getContract(contract.id)?.status).toBe('RESOLVED');
+    expect(store.getTrigger('follow-up-sibling')?.status).toBe('CANCELLED');
+  });
+
+  it('rejects a Temporal APPLY command that tries to mutate another Responsibility in the same conversation', async () => {
+    const now = new Date('2026-09-06T00:00:00.000Z');
+    const store = new InMemoryTemporalStore();
+    const initial = state();
+    const other = state({id: 'responsibility-2', operationalOutcome: 'unrelated outcome'});
+    store.setResponsibility(initial);
+    store.setResponsibility(other);
+    store.setEvidence(initial.id, {evidenceRevision: 1, references: [reference], userAttentionNeeded: true});
+    store.upsertContract({...contractInput(now), triggers: [{id: 'cross-scope-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}]});
+    const crossScope: TrustedResponsibilityCommand = {
+      commandSource: 'TRUSTED_SYSTEM',
+      userId: initial.userId,
+      connectedAccountId: initial.connectedAccountId,
+      conversationId: initial.conversationId,
+      sourceEventKey: 'cross-scope-temporal',
+      candidateKey: 'cross-scope-temporal',
+      applicationKey: 'cross-scope-temporal',
+      evidenceRevision: 1,
+      admission: {decision: 'TRACK', reasonCodes: ['TEMPORAL_RECONSIDERATION']},
+      provenance: [reference],
+      effects: [{
+        operation: 'UPDATE',
+        responsibilityRef: other.id,
+        expectedAggregateVersion: other.aggregateVersion,
+        effectKey: 'cross-scope-update',
+        patch: {operationalOutcome: 'incorrectly changed'},
+        provenance: [reference]
+      }]
+    };
+    const result = await new TemporalRuntime(store, {evaluate: () => ({kind: 'APPLY', reasonCode: 'CROSS_SCOPE', command: crossScope})})
+      .processTemporalTrigger('cross-scope-trigger', now);
+    expect(result.status).toBe('FAILED');
+    expect(result.error).toMatch(/claimed Responsibility/);
+    expect(store.getResponsibility(other.id)?.operationalOutcome).toBe('unrelated outcome');
+  });
+
   it('confines Return Attention to attention even if an evaluator supplies a command', async () => {
     const now = new Date('2026-09-06T00:00:00.000Z');
     const initial = state({attentionMode: 'DEFERRED'});

@@ -11,7 +11,9 @@ import argparse
 import grp
 import concurrent.futures
 from datetime import datetime
+import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -19,6 +21,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from typing import Any
 
 REPO = os.environ.get("LW_REPO", "miki-labs/lunowa")
@@ -39,10 +42,18 @@ TOOL_PROFILES = {
     "browser-debug": frozenset({"context7", "next-devtools", "chrome-devtools"}),
 }
 QUOTA_RE = re.compile(r"You've hit your usage limit.*?try again at\s+([A-Z][a-z]{2})\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+(\d{1,2}:\d{2}\s+[AP]M)", re.I | re.S)
+CLI_METRICS = Path(os.environ.get("LW_CLI_METRICS", str(Path.home() / ".cache/lw/direct-cli-metrics.jsonl"))).resolve()
+_METRIC_COUNTS = {"subprocess": 0, "github": 0}
+_LAST_OUTPUT_BYTES = 0
+
+
+def process_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    _METRIC_COUNTS["subprocess"] += 1
+    return subprocess.run(*args, **kwargs)
 
 
 def run(args: list[str], *, cwd: Path | None = None, check: bool = True) -> str:
-    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True)
+    result = process_run(args, cwd=cwd, text=True, capture_output=True)
     if check and result.returncode:
         raise RuntimeError((result.stderr or result.stdout).strip() or f"command failed: {' '.join(args)}")
     return result.stdout.strip()
@@ -54,11 +65,15 @@ def as_json(args: list[str], *, cwd: Path | None = None) -> Any:
 
 
 def gh(*args: str) -> Any:
+    _METRIC_COUNTS["github"] += 1
     return as_json(["gh", *args])
 
 
 def emit(value: Any) -> None:
-    print(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+    global _LAST_OUTPUT_BYTES
+    text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    _LAST_OUTPUT_BYTES = len(text.encode("utf-8")) + 1
+    print(text)
 
 
 def now_local() -> datetime:
@@ -71,30 +86,42 @@ def fetch_main() -> str:
     return head
 
 
-def issue_list() -> list[dict[str, Any]]:
-    return gh("issue", "list", "--repo", REPO, "--state", "open", "--label", PRIORITY_LABEL,
-              "--limit", "100", "--json", "number,title,body,labels,url,updatedAt") or []
-
-
-def dependency_map(numbers: list[int]) -> dict[int, list[dict[str, Any]]]:
-    if not numbers:
-        return {}
-    fields = " ".join(
-        f'i{n}:issue(number:{n}){{blockedBy(first:30){{nodes{{number state title}}}}}}' for n in numbers
-    )
-    query = f"query($owner:String!,$name:String!){{repository(owner:$owner,name:$name){{{fields}}}}}"
-    payload = gh("api", "graphql", "-F", f"owner={OWNER}", "-F", f"name={NAME}", "-f", f"query={query}")
+def remote_fleet_inputs() -> tuple[list[dict[str, Any]], dict[int, list[dict[str, Any]]], list[dict[str, Any]]]:
+    query = """query($owner:String!,$name:String!,$label:String!){repository(owner:$owner,name:$name){issues(first:100,states:OPEN,labels:[$label],orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title url blockedBy(first:30){nodes{number state title} pageInfo{hasNextPage}}} pageInfo{hasNextPage}} pullRequests(first:100,states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title headRefName headRefOid baseRefName url closingIssuesReferences(first:20){nodes{number} pageInfo{hasNextPage}}} pageInfo{hasNextPage}}}}"""
+    payload = gh("api", "graphql", "-F", f"owner={OWNER}", "-F", f"name={NAME}", "-F", f"label={PRIORITY_LABEL}", "-f", f"query={query}")
     repo = ((payload or {}).get("data") or {}).get("repository") or {}
-    return {n: (((repo.get(f"i{n}") or {}).get("blockedBy") or {}).get("nodes") or []) for n in numbers}
-
-
-def open_prs() -> list[dict[str, Any]]:
-    return gh("pr", "list", "--repo", REPO, "--state", "open", "--limit", "100",
-              "--json", "number,title,body,headRefName,headRefOid,baseRefName,url") or []
+    if ((repo.get("issues") or {}).get("pageInfo") or {}).get("hasNextPage") or ((repo.get("pullRequests") or {}).get("pageInfo") or {}).get("hasNextPage"):
+        raise RuntimeError("fleet remote query exceeded bounded 100-item page; refusing partial state")
+    issues: list[dict[str, Any]] = []
+    deps: dict[int, list[dict[str, Any]]] = {}
+    for node in ((repo.get("issues") or {}).get("nodes") or []):
+        number = int(node["number"])
+        blocked = node.get("blockedBy") or {}
+        if (blocked.get("pageInfo") or {}).get("hasNextPage"):
+            raise RuntimeError(f"Issue #{number} exceeds bounded blocked_by page; refusing partial dependency state")
+        issues.append({"number": number, "title": node.get("title"), "url": node.get("url")})
+        deps[number] = (blocked.get("nodes") or [])
+    prs: list[dict[str, Any]] = []
+    for node in ((repo.get("pullRequests") or {}).get("nodes") or []):
+        closing_ref = node.get("closingIssuesReferences") or {}
+        if (closing_ref.get("pageInfo") or {}).get("hasNextPage"):
+            raise RuntimeError(f"PR #{node.get('number')} exceeds bounded closing-Issue references; refusing partial mapping")
+        closing = [int(row["number"]) for row in (closing_ref.get("nodes") or [])]
+        prs.append({
+            "number": node.get("number"), "title": node.get("title"), "headRefName": node.get("headRefName"),
+            "headRefOid": node.get("headRefOid"), "baseRefName": node.get("baseRefName"), "url": node.get("url"),
+            "closingIssueNumbers": closing,
+        })
+    return issues, deps, prs
 
 
 def pr_issue_number(pr: dict[str, Any]) -> int | None:
-    text = "\n".join(str(pr.get(k) or "") for k in ("title", "body", "headRefName"))
+    closing = pr.get("closingIssueNumbers") or []
+    if len(closing) > 1:
+        raise RuntimeError(f"PR #{pr.get('number')} closes multiple Issues; one-Issue/one-writer mapping is ambiguous")
+    if len(closing) == 1:
+        return int(closing[0])
+    text = "\n".join(str(pr.get(k) or "") for k in ("title", "headRefName", "body"))
     branch = re.search(r"issue[-_/](\d+)|issue-(\d+)", text, re.I)
     if branch:
         return int(next(x for x in branch.groups() if x))
@@ -156,7 +183,7 @@ def _tool_version(command: str, args: list[str]) -> str | None:
     if not binary:
         return None
     try:
-        result = subprocess.run([binary, *args], text=True, capture_output=True, timeout=3)
+        result = process_run([binary, *args], text=True, capture_output=True, timeout=3)
     except (OSError, subprocess.TimeoutExpired):
         return None
     text = (result.stdout or result.stderr).strip().splitlines()
@@ -234,7 +261,7 @@ def betterleaks_status_code(path: Path) -> int:
     binary = shutil.which("betterleaks")
     if not binary:
         return 2
-    result = subprocess.run([binary, "git", "--pre-commit", "--no-banner", "--no-color", "--redact=100",
+    result = process_run([binary, "git", "--pre-commit", "--no-banner", "--no-color", "--redact=100",
         "--report-format", "json", "--report-path", os.devnull, "."], cwd=path,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if result.returncode == 0:
@@ -275,7 +302,7 @@ def user_systemd_env() -> dict[str, str]:
 
 
 def systemd_show(unit: str) -> dict[str, str]:
-    result = subprocess.run(["systemctl", "--user", "show", unit,
+    result = process_run(["systemctl", "--user", "show", unit,
         "--property=LoadState,ActiveState,SubState,Result,MainPID,ExecMainStatus"], text=True, capture_output=True, env=user_systemd_env())
     if result.returncode:
         return {"LoadState": "not-found", "ActiveState": "inactive", "SubState": "dead"}
@@ -322,6 +349,23 @@ def agent_records() -> list[dict[str, Any]]:
 
 
 
+def parse_git_status_v2(text: str) -> dict[str, Any]:
+    head: str | None = None; branch = "DETACHED"; dirty: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("# branch.oid "):
+            value = line.removeprefix("# branch.oid ").strip(); head = None if value == "(initial)" else value
+        elif line.startswith("# branch.head "):
+            value = line.removeprefix("# branch.head ").strip(); branch = "DETACHED" if value.startswith("(") else value
+        elif line and not line.startswith("#") and not re.search(r"(?:^|\s)\.pnpm-store/", line):
+            dirty.append(line)
+    return {"head": head, "branch": branch, "dirty": dirty}
+
+
+def git_status_snapshot(path: Path) -> dict[str, Any]:
+    text = run(["git", "status", "--porcelain=v2", "--branch", "--untracked-files=all"], cwd=path, check=False)
+    return parse_git_status_v2(text)
+
+
 def _meaningful_status(path: Path) -> list[str]:
     lines = run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=path, check=False).splitlines()
     return [line for line in lines if line and not re.search(r"(?:^|\s)\.pnpm-store/", line)]
@@ -352,16 +396,14 @@ def local_issue_workspaces(number: int, prs: list[dict[str, Any]]) -> list[dict[
     for path, kind in candidates:
         if path in seen: continue
         seen.add(path)
-        head = run(["git", "rev-parse", "HEAD"], cwd=path, check=False)
-        branch = run(["git", "branch", "--show-current"], cwd=path, check=False) or "DETACHED"
-        dirty = _meaningful_status(path)
+        status = git_status_snapshot(path)
+        head = str(status.get("head") or ""); branch = str(status.get("branch") or "DETACHED"); dirty = list(status.get("dirty") or [])
         ahead = False
         for pr_head in pr_heads:
-            if pr_head and head and head != pr_head and subprocess.run(["git", "merge-base", "--is-ancestor", pr_head, head], cwd=path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            if pr_head and head and head != pr_head and process_run(["git", "merge-base", "--is-ancestor", pr_head, head], cwd=path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
                 ahead = True; break
-        base_ref = "origin/main" if run(["git", "rev-parse", "--verify", "origin/main"], cwd=path, check=False) else "current/main"
-        base_head = run(["git", "rev-parse", "--verify", base_ref], cwd=path, check=False) if base_ref else ""
-        ahead_main = bool(base_head and head and head != base_head and subprocess.run(["git", "merge-base", "--is-ancestor", base_head, head], cwd=path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)
+        counts = run(["git", "rev-list", "--left-right", "--count", "origin/main...HEAD"], cwd=path, check=False).split()
+        ahead_main = len(counts) == 2 and int(counts[1]) > 0
         out.append({"path": str(path), "kind": kind, "branch": branch, "head": head,
                     "dirty_paths": len(dirty), "dirty_preview": dirty[:12], "ahead_of_pr": ahead, "ahead_of_main": ahead_main})
     return out
@@ -414,6 +456,9 @@ def worktree_changed_paths(path: Path) -> list[str]:
 
 
 def collision_snapshot(candidates: list[dict[str, Any]], active: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    possible_issues = {int(row["number"]) for row in candidates + active}
+    if len(possible_issues) < 2:
+        return []
     by_asset: dict[str, list[dict[str, Any]]] = {}
     seen_writers: set[tuple[int, str, str]] = set()
 
@@ -467,27 +512,101 @@ def lane_calculation(*, ready: int, active: int, unknown: int, candidates: int, 
     }
 
 
-def fleet_snapshot() -> dict[str, Any]:
-    main = fetch_main(); issues = issue_list(); numbers = [int(x["number"]) for x in issues]
+def fleet_snapshot(*, include_capabilities: bool = True) -> dict[str, Any]:
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-        f_deps = pool.submit(dependency_map, numbers); f_prs = pool.submit(open_prs); f_quota = pool.submit(quota_snapshot)
-        deps, prs, quota = f_deps.result(), f_prs.result(), f_quota.result()
+        f_main = pool.submit(fetch_main)
+        f_remote = pool.submit(remote_fleet_inputs)
+        f_quota = pool.submit(quota_snapshot)
+        main = f_main.result()
+        issues, deps, prs = f_remote.result()
+        quota = f_quota.result()
     agents = agent_records(); classified = classify_issues(issues, deps, prs, agents); resources = resource_snapshot()
     active = sum(1 for row in agents if row.get("active")); unknown = sum(1 for row in agents if row.get("unknown"))
     lanes = lane_calculation(ready=len(classified["ready"]), active=active, unknown=unknown,
                              candidates=len(classified["candidates"]), resource_cap=resources["implementation_cap"],
                              quota_blocked=quota["blocked"])
-    return {"main": main, "policy": {"one_issue_one_writer": True, "parallel_merge": False,
+    result = {"main": main, "policy": {"one_issue_one_writer": True, "parallel_merge": False,
             "native_subagents": "read-heavy exploration/research/test analysis; one top-level writer owns an Issue",
             "lane_formula": "min(independent ready work, WIP/review capacity, quota, local resource cap)"},
-            "lanes": lanes, "quota": quota, "resources": resources, "capabilities": capability_snapshot(), "issues": classified,
+            "lanes": lanes, "quota": quota, "resources": resources, "issues": classified,
             "agents": agents, "shared_asset_collisions": collision_snapshot(classified["candidates"], classified["active"])}
+    if include_capabilities:
+        result["capabilities"] = capability_snapshot()
+    return result
 
 
-def issue_gate(number: int) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
-    issue = gh("issue", "view", str(number), "--repo", REPO, "--json", "number,title,state,body,url")
-    deps = dependency_map([number]).get(number, []); prs = [p for p in open_prs() if pr_issue_number(p) == number]
-    return issue, deps, prs
+def main_repo_state(remote_main: str) -> dict[str, Any]:
+    status = git_status_snapshot(MAIN)
+    local_head = status.get("head")
+    return {"local_head": local_head, "branch": status.get("branch"), "dirty_paths": len(status.get("dirty") or []), "stale": local_head != remote_main}
+
+
+def _compact_candidate(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "issue": int(row["number"]),
+        "prs": [{"number": int(pr["number"]), "head": pr.get("headRefOid")} for pr in row.get("prs") or []],
+        "dirty": bool(row.get("has_dirty_correction")), "needs_push": bool(row.get("needs_push")),
+        "terminal_event": row.get("local_terminal_event"),
+    }
+
+
+def recommended_actions(fleet: dict[str, Any]) -> list[dict[str, Any]]:
+    issues = fleet.get("issues") or {}; actions: list[dict[str, Any]] = []
+    for row in fleet.get("agents") or []:
+        if row.get("unknown"):
+            actions.append({"priority": 0, "kind": "INSPECT_UNKNOWN_DIRECT_AGENT", "issue": int(row["issue"])})
+    for candidate in issues.get("candidates") or []:
+        kind = "CONTINUE_EXISTING_CORRECTION" if candidate.get("has_dirty_correction") else "PUBLISH_LOCAL_CANDIDATE" if candidate.get("needs_push") else "REVIEW_CANDIDATE"
+        actions.append({"priority": 1, "kind": kind, "issue": int(candidate["number"])})
+    if (fleet.get("quota") or {}).get("blocked"):
+        actions.append({"priority": 2, "kind": "CODEX_QUOTA_BLOCKED", "retry_after": fleet["quota"].get("retry_after")})
+    if int((fleet.get("lanes") or {}).get("recommended_new_lanes") or 0) > 0:
+        for ready in issues.get("ready") or []:
+            actions.append({"priority": 3, "kind": "START_DIRECT_AGENT", "issue": int(ready["number"])})
+    if not actions:
+        actions.append({"priority": 9, "kind": "NO_IMMEDIATE_PRODUCT_ACTION"})
+    actions.sort(key=lambda row: (int(row["priority"]), int(row.get("issue") or 10**9)))
+    return actions
+
+
+def snapshot_state_from_fleet(fleet: dict[str, Any]) -> dict[str, Any]:
+    issues = fleet.get("issues") or {}
+    blocked = {str(int(row["number"])): [int(dep["number"]) for dep in row.get("blocked_by") or []] for row in issues.get("blocked") or []}
+    collisions = [{"asset": row.get("asset"), "issues": sorted({int(writer["issue"]) for writer in row.get("writers") or []})} for row in fleet.get("shared_asset_collisions") or []]
+    return {
+        "main": fleet.get("main"), "repo": main_repo_state(str(fleet.get("main") or "")),
+        "queue": {
+            "ready": [int(row["number"]) for row in issues.get("ready") or []],
+            "blocked": blocked,
+            "running": [int(row["number"]) for row in issues.get("active") or []],
+            "candidates": [_compact_candidate(row) for row in issues.get("candidates") or []],
+        },
+        "lanes": {key: (fleet.get("lanes") or {}).get(key) for key in ("current_wip", "free_wip_slots", "free_process_slots", "recommended_new_lanes", "available_correction_lanes")},
+        "quota": {key: (fleet.get("quota") or {}).get(key) for key in ("blocked", "retry_after", "reason")},
+        "risk": {"unknown_agents": [int(row["issue"]) for row in fleet.get("agents") or [] if row.get("unknown")], "collisions": collisions},
+        "next": recommended_actions(fleet)[0],
+    }
+
+
+def snapshot_id_for_state(state: dict[str, Any]) -> str:
+    canonical = json.dumps(state, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()[:20]
+
+
+def snapshot_from_fleet(fleet: dict[str, Any], *, observed_at: datetime | None = None) -> dict[str, Any]:
+    state = snapshot_state_from_fleet(fleet)
+    return {"schema": "lw.snapshot.v1", "observed_at": (observed_at or now_local()).isoformat(), "snapshot_id": snapshot_id_for_state(state), **state}
+
+
+def snapshot_response(snapshot: dict[str, Any], since: str | None) -> dict[str, Any]:
+    if since and since == snapshot.get("snapshot_id"):
+        return {"schema": snapshot["schema"], "observed_at": snapshot["observed_at"], "snapshot_id": snapshot["snapshot_id"], "changed": False}
+    return {**snapshot, **({"changed": True} if since else {})}
+
+
+def require_snapshot(expected: str | None, actual: str) -> None:
+    if expected and expected != actual:
+        raise RuntimeError(f"STALE_PRECONDITION expected_snapshot={expected} actual_snapshot={actual}")
 
 
 def codex_tool_args(profile: str) -> list[str]:
@@ -514,12 +633,13 @@ Run targeted verification and the canonical verification appropriate to the fina
 
 
 def ensure_systemd() -> None:
-    if not shutil.which("systemd-run") or subprocess.run(["systemctl", "--user", "show-environment"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=user_systemd_env()).returncode:
+    if not shutil.which("systemd-run") or process_run(["systemctl", "--user", "show-environment"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=user_systemd_env()).returncode:
         raise RuntimeError("systemd --user is unavailable; direct agents are not started from the RDC process tree")
 
 
-def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, existing_worktree: str | None = None, tool_profile: str = "repo") -> dict[str, Any]:
-    fleet = fleet_snapshot()
+def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, existing_worktree: str | None = None, tool_profile: str = "repo", expected_snapshot: str | None = None) -> dict[str, Any]:
+    fleet = fleet_snapshot(include_capabilities=False)
+    require_snapshot(expected_snapshot, snapshot_from_fleet(fleet)["snapshot_id"])
     quota_blocked = bool(fleet["quota"]["blocked"])
     if any(int(row["issue"]) == number and (row.get("active") or row.get("unknown")) for row in fleet["agents"]):
         raise RuntimeError(f"Issue #{number} already has an active/unknown direct-agent execution")
@@ -530,17 +650,19 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
         if mode == "fresh":
             raise RuntimeError("no fresh implementation lane is currently available; drain candidate/review WIP or wait for quota/resources")
         raise RuntimeError("no correction process lane is currently available; wait for quota/resources or another active correction to finish")
-    issue, deps, prs = issue_gate(number)
-    if str(issue.get("state", "")).upper() != "OPEN":
-        raise RuntimeError(f"Issue #{number} is not open")
-    unresolved = [row for row in deps if str(row.get("state", "")).lower() != "closed"]
-    if unresolved:
-        raise RuntimeError(f"Issue #{number} has unresolved blocked_by dependencies: {[x['number'] for x in unresolved]}")
-    if mode == "fresh" and prs:
-        raise RuntimeError(f"Issue #{number} already has an open PR; use correction mode on its existing worktree")
-    if mode == "correction" and not prs:
-        raise RuntimeError(f"Issue #{number} has no open PR to correct")
-    main = fetch_main()
+    classified = fleet.get("issues") or {}
+    buckets = {name: {int(row["number"]): row for row in classified.get(name) or []} for name in ("ready", "blocked", "active", "candidates")}
+    issue = next((bucket[number] for bucket in buckets.values() if number in bucket), None)
+    if issue is None:
+        raise RuntimeError(f"Issue #{number} is not an open priority task in the live fleet snapshot")
+    if number in buckets["blocked"]:
+        raise RuntimeError(f"Issue #{number} has unresolved blocked_by dependencies: {[x['number'] for x in buckets['blocked'][number].get('blocked_by') or []]}")
+    prs = (buckets["candidates"].get(number) or {}).get("prs") or []
+    if mode == "fresh" and number not in buckets["ready"]:
+        raise RuntimeError(f"Issue #{number} is not a fresh ready task in the live fleet snapshot")
+    if mode == "correction" and number not in buckets["candidates"]:
+        raise RuntimeError(f"Issue #{number} has no live candidate to correct")
+    main = str(fleet.get("main") or "")
     if mode == "correction":
         if not existing_worktree:
             raise RuntimeError("correction mode requires --worktree PATH; explicit ownership avoids guessing stale/legacy workspaces")
@@ -563,10 +685,10 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
     if mode == "fresh":
         if worktree.exists():
             raise RuntimeError(f"worktree already exists: {worktree}; inspect/reuse explicitly instead of replacing it")
-        if subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=MAIN).returncode == 0:
+        if process_run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=MAIN).returncode == 0:
             raise RuntimeError(f"local branch already exists: {branch}")
-        run(["git", "worktree", "add", "-b", branch, str(worktree), "origin/main"], cwd=MAIN)
-        preflight = subprocess.run([sys.executable, str(worktree / "scripts/parallel-task-preflight.py"),
+        run(["git", "worktree", "add", "-b", branch, str(worktree), main], cwd=MAIN)
+        preflight = process_run([sys.executable, str(worktree / "scripts/parallel-task-preflight.py"),
             "--expected-repository", str(worktree), "--expected-worktree", str(worktree), "--expected-branch", branch,
             "--expected-head", main, "--base", "origin/main", "--remote-base", "origin/main", "--owner", owner,
             "--relationship", "independent", "--blocker-status", "none"], cwd=worktree, env=env, text=True, capture_output=True)
@@ -581,7 +703,7 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
         # user/controller names the worktree explicitly and its HEAD is the PR head
         # (or a descendant local correction commit on the same Issue branch).
         base_pr_head = next(iter(pr_heads), "")
-        if base_pr_head and subprocess.run(["git", "merge-base", "--is-ancestor", base_pr_head, head], cwd=worktree).returncode != 0:
+        if base_pr_head and process_run(["git", "merge-base", "--is-ancestor", base_pr_head, head], cwd=worktree).returncode != 0:
             raise RuntimeError(f"correction worktree HEAD {head} is not based on current PR head {base_pr_head}")
         preflight_text = f"correction ownership: explicit worktree={worktree} branch={branch} head={head} dirty={bool(status)}"
     run_dir = STATE / f"issue-{number}"; run_dir.mkdir(parents=True, exist_ok=True)
@@ -596,7 +718,7 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
                "-o", str(last), prompt]
     shell = f"exec {shlex.join(command)} >{shlex.quote(str(events))} 2>{shlex.quote(str(stderr))}"
     unit = unit_name(number)
-    start = subprocess.run(["systemd-run", "--user", f"--unit={unit}", "--collect",
+    start = process_run(["systemd-run", "--user", f"--unit={unit}", "--collect",
         f"--setenv=HOME={Path.home()}", f"--setenv=PATH={os.environ.get('PATH','')}",
         f"--property=WorkingDirectory={worktree}", "/bin/bash", "-lc", shell], text=True, capture_output=True, env=user_systemd_env())
     if start.returncode:
@@ -631,18 +753,128 @@ def agent_logs(number: int, tail: int) -> dict[str, Any]:
 
 def stop_agent(number: int) -> dict[str, Any]:
     unit = unit_name(number); before = systemd_show(unit)
-    subprocess.run(["systemctl", "--user", "stop", unit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=user_systemd_env())
+    process_run(["systemctl", "--user", "stop", unit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=user_systemd_env())
     return {"issue": number, "stopped": True, "before": before, "after": systemd_show(unit),
             "retry_authorized": False, "note": "stop is not retry/replay authority"}
+
+
+def _tail_bytes(path: Path, limit: int = 262144) -> bytes:
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END); size = handle.tell(); handle.seek(max(0, size - limit))
+            return handle.read(limit)
+    except OSError:
+        return b""
+
+
+def _last_completed_usage(path: Path) -> dict[str, int] | None:
+    for raw in reversed(_tail_bytes(path).splitlines()):
+        try:
+            row = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        usage = row.get("usage") if row.get("type") == "turn.completed" else None
+        if isinstance(usage, dict):
+            return {key: int(usage.get(key) or 0) for key in ("input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens")}
+    return None
+
+
+def codex_usage_snapshot(paths: list[Path] | None = None) -> dict[str, Any]:
+    candidates = paths
+    if candidates is None:
+        candidates = sorted(STATE.glob("issue-*/events.jsonl")) if STATE.exists() else []
+        candidates += sorted(Path("/tmp").glob("lunowa-*-direct.jsonl"))
+    totals = {key: 0 for key in ("input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens")}
+    runs = 0
+    for path in candidates:
+        usage = _last_completed_usage(path)
+        if not usage:
+            continue
+        runs += 1
+        for key in totals:
+            totals[key] += usage[key]
+    fresh = max(totals["input_tokens"] - totals["cached_input_tokens"], 0)
+    return {
+        "runs_with_usage": runs, **totals, "fresh_input_tokens": fresh,
+        "cache_ratio": round(totals["cached_input_tokens"] / totals["input_tokens"], 4) if totals["input_tokens"] else None,
+        "interpretation": "model-reported usage metadata; not billing or quota truth",
+    }
+
+
+def _metric_command(argv: list[str]) -> str:
+    if not argv:
+        return "fleet"
+    if argv[0] == "agent" and len(argv) > 1:
+        return f"agent:{argv[1]}"
+    return argv[0]
+
+
+def record_cli_metric(command: str, elapsed_ms: int, ok: bool) -> None:
+    row = {
+        "ts": now_local().isoformat(), "command": command, "elapsed_ms": elapsed_ms, "ok": bool(ok),
+        "stdout_bytes": _LAST_OUTPUT_BYTES, "subprocess_calls": int(_METRIC_COUNTS["subprocess"]),
+        "github_calls": int(_METRIC_COUNTS["github"]),
+    }
+    try:
+        CLI_METRICS.parent.mkdir(parents=True, exist_ok=True)
+        if CLI_METRICS.exists() and CLI_METRICS.stat().st_size > 512 * 1024:
+            rotated = CLI_METRICS.with_suffix(CLI_METRICS.suffix + ".1")
+            try:
+                rotated.unlink(missing_ok=True); CLI_METRICS.replace(rotated)
+            except OSError:
+                pass
+        with CLI_METRICS.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+
+
+def _percentile(values: list[int], q: float) -> int | None:
+    if not values:
+        return None
+    ordered = sorted(values); index = max(0, min(len(ordered) - 1, math.ceil(q * len(ordered)) - 1))
+    return ordered[index]
+
+
+def cli_metrics_snapshot(limit: int = 500) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    try:
+        lines = CLI_METRICS.read_text(encoding="utf-8").splitlines()[-limit:]
+    except OSError:
+        lines = []
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict) and isinstance(row.get("command"), str):
+            rows.append(row)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(row["command"], []).append(row)
+    commands = []
+    for command, items in sorted(grouped.items()):
+        latency = [int(row.get("elapsed_ms") or 0) for row in items]
+        output = [int(row.get("stdout_bytes") or 0) for row in items]
+        commands.append({
+            "command": command, "count": len(items), "success_rate": round(sum(1 for row in items if row.get("ok")) / len(items), 4),
+            "p50_ms": _percentile(latency, 0.50), "p95_ms": _percentile(latency, 0.95),
+            "p50_stdout_bytes": _percentile(output, 0.50), "p95_stdout_bytes": _percentile(output, 0.95),
+            "avg_subprocess_calls": round(sum(int(row.get("subprocess_calls") or 0) for row in items) / len(items), 2),
+            "avg_github_calls": round(sum(int(row.get("github_calls") or 0) for row in items) / len(items), 2),
+        })
+    return {"schema": "lw.metrics.v1", "samples": len(rows), "commands": commands, "codex_usage": codex_usage_snapshot(), "privacy": "metadata only; no stdout/stderr, GitHub bodies, prompts, scanner findings, or credentials stored"}
 
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__); sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("fleet")
+    sn = sub.add_parser("snapshot"); sn.add_argument("--since")
+    sub.add_parser("metrics")
     sub.add_parser("capabilities")
     sg = sub.add_parser("guard-secrets"); sg.add_argument("--path", default=".")
     a = sub.add_parser("agent"); aa = a.add_subparsers(dest="action", required=True)
-    s = aa.add_parser("start"); s.add_argument("issue", type=int); s.add_argument("--model", default="gpt-5.6-luna"); s.add_argument("--effort", choices=("low","medium","high","xhigh"), default="high"); s.add_argument("--mode", choices=("fresh","correction"), default="fresh"); s.add_argument("--worktree"); s.add_argument("--tool-profile", choices=tuple(TOOL_PROFILES), default="repo"); s.add_argument("--dry-run", action="store_true")
+    s = aa.add_parser("start"); s.add_argument("issue", type=int); s.add_argument("--model", default="gpt-5.6-luna"); s.add_argument("--effort", choices=("low","medium","high","xhigh"), default="high"); s.add_argument("--mode", choices=("fresh","correction"), default="fresh"); s.add_argument("--worktree"); s.add_argument("--tool-profile", choices=tuple(TOOL_PROFILES), default="repo"); s.add_argument("--expect-snapshot"); s.add_argument("--dry-run", action="store_true")
     st = aa.add_parser("status"); st.add_argument("issue", type=int, nargs="?")
     lg = aa.add_parser("logs"); lg.add_argument("issue", type=int); lg.add_argument("--tail", type=int, default=40)
     sp = aa.add_parser("stop"); sp.add_argument("issue", type=int)
@@ -652,6 +884,8 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     if args.command == "fleet": emit(fleet_snapshot())
+    elif args.command == "snapshot": emit(snapshot_response(snapshot_from_fleet(fleet_snapshot(include_capabilities=False)), args.since))
+    elif args.command == "metrics": emit(cli_metrics_snapshot())
     elif args.command == "capabilities": emit(capability_snapshot())
     elif args.command == "guard-secrets":
         code = betterleaks_status_code(Path(args.path).expanduser().resolve())
@@ -666,7 +900,7 @@ def main() -> int:
             return 0
         emit({"available": True, "ok": False, "leaks_detected": None, "network_validation": False, "details_withheld": True, "status": "SCANNER_ERROR"})
         return 3
-    elif args.action == "start": emit(start_agent(args.issue, args.model, args.effort, args.mode, args.dry_run, args.worktree, args.tool_profile))
+    elif args.action == "start": emit(start_agent(args.issue, args.model, args.effort, args.mode, args.dry_run, args.worktree, args.tool_profile, args.expect_snapshot))
     elif args.action == "status": emit(agent_status(args.issue))
     elif args.action == "logs": emit(agent_logs(args.issue, args.tail))
     elif args.action == "stop": emit(stop_agent(args.issue))
@@ -674,8 +908,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    started = time.perf_counter(); command = _metric_command(sys.argv[1:]); ok = False
     try:
-        raise SystemExit(main())
+        code = main(); ok = code == 0
+        raise SystemExit(code)
     except (RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"direct-agent-control: {exc}", file=sys.stderr)
         raise SystemExit(1)
+    finally:
+        record_cli_metric(command, round((time.perf_counter() - started) * 1000), ok)

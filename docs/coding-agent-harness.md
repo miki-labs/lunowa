@@ -80,7 +80,11 @@ Add orchestration only after measured throughput, coordination, or recovery pres
 
 ### Terminal control and bounded parallelism
 
-For Lunowa, the durable terminal control surface is `scripts/direct_agent_control.py`; `lw fleet` / `lw agent ...` are host convenience aliases. The script reads live GitHub `blocked_by`, PRs, worktrees, bounded process/log evidence, local resources, and observed Codex quota failures. It does not own Product state or introduce a scheduler/database.
+For Lunowa, the durable terminal control surface is `scripts/direct_agent_control.py`; `lw snapshot` / `lw fleet` / `lw agent ...` are host convenience aliases. The script reads live GitHub `blocked_by`, PRs, worktrees, bounded process/log evidence, local resources, and observed Codex quota failures. It does not own Product state or introduce a scheduler/database.
+
+The operating assumption is **ChatGPT-only human control**: the human gives Product intent to ChatGPT; ChatGPT plus Remote Desktop Commander drives the machine interface. `snapshot` is therefore the default routine read. It normalizes decision-relevant GitHub/Git/runtime state into compact JSON, while `fleet`, task/review commands, and raw logs are progressive-disclosure diagnostics. A snapshot is never a new authority: GitHub/Git/CI remain authoritative and write actions re-read live state. `snapshot_id` is only a deterministic fingerprint of the observed decision state; `agent start --expect-snapshot ID` may reject stale controller state before dispatch.
+
+CLI optimization is measured rather than assumed. Local controller metrics may record only bounded metadata such as command name, elapsed time, output bytes, subprocess/GitHub call counts, success, and model-reported Codex usage totals. They must not persist raw stdout/stderr, prompts, GitHub bodies, provider/mail content, scanner findings, or credentials. Model-reported token usage is an engineering signal, not billing/quota truth. Metrics failure is optional and must never block Product delivery.
 
 Operational defaults are deliberately small:
 
@@ -95,8 +99,12 @@ Operational defaults are deliberately small:
 Useful controller commands:
 
 ```text
+python scripts/direct_agent_control.py snapshot
+python scripts/direct_agent_control.py snapshot --since SNAPSHOT_ID
 python scripts/direct_agent_control.py fleet
+python scripts/direct_agent_control.py metrics
 python scripts/direct_agent_control.py agent start ISSUE --dry-run
+python scripts/direct_agent_control.py agent start ISSUE --expect-snapshot SNAPSHOT_ID --dry-run
 python scripts/direct_agent_control.py agent start ISSUE --tool-profile docs --dry-run
 python scripts/direct_agent_control.py agent status [ISSUE]
 python scripts/direct_agent_control.py agent logs ISSUE

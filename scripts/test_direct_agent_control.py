@@ -30,6 +30,28 @@ class DirectAgentControlTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "unknown tool profile"):
             control.codex_tool_args("privileged")
 
+    def test_sandbox_readiness_fails_closed_on_missing_prerequisites(self) -> None:
+        blocked = control.sandbox_readiness(sbx_available=False, kvm_module=True, kvm_group=False, kvm_device=False)
+        self.assertFalse(blocked["ready_for_pilot"])
+        self.assertEqual(blocked["missing"], ["sbx", "kvm-group", "/dev/kvm-access"])
+        ready = control.sandbox_readiness(sbx_available=True, kvm_module=True, kvm_group=True, kvm_device=True)
+        self.assertTrue(ready["ready_for_pilot"])
+        self.assertEqual(ready["missing"], [])
+
+    def test_missing_optional_secret_tool_does_not_block_direct_execution(self) -> None:
+        with mock.patch.object(control.shutil, "which", return_value=None):
+            result = control.secret_guard(Path("."))
+        self.assertFalse(result["available"])
+        self.assertIsNone(result["ok"])
+        self.assertEqual(result["status"], "SKIPPED_OPTIONAL")
+
+    def test_agent_prompt_routes_optional_agent_native_tools_without_broadening_authority(self) -> None:
+        prompt = control.agent_prompt(126, "fresh", "repo")
+        self.assertIn("ast-grep outline", prompt)
+        self.assertIn("Betterleaks", prompt)
+        self.assertIn("without `--validation`", prompt)
+        self.assertIn("do not create competing writers", prompt)
+
     def test_quota_parser_extracts_retry_time(self) -> None:
         text = "You've hit your usage limit. try again at Sep 7th, 2026 12:49 PM."
         parsed = control.quota_retry_from_text(text, tz=timezone.utc)

@@ -8,6 +8,7 @@ This tool intentionally has no scheduler, workflow DB, automatic retry, or merge
 from __future__ import annotations
 
 import argparse
+import grp
 import concurrent.futures
 from datetime import datetime
 import json
@@ -146,6 +147,107 @@ def quota_snapshot(now: datetime | None = None) -> dict[str, Any]:
         "retry_after": best[0].isoformat() if best else None,
         "source": str(best[1]) if best else None,
         "evidence": best[2] if best else None,
+    }
+
+
+def _tool_version(command: str, args: list[str]) -> str | None:
+    binary = shutil.which(command)
+    if not binary:
+        return None
+    try:
+        result = subprocess.run([binary, *args], text=True, capture_output=True, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    text = (result.stdout or result.stderr).strip().splitlines()
+    return text[0][:160] if result.returncode == 0 and text else None
+
+
+def _group_names() -> set[str]:
+    names: set[str] = set()
+    for gid in os.getgroups():
+        try:
+            names.add(grp.getgrgid(gid).gr_name)
+        except KeyError:
+            continue
+    return names
+
+
+def sandbox_readiness(*, sbx_available: bool, kvm_module: bool, kvm_group: bool, kvm_device: bool) -> dict[str, Any]:
+    missing = []
+    if not sbx_available: missing.append("sbx")
+    if not kvm_module: missing.append("kvm-module")
+    if not kvm_group: missing.append("kvm-group")
+    if not kvm_device: missing.append("/dev/kvm-access")
+    return {"ready_for_pilot": not missing, "missing": missing}
+
+
+def capability_snapshot() -> dict[str, Any]:
+    ast_binary = shutil.which("ast-grep")
+    better_binary = shutil.which("betterleaks")
+    sbx_binary = shutil.which("sbx")
+    kvm_module = False
+    try:
+        kvm_module = any(line.startswith("kvm") for line in Path("/proc/modules").read_text().splitlines())
+    except OSError:
+        pass
+    kvm_group = "kvm" in _group_names()
+    kvm_device = Path("/dev/kvm").exists() and os.access("/dev/kvm", os.R_OK | os.W_OK)
+    sandbox = sandbox_readiness(sbx_available=bool(sbx_binary), kvm_module=kvm_module, kvm_group=kvm_group, kvm_device=kvm_device)
+    return {
+        "code_navigation": {
+            "ripgrep": {"available": bool(shutil.which("rg"))},
+            "ast_grep": {
+                "available": bool(ast_binary),
+                "version": _tool_version("ast-grep", ["--version"]),
+                "outline": bool(ast_binary),
+                "policy": "optional cheap structural pass before broad source reads",
+            },
+        },
+        "secret_guard": {
+            "betterleaks": {
+                "available": bool(better_binary),
+                "version": _tool_version("betterleaks", ["version"]),
+                "local_precommit": bool(better_binary),
+                "live_validation_default": False,
+            }
+        },
+        "docker_sandboxes": {
+            "available": bool(sbx_binary),
+            "version": _tool_version("sbx", ["version"]) if sbx_binary else None,
+            "kvm_module": kvm_module,
+            "kvm_group": kvm_group,
+            "kvm_device_access": kvm_device,
+            "experimental": True,
+            "canonical": False,
+            **sandbox,
+            "auth_and_project_tooling": "NOT_PROBED",
+        },
+        "deferred": {
+            "testcontainers": "defer until package/lockfile ownership is clear or a DB task explicitly needs it",
+            "serena": "A/B only for semantic cross-file work; do not enable globally",
+        },
+    }
+
+
+def secret_guard(path: Path) -> dict[str, Any]:
+    binary = shutil.which("betterleaks")
+    if not binary:
+        return {"available": False, "ok": None, "status": "SKIPPED_OPTIONAL", "reason": "betterleaks is not installed"}
+    result = subprocess.run([binary, "git", "--pre-commit", "--no-banner", "--no-color", "--redact=100",
+        "--report-format", "json", "--report-path", "-", "."], cwd=path, text=True, capture_output=True)
+    raw = (result.stdout or "").strip()
+    report: Any = None
+    if raw:
+        try:
+            report = json.loads(raw)
+        except json.JSONDecodeError:
+            report = raw[-8000:]
+    findings = len(report) if isinstance(report, list) else (0 if report in (None, "", {}) else None)
+    return {
+        "available": True, "ok": result.returncode == 0, "exit_code": result.returncode,
+        "findings": findings, "report": report,
+        "stderr": (result.stderr or "")[-4000:],
+        "network_validation": False,
     }
 
 
@@ -380,7 +482,7 @@ def fleet_snapshot() -> dict[str, Any]:
     return {"main": main, "policy": {"one_issue_one_writer": True, "parallel_merge": False,
             "native_subagents": "read-heavy exploration/research/test analysis; one top-level writer owns an Issue",
             "lane_formula": "min(independent ready work, WIP/review capacity, quota, local resource cap)"},
-            "lanes": lanes, "quota": quota, "resources": resources, "issues": classified,
+            "lanes": lanes, "quota": quota, "resources": resources, "capabilities": capability_snapshot(), "issues": classified,
             "agents": agents, "shared_asset_collisions": collision_snapshot(classified["candidates"], classified["active"])}
 
 
@@ -408,8 +510,8 @@ def agent_prompt(number: int, mode: str, tool_profile: str) -> str:
     return f"""You are the single write-owner coding agent for Lunowa Issue #{number} ({mode} mode).
 This run uses the `{tool_profile}` tool profile. Remote plugins and privileged external MCPs are not available to you; request external/provider evidence from the ChatGPT/controller instead of broadening tool authority yourself.
 Work only inside this dedicated worktree. Start by reading AGENTS.md, docs/continuity/README.md, docs/continuity/CURRENT.md, .agents/skills/execute-task/SKILL.md, then live-read GitHub Issue #{number}, its blocked_by dependencies, related PR/CI, and the task-relevant canonical sources.
-Execute the bounded Issue end-to-end. Use repository/local deterministic tools first; use installed MCP/plugins only when materially useful. You may use native subagents for independent read-heavy exploration, research, hypothesis testing, or test/log analysis when it saves time, but keep one top-level write owner for this Issue and do not create competing writers against the same files/task.
-Run targeted verification and the canonical verification appropriate to the final change. Inspect the cumulative diff. Commit the coherent candidate locally if the task contract grants it. Do not merge, deploy, perform privileged external writes, auto-retry/replay, or modify other Issues. Report exact commit/head, checks actually run, and anything NOT_VERIFIED.
+Execute the bounded Issue end-to-end. Use repository/local deterministic tools first; use installed MCP/plugins only when materially useful. For unfamiliar code, prefer `rg` to narrow candidates and use `ast-grep outline` when available as a cheap structural pass before broad full-file reads. You may use native subagents for independent read-heavy exploration, research, hypothesis testing, or test/log analysis when it saves time, but keep one top-level write owner for this Issue and do not create competing writers against the same files/task.
+Run targeted verification and the canonical verification appropriate to the final change. When Betterleaks is available, run a local pre-commit/diff secret scan without `--validation` before reporting a commit-ready candidate. Inspect the cumulative diff. Commit the coherent candidate locally if the task contract grants it. Do not merge, deploy, perform privileged external writes, auto-retry/replay, or modify other Issues. Report exact commit/head, checks actually run, and anything NOT_VERIFIED.
 """
 
 
@@ -530,6 +632,8 @@ def stop_agent(number: int) -> dict[str, Any]:
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__); sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("fleet")
+    sub.add_parser("capabilities")
+    sg = sub.add_parser("guard-secrets"); sg.add_argument("--path", default=".")
     a = sub.add_parser("agent"); aa = a.add_subparsers(dest="action", required=True)
     s = aa.add_parser("start"); s.add_argument("issue", type=int); s.add_argument("--model", default="gpt-5.6-luna"); s.add_argument("--effort", choices=("low","medium","high","xhigh"), default="high"); s.add_argument("--mode", choices=("fresh","correction"), default="fresh"); s.add_argument("--worktree"); s.add_argument("--tool-profile", choices=tuple(TOOL_PROFILES), default="repo"); s.add_argument("--dry-run", action="store_true")
     st = aa.add_parser("status"); st.add_argument("issue", type=int, nargs="?")
@@ -541,6 +645,10 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     if args.command == "fleet": emit(fleet_snapshot())
+    elif args.command == "capabilities": emit(capability_snapshot())
+    elif args.command == "guard-secrets":
+        result = secret_guard(Path(args.path).expanduser().resolve()); emit(result)
+        if result.get("ok") is False: return 1
     elif args.action == "start": emit(start_agent(args.issue, args.model, args.effort, args.mode, args.dry_run, args.worktree, args.tool_profile))
     elif args.action == "status": emit(agent_status(args.issue))
     elif args.action == "logs": emit(agent_logs(args.issue, args.tail))

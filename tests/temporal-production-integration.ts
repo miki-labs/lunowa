@@ -236,14 +236,24 @@ try {
   const sharedLogicalKey = 'same-logical-trigger-key';
   const scopedTriggerA = randomUUID();
   const scopedTriggerB = randomUUID();
-  await temporalRepository.upsertTemporalContract({
+  const scopedRequestA = randomUUID();
+  const scopedRequestB = randomUUID();
+  const scopedInputA = {
     ...contractInput(initial.id, now, []),
-    triggers: [{id: scopedTriggerA, triggerType: 'TIME', triggerAt: now.toISOString(), idempotencyKey: sharedLogicalKey}]
-  });
-  await temporalRepository.upsertTemporalContract({
+    id: scopedRequestA,
+    triggers: [{id: scopedTriggerA, triggerType: 'TIME' as const, triggerAt: now.toISOString(), idempotencyKey: sharedLogicalKey}]
+  };
+  const scopedInputB = {
     ...contractInput(t04Initial.id, now, []),
-    triggers: [{id: scopedTriggerB, triggerType: 'TIME', triggerAt: now.toISOString(), idempotencyKey: sharedLogicalKey}]
-  });
+    id: scopedRequestB,
+    triggers: [{id: scopedTriggerB, triggerType: 'TIME' as const, triggerAt: now.toISOString(), idempotencyKey: sharedLogicalKey}]
+  };
+  const scopedContractA = await temporalRepository.upsertTemporalContract(scopedInputA);
+  const scopedContractB = await temporalRepository.upsertTemporalContract(scopedInputB);
+  assert(scopedContractA.version > deferred.contract.version && scopedContractA.id === scopedRequestA, 'a new contract after resolution reused old version/identity.');
+  assert(scopedContractB.version > t04Contract.version && scopedContractB.id === scopedRequestB, 'a second Responsibility did not advance its own Temporal contract history.');
+  const scopedReplayA = await temporalRepository.upsertTemporalContract(scopedInputA);
+  assert(scopedReplayA.id === scopedContractA.id && scopedReplayA.version === scopedContractA.version, 'replaying an explicit replacement request created another contract version.');
   const scopedKeys = await pool.query<{id: string; idempotency_key: string}>(
     `SELECT id, idempotency_key FROM temporal_triggers WHERE id = ANY($1::uuid[]) ORDER BY id`,
     [[scopedTriggerA, scopedTriggerB]]

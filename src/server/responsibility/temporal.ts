@@ -295,22 +295,19 @@ export class InMemoryTemporalStore {
       responsibility.resolutionStatus !== 'OPEN' ||
       responsibility.liveTrackingState !== 'TRACKING_ACTIVE'
     )) throw new Error('temporal contract requires an active open Responsibility in the authorized scope');
-    const existing = input.id
-      ? this.contracts.get(input.id)
-      : [...this.contracts.values()].find((contract) =>
-        contract.userId === input.userId &&
-        contract.connectedAccountId === input.connectedAccountId &&
-        contract.responsibilityId === input.responsibilityId &&
-        contract.status === 'ACTIVE'
-      );
-    if (existing && (existing.userId !== input.userId || existing.connectedAccountId !== input.connectedAccountId || existing.responsibilityId !== input.responsibilityId)) {
+    const priorRequest = input.id ? this.contracts.get(input.id) : undefined;
+    if (priorRequest && (priorRequest.userId !== input.userId || priorRequest.connectedAccountId !== input.connectedAccountId || priorRequest.responsibilityId !== input.responsibilityId)) {
       throw new Error('temporal contract scope mismatch');
     }
-    if (existing && input.id === existing.id) return clone(existing);
-    const version = (existing?.version ?? 0) + 1;
-    const id = existing
-      ? stableId(`${input.userId}:${input.responsibilityId}:contract:${version}`)
-      : input.id ?? stableId(`${input.userId}:${input.responsibilityId}:contract:1`);
+    if (priorRequest) return clone(priorRequest);
+    const scopedHistory = [...this.contracts.values()].filter((contract) =>
+      contract.userId === input.userId &&
+      contract.connectedAccountId === input.connectedAccountId &&
+      contract.responsibilityId === input.responsibilityId
+    );
+    const existing = scopedHistory.find((contract) => contract.status === 'ACTIVE');
+    const version = Math.max(0, ...scopedHistory.map((contract) => contract.version)) + 1;
+    const id = input.id ?? stableId(`${input.userId}:${input.responsibilityId}:contract:${version}`);
     if (existing) {
       existing.status = 'SUPERSEDED';
       existing.resolvedAt = iso(now);

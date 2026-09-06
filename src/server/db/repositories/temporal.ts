@@ -1,4 +1,4 @@
-import {and, asc, eq, lte, or, sql} from 'drizzle-orm';
+import {and, asc, desc, eq, lte, or, sql} from 'drizzle-orm';
 import {createHash} from 'node:crypto';
 
 import {getDatabase} from '../index';
@@ -155,7 +155,7 @@ export class TemporalRepository {
     if (!responsibility) throw new Error('temporal contract Responsibility is outside the authorized scope');
     if (responsibility.resolutionStatus !== 'OPEN' || responsibility.liveTrackingState !== 'TRACKING_ACTIVE') throw new Error('temporal contract requires an active open Responsibility');
 
-    const requestedId = input.id ? asUuid(input.id, `${input.userId}:${input.responsibilityId}:contract:1`) : undefined;
+    const requestedId = input.id ? asUuid(input.id, `${input.userId}:${input.responsibilityId}:contract-request:${input.id}`) : undefined;
     if (requestedId) {
       const [priorRequest] = await tx.select().from(temporalContracts).where(eq(temporalContracts.id, requestedId)).for('update');
       if (priorRequest) {
@@ -169,14 +169,24 @@ export class TemporalRepository {
     const [existing] = await tx.select().from(temporalContracts).where(and(
       eq(temporalContracts.responsibilityId, input.responsibilityId),
       eq(temporalContracts.userId, input.userId),
+      eq(temporalContracts.connectedAccountId, input.connectedAccountId),
       eq(temporalContracts.contractStatus, 'ACTIVE')
     )).for('update');
-    const version = (existing?.version ?? 0) + 1;
+    // The Responsibility row lock above serializes contract creation for this
+    // aggregate. Version therefore advances from all durable history, not only
+    // from the currently ACTIVE row; resolving a contract must never reset the
+    // identity/version sequence back to 1.
+    const [latest] = await tx.select({version: temporalContracts.version}).from(temporalContracts).where(and(
+      eq(temporalContracts.responsibilityId, input.responsibilityId),
+      eq(temporalContracts.userId, input.userId),
+      eq(temporalContracts.connectedAccountId, input.connectedAccountId)
+    )).orderBy(desc(temporalContracts.version)).limit(1);
+    const version = (latest?.version ?? 0) + 1;
     if (existing) {
       await tx.update(temporalContracts).set({contractStatus: 'SUPERSEDED', resolvedAt: now, updatedAt: now}).where(eq(temporalContracts.id, existing.id));
       await tx.update(temporalTriggers).set({triggerStatus: 'SUPERSEDED', updatedAt: now}).where(and(eq(temporalTriggers.temporalContractId, existing.id), or(eq(temporalTriggers.triggerStatus, 'SCHEDULED'), eq(temporalTriggers.triggerStatus, 'CLAIMED'), eq(temporalTriggers.triggerStatus, 'FAILED'))));
     }
-    const contractId = asUuid(existing ? undefined : input.id, `${input.userId}:${input.responsibilityId}:contract:${version}`);
+    const contractId = requestedId ?? stableUuid(`${input.userId}:${input.responsibilityId}:contract:${version}`);
     const [row] = await tx.insert(temporalContracts).values({
       id: contractId,
       userId: input.userId,

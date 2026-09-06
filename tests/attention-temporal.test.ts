@@ -166,6 +166,28 @@ describe('G32 attention and Temporal runtime', () => {
     expect(restarted.getTrigger('sibling-trigger')?.status).toBe('CANCELLED');
   });
 
+  it('keeps contract versions monotonic after resolution and replays a replacement request idempotently', async () => {
+    const now = new Date('2026-09-06T00:00:00.000Z');
+    const store = new InMemoryTemporalStore();
+    const initial = state();
+    store.setResponsibility(initial);
+    const runtime = new TemporalRuntime(store);
+    const first = await runtime.deferAttention({
+      state: initial,
+      requestKey: 'version-first',
+      contract: {...contractInput(now), id: 'contract-request-1', triggers: [{id: 'version-trigger-1', triggerType: 'TIME', triggerAt: now.toISOString()}]}
+    });
+    runtime.returnAttention({responsibilityId: initial.id, requestKey: 'version-return', now});
+    const secondInput = {...contractInput(now), id: 'contract-request-2', triggers: [{id: 'version-trigger-2', triggerType: 'TIME' as const, triggerAt: now.toISOString()}]};
+    const second = await runtime.deferAttention({state: initial, requestKey: 'version-second', contract: secondInput});
+    expect(second.contract.version).toBe(first.contract.version + 1);
+    expect(second.contract.id).toBe('contract-request-2');
+    const replay = await runtime.deferAttention({state: initial, requestKey: 'version-second', contract: secondInput});
+    expect(replay.contract.id).toBe(second.contract.id);
+    expect(replay.contract.version).toBe(second.contract.version);
+    expect(store.listTriggers().filter((trigger) => trigger.temporalContractId === second.contract.id)).toHaveLength(1);
+  });
+
   it('turns an old contract version into an audited no-op and never resurrects it', async () => {
     const now = new Date('2026-09-06T00:00:00.000Z');
     const store = new InMemoryTemporalStore();

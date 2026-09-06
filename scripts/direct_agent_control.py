@@ -639,7 +639,8 @@ def ensure_systemd() -> None:
 
 def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, existing_worktree: str | None = None, tool_profile: str = "repo", expected_snapshot: str | None = None) -> dict[str, Any]:
     fleet = fleet_snapshot(include_capabilities=False)
-    require_snapshot(expected_snapshot, snapshot_from_fleet(fleet)["snapshot_id"])
+    if expected_snapshot:
+        require_snapshot(expected_snapshot, snapshot_from_fleet(fleet)["snapshot_id"])
     quota_blocked = bool(fleet["quota"]["blocked"])
     if any(int(row["issue"]) == number and (row.get("active") or row.get("unknown")) for row in fleet["agents"]):
         raise RuntimeError(f"Issue #{number} already has an active/unknown direct-agent execution")

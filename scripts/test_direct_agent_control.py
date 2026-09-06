@@ -184,6 +184,30 @@ class DirectAgentControlTest(unittest.TestCase):
         self.assertIn("mcp_servers.cloudflare-api.enabled=false", result["codex_tool_args"])
 
 
+    def test_start_without_expected_snapshot_does_not_build_snapshot_fingerprint(self) -> None:
+        fleet = {
+            "main": "abc",
+            "quota": {"blocked": False, "retry_after": None},
+            "lanes": {"recommended_new_lanes": 1},
+            "agents": [{"issue": 74, "active": True, "unknown": False}],
+        }
+        with mock.patch.object(control, "fleet_snapshot", return_value=fleet), \
+             mock.patch.object(control, "snapshot_from_fleet", side_effect=AssertionError("snapshot fingerprint must be opt-in")):
+            with self.assertRaisesRegex(RuntimeError, "already has an active/unknown"):
+                control.start_agent(74, "gpt-5.6-luna", "high", "fresh", False)
+
+    def test_start_expected_snapshot_checks_fingerprint(self) -> None:
+        fleet = {
+            "main": "abc",
+            "quota": {"blocked": False, "retry_after": None},
+            "lanes": {"recommended_new_lanes": 1},
+            "agents": [{"issue": 74, "active": True, "unknown": False}],
+        }
+        with mock.patch.object(control, "fleet_snapshot", return_value=fleet), \
+             mock.patch.object(control, "snapshot_from_fleet", return_value={"snapshot_id": "new"}):
+            with self.assertRaisesRegex(RuntimeError, "STALE_PRECONDITION"):
+                control.start_agent(74, "gpt-5.6-luna", "high", "fresh", False, expected_snapshot="old")
+
     def test_remote_fleet_inputs_uses_structured_closing_issue_references(self) -> None:
         payload = {"data": {"repository": {
             "issues": {"nodes": [{"number": 69, "title": "G32", "url": "u", "blockedBy": {"nodes": []}}]},

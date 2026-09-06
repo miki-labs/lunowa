@@ -22,9 +22,83 @@ const appSession = {
     updatedAt: '2030-01-01T00:00:00.000Z'
   }
 };
+const sourceAccount = {
+  id: 'source-account-1',
+  provider: 'gmail',
+  providerAccountId: 'browser@example.invalid',
+  emailAddress: 'browser@example.invalid',
+  displayName: 'Browser mailbox',
+  connectionState: 'CONNECTED',
+  sync: {
+    status: 'HEALTHY',
+    lastSuccessAt: '2030-01-01T00:00:00.000Z',
+    lastFullReconcileAt: '2030-01-01T00:00:00.000Z',
+    dataThroughAt: '2030-01-01T00:00:00.000Z',
+    errorCode: null
+  }
+};
+const sourcePage = {
+  accounts: [sourceAccount],
+  conversations: [{
+    id: 'source-conversation-1',
+    providerThreadId: 'source-thread-1',
+    subject: '来期の見積書について',
+    preview: '添付の見積書をご確認いただけますか。',
+    lastMessageAt: '2030-01-01T00:00:00.000Z',
+    messageCount: 1,
+    hasAttachments: true,
+    account: sourceAccount,
+    latestSender: {email: 'sender@example.com', displayName: '佐藤ひろ子'}
+  }],
+  readiness: 'ready',
+  dataThroughAt: '2030-01-01T00:00:00.000Z',
+  query: {text: '', accountId: null, sender: null, from: null, to: null},
+  total: 1,
+  nextCursor: null
+};
+const sourceDetail = {
+  id: 'source-conversation-1',
+  providerThreadId: 'source-thread-1',
+  subject: '来期の見積書について',
+  account: sourceAccount,
+  evidenceRevision: 1,
+  messages: [{
+    id: 'source-message-1',
+    providerMessageId: 'provider-message-1',
+    providerThreadId: 'source-thread-1',
+    direction: 'INBOUND',
+    sender: {email: 'sender@example.com', displayName: '佐藤ひろ子'},
+    recipients: [{email: 'browser@example.invalid', displayName: 'Browser User'}],
+    cc: [],
+    bcc: [],
+    subject: '来期の見積書について',
+    textBody: '添付の見積書をご確認いただけますか。',
+    sanitizedHtmlBody: null,
+    occurredAt: '2030-01-01T00:00:00.000Z',
+    providerReceivedAt: '2030-01-01T00:00:00.000Z',
+    readState: 'READ',
+    providerDeletedAt: null,
+    attachments: [{
+      id: 'source-attachment-1',
+      providerAttachmentId: 'provider-attachment-1',
+      filename: 'estimate.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 1024,
+      contentDisposition: 'attachment',
+      contentReference: 'gmail://source-message-1/provider-attachment-1',
+      contentHash: null,
+      previewState: 'PROVIDER_FETCH_REQUIRED'
+    }]
+  }]
+};
 
 test.beforeEach(async ({page}) => {
   await page.route('**/api/auth/get-session**', (route) => route.fulfill({json: appSession}));
+  await page.route('**/api/bff/users/**/source/search**', (route) => route.fulfill({json: sourcePage}));
+  await page.route('**/api/bff/users/**/source/conversations**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    await route.fulfill({json: pathname.endsWith('/source-conversation-1') ? sourceDetail : sourcePage});
+  });
 });
 
 test('renders the shell and navigates a Needs You item to its Moment', async ({page}) => {
@@ -42,17 +116,16 @@ test('renders the shell and navigates a Needs You item to its Moment', async ({p
   expect(consoleErrors).toEqual([]);
 });
 
-test('preserves a draft and exposes a usable compact navigation drawer', async ({page}) => {
+test('keeps the real Source Conversation read-only and exposes a usable compact navigation drawer', async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
   await page.goto('/ja');
   await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '会話').click();
   await page.getByRole('button', {name: /佐藤ひろ子/}).click();
-  const draft = page.getByLabel('本文');
-  await draft.fill('確認しました。');
+  await expect(page.getByLabel('詳細').getByText('添付の見積書をご確認いただけますか。')).toBeVisible();
+  await expect(page.getByRole('button', {name: '送信する'})).toHaveCount(0);
   await page.getByRole('button', {name: /一覧に戻る/}).click();
-  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
-  await expect(page.getByLabel('本文')).toHaveValue('確認しました。');
+  await expect(page.getByRole('button', {name: /佐藤ひろ子/})).toBeVisible();
 });
 
 test('keeps each responsive stage in content-fit order and rail labels discoverable', async ({page}) => {
@@ -108,8 +181,8 @@ test('preserves core reading and focus visibility at 125, 150, and 200 percent b
       document.documentElement.style.fontSize = `${textScale * 100}%`;
     }, scale);
     if (width < 900) await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
-    await nav(page, '会話').click();
-    await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+    await nav(page, '対応が必要').click();
+    await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
     const draft = page.getByLabel('本文');
     await draft.focus();
     const result = await page.evaluate(() => {
@@ -142,9 +215,9 @@ test('returns focus to compact conversation-entry controls', async ({page}) => {
   await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '検索').click();
   await page.getByLabel('メールを検索').fill('見積書');
-  await page.locator('#search-result-estimate').click();
+  await page.locator('#source-conversation-1').click();
   await page.getByRole('button', {name: /一覧に戻る/}).click();
-  await expect(page.locator('#search-result-estimate')).toBeFocused();
+  await expect(page.locator('#source-conversation-1')).toBeFocused();
 });
 
 test('does not activate global search for editable input or Japanese IME composition boundary events', async ({page}) => {
@@ -166,10 +239,10 @@ test('does not activate global search for editable input or Japanese IME composi
   });
   await expect(page.getByRole('heading', {name: 'ホーム'})).toBeVisible();
 
-  await nav(page, '会話').click();
-  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
   await page.getByLabel('本文').press('/');
-  await expect(page.getByRole('heading', {name: '来期の見積書について'})).toBeVisible();
+  await expect(page.getByRole('heading', {name: '見積書を確認して返信する'})).toBeVisible();
 });
 
 test('expires, re-authenticates, and signs out without changing mailbox monitoring semantics', async ({page}) => {

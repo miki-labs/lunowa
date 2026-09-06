@@ -109,7 +109,7 @@ export function AuthBoundary() {
       {sessionState.data && (
         <div hidden={!authenticated}>
           <LunowaShell
-            appUser={{name: sessionState.data.user.name, email: sessionState.data.user.email}}
+            appUser={{id: sessionState.data.user.id, name: sessionState.data.user.name, email: sessionState.data.user.email}}
             onSignOut={signOut}
             signingOut={signingOut}
             sessionActionError={sessionActionError}

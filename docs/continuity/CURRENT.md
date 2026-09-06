@@ -2,14 +2,14 @@
 
 > **目的:** 5分以内に「何がaccepted済みか、今どの層を作っているか、どこをlive確認すべきか」を復元するための人間向けcheckpoint。
 >
-> これは Product / Design / Responsibility / Architecture / Issue / ACP のauthorityではありません。正確さが重要なactionでは、owning canonical sourceとlive stateを確認してください。
+> これは Product / Design / Responsibility / Architecture / Issue のauthorityではありません。正確さが重要なactionでは、owning canonical sourceとlive stateを確認してください。
 
 ## Checkpoint metadata
 
-- Last reconciled: **2026-09-05**
+- Last reconciled: **2026-09-06**
 - Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
 - Accepted Product/application base at this reconcile includes **G00 / G11 / G10 / G19 / G30**
-- Current Issue / PR / CI / GitHub dependency / ACP host state: **必ずlive確認**
+- Current Issue / PR / CI / GitHub dependency / worktree/runtime state: **必ずlive確認**
 
 ## NOW — 今どこまで出来ている？
 
@@ -53,33 +53,31 @@ specified
 
 G20がacceptedされるとG21 Source/Searchへ、G31がacceptedされるとG32 Attention/Temporalへ進むのがimplementation graph上の主経路です。正確なdependencyは `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub `blocked_by` がauthorityです。
 
-## EXECUTION — ACPをどう扱う？
+## EXECUTION — direct coding agent workflow
 
-### Authority separation
+GitHub Issue / `blocked_by` がdurable task/dependency authorityであり、execution engineはreplaceableです。通常のnon-trivial implementationは次のpathを使います。
 
 ```text
-miki-labs/lunowa
-  = Product/application/task-contract authority
-
-miki-labs/agent-control-plane
-  = execution/admission/concurrency/recovery/model-routing authority
+live Issue contract + blocked_by
+-> dedicated branch/worktree
+-> direct coding agent + task-relevant tools/skills only
+-> targeted + canonical verification
+-> PR / CI
+-> independent exact-head cumulative review
+-> same PR/worktree correction on FAIL
+-> merge only on PASS
+-> materialなbase movement後にaffected candidatesを再検証
 ```
-
-ACPはLunowa Product semanticsを決めません。
 
 ### Stable execution invariants
 
-- ACPはbounded parallel model executionをサポートし、hard maximumは2 active model executions。
-- 実際のinstalled capacityとfree slotはlive host factであり、固定値としてこのfileへ保存しない。
-- lane 2はdistinct execution identity + current unblocked dependency + explicit model authority + explicit parallel authority + free slotが必要。
-- same Issue/execution identityを2 laneで実行しない。
-- parallel execution != parallel merge。
-- one GitHub-authorized admission => max one automatic model execution for that identity。
-- scheduler restart/repetitionはretry authorityではない。
-- unknown outcome / quarantineはfail closed。blind replay禁止。
-- `agent:running` / `agent:ready` labelだけでは、実processの存在・free slot・retry safetyを証明しない。
-- recovery判断が曖昧ならACP manifest / host process stateまで確認する。
-- model routingはcurrent ACP authorityをlive-readする。
+- one active implementationがone Issue/worktreeを所有する。同じIssue/worktreeへduplicate agentを同時実行しない。
+- parallel implementationはdistinct unblocked Issues + isolated worktrees + isolated runtime stateがある場合だけ。parallel implementation != parallel merge。
+- local files/search/CLIなどdeterministicで安価なevidenceを優先し、MCP/plugin/network/specialist skillはtaskにmaterialなものだけ選ぶ。
+- mutable external factがsolutionまたはacceptance evidenceを変え得る時だけlive queryする。
+- privileged/destructive external writeにはseparate explicit authorityが必要で、ordinary coding agentのambient capabilityにしない。
+- automatic retry/replayやreplacement orchestratorをdefault workflowへ追加しない。必要性が実測された時だけsmallest mechanismを別contractで判断する。
+- mechanical invariantはpracticalな範囲でtests/CI/scripts/schema/typeへ置き、proseはjudgment/rationaleを所有する。
 
 ## REVIEW — 受入の基本
 
@@ -109,7 +107,8 @@ current task contract
 | architecture / data / contracts | `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md` |
 | exact implementation DAG / parallelization / writer topology | `docs/product/IMPLEMENTATION-GRAPH.md` + live Issues / `blocked_by` |
 | current task / candidate / CI | live GitHub Issue / PR / reviews / checks |
-| ACP execution / recovery / model routing | current `miki-labs/agent-control-plane` + host evidence when needed |
+| implementation / verification / review workflow | `docs/implementation-workflow.md`, `docs/coding-agent-harness.md`, repository-local `execute-task` / `evaluate-change` skills |
+| current execution ownership / state | explicit task owner/launch authority + actual branch/worktree/runtime evidence |
 | 実際のbehavior | code / schema / migrations / tests / deployed evidence |
 
 詳細routingは `KNOWLEDGE-MAP.md` を見ます。
@@ -130,7 +129,7 @@ pnpm test:e2e
 pnpm build
 ```
 
-provider / database / deployment / scheduler / security / Sendなどworker sandboxやmockで証明できないclaimは、task contractに従ってexact-head trusted CI / host / provider evidenceで閉じます。
+provider / database / deployment / scheduler / security / Sendなどlocal checksやmockで証明できないclaimは、task contractに従ってexact-head trusted CI / host / provider evidenceで閉じます。
 
 ## Fresh-session rule
 
@@ -141,8 +140,8 @@ AGENTS.md
 -> continuity navigation/checkpoint
 -> live Lunowa Issue / PR / CI / blocked_by
 -> relevant canonical Product/domain docs
--> execution/recoveryが関係するならlive ACP authority
--> ambiguityがあるならmanifest/process evidence
+-> dedicated branch/worktreeのowner・base・status
+-> task-relevant skill/toolとcode/tests/runtime evidence
 ```
 
 **CURRENT.mdがstaleならlive/canonical sourceが常に優先です。**

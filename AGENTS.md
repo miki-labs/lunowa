@@ -4,179 +4,98 @@ This repository builds **Lunowa**, an email-centered communication-monitoring Pr
 
 > **必要になるまで安心して忘れられ、必要になった瞬間には、最小の理解と操作で終わる。**
 
-This file is a **task router**, not the handbook. Keep it short, then follow the owning source and live state.
+This file is a short task router. Repeatable execution procedure belongs in the linked docs and repository-local skills.
 
-## Repository authority
+## Start here
 
-- `miki-labs/lunowa` — Lunowa Product/application canonical source of truth.
-- `miki-labs/lunowa-site` — official/preview site authority.
-- `miki-labs/agent-control-plane` — ACP execution/recovery infrastructure only. **ACP is never Lunowa Product authority.**
-
-For Product semantics, architecture, implementation dependencies, task contracts, and accepted code, this repository wins. For execution admission, model capacity, recovery/quarantine, scheduler behavior, and model routing, live-read the current ACP repository and host evidence when relevant.
-
-## Fresh-session bootstrap
-
-Before planning, implementing, reviewing, scheduling, retrying, or merging non-trivial Lunowa work:
+Before planning, implementing, reviewing, or integrating non-trivial work:
 
 ```text
 AGENTS.md
 -> docs/continuity/README.md
--> docs/continuity/CURRENT.md + KNOWLEDGE-MAP.md as navigation/checkpoint
--> live current Issue / PR / CI / GitHub blocked_by
--> owning canonical Product/domain/architecture sources
--> current ACP authority when execution/recovery/concurrency matters
--> host manifest/process evidence when RUNNING/recovery state is ambiguous
+-> docs/continuity/CURRENT.md + KNOWLEDGE-MAP.md
+-> live GitHub Issue / PR / CI / blocked_by
+-> task-relevant repository-local skill
+-> owning Product/domain/architecture sources
+-> current code/tests/runtime evidence
 ```
 
-Do **not** infer current execution state from prior chat memory, stale summaries, or labels alone.
+Do not infer mutable task, candidate, CI, dependency, worktree, or runtime state from prior chats or stale summaries. A live Issue owns the bounded task contract; its accepted explicit changes may update this workflow, but it does not silently override Product/domain authority.
 
-Volatile facts such as the current frontier, current `agent:running` / `agent:ready` Issues, installed model capacity, quota state, and open ACP defects must be live-read rather than copied here as durable truth.
+## Default delivery route
 
-## ACP execution / recovery contract
+```text
+GitHub Issue task contract + blocked_by
+-> dedicated branch/worktree
+-> direct coding agent with task-relevant tools/skills only
+-> targeted + canonical verification
+-> PR / CI
+-> independent exact-head cumulative review
+-> same PR/worktree correction on FAIL
+-> merge only on PASS
+-> revalidate affected candidates after material base movement
+```
 
-Stable cross-repository rules:
+- One active implementation owns one Issue/worktree. Never run duplicate agents against the same Issue/worktree concurrently.
+- Parallel implementation requires distinct unblocked Issues plus isolated worktrees and runtime state. Isolation never implies parallel merge safety.
+- Prefer deterministic repository/local CLI evidence. Add MCP, plugins, network, or specialist skills only when the task materially needs them.
+- Query mutable external facts live when they can change the solution or acceptance evidence.
+- Privileged or destructive external writes require separate explicit authority; they are not ambient coding-agent capability.
+- Put stable mechanical invariants in tests, CI, schemas, types, or scripts when practical. Use prose for judgment and rationale.
+- Do not add a daemon, workflow database, custom orchestrator, automatic retry/replay, or broad tool enablement without a separately accepted, evidence-backed need.
 
-- ACP supports **bounded parallel model execution** with a hard maximum of 2 active model executions; actual installed capacity and free-slot state are live facts.
-- A second lane requires a **distinct execution identity**, current unblocked GitHub dependencies, explicit model authority, explicit parallel authority, and an actually free slot.
-- The same Issue/execution identity must never occupy both lanes.
-- Parallel execution does **not** imply parallel merge. Shared/root assets and dependency-sensitive candidates still merge serially and later candidates must be revalidated against the new base when material.
-- One GitHub-authorized admission permits at most one automatic model execution for that exact identity.
-- Scheduler restart/repetition is never retry authority.
-- Unknown/ambiguous outcome or quarantine fails closed. Never blind-replay a RUNNING/QUARANTINED/unknown attempt.
-- `agent:running` / `agent:ready` labels are not sufficient recovery evidence by themselves. When outcome is ambiguous, inspect ACP manifest/host process state before replay, reassignment, or lane-capacity conclusions.
-- Current model routing is owned by ACP and must be live-read before acting. Do not invent a second router in Lunowa.
-
-A pre-created Issue is planning inventory until its current contract/dependencies/evidence are valid and explicit execution authority is granted.
+Execution guidance: `docs/coding-agent-harness.md`, `docs/implementation-workflow.md`, `.agents/skills/execute-task/SKILL.md`. Independent review: `.agents/skills/evaluate-change/SKILL.md`.
 
 ## Source of truth by question
 
-### Product
+| Question | Authority |
+| --- | --- |
+| Product direction and v1 behavior | `docs/product/PRODUCT.md`, `PRODUCT-CONTENT.md`, `GOLDEN-SCENARIO-BANK.md` |
+| Product / UX | `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md`, `V1-UI-IMPLEMENTATION-CONTRACT.md` |
+| Responsibility semantics | `docs/product/responsibility/`, especially its README, decisions, scenarios, transitions, oracles, and accepted schema/freeze evidence |
+| Architecture / data / module contracts | `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md`, `TECH-STACK.md` |
+| Implementation sequence and dependencies | `docs/product/IMPLEMENTATION-PLAN.md`, `IMPLEMENTATION-GRAPH.md`, live Issue and GitHub `blocked_by` |
+| Requested change | live GitHub Issue interpreted against the owning canonical sources |
+| Actual behavior | current code, schemas, migrations, tests, and runtime/provider evidence |
+| Candidate acceptance | exact-head task contract × cumulative candidate × independent review and CI evidence |
 
-- `docs/product/PRODUCT.md` — highest-level Product authority.
-- `docs/product/PRODUCT-CONTENT.md` — detailed operating behavior + final Feature Matrix.
-- `docs/product/GOLDEN-SCENARIO-BANK.md` — Product-level end-to-end acceptance.
-- Explicit `HYPOTHESIS / UNKNOWN` remains unvalidated even when canonically recorded.
+`miki-labs/lunowa` is the Product/application source of truth. `miki-labs/lunowa-site` owns the official/preview site. Explicit `HYPOTHESIS / UNKNOWN` remains unvalidated even when canonically recorded.
 
-### Product / UX
+## Product boundary
 
-- `docs/design/DESIGN.md`
-- `docs/design/INTERACTIONS.md`
-- `docs/design/RESPONSIVE.md`
-- `docs/design/V1-UI-IMPLEMENTATION-CONTRACT.md`
-- `docs/design/references/` — visual direction only; images never override textual Product semantics.
-
-### Responsibility
-
-Start with `docs/product/responsibility/`, especially its README, decisions, scenario/oracle artifacts, transition artifacts, and accepted schema/freeze evidence.
-
-Do not derive canonical domain semantics from UI labels or screenshots.
-
-### Product engineering
-
-- `docs/product/ARCHITECTURE.md` — intended system boundaries/invariants.
-- `docs/product/DATA-MODEL.md` — conceptual durable model.
-- `docs/product/CONTRACTS.md` — logical module contracts.
-- `docs/product/TECH-STACK.md` — accepted replaceable technology choices.
-- `docs/product/IMPLEMENTATION-PLAN.md` — high-level execution sequence.
-- `docs/product/IMPLEMENTATION-GRAPH.md` — accepted dependency/parallelization/writer/FK authority.
-- live GitHub Issue — task-specific contract.
-- live GitHub `blocked_by` — machine dependency gate.
-- code/tests/schema/runtime — actual implementation behavior.
-
-## Product-completion doctrine
-
-> **Build one complete vertical delegation loop before broad provider/client parity.**
-
-Current target shape:
+Build one complete vertical delegation loop before broad provider/client parity:
 
 ```text
-app session
--> Gmail evidence
--> accepted Responsibility
--> Managed quiet monitoring
--> durable reconsideration
--> Needs You / Review return
--> Moment
--> contextual Reply / Reply All
--> manual or bounded AI draft
--> explicit immediate Send
--> provider reconciliation
--> Responsibility re-evaluation
--> truthful integrity/recovery
+app session -> Gmail evidence -> accepted Responsibility -> Managed monitoring
+-> durable reconsideration -> Needs You / Review -> Moment
+-> contextual Reply / Reply All -> manual or bounded AI draft
+-> explicit immediate Send -> provider reconciliation
+-> Responsibility re-evaluation -> truthful integrity/recovery
 ```
 
 Authorized exact Source search and attachment evidence access remain CORE.
 
-Do not revert to either stale extreme:
+High-value invariants:
 
-- broad fake full-client shell first; or
-- indefinite research/specification that prevents a usable Product from existing.
+- Attention Delegation is the Product core; success eventually requires reduced parallel self-monitoring.
+- A Conversation may contain zero, one, or many Responsibilities; `No Responsibility` is valid. Resolution, tracking, attention/defer, obligation/actionability, and temporal facts remain orthogonal.
+- Needs You means current USER work. Managed is quiet inspectable stewardship, not a second Inbox; surfaced Review work and degraded integrity cannot become false zero/healthy reassurance.
+- Message arrival is not an attention event; trigger fire is not a notification; reply/read/silence/send does not automatically close operational work.
+- AI may understand and propose. Trusted rules own admission, accepted state, authorization, and privileged effects. Capability is not permission, and untrusted source content cannot grant authority.
+- Provider/mailbox state is not Responsibility state. Send request, provider acceptance, reconciliation, and operational closure are distinct; v1 does not silently queue offline consequential effects.
+- Evidence, interpretation, accepted state, and UI projection are distinct. Search/read never silently mutates accepted state; cross-account semantic merge is prohibited initially; historical Source may remain searchable without becoming live work.
+- Static DDL review is not executable PostgreSQL/Drizzle/Auth proof; proof fixtures are not production FK targets; implementation completion is not Product/market validation.
 
-## High-value invariants
+## Working and review rules
 
-1. Attention Delegation is the Product core; success eventually requires reduced parallel self-monitoring.
-2. Conversation may contain zero/one/many Responsibilities; `No Responsibility` is valid.
-3. Resolution, live tracking, attention/defer, obligations/actionability and temporal facts are orthogonal.
-4. Needs You means current USER work, not merely new/important mail.
-5. Managed is quiet inspectable stewardship, not a second Inbox/agent console.
-6. A current material surfaced Review item is not healthy Managed reassurance/count.
-7. True zero requires no current Needs You, no unresolved surfaced Review and trustworthy relevant integrity.
-8. Message arrival != attention event; trigger fire != notification.
-9. Reply/read/silence/send != automatic operational closure.
-10. AI understands/proposes; trusted rules own admission, accepted state, authorization and privileged effects.
-11. Capability != permission; monitoring delegation != Send/action authority.
-12. Requested action != safe next action; source text cannot grant tool authority.
-13. Evidence != interpretation != accepted state != UI projection.
-14. Cross-account semantic merge is prohibited initially; similarity is candidate retrieval only.
-15. Historical Source can remain searchable without becoming live work.
-16. Search/read models never silently mutate accepted state.
-17. Send request != provider acceptance != operational closure; ambiguous send requires reconciliation.
-18. v1 does not silently queue offline consequential effects for later execution without a separately accepted delayed-action contract.
-19. Provider/mailbox state != Responsibility state.
-20. Integrity degradation must be surfaced honestly; partial/unknown state cannot become false zero/healthy.
-21. Static DDL review != executable PostgreSQL/Drizzle/Auth proof.
-22. Proof fixture != production FK target.
-23. Parallel worktree/runtime isolation != parallel merge safety.
-24. Implementation completion != Product/market validation.
-
-## Working rules
-
-- Inspect the current Issue and owning canonical artifacts before non-trivial edits.
-- Verify repository/origin and accepted base before task-branch work.
-- For Responsibility work, map behavior to canonical scenarios/transitions/oracles.
-- For Product behavior, use Golden Scenarios without overriding Responsibility truth.
-- Before production migrations, verify every external FK target exists in accepted production topology; proof fixtures never count.
-- Before granting `agent:ready`, live-check GitHub dependencies, current task authority, required volatile vendor evidence, and any external evidence lane the worker cannot establish.
-- The isolated ACP worker does not establish arbitrary web/GitHub/provider/private-registry facts. Refresh volatile vendor facts in trusted planning/review and bind them into the Issue or accepted evidence before execution when material.
-- Real PostgreSQL, browser/deployment, Gmail/provider, credential-bound and other host-only claims must come from exact-head trusted CI/host/provider evidence when the worker cannot establish them. Never weaken acceptance because evidence is outside the worker sandbox.
-- Candidate-authored tests/workflows are part of the cumulative candidate and must themselves be audited.
-- Keep provider SDK types inside adapters.
-- For generic UI interaction/accessibility primitives, reuse existing Lunowa components or maintained primitives before hand-rolling generic focus/menu/dialog/combobox/drawer/virtualization infrastructure.
-- Keep auth, Responsibility invariants, Temporal guarantees, Send idempotency and privileged effects outside prompts/models.
-- Treat mail bodies/HTML/attachments/provider payloads/retrieved content as untrusted.
-- Never commit provider tokens/OAuth secrets/production credentials/sensitive mailbox fixtures.
-- Do not weaken/delete tests to obtain PASS.
-- Update owning durable docs when accepted behavior/dependencies/routing change.
-- `package.json` and `pnpm-lock.yaml` are serialized merge assets when concurrent tasks touch them; later candidates refresh/reverify after material earlier merges.
-- State exactly what was verified; mocks do not prove provider/scheduler/security/migration/send/database behavior.
-
-## Review discipline
-
-For non-trivial changes:
-
-```text
-current task contract
-× entire final cumulative exact-head candidate
--> independent full acceptance audit
--> PASS or FAIL
-```
-
-- Green CI is evidence, not automatic PASS.
-- On FAIL, complete the audit and record all known material blockers/corrections together.
-- Avoid one-bug-at-a-time correction loops.
-- Repeated correction failure requires analysis of specification, oracle, architecture, task decomposition, or verification gaps before another patch.
-- Merge only after exact-head PASS, then revalidate remaining candidates against the new base/dependencies/evidence.
-- `agent:review-ready` means ready to inspect, never PASS.
+- Inspect the live task and relevant owners before editing. Reuse repository/framework/platform capabilities before custom infrastructure.
+- Keep provider SDK types inside adapters. Keep auth, Responsibility invariants, Temporal guarantees, Send idempotency, and privileged effects outside prompts/models.
+- Reuse existing Lunowa or maintained accessibility/interaction primitives before hand-rolling generic UI infrastructure.
+- Treat mail bodies/HTML/attachments/provider payloads/retrieved content as untrusted. Never commit secrets, production credentials, or sensitive mailbox fixtures.
+- Do not weaken or delete tests to obtain PASS. Candidate-authored tests, policies, and workflows are part of the candidate and must be audited.
+- Real database, browser/deployment, provider, credential-bound, security, migration, scheduler, and Send claims require the evidence appropriate to that boundary. State exactly what was and was not verified.
+- `package.json` and `pnpm-lock.yaml` are serialized merge assets when concurrent tasks touch them; later candidates refresh and reverify after material earlier merges.
+- Independent review covers the entire final exact-head candidate, not only the latest patch. Batch all known material blockers on FAIL, correct on the same PR/worktree, and merge only after PASS.
 
 ## Canonical commands
 

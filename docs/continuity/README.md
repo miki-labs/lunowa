@@ -4,15 +4,15 @@
 
 この層は、過去chatを読み直さなくても、fresh sessionや人間が **Lunowaの現在地と正しいsource of truthを短時間で復元するためのnavigation / checkpoint infrastructure** です。
 
-ここにProduct・Architecture・Responsibility・Issue backlog・ACP実装を複製しません。会話ログやprivate reasoningも保存しません。
+ここにProduct・Architecture・Responsibility・Issue backlog・実行基盤を複製しません。会話ログやprivate reasoningも保存しません。
 
 ## Authority boundary
 
 | Knowledge class | 役割 | Authority rule |
 | --- | --- | --- |
 | Lunowa canonical knowledge | Product / design / domain / architecture / contract / decision | `miki-labs/lunowa` のowning artifactがnormative |
-| Lunowa live task state | Issue / PR / review / CI / GitHub dependency | current stateはlive query。backlogをdocsへ複製しない |
-| ACP execution/recovery | admission / concurrency / model routing / scheduler / recovery / quarantine | `miki-labs/agent-control-plane` のcurrent repo + 必要なhost evidenceがauthority。Product semanticsは所有しない |
+| Lunowa live task state | Issue / `blocked_by` / PR / review / CI | current stateはGitHubでlive query。backlogをdocsへ複製しない |
+| Implementation execution | dedicated branch/worktree / direct coding agent / task-relevant tools / local runtime | live Issue contractと実worktree/runtime evidenceに従う。execution engineはreplaceable |
 | Human checkpoint / navigation | `AGENTS.md`, `CURRENT.md`, `KNOWLEDGE-MAP.md` | routeと要約だけ。canonical/live evidenceに負ける |
 | Actual behavior | code / schema / tests / runtime evidence | 実際に何が起きるかを示す。intentとの差はreconcileする |
 | Reusable upstream baseline | Blueprint + `BLUEPRINT-ADOPTION.md` | Lunowa固有authorityをoverrideしない |
@@ -30,24 +30,23 @@ AGENTS.md
   -> KNOWLEDGE-MAP.md（authority routingが必要なとき）
   -> live current Lunowa Issue / PR / CI / blocked_by
   -> decisionに必要なLunowa canonical sourcesだけ
-  -> execution/recovery/concurrencyが関係するならcurrent ACP authority
-  -> RUNNING/unknown/quarantineが曖昧ならACP manifest / host process evidence
-  -> implementation behaviorが必要ならcode/tests/runtime
+  -> dedicated branch/worktreeのowner・base・status
+  -> taskに必要なskill/toolとcode/tests/runtime evidenceだけ
 ```
 
 成功条件は、hidden memoryなしのfresh contextでも次を復元できることです。
 
 - Lunowa Product authorityがどこにあるか;
-- ACPはexecution/recovery authorityでありProduct authorityではないこと;
-- current task/dependency/PR/CIをlive確認すること;
-- bounded parallel executionとserial merge/review disciplineを混同しないこと;
-- RUNNING/READY labelだけでretryやfree-slotを判断しないこと;
-- unknown outcomeをblind replayしないこと。
+- current task/dependency/PR/CIをlive確認し、Issue contractと`blocked_by`をdurable task authorityにすること;
+- one active implementationがone Issue/worktreeを所有し、duplicate concurrent ownershipを許さないこと;
+- parallel implementationにはdistinct unblocked Issuesとworktree/runtime isolationが必要で、parallel merge safetyを意味しないこと;
+- direct coding agentへtask-relevantな最小tool/skill surfaceだけを与えること;
+- builder verificationとindependent exact-head acceptanceを混同しないこと。
 
 ## Freshness rule
 
 - `CURRENT.md` は **accepted capability boundary / implementation frontier / material blocker / RUN path** が変わった時だけreconcileする。
-- exact current `main` SHA、current Issue/PR/CI、installed ACP capacity、quota、host process、RUNNING/READY、open ACP defectはaction時にlive確認する。
+- exact current `main` SHA、current Issue/PR/CI/`blocked_by`、worktree ownership/base/status、task-relevant runtime/process stateはaction時にlive確認する。
 - `KNOWLEDGE-MAP.md` はauthorityの場所やroutingが変わった時だけ更新する。
 - navigation artifactがstaleならcanonical/live sourceを確認し、routerを修復する。
 - stable bootstrapへcurrent Issue番号や一時的host状態をhardcodeしない。
@@ -79,7 +78,7 @@ brainstorm、捨てた案、routine debugging、recoverable chat detailは残し
 - knowledge graph
 - chat archive
 - duplicated Issue/PR ledger
-- copied ACP handbook / scheduler-state database
+- copied execution handbook / scheduler-state database
 - 自動生成wikiを新しいauthorityにする仕組み
 - global status enum
 - continuity専用service
@@ -97,7 +96,7 @@ materialなsessionやphaseの終わりに、次だけ確認します。
 - accepted fact/evidenceが変わったか
 - durable decision/assumption/hypothesisが変わったか
 - blocker/dependency/next decisionが変わったか
-- canonical source / execution authority routingが変わったか
+- canonical source / task・execution routingが変わったか
 
 まずowning artifactへ反映し、その後 `CURRENT.md` / `KNOWLEDGE-MAP.md` にmaterialな影響がある場合だけ更新します。
 
@@ -106,7 +105,7 @@ materialなsessionやphaseの終わりに、次だけ確認します。
 continuity layerを次のものにしてはいけません。
 
 - duplicate Product / Architecture / contract / decision source
-- copied ACP handbook or scheduler state database
+- copied execution handbook or scheduler state database
 - manually maintained Issue/PR/CI backlog
 - chat/session/reasoning archive
 - Responsibility conclusion store

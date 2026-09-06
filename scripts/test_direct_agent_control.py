@@ -14,6 +14,22 @@ spec.loader.exec_module(control)
 
 
 class DirectAgentControlTest(unittest.TestCase):
+    def test_tool_profiles_fail_closed_and_keep_privileged_integrations_off(self) -> None:
+        repo = control.codex_tool_args("repo")
+        self.assertIn("remote_plugin", repo)
+        self.assertIn("mcp_servers.cloudflare-api.enabled=false", repo)
+        self.assertIn("mcp_servers.google-pubsub.enabled=false", repo)
+        docs = control.codex_tool_args("docs")
+        self.assertIn("mcp_servers.context7.enabled=true", docs)
+        self.assertIn("mcp_servers.cloudflare-api.enabled=false", docs)
+        ui = control.codex_tool_args("ui")
+        self.assertIn("mcp_servers.next-devtools.enabled=true", ui)
+        self.assertIn("mcp_servers.chrome-devtools.enabled=false", ui)
+        browser = control.codex_tool_args("browser-debug")
+        self.assertIn("mcp_servers.chrome-devtools.enabled=true", browser)
+        with self.assertRaisesRegex(RuntimeError, "unknown tool profile"):
+            control.codex_tool_args("privileged")
+
     def test_quota_parser_extracts_retry_time(self) -> None:
         text = "You've hit your usage limit. try again at Sep 7th, 2026 12:49 PM."
         parsed = control.quota_retry_from_text(text, tz=timezone.utc)
@@ -114,6 +130,8 @@ class DirectAgentControlTest(unittest.TestCase):
         self.assertTrue(result["dry_run"])
         self.assertTrue(result["quota_blocked"])
         self.assertFalse(result["launchable_now"])
+        self.assertEqual(result["tool_profile"], "repo")
+        self.assertIn("mcp_servers.cloudflare-api.enabled=false", result["codex_tool_args"])
 
 
 if __name__ == "__main__":

@@ -97,12 +97,15 @@ Useful controller commands:
 ```text
 python scripts/direct_agent_control.py fleet
 python scripts/direct_agent_control.py agent start ISSUE --dry-run
+python scripts/direct_agent_control.py agent start ISSUE --tool-profile docs --dry-run
 python scripts/direct_agent_control.py agent status [ISSUE]
 python scripts/direct_agent_control.py agent logs ISSUE
 python scripts/direct_agent_control.py agent stop ISSUE
 ```
 
 The controller (normally ChatGPT plus Remote Desktop Commander) chooses which Issue to start, model/reasoning effort, external evidence, review order, and any privileged write. The terminal helper validates and executes that decision; it does not autonomously choose, retry, merge, deploy, or broaden tool authority.
+
+Direct-agent tool profiles are fail-closed: `repo` exposes no MCP/plugin integrations, `docs` adds Context7, `ui` adds Context7 + Next DevTools, and `browser-debug` additionally adds Chrome DevTools. Remote plugins and privileged external/provider MCPs remain disabled for coding-agent runs; the controller obtains or authorizes that evidence separately.
 
 ## Inspect before editing
 

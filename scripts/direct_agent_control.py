@@ -30,6 +30,13 @@ TARGET_LANES = int(os.environ.get("LW_TARGET_LANES", "3"))
 HARD_CAP = int(os.environ.get("LW_HARD_LANES", "4"))
 WIP_CAP = int(os.environ.get("LW_WIP_CAP", "3"))
 SHARED_ASSETS = {"package.json", "pnpm-lock.yaml", "tsconfig.json", "drizzle.config.ts", "next.config.ts", "next.config.js"}
+MCP_SERVERS = ("context7", "chrome-devtools", "cloudflare-api", "next-devtools", "cloudflare-observability", "google-pubsub")
+TOOL_PROFILES = {
+    "repo": frozenset(),
+    "docs": frozenset({"context7"}),
+    "ui": frozenset({"context7", "next-devtools"}),
+    "browser-debug": frozenset({"context7", "next-devtools", "chrome-devtools"}),
+}
 QUOTA_RE = re.compile(r"You've hit your usage limit.*?try again at\s+([A-Z][a-z]{2})\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+(\d{1,2}:\d{2}\s+[AP]M)", re.I | re.S)
 
 
@@ -383,8 +390,23 @@ def issue_gate(number: int) -> tuple[dict[str, Any], list[dict[str, Any]], list[
     return issue, deps, prs
 
 
-def agent_prompt(number: int, mode: str) -> str:
+def codex_tool_args(profile: str) -> list[str]:
+    allowed = TOOL_PROFILES.get(profile)
+    if allowed is None:
+        raise RuntimeError(f"unknown tool profile: {profile}")
+    # Remote plugins are intentionally controller-only. Each MCP server is then
+    # explicitly enabled/disabled for this execution so normal Codex auth and
+    # local configuration remain usable without ambient privileged integrations.
+    args = ["--disable", "remote_plugin", "--strict-config"]
+    for name in MCP_SERVERS:
+        enabled = "true" if name in allowed else "false"
+        args.extend(["-c", f"mcp_servers.{name}.enabled={enabled}"])
+    return args
+
+
+def agent_prompt(number: int, mode: str, tool_profile: str) -> str:
     return f"""You are the single write-owner coding agent for Lunowa Issue #{number} ({mode} mode).
+This run uses the `{tool_profile}` tool profile. Remote plugins and privileged external MCPs are not available to you; request external/provider evidence from the ChatGPT/controller instead of broadening tool authority yourself.
 Work only inside this dedicated worktree. Start by reading AGENTS.md, docs/continuity/README.md, docs/continuity/CURRENT.md, .agents/skills/execute-task/SKILL.md, then live-read GitHub Issue #{number}, its blocked_by dependencies, related PR/CI, and the task-relevant canonical sources.
 Execute the bounded Issue end-to-end. Use repository/local deterministic tools first; use installed MCP/plugins only when materially useful. You may use native subagents for independent read-heavy exploration, research, hypothesis testing, or test/log analysis when it saves time, but keep one top-level write owner for this Issue and do not create competing writers against the same files/task.
 Run targeted verification and the canonical verification appropriate to the final change. Inspect the cumulative diff. Commit the coherent candidate locally if the task contract grants it. Do not merge, deploy, perform privileged external writes, auto-retry/replay, or modify other Issues. Report exact commit/head, checks actually run, and anything NOT_VERIFIED.
@@ -396,7 +418,7 @@ def ensure_systemd() -> None:
         raise RuntimeError("systemd --user is unavailable; direct agents are not started from the RDC process tree")
 
 
-def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, existing_worktree: str | None = None) -> dict[str, Any]:
+def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, existing_worktree: str | None = None, tool_profile: str = "repo") -> dict[str, Any]:
     fleet = fleet_snapshot()
     quota_blocked = bool(fleet["quota"]["blocked"])
     if any(int(row["issue"]) == number and (row.get("active") or row.get("unknown")) for row in fleet["agents"]):
@@ -430,11 +452,12 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
             raise RuntimeError(f"correction worktree branch does not identify Issue #{number}: {branch or '<detached>'}")
     else:
         worktree = WORKTREES / f"issue-{number}"; branch = f"agent/issue-{number}"
-    plan = {"issue": number, "mode": mode, "model": model, "effort": effort, "base": main,
+    tool_args = codex_tool_args(tool_profile)
+    plan = {"issue": number, "mode": mode, "model": model, "effort": effort, "tool_profile": tool_profile, "base": main,
             "worktree": str(worktree), "branch": branch, "unit": unit_name(number),
             "quota_blocked": quota_blocked, "launchable_now": (not quota_blocked and int(fleet["lanes"].get(lane_key) or 0) > 0)}
     if dry_run:
-        return {"dry_run": True, **plan, "prompt": agent_prompt(number, mode)}
+        return {"dry_run": True, **plan, "codex_tool_args": tool_args, "prompt": agent_prompt(number, mode, tool_profile)}
     ensure_systemd(); WORKTREES.mkdir(parents=True, exist_ok=True); STATE.mkdir(parents=True, exist_ok=True)
     owner = f"issue-{number}-direct-agent"; env = os.environ.copy(); env["PARALLEL_TASK_OWNER"] = owner
     if mode == "fresh":
@@ -468,8 +491,8 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
     codex = shutil.which("codex")
     if not codex:
         raise RuntimeError("codex executable is unavailable")
-    prompt = agent_prompt(number, mode)
-    command = [codex, "exec", "--json", "--approve-for-me", "-m", model, "-c", f'model_reasoning_effort="{effort}"',
+    prompt = agent_prompt(number, mode, tool_profile)
+    command = [codex, "exec", "--json", "--approve-for-me", *tool_args, "-m", model, "-c", f'model_reasoning_effort="{effort}"',
                "-o", str(last), prompt]
     shell = f"exec {shlex.join(command)} >{shlex.quote(str(events))} 2>{shlex.quote(str(stderr))}"
     unit = unit_name(number)
@@ -508,7 +531,7 @@ def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__); sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("fleet")
     a = sub.add_parser("agent"); aa = a.add_subparsers(dest="action", required=True)
-    s = aa.add_parser("start"); s.add_argument("issue", type=int); s.add_argument("--model", default="gpt-5.6-luna"); s.add_argument("--effort", choices=("low","medium","high","xhigh"), default="high"); s.add_argument("--mode", choices=("fresh","correction"), default="fresh"); s.add_argument("--worktree"); s.add_argument("--dry-run", action="store_true")
+    s = aa.add_parser("start"); s.add_argument("issue", type=int); s.add_argument("--model", default="gpt-5.6-luna"); s.add_argument("--effort", choices=("low","medium","high","xhigh"), default="high"); s.add_argument("--mode", choices=("fresh","correction"), default="fresh"); s.add_argument("--worktree"); s.add_argument("--tool-profile", choices=tuple(TOOL_PROFILES), default="repo"); s.add_argument("--dry-run", action="store_true")
     st = aa.add_parser("status"); st.add_argument("issue", type=int, nargs="?")
     lg = aa.add_parser("logs"); lg.add_argument("issue", type=int); lg.add_argument("--tail", type=int, default=40)
     sp = aa.add_parser("stop"); sp.add_argument("issue", type=int)
@@ -518,7 +541,7 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     if args.command == "fleet": emit(fleet_snapshot())
-    elif args.action == "start": emit(start_agent(args.issue, args.model, args.effort, args.mode, args.dry_run, args.worktree))
+    elif args.action == "start": emit(start_agent(args.issue, args.model, args.effort, args.mode, args.dry_run, args.worktree, args.tool_profile))
     elif args.action == "status": emit(agent_status(args.issue))
     elif args.action == "logs": emit(agent_logs(args.issue, args.tail))
     elif args.action == "stop": emit(stop_agent(args.issue))

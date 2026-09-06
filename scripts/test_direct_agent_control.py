@@ -226,6 +226,17 @@ class DirectAgentControlTest(unittest.TestCase):
         self.assertEqual(control.pr_issue_number(prs[0]), 69)
         self.assertNotIn("body", prs[0])
 
+    def test_remote_fleet_inputs_fails_closed_on_graphql_errors(self) -> None:
+        payload = {"data": {"repository": None}, "errors": [{"message": "temporary failure"}]}
+        with mock.patch.object(control, "gh", return_value=payload):
+            with self.assertRaisesRegex(RuntimeError, "incomplete"):
+                control.remote_fleet_inputs()
+
+    def test_fetch_main_fails_closed_when_remote_fetch_fails(self) -> None:
+        with mock.patch.object(control, "run", side_effect=RuntimeError("fetch failed")):
+            with self.assertRaisesRegex(RuntimeError, "fetch failed"):
+                control.fetch_main()
+
     def test_remote_fleet_inputs_fails_closed_on_pagination(self) -> None:
         payload = {"data": {"repository": {
             "issues": {"nodes": [], "pageInfo": {"hasNextPage": True}},

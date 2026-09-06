@@ -81,7 +81,7 @@ def now_local() -> datetime:
 
 
 def fetch_main() -> str:
-    run(["git", "fetch", "--quiet", "origin", "main"], cwd=MAIN, check=False)
+    run(["git", "fetch", "--quiet", "origin", "main"], cwd=MAIN)
     head = run(["git", "rev-parse", "origin/main"], cwd=MAIN)
     return head
 
@@ -89,7 +89,9 @@ def fetch_main() -> str:
 def remote_fleet_inputs() -> tuple[list[dict[str, Any]], dict[int, list[dict[str, Any]]], list[dict[str, Any]]]:
     query = """query($owner:String!,$name:String!,$label:String!){repository(owner:$owner,name:$name){issues(first:100,states:OPEN,labels:[$label],orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title url blockedBy(first:30){nodes{number state title} pageInfo{hasNextPage}}} pageInfo{hasNextPage}} pullRequests(first:100,states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title headRefName headRefOid baseRefName url closingIssuesReferences(first:20){nodes{number} pageInfo{hasNextPage}}} pageInfo{hasNextPage}}}}"""
     payload = gh("api", "graphql", "-F", f"owner={OWNER}", "-F", f"name={NAME}", "-F", f"label={PRIORITY_LABEL}", "-f", f"query={query}")
-    repo = ((payload or {}).get("data") or {}).get("repository") or {}
+    repo = ((payload or {}).get("data") or {}).get("repository")
+    if (payload or {}).get("errors") or not isinstance(repo, dict):
+        raise RuntimeError("fleet remote GraphQL state is incomplete; refusing empty/partial state")
     if ((repo.get("issues") or {}).get("pageInfo") or {}).get("hasNextPage") or ((repo.get("pullRequests") or {}).get("pageInfo") or {}).get("hasNextPage"):
         raise RuntimeError("fleet remote query exceeded bounded 100-item page; refusing partial state")
     issues: list[dict[str, Any]] = []

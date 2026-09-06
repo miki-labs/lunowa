@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
@@ -165,20 +167,162 @@ class DirectAgentControlTest(unittest.TestCase):
 
     def test_dry_run_reports_quota_without_launching(self) -> None:
         fleet = {
+            "main": "abc",
             "quota": {"blocked": True, "retry_after": "2026-09-07T12:49:00+09:00"},
             "lanes": {"recommended_new_lanes": 0},
             "agents": [],
+            "issues": {"ready": [{"number": 74, "title": "AI", "url": "x", "blocked_by": []}], "blocked": [], "active": [], "candidates": []},
+            "shared_asset_collisions": [],
         }
-        issue = {"number": 74, "state": "OPEN", "title": "AI", "body": "", "url": "x"}
         with mock.patch.object(control, "fleet_snapshot", return_value=fleet), \
-             mock.patch.object(control, "issue_gate", return_value=(issue, [], [])), \
-             mock.patch.object(control, "fetch_main", return_value="abc"):
+             mock.patch.object(control, "main_repo_state", return_value={"local_head": "abc", "branch": "main", "dirty_paths": 0, "stale": False}):
             result = control.start_agent(74, "gpt-5.6-luna", "high", "fresh", True)
         self.assertTrue(result["dry_run"])
         self.assertTrue(result["quota_blocked"])
         self.assertFalse(result["launchable_now"])
         self.assertEqual(result["tool_profile"], "repo")
         self.assertIn("mcp_servers.cloudflare-api.enabled=false", result["codex_tool_args"])
+
+
+    def test_start_without_expected_snapshot_does_not_build_snapshot_fingerprint(self) -> None:
+        fleet = {
+            "main": "abc",
+            "quota": {"blocked": False, "retry_after": None},
+            "lanes": {"recommended_new_lanes": 1},
+            "agents": [{"issue": 74, "active": True, "unknown": False}],
+        }
+        with mock.patch.object(control, "fleet_snapshot", return_value=fleet), \
+             mock.patch.object(control, "snapshot_from_fleet", side_effect=AssertionError("snapshot fingerprint must be opt-in")):
+            with self.assertRaisesRegex(RuntimeError, "already has an active/unknown"):
+                control.start_agent(74, "gpt-5.6-luna", "high", "fresh", False)
+
+    def test_start_expected_snapshot_checks_fingerprint(self) -> None:
+        fleet = {
+            "main": "abc",
+            "quota": {"blocked": False, "retry_after": None},
+            "lanes": {"recommended_new_lanes": 1},
+            "agents": [{"issue": 74, "active": True, "unknown": False}],
+        }
+        with mock.patch.object(control, "fleet_snapshot", return_value=fleet), \
+             mock.patch.object(control, "snapshot_from_fleet", return_value={"snapshot_id": "new"}):
+            with self.assertRaisesRegex(RuntimeError, "STALE_PRECONDITION"):
+                control.start_agent(74, "gpt-5.6-luna", "high", "fresh", False, expected_snapshot="old")
+
+    def test_remote_fleet_inputs_uses_structured_closing_issue_references(self) -> None:
+        payload = {"data": {"repository": {
+            "ref": {"target": {"oid": "main-sha"}},
+            "issues": {"nodes": [{"number": 69, "title": "G32", "url": "u", "blockedBy": {"nodes": []}}]},
+            "pullRequests": {"nodes": [{
+                "number": 120, "title": "candidate", "headRefName": "feature/no-number",
+                "headRefOid": "abc", "baseRefName": "main", "url": "p",
+                "closingIssuesReferences": {"nodes": [{"number": 69}]},
+            }]},
+        }}}
+        with mock.patch.object(control, "gh", return_value=payload) as github:
+            main, issues, deps, prs = control.remote_fleet_inputs()
+        github.assert_called_once()
+        self.assertEqual(main, "main-sha")
+        self.assertNotIn(" body ", " ".join(str(arg) for arg in github.call_args.args))
+        self.assertEqual([row["number"] for row in issues], [69])
+        self.assertEqual(deps, {69: []})
+        self.assertEqual(control.pr_issue_number(prs[0]), 69)
+        self.assertNotIn("body", prs[0])
+
+    def test_remote_fleet_inputs_fails_closed_on_graphql_errors(self) -> None:
+        payload = {"data": {"repository": None}, "errors": [{"message": "temporary failure"}]}
+        with mock.patch.object(control, "gh", return_value=payload):
+            with self.assertRaisesRegex(RuntimeError, "incomplete"):
+                control.remote_fleet_inputs()
+
+    def test_ensure_local_main_avoids_remote_fetch_when_already_current(self) -> None:
+        with mock.patch.object(control, "run", return_value="same-main"), \
+             mock.patch.object(control, "refresh_main", side_effect=AssertionError("must not fetch")):
+            control.ensure_local_main("same-main")
+
+    def test_refresh_main_fails_closed_when_remote_head_moves(self) -> None:
+        control._METRIC_COUNTS["remote_git"] = 0
+        with mock.patch.object(control, "run", side_effect=["", "new-main"]):
+            with self.assertRaisesRegex(RuntimeError, "STALE_PRECONDITION"):
+                control.refresh_main("old-main")
+        self.assertEqual(control._METRIC_COUNTS["remote_git"], 1)
+
+    def test_remote_fleet_inputs_fails_closed_on_pagination(self) -> None:
+        payload = {"data": {"repository": {
+            "ref": {"target": {"oid": "main-sha"}},
+            "issues": {"nodes": [], "pageInfo": {"hasNextPage": True}},
+            "pullRequests": {"nodes": [], "pageInfo": {"hasNextPage": False}},
+        }}}
+        with mock.patch.object(control, "gh", return_value=payload):
+            with self.assertRaisesRegex(RuntimeError, "partial state"):
+                control.remote_fleet_inputs()
+
+    def test_snapshot_identity_is_stable_and_since_can_return_tiny_no_change(self) -> None:
+        fleet = {
+            "main": "abc", "issues": {
+                "ready": [{"number": 74}],
+                "blocked": [{"number": 70, "blocked_by": [{"number": 69}]}],
+                "active": [],
+                "candidates": [{"number": 69, "prs": [{"number": 120, "headRefOid": "def"}], "has_dirty_correction": True, "needs_push": False, "local_terminal_event": None}],
+            },
+            "lanes": {"current_wip": 1, "free_wip_slots": 2, "free_process_slots": 4, "recommended_new_lanes": 0, "available_correction_lanes": 0},
+            "quota": {"blocked": True, "retry_after": "2026-09-07T12:49:00+09:00", "reason": "usage_limit"},
+            "agents": [], "shared_asset_collisions": [],
+        }
+        repo = {"local_head": "abc", "branch": "main", "dirty_paths": 0, "stale": False}
+        with mock.patch.object(control, "main_repo_state", return_value=repo):
+            first = control.snapshot_from_fleet(fleet, observed_at=datetime(2026, 9, 7, 1, tzinfo=timezone.utc))
+            second = control.snapshot_from_fleet(fleet, observed_at=datetime(2026, 9, 7, 2, tzinfo=timezone.utc))
+        self.assertEqual(first["snapshot_id"], second["snapshot_id"])
+        self.assertEqual(first["next"], {"priority": 1, "kind": "CONTINUE_EXISTING_CORRECTION", "issue": 69})
+        unchanged = control.snapshot_response(second, first["snapshot_id"])
+        self.assertFalse(unchanged["changed"])
+        self.assertNotIn("queue", unchanged)
+        self.assertLess(len(json.dumps(unchanged)), 200)
+
+    def test_snapshot_precondition_rejects_stale_controller_state(self) -> None:
+        control.require_snapshot("same", "same")
+        with self.assertRaisesRegex(RuntimeError, "STALE_PRECONDITION"):
+            control.require_snapshot("old", "new")
+
+    def test_single_issue_collision_check_skips_pr_file_fetch(self) -> None:
+        candidate = [{"number": 69, "prs": [{"number": 120}], "local_workspaces": []}]
+        with mock.patch.object(control, "pr_files", side_effect=AssertionError("must not fetch files")):
+            self.assertEqual(control.collision_snapshot(candidate, []), [])
+
+    def test_cli_metric_is_metadata_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "metrics.jsonl"
+            with mock.patch.object(control, "CLI_METRICS", target):
+                control._METRIC_COUNTS.update({"subprocess": 7, "github": 1, "remote_git": 0})
+                control._LAST_OUTPUT_BYTES = 321
+                control.record_cli_metric("snapshot", 123, True)
+            row = json.loads(target.read_text().strip())
+        self.assertEqual(set(row), {"ts", "command", "elapsed_ms", "ok", "stdout_bytes", "subprocess_calls", "github_calls", "remote_git_calls"})
+        self.assertEqual(row["command"], "snapshot")
+        self.assertEqual(row["github_calls"], 1)
+        self.assertEqual(row["remote_git_calls"], 0)
+
+    def test_metrics_failure_never_blocks_execution(self) -> None:
+        with mock.patch.object(control, "CLI_METRICS", Path("/unwritable/metrics.jsonl")), \
+             mock.patch.object(Path, "mkdir", side_effect=OSError("denied")):
+            control.record_cli_metric("snapshot", 1, True)
+
+    def test_codex_usage_aggregation_reads_only_completed_usage_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            first = Path(tmp) / "a.jsonl"
+            second = Path(tmp) / "b.jsonl"
+            first.write_text('\n'.join([
+                json.dumps({"type": "item.completed", "item": {"text": "private body that must be ignored"}}),
+                json.dumps({"type": "turn.completed", "usage": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 10, "reasoning_output_tokens": 4}}),
+            ]) + '\n')
+            second.write_text(json.dumps({"type": "turn.completed", "usage": {"input_tokens": 50, "cached_input_tokens": 20, "cache_write_input_tokens": 2, "output_tokens": 5, "reasoning_output_tokens": 1}}) + '\n')
+            result = control.codex_usage_snapshot([first, second])
+        self.assertEqual(result["runs_with_usage"], 2)
+        self.assertEqual(result["input_tokens"], 150)
+        self.assertEqual(result["cached_input_tokens"], 100)
+        self.assertEqual(result["fresh_input_tokens"], 50)
+        self.assertEqual(result["output_tokens"], 15)
+        self.assertIn("not billing", result["interpretation"])
 
 
 if __name__ == "__main__":

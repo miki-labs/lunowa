@@ -28,11 +28,13 @@ const temporalRepository = new TemporalRepository(database);
 const userId = randomUUID();
 const accountId = randomUUID();
 const conversationId = randomUUID();
+const counterpartyParticipantId = randomUUID();
 let messageId: string;
 
 const otherPartyLeg = (id: string): ObligationLeg => ({
   id,
   bearer: 'OTHER_PARTY',
+  participantId: counterpartyParticipantId,
   actionCode: 'SEND_RESULT',
   status: 'OPEN',
   actionability: 'BLOCKED',
@@ -102,6 +104,11 @@ try {
     `INSERT INTO connected_accounts (id, user_id, provider, provider_account_id, email_address, credential_reference)
      VALUES ($1, $2, 'fixture-provider', 'g32-account', 'g32@example.invalid', 'credential-ref:g32')`,
     [accountId, userId]
+  );
+  await pool.query(
+    `INSERT INTO participant_identities (id, user_id, canonical_email)
+     VALUES ($1, $2, 'g32-counterparty@example.invalid')`,
+    [counterpartyParticipantId, userId]
   );
   const normalized = await evidenceRepository.upsertNormalizedMessage(normalizedEvidenceFixture(userId, accountId, {
     conversation: {id: conversationId, providerThreadId: 'g32-thread', normalizedSubject: 'G32 temporal fixture', semanticTopic: 'G32 temporal fixture'},

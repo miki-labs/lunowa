@@ -1,4 +1,4 @@
-import {and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql} from 'drizzle-orm';
+import {and, asc, count, desc, eq, gt, gte, ilike, inArray, isNull, lt, or, sql} from 'drizzle-orm';
 
 import type {
   SourceAccountReadModel,
@@ -34,6 +34,7 @@ export type SourceSearchRequest = {
   from?: Date;
   to?: Date;
   limit?: number;
+  cursor?: string;
 };
 
 export class SourceAccessError extends Error {
@@ -57,6 +58,15 @@ type AccountRow = {
 
 const MAX_PAGE_SIZE = 100;
 const MAX_QUERY_LENGTH = 512;
+const MAX_CURSOR_LENGTH = 4096;
+
+type SourcePageContext = SourcePageReadModel['query'];
+type SourceCursorPosition = {lastMessageAt: string | null; conversationId: string};
+type SourceCursorPayload = {
+  version: 1;
+  context: SourcePageContext;
+  position: SourceCursorPosition;
+};
 
 function boundedLimit(limit: number | undefined): number {
   if (limit === undefined) return 50;
@@ -72,6 +82,32 @@ function cleanQuery(value: string | undefined): string {
 
 function escapedLike(value: string): string {
   return `%${value.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
+function encodeCursor(position: SourceCursorPosition, context: SourcePageContext): string {
+  const payload: SourceCursorPayload = {version: 1, context, position};
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+}
+
+function decodeCursor(value: string | undefined, context: SourcePageContext): SourceCursorPosition | undefined {
+  if (!value) return undefined;
+  if (value.length > MAX_CURSOR_LENGTH) throw new Error('SOURCE_INVALID_CURSOR');
+  try {
+    const payload = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Partial<SourceCursorPayload>;
+    const position = payload.position;
+    if (
+      payload.version !== 1 ||
+      JSON.stringify(payload.context) !== JSON.stringify(context) ||
+      !position ||
+      typeof position.conversationId !== 'string' ||
+      !position.conversationId ||
+      (position.lastMessageAt !== null && typeof position.lastMessageAt !== 'string') ||
+      (position.lastMessageAt !== null && Number.isNaN(new Date(position.lastMessageAt).getTime()))
+    ) throw new Error('invalid cursor');
+    return position;
+  } catch {
+    throw new Error('SOURCE_INVALID_CURSOR');
+  }
 }
 
 function iso(value: Date | null | undefined): string | null {
@@ -126,14 +162,29 @@ function scopeDataThrough(accounts: readonly AccountRow[]): string | null {
   return new Date(Math.min(...dates.map((value) => value.getTime()))).toISOString();
 }
 
-function sourcePageContext(input: SourceSearchRequest): SourcePageReadModel['query'] {
+function sourcePageContext(input: SourceSearchRequest): SourcePageContext {
   return {
     text: cleanQuery(input.text ?? input.query),
     accountId: input.connectedAccountId ?? input.accountId ?? null,
-    sender: input.sender?.trim() || null,
+    sender: input.sender?.normalize('NFC').trim() || null,
     from: iso(input.from),
     to: iso(input.to)
   };
+}
+
+function afterPosition(position: SourceCursorPosition) {
+  if (position.lastMessageAt === null) {
+    return and(isNull(conversations.lastMessageAt), gt(conversations.id, position.conversationId))!;
+  }
+  const lastMessageAt = new Date(position.lastMessageAt);
+  return or(
+    isNull(conversations.lastMessageAt),
+    lt(conversations.lastMessageAt, lastMessageAt),
+    and(
+      eq(conversations.lastMessageAt, lastMessageAt),
+      gt(conversations.id, position.conversationId)
+    )
+  )!;
 }
 
 export class SourceRepository {
@@ -252,28 +303,50 @@ export class SourceRepository {
     };
   }
 
+  private async matchingParticipantIds(userId: string, value: string): Promise<string[]> {
+    if (!value) return [];
+    const pattern = escapedLike(value);
+    const rows = await this.db
+      .select({id: participantIdentities.id})
+      .from(participantIdentities)
+      .where(and(
+        eq(participantIdentities.userId, userId),
+        or(
+          ilike(participantIdentities.canonicalEmail, pattern),
+          ilike(participantIdentities.displayName, pattern)
+        )
+      ));
+    return rows.map(({id}) => id);
+  }
+
   private async summaries(
     userId: string,
     accounts: readonly AccountRow[],
     limit: number,
-    conversationIds?: readonly string[]
-  ): Promise<SourceConversationSummary[]> {
-    if (accounts.length === 0 || conversationIds?.length === 0) return [];
+    conversationIds?: readonly string[],
+    after?: SourceCursorPosition
+  ): Promise<{items: SourceConversationSummary[]; hasMore: boolean; lastPosition: SourceCursorPosition | null}> {
+    if (accounts.length === 0 || conversationIds?.length === 0) {
+      return {items: [], hasMore: false, lastPosition: null};
+    }
     const accountIds = accounts.map((account) => account.id);
     const filters = [
       eq(conversations.userId, userId),
       inArray(conversations.connectedAccountId, accountIds)
     ];
     if (conversationIds) filters.push(inArray(conversations.id, [...conversationIds]));
+    if (after) filters.push(afterPosition(after));
     const rows = await this.db
       .select()
       .from(conversations)
       .where(and(...filters))
       .orderBy(sql`${conversations.lastMessageAt} DESC NULLS LAST`, asc(conversations.id))
-      .limit(limit);
+      .limit(limit + 1);
+    const pageRows = rows.slice(0, limit);
+    const hasMore = rows.length > limit;
     const accountMap = new Map(accounts.map((account) => [account.id, account]));
     const result: SourceConversationSummary[] = [];
-    for (const row of rows) {
+    for (const row of pageRows) {
       const account = accountMap.get(row.connectedAccountId);
       if (!account) continue;
       const messageRows = await this.db
@@ -311,7 +384,12 @@ export class SourceRepository {
         latestSender: latest ? await this.participantById(userId, latest.senderParticipantId) : null
       });
     }
-    return result;
+    const lastRow = pageRows.at(-1);
+    return {
+      items: result,
+      hasMore,
+      lastPosition: lastRow ? {lastMessageAt: iso(lastRow.lastMessageAt), conversationId: lastRow.id} : null
+    };
   }
 
   private async conversationCount(userId: string, accounts: readonly AccountRow[]): Promise<number> {
@@ -330,17 +408,21 @@ export class SourceRepository {
     userId: string;
     connectedAccountId?: string;
     limit?: number;
+    cursor?: string;
   }): Promise<SourcePageReadModel> {
     const accounts = await this.ownedAccounts(input.userId, input.connectedAccountId);
     const limit = boundedLimit(input.limit);
+    const context = {text: '', accountId: input.connectedAccountId ?? null, sender: null, from: null, to: null};
+    const after = decodeCursor(input.cursor, context);
+    const page = await this.summaries(input.userId, accounts, limit, undefined, after);
     return {
       accounts: accounts.map(accountModel),
-      conversations: await this.summaries(input.userId, accounts, limit),
+      conversations: page.items,
       readiness: readiness(accounts),
       dataThroughAt: scopeDataThrough(accounts),
-      query: {text: '', accountId: input.connectedAccountId ?? null, sender: null, from: null, to: null},
+      query: context,
       total: await this.conversationCount(input.userId, accounts),
-      nextCursor: null
+      nextCursor: page.hasMore && page.lastPosition ? encodeCursor(page.lastPosition, context) : null
     };
   }
 
@@ -386,33 +468,21 @@ export class SourceRepository {
   }
 
   public async searchSource(userId: string, input: SourceSearchRequest): Promise<SourcePageReadModel> {
-    const text = cleanQuery(input.text ?? input.query);
-    const sender = input.sender?.normalize('NFC').trim() ?? '';
+    const context = sourcePageContext(input);
+    const text = context.text;
+    const sender = context.sender ?? '';
     const connectedAccountId = input.connectedAccountId ?? input.accountId;
     const accounts = await this.ownedAccounts(userId, connectedAccountId);
-    const context = sourcePageContext(input);
     const limit = boundedLimit(input.limit);
+    const after = decodeCursor(input.cursor, context);
     if (accounts.length === 0) {
       return {accounts: [], conversations: [], readiness: 'unavailable', dataThroughAt: null, query: context, total: 0, nextCursor: null};
     }
 
-    const participantFilters = [];
-    if (text || sender) {
-      const participantQuery = escapedLike(text || sender);
-      participantFilters.push(
-        or(
-          ilike(participantIdentities.canonicalEmail, participantQuery),
-          ilike(participantIdentities.displayName, participantQuery)
-        )
-      );
-    }
-    const matchingParticipants = participantFilters.length === 0
-      ? []
-      : await this.db
-        .select({id: participantIdentities.id})
-        .from(participantIdentities)
-        .where(and(eq(participantIdentities.userId, userId), ...participantFilters));
-    const participantIds = matchingParticipants.map(({id}) => id);
+    const [senderParticipantIds, textParticipantIds] = await Promise.all([
+      this.matchingParticipantIds(userId, sender),
+      this.matchingParticipantIds(userId, text)
+    ]);
 
     const accountIds = accounts.map((account) => account.id);
     const filters = [
@@ -424,10 +494,10 @@ export class SourceRepository {
     if (input.from) filters.push(gte(messages.occurredAt, input.from));
     if (input.to) filters.push(lt(messages.occurredAt, input.to));
     if (sender) {
-      if (participantIds.length === 0) {
+      if (senderParticipantIds.length === 0) {
         return {accounts: accounts.map(accountModel), conversations: [], readiness: readiness(accounts), dataThroughAt: scopeDataThrough(accounts), query: context, total: 0, nextCursor: null};
       }
-      filters.push(inArray(messages.senderParticipantId, participantIds));
+      filters.push(inArray(messages.senderParticipantId, senderParticipantIds));
     }
     if (text) {
       const pattern = escapedLike(text);
@@ -439,9 +509,9 @@ export class SourceRepository {
         ilike(messages.providerMessageId, pattern),
         ilike(attachments.filename, pattern)
       ];
-      if (participantIds.length > 0) {
-        textMatches.push(inArray(messages.senderParticipantId, participantIds));
-        textMatches.push(inArray(messageParticipants.participantId, participantIds));
+      if (textParticipantIds.length > 0) {
+        textMatches.push(inArray(messages.senderParticipantId, textParticipantIds));
+        textMatches.push(inArray(messageParticipants.participantId, textParticipantIds));
       }
       const textMatch = or(...textMatches);
       if (textMatch) filters.push(textMatch);
@@ -466,15 +536,15 @@ export class SourceRepository {
       ))
       .where(and(...filters));
     const conversationIds = matchingRows.map(({conversationId}) => conversationId);
-    const conversationsResult = await this.summaries(userId, accounts, limit, conversationIds);
+    const page = await this.summaries(userId, accounts, limit, conversationIds, after);
     return {
       accounts: accounts.map(accountModel),
-      conversations: conversationsResult,
+      conversations: page.items,
       readiness: readiness(accounts),
       dataThroughAt: scopeDataThrough(accounts),
       query: context,
       total: conversationIds.length,
-      nextCursor: null
+      nextCursor: page.hasMore && page.lastPosition ? encodeCursor(page.lastPosition, context) : null
     };
   }
 }

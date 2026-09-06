@@ -121,6 +121,7 @@ describe('G21 Source safety boundaries', () => {
     expect(screen.getByText('Safe source')).toBeInTheDocument();
     expect(screen.queryByText('window.authority = true')).not.toBeInTheDocument();
     expect(screen.getByText(/この画面でのプレビューに失敗しました/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '送信する'})).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', {name: /一覧に戻る/}));
     fireEvent.click(screen.getByRole('button', {name: '検索を表示'}));
@@ -130,5 +131,55 @@ describe('G21 Source safety boundaries', () => {
     expect(screen.getByLabelText('メールを検索')).toHaveValue('missing evidence');
     expect(screen.getByLabelText('検索するアカウント')).toHaveValue('account-1');
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('accountId=account-1'), expect.anything());
+  });
+
+  it('continues a bounded Source list through its cursor', async () => {
+    const secondConversation = {
+      ...page.conversations[0],
+      id: 'conversation-2',
+      subject: 'Second source subject',
+      latestSender: {email: 'second@example.com', displayName: 'Second Sender'}
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('cursor=page-2')) {
+        return jsonResponse({...page, conversations: [secondConversation], total: 2, nextCursor: null});
+      }
+      return jsonResponse({...page, total: 2, nextCursor: 'page-2'});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(screen.getByRole('button', {name: '会話を表示'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: '次の会話を読み込む'})).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', {name: '次の会話を読み込む'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: /Second Sender/})).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('cursor=page-2'), expect.anything());
+  });
+
+  it('surfaces degraded sync on Source detail even when the account remains connected', async () => {
+    const degradedAccount = {
+      ...account,
+      sync: {...account.sync, status: 'ERROR', errorCode: 'HISTORY_GAP'}
+    };
+    const degradedPage = {
+      ...page,
+      accounts: [degradedAccount],
+      conversations: [{...page.conversations[0], account: degradedAccount}]
+    };
+    const degradedDetail = {...detail, account: degradedAccount};
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      return String(input).includes('/source/conversations/conversation-1')
+        ? jsonResponse(degradedDetail)
+        : jsonResponse(degradedPage);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(screen.getByRole('button', {name: '会話を表示'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: /Source Sender/})).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', {name: /Source Sender/}));
+    await waitFor(() => expect(screen.getByText('Sourceの確認範囲に問題があります')).toBeInTheDocument());
+    expect(screen.getByText(/検索結果は全件を表さない可能性があります/)).toBeInTheDocument();
   });
 });

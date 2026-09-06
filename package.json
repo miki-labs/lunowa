@@ -26,6 +26,7 @@
     "test:responsibility-reducer-production": "node --import tsx tests/responsibility-reducer-production-integration.ts",
     "test:gmail-provider": "vitest run tests/gmail-provider.test.ts",
     "test:gmail-production": "node --import tsx tests/gmail-provider-integration.ts",
+    "test:source-production": "node --import tsx tests/source-integration.ts",
     "test:gmail-real-provider": "node --import tsx tests/gmail-real-provider-evidence.ts",
     "proof:auth-uuid:schema": "auth generate --config proofs/better-auth-uuid/auth.ts --output proofs/better-auth-uuid/auth-schema.ts --yes && drizzle-kit generate --config proofs/better-auth-uuid/drizzle.config.ts",
     "test:auth-uuid": "node --import tsx tests/better-auth-uuid-proof.ts",

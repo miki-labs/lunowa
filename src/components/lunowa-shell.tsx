@@ -184,6 +184,32 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     return () => controller.abort();
   }, [appUser?.id, sourceReload]);
 
+  const loadMoreSource = () => {
+    if (!appUser?.id || !sourceModel?.nextCursor || sourceLoading) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({limit: '50', cursor: sourceModel.nextCursor});
+    setSourceLoading(true);
+    setSourceError('');
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?${query.toString()}`, {
+      credentials: 'same-origin',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('SOURCE_LIST_FAILED');
+        return response.json() as Promise<SourcePageReadModel>;
+      })
+      .then((result) => setSourceModel((current) => current ? {
+        ...result,
+        conversations: [...current.conversations, ...result.conversations]
+      } : result))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setSourceError(error instanceof Error ? error.message : 'SOURCE_LIST_FAILED');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSourceLoading(false);
+      });
+  };
+
   useEffect(() => {
     if (!appUser?.id) return;
     if (!search.trim()) {
@@ -216,7 +242,34 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [appUser?.id, search, searchAccountId, sourceModel]);
+  }, [appUser?.id, search, searchAccountId]);
+
+  const loadMoreSourceSearch = () => {
+    if (!appUser?.id || !search.trim() || !sourceSearchModel?.nextCursor || sourceSearchLoading) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({q: search, limit: '50', cursor: sourceSearchModel.nextCursor});
+    if (searchAccountId) query.set('accountId', searchAccountId);
+    setSourceSearchLoading(true);
+    setSourceSearchError('');
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/search?${query.toString()}`, {
+      credentials: 'same-origin',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('SOURCE_SEARCH_FAILED');
+        return response.json() as Promise<SourcePageReadModel>;
+      })
+      .then((result) => setSourceSearchModel((current) => current && current.query.text === search.normalize('NFC').trim() && current.query.accountId === (searchAccountId || null) ? {
+        ...result,
+        conversations: [...current.conversations, ...result.conversations]
+      } : current))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setSourceSearchError(error instanceof Error ? error.message : 'SOURCE_SEARCH_FAILED');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSourceSearchLoading(false);
+      });
+  };
 
   useEffect(() => {
     if (!appUser?.id || detail !== 'conversation' || !selectedConversationId) return;
@@ -304,9 +357,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
           signingOut={signingOut}
           sessionActionError={sessionActionError}
           search={search}
-          onSearch={setSearch}
           searchAccountId={searchAccountId}
-          onSearchAccount={setSearchAccountId}
           sourceModel={sourceModel}
           sourceLoading={sourceLoading}
           sourceError={sourceError}
@@ -322,6 +373,18 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
           openManaged={() => openDetail('managed-detail', 'managed-estimate')}
           openReview={() => openDetail('review-detail', 'review-condition')}
           openConversation={openConversation}
+          onLoadMoreSource={loadMoreSource}
+          onLoadMoreSourceSearch={loadMoreSourceSearch}
+          onSearch={(value) => {
+            setSearch(value);
+            setSourceSearchModel(null);
+            setSourceSearchError('');
+          }}
+          onSearchAccount={(value) => {
+            setSearchAccountId(value);
+            setSourceSearchModel(null);
+            setSourceSearchError('');
+          }}
         />
         <FixtureSwitch fixtureId={fixtureId} onChange={changeFixture} />
       </section>
@@ -375,7 +438,7 @@ function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; on
   );
 }
 
-function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessionActionError, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openConversation}: {
+function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessionActionError, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
   surface: Surface;
   fixture: ShellFixture;
   appUser?: AppUserSummary;
@@ -393,6 +456,8 @@ function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessi
   sourceSearchModel: SourcePageReadModel | null;
   sourceSearchLoading: boolean;
   sourceSearchError: string;
+  onLoadMoreSource: () => void;
+  onLoadMoreSourceSearch: () => void;
   openMoment: (origin?: string) => void;
   openManaged: () => void;
   openReview: () => void;
@@ -416,10 +481,10 @@ function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessi
       {!loading && surface === 'managed' && <Managed fixture={fixture} openManaged={openManaged} />}
       {!loading && surface === 'review' && <Review fixture={fixture} openReview={openReview} />}
       {!loading && surface === 'source' && (appUser?.id
-        ? <RealSourceList model={sourceModel} loading={sourceLoading} error={sourceError} onRetry={onRetrySource} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} />
+        ? <RealSourceList model={sourceModel} loading={sourceLoading} error={sourceError} onRetry={onRetrySource} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} onLoadMore={onLoadMoreSource} />
         : <FixtureSourceList openConversation={openConversation} openMoment={openMoment} />)}
       {!loading && surface === 'search' && (appUser?.id
-        ? <RealSourceSearch model={sourceSearchModel ?? sourceModel} loading={sourceSearchLoading} error={sourceSearchError} text={search} accountId={searchAccountId} onText={onSearch} onAccount={onSearchAccount} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} />
+        ? <RealSourceSearch model={sourceSearchModel ?? sourceModel} loading={sourceSearchLoading} error={sourceSearchError} text={search} accountId={searchAccountId} onText={onSearch} onAccount={onSearchAccount} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} onLoadMore={onLoadMoreSourceSearch} />
         : <Search search={search} onSearch={onSearch} openConversation={openConversation} />)}
       {!loading && surface === 'settings' && (
         <Settings
@@ -516,17 +581,7 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
     {detail === 'managed-detail' && <ManagedDetail mutation={commonMutations['stop-tracking']} onMutation={onCommonMutation} />}
     {detail === 'review-detail' && <ReviewDetail mutation={commonMutations['review-answer']} onMutation={onCommonMutation} />}
     {detail === 'conversation' && (sourceUserId
-      ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError}>
-        {sourceConversation && <Composer
-          draft={draft}
-          onDraft={onDraft}
-          sendState={sendState}
-          fixture={fixture}
-          onSend={onSend}
-          toLabel={sourceConversation.messages[0]?.recipients[0]?.displayName ?? sourceConversation.messages[0]?.recipients[0]?.email ?? '宛先情報なし'}
-          fromLabel={sourceConversation.account.emailAddress}
-        />}
-      </SourceConversationDetail>
+      ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError} />
       : <Conversation draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />)}
   </div>;
 }

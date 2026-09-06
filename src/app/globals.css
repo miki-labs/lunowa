@@ -106,6 +106,7 @@ h3 { font-size: 1rem; margin-bottom: 8px; }
 .source-main { display: grid; min-width: 0; gap: 3px; border: 0; background: transparent; color: var(--foreground); padding: 2px 0; text-align: left; }
 .source-main span { overflow: hidden; color: var(--muted-foreground); font-size: .875rem; text-overflow: ellipsis; white-space: nowrap; }
 .source-row time { color: var(--muted-foreground); font-size: .75rem; }
+.source-pagination { display: grid; gap: 8px; justify-items: start; border-top: 1px solid var(--border); padding: 16px 0; }
 .status-affordance { min-height: 32px; border: 1px solid #c6b9df; border-radius: 8px; background: var(--review-bg); color: var(--review-fg); font-size: .75rem; font-weight: 700; padding: 5px 8px; }
 .search-box { display: grid; gap: 8px; color: var(--foreground); font-size: .875rem; font-weight: 700; }
 .search-box input, .auth-form input, textarea { width: 100%; border: 1px solid #aeb9cb; border-radius: 9px; background: white; color: var(--foreground); font-size: 1rem; line-height: 1.5; padding: 10px 12px; }

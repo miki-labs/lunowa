@@ -1,7 +1,7 @@
 import {getOwnedAppSession} from '@/server/auth/session';
 import {searchSource} from '@/server/db/repositories/source';
 
-import {parseSourceDate, parseSourceLimit, sourceErrorResponse} from '@/server/source/http';
+import {parseSourceCursor, parseSourceDate, parseSourceLimit, sourceErrorResponse} from '@/server/source/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,8 @@ export async function GET(request: Request, context: RouteContext) {
       sender: url.searchParams.get('sender') ?? undefined,
       from: parseSourceDate(url.searchParams.get('from'), 'from'),
       to: parseSourceDate(url.searchParams.get('to'), 'to'),
-      limit: parseSourceLimit(url.searchParams.get('limit'))
+      limit: parseSourceLimit(url.searchParams.get('limit')),
+      cursor: parseSourceCursor(url.searchParams.get('cursor'))
     });
     return Response.json(result, {headers: {'Cache-Control': 'private, no-store'}});
   } catch (error) {

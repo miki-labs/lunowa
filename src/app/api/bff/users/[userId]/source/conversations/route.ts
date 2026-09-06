@@ -1,7 +1,7 @@
 import {getOwnedAppSession} from '@/server/auth/session';
 import {SourceRepository} from '@/server/db/repositories/source';
 
-import {parseSourceLimit, sourceErrorResponse} from '@/server/source/http';
+import {parseSourceCursor, parseSourceLimit, sourceErrorResponse} from '@/server/source/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,8 @@ export async function GET(request: Request, context: RouteContext) {
     const result = await new SourceRepository().listConversations({
       userId,
       connectedAccountId: url.searchParams.get('accountId') ?? undefined,
-      limit: parseSourceLimit(url.searchParams.get('limit'))
+      limit: parseSourceLimit(url.searchParams.get('limit')),
+      cursor: parseSourceCursor(url.searchParams.get('cursor'))
     });
     return Response.json(result, {headers: {'Cache-Control': 'private, no-store'}});
   } catch (error) {

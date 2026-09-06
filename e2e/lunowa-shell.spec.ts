@@ -116,17 +116,16 @@ test('renders the shell and navigates a Needs You item to its Moment', async ({p
   expect(consoleErrors).toEqual([]);
 });
 
-test('preserves a draft and exposes a usable compact navigation drawer', async ({page}) => {
+test('keeps the real Source Conversation read-only and exposes a usable compact navigation drawer', async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
   await page.goto('/ja');
   await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '会話').click();
   await page.getByRole('button', {name: /佐藤ひろ子/}).click();
-  const draft = page.getByLabel('本文');
-  await draft.fill('確認しました。');
+  await expect(page.getByLabel('詳細').getByText('添付の見積書をご確認いただけますか。')).toBeVisible();
+  await expect(page.getByRole('button', {name: '送信する'})).toHaveCount(0);
   await page.getByRole('button', {name: /一覧に戻る/}).click();
-  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
-  await expect(page.getByLabel('本文')).toHaveValue('確認しました。');
+  await expect(page.getByRole('button', {name: /佐藤ひろ子/})).toBeVisible();
 });
 
 test('keeps each responsive stage in content-fit order and rail labels discoverable', async ({page}) => {
@@ -182,8 +181,8 @@ test('preserves core reading and focus visibility at 125, 150, and 200 percent b
       document.documentElement.style.fontSize = `${textScale * 100}%`;
     }, scale);
     if (width < 900) await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
-    await nav(page, '会話').click();
-    await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+    await nav(page, '対応が必要').click();
+    await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
     const draft = page.getByLabel('本文');
     await draft.focus();
     const result = await page.evaluate(() => {
@@ -240,10 +239,10 @@ test('does not activate global search for editable input or Japanese IME composi
   });
   await expect(page.getByRole('heading', {name: 'ホーム'})).toBeVisible();
 
-  await nav(page, '会話').click();
-  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
   await page.getByLabel('本文').press('/');
-  await expect(page.getByRole('heading', {name: '来期の見積書について'})).toBeVisible();
+  await expect(page.getByRole('heading', {name: '見積書を確認して返信する'})).toBeVisible();
 });
 
 test('expires, re-authenticates, and signs out without changing mailbox monitoring semantics', async ({page}) => {

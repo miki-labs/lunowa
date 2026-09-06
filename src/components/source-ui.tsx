@@ -21,12 +21,47 @@ function readinessNotice(readiness: SourceReadiness, dataThroughAt: string | nul
     return <p className="coverage-notice" role="status">会話を同期しています。現在の確認範囲のみを表示しています{dataThroughAt ? `（${new Date(dataThroughAt).toLocaleString('ja-JP')}まで）` : ''}。空の結果を全件なしとは扱いません。</p>;
   }
   if (readiness === 'degraded') {
-    return <aside className="integrity-banner" aria-label="Sourceの確認範囲"><strong>Sourceの確認範囲に問題があります</strong><span>同期またはメールボックスの再認証が必要です。保存済みの原文は確認できますが、検索結果は全件を表さない可能性があります。</span></aside>;
+    return <aside className="integrity-banner" aria-label="Sourceの確認範囲"><strong>Sourceの確認範囲に問題があります</strong><span>同期またはメールボックスの再認証が必要です。保存済みの原文は確認できますが、検索結果は全件を表さない可能性があります。{dataThroughAt ? `データ確認時点: ${new Date(dataThroughAt).toLocaleString('ja-JP')}。` : 'データ確認時点は不明です。'}</span></aside>;
   }
   if (readiness === 'unavailable') {
     return <p className="empty-state">メールボックスが接続されていません。Sourceを表示するには、対応するメールボックスを接続してください。</p>;
   }
   return null;
+}
+
+function accountReadiness(account: SourcePageReadModel['accounts'][number]): SourceReadiness {
+  if (
+    account.connectionState === 'ERROR' ||
+    account.connectionState === 'RECONNECT_REQUIRED' ||
+    account.sync.status === 'ERROR' ||
+    account.sync.status === 'RECONCILIATION_REQUIRED'
+  ) return 'degraded';
+  if (
+    account.connectionState !== 'CONNECTED' ||
+    !account.sync.lastSuccessAt ||
+    account.sync.status === 'PENDING' ||
+    account.sync.status === 'SYNCING' ||
+    account.sync.status === 'UNKNOWN'
+  ) return 'partial';
+  return 'ready';
+}
+
+function accountCoverageNotice(account: SourcePageReadModel['accounts'][number]): React.ReactNode {
+  const coverage = accountReadiness(account);
+  return <>
+    {readinessNotice(coverage, account.sync.dataThroughAt)}
+    {coverage !== 'ready' && <p className="metadata">同期状態: {account.sync.status} · データ確認時点: {account.sync.dataThroughAt ? new Date(account.sync.dataThroughAt).toLocaleString('ja-JP') : '不明'}</p>}
+  </>;
+}
+
+function continuation(model: SourcePageReadModel, loading: boolean, onLoadMore: () => void): React.ReactNode {
+  if (!model.nextCursor) return null;
+  return <div className="source-pagination">
+    <p className="metadata">{model.conversations.length}件を表示中（全{model.total}件）</p>
+    <button className="quiet-button" type="button" onClick={onLoadMore} disabled={loading}>
+      {loading ? '次の会話を読み込んでいます' : '次の会話を読み込む'}
+    </button>
+  </div>;
 }
 
 function sourceRow(
@@ -47,12 +82,13 @@ function sourceRow(
   </article>;
 }
 
-export function RealSourceList({model, loading, error, onRetry, onOpenConversation}: {
+export function RealSourceList({model, loading, error, onRetry, onOpenConversation, onLoadMore}: {
   model: SourcePageReadModel | null;
   loading: boolean;
   error: string;
   onRetry: () => void;
   onOpenConversation: (conversationId: string) => void;
+  onLoadMore: () => void;
 }) {
   if (loading && !model) return <div className="surface-content"><div className="loading-state" role="status">Sourceの会話を確認しています。</div></div>;
   if (error && !model) return <div className="surface-content"><div className="empty-state" role="alert">Sourceを確認できませんでした。接続状態を確認してから、もう一度お試しください。<br /><button className="quiet-button" type="button" onClick={onRetry}>Sourceを再確認</button></div></div>;
@@ -60,12 +96,14 @@ export function RealSourceList({model, loading, error, onRetry, onOpenConversati
   return <div className="surface-content">
     <p className="surface-intro">元の会話をそのまま確認できます。Sourceは対応や判断とは別の原文です。</p>
     {readinessNotice(model.readiness, model.dataThroughAt)}
+    {error && <p className="inline-status" role="alert">追加の会話を読み込めませんでした。表示済みのSourceは保持しています。再試行できます。</p>}
     {model.accounts.length > 0 && <p className="metadata">確認対象: {model.accounts.map(accountLabel).join('、')}</p>}
     {model.conversations.length > 0
       ? model.conversations.map((item) => sourceRow(item, onOpenConversation))
       : model.readiness === 'ready'
         ? <p className="empty-state">認可された会話はありません。</p>
         : <p className="empty-state">現在の確認範囲に表示できる会話はありません。同期が完了するまで、全件なしとは扱いません。</p>}
+    {continuation(model, loading, onLoadMore)}
   </div>;
 }
 
@@ -73,7 +111,7 @@ export function FixtureSourceList({openConversation, openMoment}: {openConversat
   return <div className="surface-content"><p className="surface-intro">元の会話をそのまま確認できます。</p><article className="source-row"><button id="source-estimate" className="source-main" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>佐藤ひろ子</strong><span>来期の見積書について</span><span>添付の見積書をご確認いただけますか。</span></button><button className="status-affordance" type="button" onClick={() => openMoment('source-estimate')} aria-label="この会話の対応状況を見る">対応</button><time>10:24</time></article></div>;
 }
 
-export function RealSourceSearch({model, loading, error, text, accountId, onText, onAccount, onOpenConversation}: {
+export function RealSourceSearch({model, loading, error, text, accountId, onText, onAccount, onOpenConversation, onLoadMore}: {
   model: SourcePageReadModel | null;
   loading: boolean;
   error: string;
@@ -82,6 +120,7 @@ export function RealSourceSearch({model, loading, error, text, accountId, onText
   onText: (value: string) => void;
   onAccount: (value: string) => void;
   onOpenConversation: (conversationId: string) => void;
+  onLoadMore: () => void;
 }) {
   return <div className="surface-content">
     <div className="search-box">
@@ -99,6 +138,7 @@ export function RealSourceSearch({model, loading, error, text, accountId, onText
     {!loading && !error && !text.trim() && <p className="empty-state">検索語を入力すると、認可された会話の原文を検索します。</p>}
     {!loading && !error && text.trim() && model?.conversations.length === 0 && <p className="empty-state">「{text}」に一致する認可されたSourceはありません。検索語またはアカウント範囲を変更できます。</p>}
     {!loading && !error && model?.conversations.map((item) => sourceRow(item, onOpenConversation))}
+    {model && text.trim() && model.query.text === text.normalize('NFC').trim() && model.query.accountId === (accountId || null) && continuation(model, loading, onLoadMore)}
   </div>;
 }
 
@@ -163,13 +203,13 @@ function SourceAttachment({attachment, accountId, userId}: {attachment: SourceAt
   </li>;
 }
 
-export function SourceConversationDetail({conversation, userId, loading, error, children}: {conversation: SourceConversationReadModel | null; userId: string; loading: boolean; error: string; children?: React.ReactNode}) {
+export function SourceConversationDetail({conversation, userId, loading, error}: {conversation: SourceConversationReadModel | null; userId: string; loading: boolean; error: string}) {
   if (loading && !conversation) return <div className="source-detail-state" role="status">Sourceの会話を読み込んでいます。</div>;
   if (error && !conversation) return <div className="source-detail-state" role="alert">このSource会話を確認できませんでした。認可された会話か、接続状態を確認してください。</div>;
   if (!conversation) return null;
   return <div className="source-conversation-body">
     <p className="metadata">原文 · {conversation.account.provider} · {conversation.account.emailAddress} · evidence revision {conversation.evidenceRevision}</p>
-    {conversation.account.connectionState !== 'CONNECTED' && <p className="coverage-notice" role="status">このメールボックスは現在{conversation.account.connectionState}です。保存済みのSourceを表示しています。最新性は保証されません。</p>}
+    {accountCoverageNotice(conversation.account)}
     {conversation.messages.map((message) => <article className="source-message" key={message.id}>
       <header><strong>{message.sender.displayName || message.sender.email}</strong><span>{message.sender.email}</span><time dateTime={message.occurredAt}>{new Date(message.occurredAt).toLocaleString('ja-JP')}</time></header>
       <p className="metadata">{message.direction === 'INBOUND' ? '受信' : '送信'} · 宛先: {formatRecipients(message)} · provider message: {message.providerMessageId}</p>
@@ -181,6 +221,5 @@ export function SourceConversationDetail({conversation, userId, loading, error, 
           : <p className="empty-state">本文は利用できません。</p>}
       {message.attachments.length > 0 && <section className="attachment-list" aria-label="添付ファイル"><h3>添付ファイル</h3><ul>{message.attachments.map((attachment) => <SourceAttachment key={attachment.id} attachment={attachment} accountId={conversation.account.id} userId={userId} />)}</ul></section>}
     </article>)}
-    {children}
   </div>;
 }

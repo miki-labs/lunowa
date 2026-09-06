@@ -11,7 +11,7 @@ export function sourceErrorResponse(error: unknown): Response | null {
       {status: 404, headers: {'Cache-Control': 'no-store'}}
     );
   }
-  if (error instanceof Error && /^SOURCE_(INVALID_LIMIT|QUERY_TOO_LONG|INVALID_FROM_DATE|INVALID_TO_DATE)$/.test(error.message)) {
+  if (error instanceof Error && /^SOURCE_(INVALID_LIMIT|QUERY_TOO_LONG|INVALID_CURSOR|INVALID_FROM_DATE|INVALID_TO_DATE)$/.test(error.message)) {
     return Response.json(
       {error: error.message},
       {status: 400, headers: {'Cache-Control': 'no-store'}}
@@ -25,6 +25,12 @@ export function parseSourceLimit(value: string | null): number | undefined {
   const limit = Number(value);
   if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('SOURCE_INVALID_LIMIT');
   return limit;
+}
+
+export function parseSourceCursor(value: string | null): string | undefined {
+  if (value === null || value === '') return undefined;
+  if (value.length > 4096) throw new Error('SOURCE_INVALID_CURSOR');
+  return value;
 }
 
 export function parseSourceDate(value: string | null, name: 'from' | 'to'): Date | undefined {

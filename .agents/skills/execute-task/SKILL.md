@@ -50,7 +50,7 @@ Read the smallest relevant subset of:
 - current dependencies/framework/platform configuration;
 - current external primary documentation when a provider/platform/tool fact can materially change the solution.
 
-Search for existing owners, helpers, components, services, adapters, and framework/platform capabilities before generating a second implementation.
+Search for existing owners, helpers, components, services, adapters, and framework/platform capabilities before generating a second implementation. When available, prefer `rg` to narrow candidates and `ast-grep outline` as a cheap syntax-aware map before broad full-file reads; fall back normally when the optional outline tool is absent or insufficient.
 
 ## 3. Route only material tools and specialist concerns
 
@@ -128,6 +128,7 @@ Before declaring completion:
 
 - inspect the actual diff and changed-file list;
 - look for unrequested behavior, duplicate owners, accidental generated files, secrets, debug residue, and unrelated cleanup;
+- when Betterleaks is available, run a local diff/pre-commit secret scan without `--validation` before treating the candidate as commit-ready; absence of this optional tool does not replace existing secret-handling rules or block ordinary work;
 - inspect important generated tests for meaningful assertions, determinism, negative/failure coverage, and observable-contract focus;
 - confirm the verification evidence applies to the final candidate state rather than an earlier revision.
 

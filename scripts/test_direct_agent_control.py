@@ -30,6 +30,53 @@ class DirectAgentControlTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "unknown tool profile"):
             control.codex_tool_args("privileged")
 
+    def test_sandbox_readiness_fails_closed_on_missing_prerequisites(self) -> None:
+        blocked = control.sandbox_readiness(sbx_available=False, kvm_module=True, kvm_group=False, kvm_device=False)
+        self.assertFalse(blocked["ready_for_pilot"])
+        self.assertEqual(blocked["missing"], ["sbx", "kvm-group", "/dev/kvm-access"])
+        ready = control.sandbox_readiness(sbx_available=True, kvm_module=True, kvm_group=True, kvm_device=True)
+        self.assertTrue(ready["ready_for_pilot"])
+        self.assertEqual(ready["missing"], [])
+
+    def test_missing_optional_secret_tool_does_not_block_direct_execution(self) -> None:
+        with mock.patch.object(control.shutil, "which", return_value=None):
+            result = control.betterleaks_status_code(Path("."))
+        self.assertEqual(result, 2)
+
+    def test_secret_guard_never_captures_scanner_output(self) -> None:
+        completed = mock.Mock(returncode=1)
+        with mock.patch.object(control.shutil, "which", return_value="/usr/bin/betterleaks"), \
+             mock.patch.object(control.subprocess, "run", return_value=completed) as runner:
+            result = control.betterleaks_status_code(Path("."))
+        self.assertEqual(result, 1)
+        kwargs = runner.call_args.kwargs
+        self.assertIs(kwargs["stdout"], control.subprocess.DEVNULL)
+        self.assertIs(kwargs["stderr"], control.subprocess.DEVNULL)
+        self.assertIn(control.os.devnull, runner.call_args.args[0])
+
+    def test_agent_prompt_routes_optional_agent_native_tools_without_broadening_authority(self) -> None:
+        prompt = control.agent_prompt(126, "fresh", "repo")
+        self.assertIn("ast-grep outline", prompt)
+        self.assertIn("Betterleaks", prompt)
+        self.assertIn("without `--validation`", prompt)
+        self.assertIn("do not create competing writers", prompt)
+
+    def test_quota_snapshot_withholds_raw_evidence(self) -> None:
+        now = datetime(2026, 9, 7, 1, 0, tzinfo=timezone.utc)
+        with mock.patch.object(control, "STATE", Path("/does-not-exist")), \
+             mock.patch.object(Path, "glob", return_value=[]):
+            result = control.quota_snapshot(now)
+        self.assertNotIn("evidence", result)
+
+    def test_agent_logs_returns_metadata_not_raw_content(self) -> None:
+        with mock.patch.object(control, "agent_status", return_value={"agents": [], "quota": {}}), \
+             mock.patch.object(control, "terminal_event", return_value="turn.failed"):
+            result = control.agent_logs(42, 40)
+        self.assertTrue(result["content_withheld"])
+        self.assertNotIn("events_tail", result)
+        self.assertNotIn("stderr_tail", result)
+        self.assertNotIn("last_message", result)
+
     def test_quota_parser_extracts_retry_time(self) -> None:
         text = "You've hit your usage limit. try again at Sep 7th, 2026 12:49 PM."
         parsed = control.quota_retry_from_text(text, tz=timezone.utc)

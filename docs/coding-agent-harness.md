@@ -107,6 +107,12 @@ The controller (normally ChatGPT plus Remote Desktop Commander) chooses which Is
 
 Direct-agent tool profiles are fail-closed: `repo` exposes no MCP/plugin integrations, `docs` adds Context7, `ui` adds Context7 + Next DevTools, and `browser-debug` additionally adds Chrome DevTools. Remote plugins and privileged external/provider MCPs remain disabled for coding-agent runs; the controller obtains or authorizes that evidence separately.
 
+### Agent-native tooling policy
+
+Optional local tools should reduce context, risk, or verification cost without becoming new task authority. Inspect them with `python scripts/direct_agent_control.py capabilities`. Prefer `rg` first and `ast-grep outline` when available for a cheap structural first pass. Betterleaks may scan the local diff/pre-commit state in JSON form, but ordinary guards must not enable live secret validation/network calls implicitly. Missing optional tools never block the direct path.
+
+Docker Sandboxes remain an experimental execution substrate, not the default path. Promote them only after a bounded single-Issue A/B pilot proves KVM/access readiness, Codex authentication, project skills/tool profiles/MCP behavior, worktree semantics, verification compatibility, startup overhead, and terminal failure observability. User-level `~/.codex` configuration is not assumed to exist inside a sandbox. Testcontainers is deferred until package/lockfile ownership is clear or a DB task explicitly needs real isolated PostgreSQL evidence. Serena is opt-in for semantic cross-file work rather than a global MCP dependency.
+
 ## Inspect before editing
 
 For non-trivial work, inspect the relevant subset of:

@@ -132,7 +132,7 @@ def quota_snapshot(now: datetime | None = None) -> dict[str, Any]:
         candidates.extend(STATE.glob("issue-*/events.jsonl"))
         candidates.extend(STATE.glob("issue-*/stderr.log"))
     candidates.extend(Path("/tmp").glob("lunowa-*-direct.jsonl"))  # one-time legacy migration evidence
-    best: tuple[datetime, Path, str] | None = None
+    best: tuple[datetime, Path] | None = None
     for path in candidates:
         try:
             text = path.read_text(errors="replace")[-120000:]
@@ -140,13 +140,14 @@ def quota_snapshot(now: datetime | None = None) -> dict[str, Any]:
             continue
         retry = quota_retry_from_text(text, tz=current.tzinfo)
         if retry and (best is None or retry > best[0]):
-            best = (retry, path, QUOTA_RE.search(text).group(0)[-500:])
+            best = (retry, path)
     blocked = bool(best and best[0] > current)
     return {
         "blocked": blocked,
         "retry_after": best[0].isoformat() if best else None,
         "source": str(best[1]) if best else None,
-        "evidence": best[2] if best else None,
+        "reason": "usage_limit" if best else None,
+        "details_withheld": bool(best),
     }
 
 
@@ -385,7 +386,11 @@ def classify_issues(issues: list[dict[str, Any]], deps: dict[int, list[dict[str,
             issue_prs = pr_by_issue.get(n) or []
             workspaces = local_issue_workspaces(n, issue_prs)
             finished = finished_by_issue.get(n)
-            result["candidates"].append({**base, "prs": issue_prs, "local_workspaces": workspaces,
+            safe_prs = [{
+                "number": pr.get("number"), "title": pr.get("title"), "headRefName": pr.get("headRefName"),
+                "headRefOid": pr.get("headRefOid"), "baseRefName": pr.get("baseRefName"), "url": pr.get("url"),
+            } for pr in issue_prs]
+            result["candidates"].append({**base, "prs": safe_prs, "local_workspaces": workspaces,
                 "needs_push": any(row.get("ahead_of_pr") for row in workspaces) or (not issue_prs and any(row.get("ahead_of_main") for row in workspaces)),
                 "has_dirty_correction": any(int(row.get("dirty_paths") or 0) > 0 for row in workspaces),
                 "local_terminal_event": finished.get("terminal_event") if finished else None}); continue
@@ -608,11 +613,20 @@ def agent_status(number: int | None) -> dict[str, Any]:
 
 def agent_logs(number: int, tail: int) -> dict[str, Any]:
     root = STATE / f"issue-{number}"; events = root / "events.jsonl"; stderr = root / "stderr.log"; last = root / "last.txt"
-    def tail_text(path: Path) -> str:
-        if not path.exists(): return ""
-        return "\n".join(path.read_text(errors="replace").splitlines()[-tail:])[-24000:]
-    return {"issue": number, "status": agent_status(number), "last_message": tail_text(last),
-            "events_tail": tail_text(events), "stderr_tail": tail_text(stderr)}
+    def file_meta(path: Path) -> dict[str, Any]:
+        try:
+            stat = path.stat()
+            return {"path": str(path), "exists": True, "bytes": stat.st_size}
+        except OSError:
+            return {"path": str(path), "exists": False, "bytes": 0}
+    return {
+        "issue": number,
+        "status": agent_status(number),
+        "terminal_event": terminal_event(events),
+        "files": {"events": file_meta(events), "stderr": file_meta(stderr), "last": file_meta(last)},
+        "content_withheld": True,
+        "note": "Read bounded raw content explicitly with the controller/RDC only when needed.",
+    }
 
 
 def stop_agent(number: int) -> dict[str, Any]:

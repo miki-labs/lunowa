@@ -65,6 +65,22 @@ class DirectAgentControlTest(unittest.TestCase):
         self.assertIn("without `--validation`", prompt)
         self.assertIn("do not create competing writers", prompt)
 
+    def test_quota_snapshot_withholds_raw_evidence(self) -> None:
+        now = datetime(2026, 9, 7, 1, 0, tzinfo=timezone.utc)
+        with mock.patch.object(control, "STATE", Path("/does-not-exist")), \
+             mock.patch.object(Path, "glob", return_value=[]):
+            result = control.quota_snapshot(now)
+        self.assertNotIn("evidence", result)
+
+    def test_agent_logs_returns_metadata_not_raw_content(self) -> None:
+        with mock.patch.object(control, "agent_status", return_value={"agents": [], "quota": {}}), \
+             mock.patch.object(control, "terminal_event", return_value="turn.failed"):
+            result = control.agent_logs(42, 40)
+        self.assertTrue(result["content_withheld"])
+        self.assertNotIn("events_tail", result)
+        self.assertNotIn("stderr_tail", result)
+        self.assertNotIn("last_message", result)
+
     def test_quota_parser_extracts_retry_time(self) -> None:
         text = "You've hit your usage limit. try again at Sep 7th, 2026 12:49 PM."
         parsed = control.quota_retry_from_text(text, tz=timezone.utc)

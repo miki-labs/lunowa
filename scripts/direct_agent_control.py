@@ -230,18 +230,18 @@ def capability_snapshot() -> dict[str, Any]:
     }
 
 
-def secret_guard(path: Path) -> dict[str, Any]:
+def betterleaks_status_code(path: Path) -> int:
     binary = shutil.which("betterleaks")
     if not binary:
-        return {"available": False, "ok": None, "status": "SKIPPED_OPTIONAL", "reason": "betterleaks is not installed"}
+        return 2
     result = subprocess.run([binary, "git", "--pre-commit", "--no-banner", "--no-color", "--redact=100",
         "--report-format", "json", "--report-path", os.devnull, "."], cwd=path,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return {
-        "available": True, "ok": result.returncode == 0, "exit_code": result.returncode,
-        "leaks_detected": result.returncode != 0, "network_validation": False,
-        "details_withheld": result.returncode != 0,
-    }
+    if result.returncode == 0:
+        return 0
+    if result.returncode == 1:
+        return 1
+    return 3
 
 
 
@@ -654,8 +654,18 @@ def main() -> int:
     if args.command == "fleet": emit(fleet_snapshot())
     elif args.command == "capabilities": emit(capability_snapshot())
     elif args.command == "guard-secrets":
-        result = secret_guard(Path(args.path).expanduser().resolve()); emit(result)
-        if result.get("ok") is False: return 1
+        code = betterleaks_status_code(Path(args.path).expanduser().resolve())
+        if code == 0:
+            emit({"available": True, "ok": True, "leaks_detected": False, "network_validation": False, "details_withheld": False})
+            return 0
+        if code == 1:
+            emit({"available": True, "ok": False, "leaks_detected": True, "network_validation": False, "details_withheld": True})
+            return 1
+        if code == 2:
+            emit({"available": False, "ok": None, "status": "SKIPPED_OPTIONAL", "reason": "betterleaks is not installed"})
+            return 0
+        emit({"available": True, "ok": False, "leaks_detected": None, "network_validation": False, "details_withheld": True, "status": "SCANNER_ERROR"})
+        return 3
     elif args.action == "start": emit(start_agent(args.issue, args.model, args.effort, args.mode, args.dry_run, args.worktree, args.tool_profile))
     elif args.action == "status": emit(agent_status(args.issue))
     elif args.action == "logs": emit(agent_logs(args.issue, args.tail))

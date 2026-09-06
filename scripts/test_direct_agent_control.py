@@ -40,19 +40,15 @@ class DirectAgentControlTest(unittest.TestCase):
 
     def test_missing_optional_secret_tool_does_not_block_direct_execution(self) -> None:
         with mock.patch.object(control.shutil, "which", return_value=None):
-            result = control.secret_guard(Path("."))
-        self.assertFalse(result["available"])
-        self.assertIsNone(result["ok"])
-        self.assertEqual(result["status"], "SKIPPED_OPTIONAL")
+            result = control.betterleaks_status_code(Path("."))
+        self.assertEqual(result, 2)
 
     def test_secret_guard_never_captures_scanner_output(self) -> None:
         completed = mock.Mock(returncode=1)
         with mock.patch.object(control.shutil, "which", return_value="/usr/bin/betterleaks"), \
              mock.patch.object(control.subprocess, "run", return_value=completed) as runner:
-            result = control.secret_guard(Path("."))
-        self.assertFalse(result["ok"])
-        self.assertTrue(result["leaks_detected"])
-        self.assertTrue(result["details_withheld"])
+            result = control.betterleaks_status_code(Path("."))
+        self.assertEqual(result, 1)
         kwargs = runner.call_args.kwargs
         self.assertIs(kwargs["stdout"], control.subprocess.DEVNULL)
         self.assertIs(kwargs["stderr"], control.subprocess.DEVNULL)

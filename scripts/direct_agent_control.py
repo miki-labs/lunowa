@@ -43,7 +43,7 @@ TOOL_PROFILES = {
 }
 QUOTA_RE = re.compile(r"You've hit your usage limit.*?try again at\s+([A-Z][a-z]{2})\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+(\d{1,2}:\d{2}\s+[AP]M)", re.I | re.S)
 CLI_METRICS = Path(os.environ.get("LW_CLI_METRICS", str(Path.home() / ".cache/lw/direct-cli-metrics.jsonl"))).resolve()
-_METRIC_COUNTS = {"subprocess": 0, "github": 0}
+_METRIC_COUNTS = {"subprocess": 0, "github": 0, "remote_git": 0}
 _LAST_OUTPUT_BYTES = 0
 
 
@@ -80,18 +80,23 @@ def now_local() -> datetime:
     return datetime.now().astimezone()
 
 
-def fetch_main() -> str:
+def refresh_main(expected_main: str) -> None:
+    _METRIC_COUNTS["remote_git"] += 1
     run(["git", "fetch", "--quiet", "origin", "main"], cwd=MAIN)
-    head = run(["git", "rev-parse", "origin/main"], cwd=MAIN)
-    return head
+    actual = run(["git", "rev-parse", "origin/main"], cwd=MAIN)
+    if actual != expected_main:
+        raise RuntimeError(f"STALE_PRECONDITION expected_main={expected_main} actual_main={actual}")
 
 
-def remote_fleet_inputs() -> tuple[list[dict[str, Any]], dict[int, list[dict[str, Any]]], list[dict[str, Any]]]:
-    query = """query($owner:String!,$name:String!,$label:String!){repository(owner:$owner,name:$name){issues(first:100,states:OPEN,labels:[$label],orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title url blockedBy(first:30){nodes{number state title} pageInfo{hasNextPage}}} pageInfo{hasNextPage}} pullRequests(first:100,states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title headRefName headRefOid baseRefName url closingIssuesReferences(first:20){nodes{number} pageInfo{hasNextPage}}} pageInfo{hasNextPage}}}}"""
+def remote_fleet_inputs() -> tuple[str, list[dict[str, Any]], dict[int, list[dict[str, Any]]], list[dict[str, Any]]]:
+    query = """query($owner:String!,$name:String!,$label:String!){repository(owner:$owner,name:$name){ref(qualifiedName:"refs/heads/main"){target{... on Commit{oid}}} issues(first:100,states:OPEN,labels:[$label],orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title url blockedBy(first:30){nodes{number state title} pageInfo{hasNextPage}}} pageInfo{hasNextPage}} pullRequests(first:100,states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title headRefName headRefOid baseRefName url closingIssuesReferences(first:20){nodes{number} pageInfo{hasNextPage}}} pageInfo{hasNextPage}}}}"""
     payload = gh("api", "graphql", "-F", f"owner={OWNER}", "-F", f"name={NAME}", "-F", f"label={PRIORITY_LABEL}", "-f", f"query={query}")
     repo = ((payload or {}).get("data") or {}).get("repository")
     if (payload or {}).get("errors") or not isinstance(repo, dict):
         raise RuntimeError("fleet remote GraphQL state is incomplete; refusing empty/partial state")
+    remote_main = (((repo.get("ref") or {}).get("target") or {}).get("oid"))
+    if not isinstance(remote_main, str) or not remote_main:
+        raise RuntimeError("fleet remote main is incomplete; refusing state without exact main")
     if ((repo.get("issues") or {}).get("pageInfo") or {}).get("hasNextPage") or ((repo.get("pullRequests") or {}).get("pageInfo") or {}).get("hasNextPage"):
         raise RuntimeError("fleet remote query exceeded bounded 100-item page; refusing partial state")
     issues: list[dict[str, Any]] = []
@@ -114,7 +119,7 @@ def remote_fleet_inputs() -> tuple[list[dict[str, Any]], dict[int, list[dict[str
             "headRefOid": node.get("headRefOid"), "baseRefName": node.get("baseRefName"), "url": node.get("url"),
             "closingIssueNumbers": closing,
         })
-    return issues, deps, prs
+    return remote_main, issues, deps, prs
 
 
 def pr_issue_number(pr: dict[str, Any]) -> int | None:
@@ -515,12 +520,10 @@ def lane_calculation(*, ready: int, active: int, unknown: int, candidates: int, 
 
 
 def fleet_snapshot(*, include_capabilities: bool = True) -> dict[str, Any]:
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-        f_main = pool.submit(fetch_main)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         f_remote = pool.submit(remote_fleet_inputs)
         f_quota = pool.submit(quota_snapshot)
-        main = f_main.result()
-        issues, deps, prs = f_remote.result()
+        main, issues, deps, prs = f_remote.result()
         quota = f_quota.result()
     agents = agent_records(); classified = classify_issues(issues, deps, prs, agents); resources = resource_snapshot()
     active = sum(1 for row in agents if row.get("active")); unknown = sum(1 for row in agents if row.get("unknown"))
@@ -686,6 +689,7 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
     ensure_systemd(); WORKTREES.mkdir(parents=True, exist_ok=True); STATE.mkdir(parents=True, exist_ok=True)
     owner = f"issue-{number}-direct-agent"; env = os.environ.copy(); env["PARALLEL_TASK_OWNER"] = owner
     if mode == "fresh":
+        refresh_main(main)
         if worktree.exists():
             raise RuntimeError(f"worktree already exists: {worktree}; inspect/reuse explicitly instead of replacing it")
         if process_run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=MAIN).returncode == 0:
@@ -816,7 +820,7 @@ def record_cli_metric(command: str, elapsed_ms: int, ok: bool) -> None:
     row = {
         "ts": now_local().isoformat(), "command": command, "elapsed_ms": elapsed_ms, "ok": bool(ok),
         "stdout_bytes": _LAST_OUTPUT_BYTES, "subprocess_calls": int(_METRIC_COUNTS["subprocess"]),
-        "github_calls": int(_METRIC_COUNTS["github"]),
+        "github_calls": int(_METRIC_COUNTS["github"]), "remote_git_calls": int(_METRIC_COUNTS["remote_git"]),
     }
     try:
         CLI_METRICS.parent.mkdir(parents=True, exist_ok=True)
@@ -865,6 +869,7 @@ def cli_metrics_snapshot(limit: int = 500) -> dict[str, Any]:
             "p50_stdout_bytes": _percentile(output, 0.50), "p95_stdout_bytes": _percentile(output, 0.95),
             "avg_subprocess_calls": round(sum(int(row.get("subprocess_calls") or 0) for row in items) / len(items), 2),
             "avg_github_calls": round(sum(int(row.get("github_calls") or 0) for row in items) / len(items), 2),
+            "avg_remote_git_calls": round(sum(int(row.get("remote_git_calls") or 0) for row in items) / len(items), 2),
         })
     return {"schema": "lw.metrics.v1", "samples": len(rows), "commands": commands, "codex_usage": codex_usage_snapshot(), "privacy": "metadata only; no stdout/stderr, GitHub bodies, prompts, scanner findings, or credentials stored"}
 

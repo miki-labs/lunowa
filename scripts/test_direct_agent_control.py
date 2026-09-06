@@ -210,6 +210,7 @@ class DirectAgentControlTest(unittest.TestCase):
 
     def test_remote_fleet_inputs_uses_structured_closing_issue_references(self) -> None:
         payload = {"data": {"repository": {
+            "ref": {"target": {"oid": "main-sha"}},
             "issues": {"nodes": [{"number": 69, "title": "G32", "url": "u", "blockedBy": {"nodes": []}}]},
             "pullRequests": {"nodes": [{
                 "number": 120, "title": "candidate", "headRefName": "feature/no-number",
@@ -218,8 +219,9 @@ class DirectAgentControlTest(unittest.TestCase):
             }]},
         }}}
         with mock.patch.object(control, "gh", return_value=payload) as github:
-            issues, deps, prs = control.remote_fleet_inputs()
+            main, issues, deps, prs = control.remote_fleet_inputs()
         github.assert_called_once()
+        self.assertEqual(main, "main-sha")
         self.assertNotIn(" body ", " ".join(str(arg) for arg in github.call_args.args))
         self.assertEqual([row["number"] for row in issues], [69])
         self.assertEqual(deps, {69: []})
@@ -232,13 +234,16 @@ class DirectAgentControlTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "incomplete"):
                 control.remote_fleet_inputs()
 
-    def test_fetch_main_fails_closed_when_remote_fetch_fails(self) -> None:
-        with mock.patch.object(control, "run", side_effect=RuntimeError("fetch failed")):
-            with self.assertRaisesRegex(RuntimeError, "fetch failed"):
-                control.fetch_main()
+    def test_refresh_main_fails_closed_when_remote_head_moves(self) -> None:
+        control._METRIC_COUNTS["remote_git"] = 0
+        with mock.patch.object(control, "run", side_effect=["", "new-main"]):
+            with self.assertRaisesRegex(RuntimeError, "STALE_PRECONDITION"):
+                control.refresh_main("old-main")
+        self.assertEqual(control._METRIC_COUNTS["remote_git"], 1)
 
     def test_remote_fleet_inputs_fails_closed_on_pagination(self) -> None:
         payload = {"data": {"repository": {
+            "ref": {"target": {"oid": "main-sha"}},
             "issues": {"nodes": [], "pageInfo": {"hasNextPage": True}},
             "pullRequests": {"nodes": [], "pageInfo": {"hasNextPage": False}},
         }}}
@@ -283,13 +288,14 @@ class DirectAgentControlTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "metrics.jsonl"
             with mock.patch.object(control, "CLI_METRICS", target):
-                control._METRIC_COUNTS.update({"subprocess": 7, "github": 1})
+                control._METRIC_COUNTS.update({"subprocess": 7, "github": 1, "remote_git": 0})
                 control._LAST_OUTPUT_BYTES = 321
                 control.record_cli_metric("snapshot", 123, True)
             row = json.loads(target.read_text().strip())
-        self.assertEqual(set(row), {"ts", "command", "elapsed_ms", "ok", "stdout_bytes", "subprocess_calls", "github_calls"})
+        self.assertEqual(set(row), {"ts", "command", "elapsed_ms", "ok", "stdout_bytes", "subprocess_calls", "github_calls", "remote_git_calls"})
         self.assertEqual(row["command"], "snapshot")
         self.assertEqual(row["github_calls"], 1)
+        self.assertEqual(row["remote_git_calls"], 0)
 
     def test_metrics_failure_never_blocks_execution(self) -> None:
         with mock.patch.object(control, "CLI_METRICS", Path("/unwritable/metrics.jsonl")), \

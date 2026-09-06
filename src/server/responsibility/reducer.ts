@@ -161,7 +161,7 @@ function applyFieldChange(
   if (
     previousDecision &&
     previousDecision.authorityKind === 'USER_CORRECTION' &&
-    !['USER_CORRECTION', 'EXTERNAL_AUTHORITATIVE_FACT'].includes(change.authorityKind)
+    !['USER_CORRECTION', 'EXTERNAL_AUTHORITATIVE_FACT', 'TEMPORAL_RECONSIDERATION'].includes(change.authorityKind)
   ) {
     throw new Error(`field ${change.fieldKey} is protected by a user correction until authoritative evidence supersedes it`);
   }

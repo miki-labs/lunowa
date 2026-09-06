@@ -1,0 +1,347 @@
+import {and, asc, eq, lte, or, sql} from 'drizzle-orm';
+import {createHash} from 'node:crypto';
+
+import {getDatabase} from '../index';
+import {temporalContracts, temporalResurfacingEvents, temporalTriggers} from '../schema/temporal';
+import {responsibilities} from '../schema/responsibility';
+import {ResponsibilityRepository} from './responsibility';
+import {
+  createDeferAttentionCommand,
+  createReturnAttentionCommand,
+  createTemporalReconsiderationCommand,
+  isTemporalTriggerEligible,
+  projectResponsibility,
+  validateTemporalReturnCondition,
+  type TemporalContract,
+  type TemporalDecision,
+  type TemporalEvidence,
+  type TemporalEvaluationContext,
+  type TemporalProcessResult,
+  type TemporalRuntimeOptions,
+  type TemporalTrigger,
+  type UpsertTemporalContractInput
+} from '../../responsibility';
+
+type Database = ReturnType<typeof getDatabase>;
+type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function stableUuid(seed: string): string {
+  const digest = createHash('sha256').update(seed).digest('hex');
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+}
+
+function asUuid(value: string | undefined, seed: string): string {
+  return value && UUID.test(value) ? value : stableUuid(seed);
+}
+
+function iso(value: Date | null | undefined): string | undefined {
+  return value ? value.toISOString() : undefined;
+}
+
+function contractFromRow(row: typeof temporalContracts.$inferSelect): TemporalContract {
+  return {
+    id: row.id,
+    userId: row.userId,
+    connectedAccountId: row.connectedAccountId,
+    responsibilityId: row.responsibilityId,
+    status: row.contractStatus as TemporalContract['status'],
+    contractKind: row.contractKind as TemporalContract['contractKind'],
+    createdBy: row.createdBy,
+    version: row.version,
+    returnCondition: row.returnCondition,
+    activatedAt: row.activatedAt.toISOString(),
+    ...(iso(row.resolvedAt) ? {resolvedAt: iso(row.resolvedAt)} : {}),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  };
+}
+
+function triggerFromRow(row: typeof temporalTriggers.$inferSelect): TemporalTrigger {
+  return {
+    id: row.id,
+    temporalContractId: row.temporalContractId,
+    responsibilityId: row.responsibilityId,
+    userId: row.userId,
+    connectedAccountId: row.connectedAccountId,
+    contractVersion: row.contractVersion,
+    triggerType: row.triggerType as TemporalTrigger['triggerType'],
+    ...(iso(row.triggerAt) ? {triggerAt: iso(row.triggerAt)} : {}),
+    status: row.triggerStatus as TemporalTrigger['status'],
+    idempotencyKey: row.idempotencyKey,
+    availableAt: row.availableAt.toISOString(),
+    ...(iso(row.claimedAt) ? {claimedAt: iso(row.claimedAt)} : {}),
+    ...(iso(row.firedAt) ? {firedAt: iso(row.firedAt)} : {}),
+    failureCount: row.failureCount,
+    ...(row.lastErrorCode ? {lastErrorCode: row.lastErrorCode} : {}),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  };
+}
+
+function eligibleStatus(status: TemporalTrigger['status']): boolean {
+  return status === 'SCHEDULED' || status === 'FAILED' || status === 'CLAIMED';
+}
+
+export type DurableTemporalProcessInput = {
+  triggerId: string;
+  userId: string;
+  now?: Date;
+  loadEvidence: (context: {contract: TemporalContract; trigger: TemporalTrigger; responsibilityId: string}) => Promise<TemporalEvidence>;
+  evaluate?: TemporalRuntimeOptions['evaluate'];
+  notify?: TemporalRuntimeOptions['notify'];
+};
+
+/**
+ * PostgreSQL-backed Temporal boundary. Trigger.dev (or another scheduler)
+ * only calls this boundary; the contract/trigger rows and Responsibility
+ * domain idempotency remain authoritative.
+ */
+export class TemporalRepository {
+  private readonly responsibilityRepository: ResponsibilityRepository;
+
+  public constructor(private readonly db: Database = getDatabase()) {
+    this.responsibilityRepository = new ResponsibilityRepository(db);
+  }
+
+  public async getContract(input: {id: string; userId: string}): Promise<TemporalContract | null> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.select().from(temporalContracts).where(and(eq(temporalContracts.id, input.id), eq(temporalContracts.userId, input.userId)));
+      return row ? contractFromRow(row) : null;
+    });
+  }
+
+  public async upsertTemporalContract(input: UpsertTemporalContractInput): Promise<TemporalContract> {
+    const now = input.now ?? new Date();
+    validateTemporalReturnCondition(input.returnCondition);
+    return this.db.transaction(async (tx) => {
+      const [responsibility] = await tx.select().from(responsibilities).where(and(
+        eq(responsibilities.id, input.responsibilityId),
+        eq(responsibilities.userId, input.userId),
+        eq(responsibilities.connectedAccountId, input.connectedAccountId)
+      )).for('update');
+      if (!responsibility) throw new Error('temporal contract Responsibility is outside the authorized scope');
+      if (responsibility.resolutionStatus !== 'OPEN' || responsibility.liveTrackingState !== 'TRACKING_ACTIVE') throw new Error('temporal contract requires an active open Responsibility');
+
+      const [existing] = await tx.select().from(temporalContracts).where(and(
+        eq(temporalContracts.responsibilityId, input.responsibilityId),
+        eq(temporalContracts.userId, input.userId),
+        eq(temporalContracts.contractStatus, 'ACTIVE')
+      )).for('update');
+      const version = (existing?.version ?? 0) + 1;
+      if (existing) {
+        await tx.update(temporalContracts).set({contractStatus: 'SUPERSEDED', resolvedAt: now, updatedAt: now}).where(eq(temporalContracts.id, existing.id));
+        await tx.update(temporalTriggers).set({triggerStatus: 'SUPERSEDED', updatedAt: now}).where(and(eq(temporalTriggers.temporalContractId, existing.id), or(eq(temporalTriggers.triggerStatus, 'SCHEDULED'), eq(temporalTriggers.triggerStatus, 'CLAIMED'), eq(temporalTriggers.triggerStatus, 'FAILED'))));
+      }
+      const contractId = asUuid(existing ? undefined : input.id, `${input.userId}:${input.responsibilityId}:contract:${version}`);
+      const [row] = await tx.insert(temporalContracts).values({
+        id: contractId,
+        userId: input.userId,
+        connectedAccountId: input.connectedAccountId,
+        responsibilityId: input.responsibilityId,
+        contractStatus: 'ACTIVE',
+        contractKind: input.contractKind,
+        createdBy: input.createdBy,
+        version,
+        returnCondition: input.returnCondition,
+        activatedAt: existing?.activatedAt ?? now,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      }).returning();
+      if (!row) throw new Error('temporal contract was not persisted');
+      for (const [index, triggerInput] of input.triggers.entries()) {
+        const triggerId = asUuid(existing ? undefined : triggerInput.id, `${contractId}:${version}:${triggerInput.triggerType}:${triggerInput.idempotencyKey ?? index}`);
+        await tx.insert(temporalTriggers).values({
+          id: triggerId,
+          temporalContractId: contractId,
+          responsibilityId: input.responsibilityId,
+          userId: input.userId,
+          connectedAccountId: input.connectedAccountId,
+          contractVersion: version,
+          triggerType: triggerInput.triggerType,
+          triggerAt: triggerInput.triggerAt ? new Date(triggerInput.triggerAt) : null,
+          triggerStatus: 'SCHEDULED',
+          idempotencyKey: triggerInput.idempotencyKey ?? `${contractId}:${version}:${triggerInput.triggerType}:${index}`,
+          availableAt: now,
+          failureCount: 0,
+          createdAt: now,
+          updatedAt: now
+        }).onConflictDoNothing({target: temporalTriggers.idempotencyKey});
+      }
+      return contractFromRow(row);
+    });
+  }
+
+  public async deferAttention(input: {
+    state: Parameters<typeof createDeferAttentionCommand>[0]['state'];
+    requestKey: string;
+    contract: UpsertTemporalContractInput;
+  }): Promise<{contract: TemporalContract; state: NonNullable<Awaited<ReturnType<ResponsibilityRepository['getResponsibility']>>>['state']}> {
+    const current = await this.responsibilityRepository.getResponsibility({userId: input.state.userId, connectedAccountId: input.state.connectedAccountId, responsibilityId: input.state.id});
+    if (!current) throw new Error('Responsibility was not found');
+    if (input.contract.responsibilityId !== current.state.id || input.contract.userId !== current.state.userId || input.contract.connectedAccountId !== current.state.connectedAccountId) throw new Error('temporal contract scope mismatch');
+    const contract = await this.upsertTemporalContract(input.contract);
+    const command = createDeferAttentionCommand({state: current.state, requestKey: input.requestKey, returnConditionKey: contract.id, evidenceRevision: current.state.acceptedEvidenceRevision});
+    const result = await this.responsibilityRepository.applyTrustedCommand(command);
+    if (result.status !== 'APPLIED' || !result.responsibilities[0]) throw new Error(result.status === 'APPLIED' ? 'defer did not produce state' : result.reason);
+    await this.recordAudit({responsibilityId: current.state.id, userId: current.state.userId, connectedAccountId: current.state.connectedAccountId, temporalContractId: contract.id, reasonCode: 'USER_DEFERRED_ATTENTION', outcome: 'FIRED', attentionBefore: current.state.attentionMode, attentionAfter: result.responsibilities[0].attentionMode});
+    return {contract, state: result.responsibilities[0]};
+  }
+
+  public async returnAttention(input: {userId: string; connectedAccountId: string; responsibilityId: string; requestKey: string}): Promise<NonNullable<Awaited<ReturnType<ResponsibilityRepository['getResponsibility']>>>['state']> {
+    const current = await this.responsibilityRepository.getResponsibility(input);
+    if (!current) throw new Error('Responsibility was not found');
+    const command = createReturnAttentionCommand({state: current.state, requestKey: input.requestKey, evidenceRevision: current.state.acceptedEvidenceRevision});
+    const result = await this.responsibilityRepository.applyTrustedCommand(command);
+    if (result.status !== 'APPLIED' || !result.responsibilities[0]) throw new Error(result.status === 'APPLIED' ? 'Return Attention did not produce state' : result.reason);
+    const now = new Date();
+    await this.db.transaction(async (tx) => {
+      const active = await tx.select({id: temporalContracts.id}).from(temporalContracts).where(and(eq(temporalContracts.responsibilityId, input.responsibilityId), eq(temporalContracts.userId, input.userId), eq(temporalContracts.contractStatus, 'ACTIVE'))).for('update');
+      for (const contract of active) {
+        await tx.update(temporalContracts).set({contractStatus: 'RESOLVED', resolvedAt: now, updatedAt: now}).where(eq(temporalContracts.id, contract.id));
+        await tx.update(temporalTriggers).set({triggerStatus: 'CANCELLED', updatedAt: now}).where(and(eq(temporalTriggers.temporalContractId, contract.id), or(eq(temporalTriggers.triggerStatus, 'SCHEDULED'), eq(temporalTriggers.triggerStatus, 'CLAIMED'), eq(temporalTriggers.triggerStatus, 'FAILED'))));
+      }
+    });
+    await this.recordAudit({responsibilityId: input.responsibilityId, userId: input.userId, connectedAccountId: input.connectedAccountId, reasonCode: 'USER_RETURNED_ATTENTION', outcome: 'FIRED', attentionBefore: current.state.attentionMode, attentionAfter: result.responsibilities[0].attentionMode});
+    return result.responsibilities[0];
+  }
+
+  public async processTemporalTrigger(input: DurableTemporalProcessInput): Promise<TemporalProcessResult> {
+    const now = input.now ?? new Date();
+    const claimed = await this.claimTrigger(input.triggerId, input.userId, now);
+    if (!claimed) return {status: 'NOT_FOUND', triggerId: input.triggerId};
+    if (claimed.trigger.status === 'FIRED') return {status: 'ALREADY_PROCESSED', triggerId: input.triggerId, trigger: claimed.trigger};
+    if (claimed.trigger.status === 'CANCELLED' || claimed.trigger.status === 'SUPERSEDED') {
+      await this.recordAudit({responsibilityId: claimed.trigger.responsibilityId, userId: claimed.trigger.userId, connectedAccountId: claimed.trigger.connectedAccountId, temporalContractId: claimed.trigger.temporalContractId, triggerId: claimed.trigger.id, reasonCode: 'STALE_TEMPORAL_TRIGGER', outcome: 'STALE'});
+      return {status: 'STALE', triggerId: input.triggerId, trigger: claimed.trigger};
+    }
+    if (!claimed.owned) return {status: 'NOT_DUE', triggerId: input.triggerId, trigger: claimed.trigger};
+    const current = await this.responsibilityRepository.getResponsibility({userId: input.userId, connectedAccountId: claimed.trigger.connectedAccountId, responsibilityId: claimed.trigger.responsibilityId});
+    const stale = !current || claimed.contract.status !== 'ACTIVE' || claimed.contract.version !== claimed.trigger.contractVersion || current.state.resolutionStatus !== 'OPEN' || current.state.liveTrackingState !== 'TRACKING_ACTIVE';
+    if (stale) {
+      await this.finishTrigger(claimed.trigger, 'SUPERSEDED', now, 'STALE_TEMPORAL_TRIGGER');
+      return {status: 'STALE', triggerId: input.triggerId, trigger: {...claimed.trigger, status: 'SUPERSEDED'}};
+    }
+    const evidence = await input.loadEvidence({contract: claimed.contract, trigger: claimed.trigger, responsibilityId: claimed.trigger.responsibilityId});
+    if (evidence.evidenceRevision < current.state.acceptedEvidenceRevision) {
+      await this.finishTrigger(claimed.trigger, 'SUPERSEDED', now, 'STALE_TEMPORAL_TRIGGER');
+      return {status: 'STALE', triggerId: input.triggerId, trigger: {...claimed.trigger, status: 'SUPERSEDED'}};
+    }
+    if (!isTemporalTriggerEligible(claimed.trigger, evidence, now)) {
+      await this.resetClaim(claimed.trigger.id, now);
+      return {status: 'NOT_DUE', triggerId: input.triggerId, trigger: {...claimed.trigger, status: 'SCHEDULED'}};
+    }
+    const context: TemporalEvaluationContext = {contract: claimed.contract, trigger: claimed.trigger, state: current.state, evidence, now};
+    try {
+      const decision: TemporalDecision = await (input.evaluate ?? (() => ({kind: evidence.userAttentionNeeded ? 'RETURN_ATTENTION' : 'NO_OP', reasonCode: evidence.userAttentionNeeded ? 'CURRENT_USER_ATTENTION_REQUIRED' : 'CURRENT_EVIDENCE_STILL_QUIET'})))(context);
+      const latestContract = await this.getContract({id: claimed.contract.id, userId: input.userId});
+      const latestState = await this.responsibilityRepository.getResponsibility({userId: input.userId, connectedAccountId: claimed.trigger.connectedAccountId, responsibilityId: claimed.trigger.responsibilityId});
+      const latestEvidence = latestState ? await input.loadEvidence({contract: latestContract ?? claimed.contract, trigger: claimed.trigger, responsibilityId: claimed.trigger.responsibilityId}) : null;
+      if (!latestContract || latestContract.status !== 'ACTIVE' || latestContract.version !== claimed.trigger.contractVersion || !latestState || latestState.state.aggregateVersion !== current.state.aggregateVersion || !latestEvidence || latestEvidence.evidenceRevision !== evidence.evidenceRevision) {
+        await this.finishTrigger(claimed.trigger, 'SUPERSEDED', now, 'STALE_TEMPORAL_TRIGGER');
+        return {status: 'STALE', triggerId: input.triggerId, trigger: {...claimed.trigger, status: 'SUPERSEDED'}};
+      }
+      let next = current.state;
+      if (decision.kind !== 'NO_OP') {
+        const command = createTemporalReconsiderationCommand(context, decision.kind === 'RETURN_ATTENTION' ? {...decision, patch: {fieldChanges: [{fieldKey: 'attentionMode', value: 'PRESENT', authorityKind: 'TEMPORAL_RECONSIDERATION', provenance: evidence.references}]}} : decision);
+        const result = await this.responsibilityRepository.applyTrustedCommand(command);
+        if (result.status !== 'APPLIED' || !result.responsibilities[0]) throw new Error(result.status === 'APPLIED' ? 'temporal decision did not produce state' : result.reason);
+        next = result.responsibilities[0];
+      }
+      await this.finishTrigger(claimed.trigger, 'FIRED', now, decision.reasonCode, current.state.attentionMode, next.attentionMode, claimed.contract.id);
+      let notificationStatus: 'NOT_ATTEMPTED' | 'DELIVERED' | 'FAILED' = 'NOT_ATTEMPTED';
+      if (input.notify && decision.kind !== 'NO_OP') {
+        try { await input.notify(context); notificationStatus = 'DELIVERED'; }
+        catch { notificationStatus = 'FAILED'; await this.recordAudit({responsibilityId: current.state.id, userId: current.state.userId, connectedAccountId: current.state.connectedAccountId, temporalContractId: claimed.contract.id, triggerId: claimed.trigger.id, reasonCode: 'NOTIFICATION_DELIVERY_FAILED', outcome: 'NOTIFICATION_FAILED', attentionBefore: next.attentionMode, attentionAfter: next.attentionMode}); }
+      }
+      return {status: decision.kind === 'NO_OP' ? 'NO_OP' : 'FIRED', triggerId: input.triggerId, trigger: {...claimed.trigger, status: 'FIRED', firedAt: now.toISOString()}, state: next, projection: projectResponsibility(next), notificationStatus};
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'TEMPORAL_PROCESSING_FAILED';
+      await this.failTrigger(claimed.trigger, now, message);
+      return {status: 'FAILED', triggerId: input.triggerId, trigger: {...claimed.trigger, status: 'FAILED', lastErrorCode: message}, error: message};
+    }
+  }
+
+  public async reconcileOverdue(input: Omit<DurableTemporalProcessInput, 'triggerId'> & {userId: string}): Promise<TemporalProcessResult[]> {
+    const now = input.now ?? new Date();
+    const rows = await this.db.transaction(async (tx) => tx.select().from(temporalTriggers).where(and(
+      eq(temporalTriggers.userId, input.userId),
+      or(
+        and(or(eq(temporalTriggers.triggerStatus, 'SCHEDULED'), eq(temporalTriggers.triggerStatus, 'FAILED')), lte(temporalTriggers.availableAt, now)),
+        and(eq(temporalTriggers.triggerStatus, 'CLAIMED'), lte(temporalTriggers.claimedAt, new Date(now.getTime() - 5 * 60 * 1000)))
+      )
+    )).orderBy(asc(temporalTriggers.availableAt), asc(temporalTriggers.id)));
+    const results: TemporalProcessResult[] = [];
+    for (const row of rows) results.push(await this.processTemporalTrigger({...input, triggerId: row.id, now}));
+    return results;
+  }
+
+  private async claimTrigger(id: string, userId: string, now: Date): Promise<{trigger: TemporalTrigger; contract: TemporalContract; owned: boolean} | null> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.select().from(temporalTriggers).where(and(eq(temporalTriggers.id, id), eq(temporalTriggers.userId, userId))).for('update');
+      if (!row) return null;
+      const [contractRow] = await tx.select().from(temporalContracts).where(eq(temporalContracts.id, row.temporalContractId)).for('update');
+      if (!contractRow) return null;
+      const trigger = triggerFromRow(row);
+      if (!eligibleStatus(trigger.status)) return {trigger, contract: contractFromRow(contractRow), owned: false};
+      if (trigger.availableAt && Date.parse(trigger.availableAt) > now.getTime()) return {trigger, contract: contractFromRow(contractRow), owned: false};
+      if (trigger.status === 'CLAIMED' && trigger.claimedAt && Date.parse(trigger.claimedAt) + 5 * 60 * 1000 > now.getTime()) return {trigger, contract: contractFromRow(contractRow), owned: false};
+      const [updated] = await tx.update(temporalTriggers).set({triggerStatus: 'CLAIMED', claimedAt: now, updatedAt: now}).where(eq(temporalTriggers.id, id)).returning();
+      if (!updated) return null;
+      return {trigger: triggerFromRow(updated), contract: contractFromRow(contractRow), owned: true};
+    });
+  }
+
+  private async resetClaim(id: string, now: Date): Promise<void> {
+    await this.db.update(temporalTriggers).set({triggerStatus: 'SCHEDULED', claimedAt: null, updatedAt: now}).where(eq(temporalTriggers.id, id));
+  }
+
+  private async finishTrigger(trigger: TemporalTrigger, status: 'FIRED' | 'SUPERSEDED', now: Date, reasonCode: string, attentionBefore?: string, attentionAfter?: string, contractId?: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.update(temporalTriggers).set({triggerStatus: status, claimedAt: null, ...(status === 'FIRED' ? {firedAt: now} : {}), updatedAt: now}).where(eq(temporalTriggers.id, trigger.id));
+      await this.insertAudit(tx, {responsibilityId: trigger.responsibilityId, userId: trigger.userId, connectedAccountId: trigger.connectedAccountId, temporalContractId: contractId ?? trigger.temporalContractId, triggerId: trigger.id, reasonCode, outcome: status === 'FIRED' ? 'FIRED' : 'STALE', attentionBefore, attentionAfter, createdAt: now});
+    });
+  }
+
+  private async failTrigger(trigger: TemporalTrigger, now: Date, errorCode: string): Promise<void> {
+    const delay = Math.min(60 * 60 * 1000, 2 ** (trigger.failureCount + 1) * 1000);
+    await this.db.transaction(async (tx) => {
+      await tx.update(temporalTriggers).set({triggerStatus: 'FAILED', claimedAt: null, failureCount: sql`${temporalTriggers.failureCount} + 1`, lastErrorCode: errorCode.slice(0, 256), availableAt: new Date(now.getTime() + delay), updatedAt: now}).where(eq(temporalTriggers.id, trigger.id));
+      await this.insertAudit(tx, {responsibilityId: trigger.responsibilityId, userId: trigger.userId, connectedAccountId: trigger.connectedAccountId, temporalContractId: trigger.temporalContractId, triggerId: trigger.id, reasonCode: 'TEMPORAL_PROCESSING_FAILED', outcome: 'FAILED', createdAt: now});
+    });
+  }
+
+  private async recordAudit(input: {
+    responsibilityId: string;
+    userId: string;
+    connectedAccountId: string;
+    temporalContractId?: string;
+    triggerId?: string;
+    reasonCode: string;
+    outcome: 'CLAIMED' | 'FIRED' | 'NO_OP' | 'STALE' | 'FAILED' | 'NOTIFICATION_FAILED';
+    attentionBefore?: string;
+    attentionAfter?: string;
+  }): Promise<void> {
+    await this.db.transaction((tx) => this.insertAudit(tx, {...input, createdAt: new Date()}));
+  }
+
+  private async insertAudit(tx: Transaction, input: Parameters<TemporalRepository['recordAudit']>[0] & {createdAt: Date}): Promise<void> {
+    await tx.insert(temporalResurfacingEvents).values({
+      id: stableUuid(`${input.triggerId ?? input.temporalContractId ?? input.responsibilityId}:${input.reasonCode}`),
+      responsibilityId: input.responsibilityId,
+      userId: input.userId,
+      connectedAccountId: input.connectedAccountId,
+      temporalContractId: input.temporalContractId ?? null,
+      triggerId: input.triggerId ?? null,
+      reasonCode: input.reasonCode,
+      attentionBefore: input.attentionBefore ?? null,
+      attentionAfter: input.attentionAfter ?? null,
+      outcome: input.outcome,
+      detail: {},
+      createdAt: input.createdAt
+    }).onConflictDoNothing();
+  }
+}
+
+export const DurableTemporalRepository = TemporalRepository;

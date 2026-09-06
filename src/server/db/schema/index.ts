@@ -26,3 +26,4 @@ export {
   gmailSyncSignals,
   gmailWatchStates
 } from './gmail';
+export {temporalContracts, temporalResurfacingEvents, temporalTriggers} from './temporal';

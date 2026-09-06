@@ -29,6 +29,13 @@
       "when": 1788524494399,
       "tag": "0003_confused_marauders",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788684599654,
+      "tag": "0004_spicy_masque",
+      "breakpoints": true
     }
   ]
 }

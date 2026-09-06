@@ -45,17 +45,18 @@ class DirectAgentControlTest(unittest.TestCase):
         self.assertIsNone(result["ok"])
         self.assertEqual(result["status"], "SKIPPED_OPTIONAL")
 
-    def test_secret_guard_never_returns_raw_scanner_secret_output(self) -> None:
-        completed = mock.Mock(returncode=1, stdout='[{"Secret":"super-secret-value"}]', stderr='super-secret-value')
+    def test_secret_guard_never_captures_scanner_output(self) -> None:
+        completed = mock.Mock(returncode=1)
         with mock.patch.object(control.shutil, "which", return_value="/usr/bin/betterleaks"), \
-             mock.patch.object(control.subprocess, "run", return_value=completed):
+             mock.patch.object(control.subprocess, "run", return_value=completed) as runner:
             result = control.secret_guard(Path("."))
         self.assertFalse(result["ok"])
-        self.assertEqual(result["findings"], 1)
+        self.assertTrue(result["leaks_detected"])
         self.assertTrue(result["details_withheld"])
-        self.assertNotIn("super-secret-value", repr(result))
-        self.assertNotIn("report", result)
-        self.assertNotIn("stderr", result)
+        kwargs = runner.call_args.kwargs
+        self.assertIs(kwargs["stdout"], control.subprocess.DEVNULL)
+        self.assertIs(kwargs["stderr"], control.subprocess.DEVNULL)
+        self.assertIn(control.os.devnull, runner.call_args.args[0])
 
     def test_agent_prompt_routes_optional_agent_native_tools_without_broadening_authority(self) -> None:
         prompt = control.agent_prompt(126, "fresh", "repo")

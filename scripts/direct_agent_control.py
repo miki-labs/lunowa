@@ -234,23 +234,14 @@ def secret_guard(path: Path) -> dict[str, Any]:
     if not binary:
         return {"available": False, "ok": None, "status": "SKIPPED_OPTIONAL", "reason": "betterleaks is not installed"}
     result = subprocess.run([binary, "git", "--pre-commit", "--no-banner", "--no-color", "--redact=100",
-        "--report-format", "json", "--report-path", "-", "."], cwd=path, text=True, capture_output=True)
-    raw = (result.stdout or "").strip()
-    report: Any = None
-    if raw:
-        try:
-            report = json.loads(raw)
-        except json.JSONDecodeError:
-            report = raw[-8000:]
-    findings = len(report) if isinstance(report, list) else (0 if report in (None, "", {}) else None)
-    # Never return raw scanner findings or stderr through the terminal controller.
-    # Even with Betterleaks redaction enabled, secret-bearing scanner output is a
-    # sensitive source and must not flow into generic JSON logging.
+        "--report-format", "json", "--report-path", os.devnull, "."], cwd=path,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {
         "available": True, "ok": result.returncode == 0, "exit_code": result.returncode,
-        "findings": findings, "network_validation": False,
-        "details_withheld": bool(findings),
+        "leaks_detected": result.returncode != 0, "network_validation": False,
+        "details_withheld": result.returncode != 0,
     }
+
 
 
 def resource_snapshot() -> dict[str, Any]:

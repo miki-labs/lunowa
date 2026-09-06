@@ -223,12 +223,33 @@ try {
   assert(t04.status === 'FIRED' && t04.state?.id === t04Initial.id, 'T04 follow-up did not update the same Responsibility.');
   assert(t04.projection?.bucket === 'MY_TURN', 'T04 follow-up did not project MY_TURN after current evidence was re-evaluated.');
   assert(t04.state?.obligationLegs.some((leg) => leg.id === followUpLeg.id && leg.bearer === 'USER' && leg.status === 'OPEN'), 'T04 follow-up USER leg was not persisted.');
-  assert(t04.state?.obligationLegs.some((leg) => leg.bearer === 'OTHER_PARTY' && leg.status === 'OPEN'), 'T04 follow-up incorrectly removed the original approval expectation.');
+  assert(t04.state?.obligationLegs.some((leg) => leg.bearer !== 'USER' && leg.participantId === counterpartyParticipantId && leg.actionCode === 'SEND_RESULT' && leg.status === 'OPEN'), 'T04 follow-up incorrectly removed the original approval expectation.');
   const afterT04Count = await pool.query<{count: string}>(`SELECT count(*)::text AS count FROM responsibilities WHERE user_id = $1`, [userId]);
   assert(afterT04Count.rows[0]?.count === beforeT04Count.rows[0]?.count, 'T04 follow-up created a new Responsibility instead of updating the existing one.');
   assert((await temporalRepository.getContract({id: t04Contract.id, userId}))?.status === 'RESOLVED', 'T04 APPLY left its consumed Temporal contract active.');
   const t04Sibling = await pool.query<{trigger_status: string}>(`SELECT trigger_status FROM temporal_triggers WHERE id = $1`, [t04SiblingId]);
   assert(t04Sibling.rows[0]?.trigger_status === 'CANCELLED', 'T04 APPLY left a sibling trigger live after the return condition was consumed.');
+
+  // Caller-provided logical idempotency keys are contract-scoped before they
+  // reach the globally unique persistence key, so unrelated work cannot
+  // silently suppress another contract's trigger.
+  const sharedLogicalKey = 'same-logical-trigger-key';
+  const scopedTriggerA = randomUUID();
+  const scopedTriggerB = randomUUID();
+  await temporalRepository.upsertTemporalContract({
+    ...contractInput(initial.id, now, []),
+    triggers: [{id: scopedTriggerA, triggerType: 'TIME', triggerAt: now.toISOString(), idempotencyKey: sharedLogicalKey}]
+  });
+  await temporalRepository.upsertTemporalContract({
+    ...contractInput(t04Initial.id, now, []),
+    triggers: [{id: scopedTriggerB, triggerType: 'TIME', triggerAt: now.toISOString(), idempotencyKey: sharedLogicalKey}]
+  });
+  const scopedKeys = await pool.query<{id: string; idempotency_key: string}>(
+    `SELECT id, idempotency_key FROM temporal_triggers WHERE id = ANY($1::uuid[]) ORDER BY id`,
+    [[scopedTriggerA, scopedTriggerB]]
+  );
+  assert(scopedKeys.rowCount === 2, 'one contract suppressed another contract trigger that reused the same logical idempotency key.');
+  assert(new Set(scopedKeys.rows.map((row) => row.idempotency_key)).size === 2, 'logical idempotency keys were not scoped to their Temporal contract.');
 
   // The evaluator is trusted to interpret current evidence, but Temporal scope
   // still binds its explicit command to the claimed Responsibility.

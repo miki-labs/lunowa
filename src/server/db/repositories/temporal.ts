@@ -41,6 +41,19 @@ function iso(value: Date | null | undefined): string | undefined {
   return value ? value.toISOString() : undefined;
 }
 
+function scopedTriggerIdempotencyKey(
+  contractId: string,
+  contractVersion: number,
+  triggerType: TemporalTrigger['triggerType'],
+  logicalKey: string | undefined,
+  index: number
+): string {
+  if (logicalKey !== undefined && (!logicalKey.trim() || logicalKey.length > 256)) {
+    throw new Error('temporal trigger idempotency key must be non-empty and at most 256 characters');
+  }
+  return `temporal:${stableUuid(`${contractId}:${contractVersion}:${triggerType}:${logicalKey?.trim() || index}`)}`;
+}
+
 function contractFromRow(row: typeof temporalContracts.$inferSelect): TemporalContract {
   return {
     id: row.id,
@@ -180,7 +193,8 @@ export class TemporalRepository {
     }).returning();
     if (!row) throw new Error('temporal contract was not persisted');
     for (const [index, triggerInput] of input.triggers.entries()) {
-      const triggerId = asUuid(existing ? undefined : triggerInput.id, `${contractId}:${version}:${triggerInput.triggerType}:${triggerInput.idempotencyKey ?? index}`);
+      const idempotencyKey = scopedTriggerIdempotencyKey(contractId, version, triggerInput.triggerType, triggerInput.idempotencyKey, index);
+      const triggerId = asUuid(existing ? undefined : triggerInput.id, `${contractId}:${version}:${triggerInput.triggerType}:${idempotencyKey}`);
       await tx.insert(temporalTriggers).values({
         id: triggerId,
         temporalContractId: contractId,
@@ -191,7 +205,7 @@ export class TemporalRepository {
         triggerType: triggerInput.triggerType,
         triggerAt: triggerInput.triggerAt ? new Date(triggerInput.triggerAt) : null,
         triggerStatus: 'SCHEDULED',
-        idempotencyKey: triggerInput.idempotencyKey ?? `${contractId}:${version}:${triggerInput.triggerType}:${index}`,
+        idempotencyKey,
         availableAt: now,
         failureCount: 0,
         createdAt: now,

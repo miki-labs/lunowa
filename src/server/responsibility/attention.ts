@@ -8,6 +8,7 @@ import type {
   ResponsibilityEvidenceBasis,
   ResponsibilityPatch,
   ResponsibilityState,
+  TemporalFact,
   TrustedResponsibilityCommand
 } from './types';
 
@@ -53,16 +54,50 @@ function surfaceFor(projection: Projection): AttentionSurface {
   }
 }
 
-function temporalValue(state: ResponsibilityState): string | undefined {
-  const values = state.temporalFacts
+type RelevantTemporalValue = {value: string; fact: TemporalFact};
+
+function temporalValue(state: ResponsibilityState): RelevantTemporalValue | undefined {
+  return state.temporalFacts
     .filter((fact) => fact.currentnessStatus === 'ACCEPTED_CURRENT' && (fact.valueKind === 'DATE' || fact.valueKind === 'INSTANT'))
-    .map((fact) => fact.valueKind === 'DATE' ? `${fact.resolvedDate}T23:59:59.999Z` : fact.resolvedAt)
-    .filter((value): value is string => Boolean(value));
-  return values.sort()[0];
+    .map((fact) => ({
+      fact,
+      // DATE is deliberately kept as a calendar date. Converting it to an
+      // arbitrary UTC end-of-day instant would invent precision/reference
+      // frame that the accepted temporal fact does not contain.
+      value: fact.valueKind === 'DATE' ? fact.resolvedDate : fact.resolvedAt
+    }))
+    .filter((item): item is RelevantTemporalValue => Boolean(item.value))
+    .sort((left, right) => left.value.localeCompare(right.value))[0];
 }
 
-function isOverdue(value: string | undefined, now: Date): boolean {
-  return Boolean(value && Number.isFinite(Date.parse(value)) && Date.parse(value) < now.getTime());
+function calendarDateAt(now: Date, timeZone: string): string | undefined {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(now);
+    const value = (type: 'year' | 'month' | 'day') => parts.find((part) => part.type === type)?.value;
+    const year = value('year');
+    const month = value('month');
+    const day = value('day');
+    return year && month && day ? `${year}-${month}-${day}` : undefined;
+  } catch {
+    // Unknown/non-IANA reference frames must not be guessed into a timezone.
+    return undefined;
+  }
+}
+
+function isOverdue(value: RelevantTemporalValue | undefined, now: Date): boolean {
+  if (!value) return false;
+  if (value.fact.valueKind === 'INSTANT') {
+    const instant = value.fact.resolvedAt ? Date.parse(value.fact.resolvedAt) : Number.NaN;
+    return Number.isFinite(instant) && instant < now.getTime();
+  }
+  if (!value.fact.resolvedDate || !value.fact.referenceTimezone) return false;
+  const currentDate = calendarDateAt(now, value.fact.referenceTimezone);
+  return Boolean(currentDate && currentDate > value.fact.resolvedDate);
 }
 
 function itemSort(a: AttentionProjectionItem, b: AttentionProjectionItem): number {
@@ -96,14 +131,15 @@ export function projectConversationAttention(
   const items = states
     .map((state) => {
       const projection = projectResponsibility(state);
-      const nearestRelevantTime = temporalValue(state);
+      const nearestTemporal = temporalValue(state);
+      const nearestRelevantTime = nearestTemporal?.value;
       return {
         responsibilityId: state.id,
         projection,
         surface: surfaceFor(projection),
         state,
         ...(nearestRelevantTime ? {nearestRelevantTime} : {}),
-        overdue: isOverdue(nearestRelevantTime, now)
+        overdue: isOverdue(nearestTemporal, now)
       } satisfies AttentionProjectionItem;
     })
     .sort(itemSort);

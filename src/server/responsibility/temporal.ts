@@ -174,6 +174,13 @@ function validateTemporalApplyCommand(
     if (effect.expectedAggregateVersion !== undefined && effect.expectedAggregateVersion !== context.state.aggregateVersion) {
       throw new Error('Temporal APPLY command must target the evaluated aggregate version');
     }
+    if (
+      effect.patch?.attentionMode !== undefined ||
+      effect.patch?.liveTrackingState !== undefined ||
+      effect.patch?.fieldChanges?.some((change) => change.fieldKey === 'attentionMode' || change.fieldKey === 'liveTrackingState')
+    ) {
+      throw new Error('Temporal APPLY cannot defer attention or change live tracking; those controls require their dedicated trusted boundary');
+    }
   }
   return command;
 }
@@ -209,7 +216,7 @@ export function createTemporalReconsiderationCommand(
     sourceLocator: {authorized: true, authorityReference: context.trigger.id}
   } satisfies ProvenanceInput;
   const sourceEventKey = `temporal:${context.trigger.id}`;
-  return {
+  const command: TrustedResponsibilityCommand = {
     userId: context.state.userId,
     connectedAccountId: context.state.connectedAccountId,
     conversationId: context.state.conversationId,
@@ -229,6 +236,7 @@ export function createTemporalReconsiderationCommand(
       provenance: [provenance]
     }]
   };
+  return acceptedDecision.kind === 'APPLY' ? validateTemporalApplyCommand(context, command) : command;
 }
 
 export class InMemoryTemporalStore {
@@ -331,9 +339,14 @@ export class InMemoryTemporalStore {
     };
     this.contracts.set(id, contract);
     for (const [index, inputTrigger] of input.triggers.entries()) {
+      const logicalIdempotencyKey = inputTrigger.idempotencyKey?.trim() || String(index);
+      if (inputTrigger.idempotencyKey !== undefined && (!inputTrigger.idempotencyKey.trim() || inputTrigger.idempotencyKey.length > 256)) {
+        throw new Error('temporal trigger idempotency key must be non-empty and at most 256 characters');
+      }
+      const scopedIdempotencyKey = `${id}:${version}:${inputTrigger.triggerType}:${logicalIdempotencyKey}`;
       const triggerId = existing
-        ? stableId(`${id}:${version}:${inputTrigger.triggerType}:${inputTrigger.idempotencyKey ?? index}`)
-        : inputTrigger.id ?? stableId(`${id}:${version}:${inputTrigger.triggerType}:${inputTrigger.idempotencyKey ?? index}`);
+        ? stableId(scopedIdempotencyKey)
+        : inputTrigger.id ?? stableId(scopedIdempotencyKey);
       const trigger: TemporalTrigger = {
         id: triggerId,
         temporalContractId: id,
@@ -344,7 +357,7 @@ export class InMemoryTemporalStore {
         triggerType: inputTrigger.triggerType,
         ...(inputTrigger.triggerAt ? {triggerAt: inputTrigger.triggerAt} : {}),
         status: 'SCHEDULED',
-        idempotencyKey: inputTrigger.idempotencyKey ?? `${id}:${version}:${inputTrigger.triggerType}:${index}`,
+        idempotencyKey: scopedIdempotencyKey,
         availableAt: iso(now),
         failureCount: 0,
         createdAt: iso(now),

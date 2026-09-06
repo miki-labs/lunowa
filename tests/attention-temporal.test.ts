@@ -88,6 +88,36 @@ describe('G32 attention and Temporal runtime', () => {
     expect(projectConversationAttention([returned]).managed).toHaveLength(1);
   });
 
+  it('preserves DATE precision and only marks it overdue in an explicit valid reference timezone', () => {
+    const dated = state({
+      temporalFacts: [{
+        id: 'date-due',
+        temporalKind: 'SOURCE_DUE',
+        originalExpression: '1月2日まで',
+        valueKind: 'DATE',
+        resolvedDate: '2030-01-02',
+        precisionCode: 'DATE',
+        referenceTimezone: 'Asia/Tokyo',
+        currentnessStatus: 'ACCEPTED_CURRENT',
+        provenance: [reference]
+      }]
+    });
+    const beforeLocalMidnight = projectConversationAttention([dated], {now: new Date('2030-01-02T14:59:59.999Z')}).items[0];
+    expect(beforeLocalMidnight?.nearestRelevantTime).toBe('2030-01-02');
+    expect(beforeLocalMidnight?.overdue).toBe(false);
+
+    const afterLocalMidnight = projectConversationAttention([dated], {now: new Date('2030-01-02T15:00:00.000Z')}).items[0];
+    expect(afterLocalMidnight?.overdue).toBe(true);
+
+    const unknownReferenceFrame = state({
+      id: 'unknown-date-frame',
+      temporalFacts: [{...dated.temporalFacts[0]!, referenceTimezone: undefined}]
+    });
+    const unknown = projectConversationAttention([unknownReferenceFrame], {now: new Date('2030-01-03T12:00:00.000Z')}).items[0];
+    expect(unknown?.nearestRelevantTime).toBe('2030-01-02');
+    expect(unknown?.overdue).toBe(false);
+  });
+
   it('persists defer intent, survives snapshot/restart, and fires only after current evidence says attention is needed', async () => {
     const now = new Date('2026-09-06T00:00:00.000Z');
     const initial = state();
@@ -240,6 +270,24 @@ describe('G32 attention and Temporal runtime', () => {
     expect(result.status).toBe('FAILED');
     expect(result.error).toMatch(/claimed Responsibility/);
     expect(store.getResponsibility(other.id)?.operationalOutcome).toBe('unrelated outcome');
+  });
+
+  it('does not let Temporal APPLY hide work or change live tracking', async () => {
+    const now = new Date('2026-09-06T00:00:00.000Z');
+    const store = new InMemoryTemporalStore();
+    const initial = state();
+    store.setResponsibility(initial);
+    store.setEvidence(initial.id, {evidenceRevision: 1, references: [reference], userAttentionNeeded: true});
+    store.upsertContract({...contractInput(now), triggers: [{id: 'auto-hide-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}]});
+    const result = await new TemporalRuntime(store, {evaluate: () => ({
+      kind: 'APPLY',
+      reasonCode: 'AUTO_HIDE_ATTEMPT',
+      patch: {attentionMode: 'DEFERRED'}
+    })}).processTemporalTrigger('auto-hide-trigger', now);
+    expect(result.status).toBe('FAILED');
+    expect(result.error).toMatch(/cannot defer attention or change live tracking/);
+    expect(store.getResponsibility(initial.id)?.attentionMode).toBe('PRESENT');
+    expect(store.getResponsibility(initial.id)?.liveTrackingState).toBe('TRACKING_ACTIVE');
   });
 
   it('confines Return Attention to attention even if an evaluator supplies a command', async () => {

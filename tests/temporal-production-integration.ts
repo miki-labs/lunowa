@@ -30,6 +30,7 @@ const accountId = randomUUID();
 const conversationId = randomUUID();
 const counterpartyParticipantId = randomUUID();
 let messageId: string;
+let currentEvidenceRevision = 1;
 
 const otherPartyLeg = (id: string): ObligationLeg => ({
   id,
@@ -89,7 +90,7 @@ async function migrate(): Promise<void> {
 }
 
 async function evidence(): Promise<{evidenceRevision: number; references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED'; messageId: string}]; userAttentionNeeded: boolean}> {
-  return {evidenceRevision: 1, references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId}], userAttentionNeeded: true};
+  return {evidenceRevision: currentEvidenceRevision, references: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId}], userAttentionNeeded: true};
 }
 
 try {
@@ -343,7 +344,7 @@ try {
   assert(revisionRace.status === 'STALE', 'commit-time evidence revision race was accepted as NO_OP.');
   const revisionRaceAudit = await pool.query<{outcome: string}>(`SELECT outcome FROM temporal_resurfacing_events WHERE trigger_id = $1 AND reason_code = 'STALE_TEMPORAL_TRIGGER'`, [revisionRaceTriggerId]);
   assert(revisionRaceAudit.rows[0]?.outcome === 'STALE', 'commit-time evidence revision race was not audited as stale.');
-  await pool.query(`UPDATE conversations SET semantic_evidence_revision = 1 WHERE id = $1`, [conversationId]);
+  currentEvidenceRevision = 2;
 
   const returnTriggerId = randomUUID();
   const siblingTriggerId = randomUUID();

@@ -243,11 +243,13 @@ def secret_guard(path: Path) -> dict[str, Any]:
         except json.JSONDecodeError:
             report = raw[-8000:]
     findings = len(report) if isinstance(report, list) else (0 if report in (None, "", {}) else None)
+    # Never return raw scanner findings or stderr through the terminal controller.
+    # Even with Betterleaks redaction enabled, secret-bearing scanner output is a
+    # sensitive source and must not flow into generic JSON logging.
     return {
         "available": True, "ok": result.returncode == 0, "exit_code": result.returncode,
-        "findings": findings, "report": report,
-        "stderr": (result.stderr or "")[-4000:],
-        "network_validation": False,
+        "findings": findings, "network_validation": False,
+        "details_withheld": bool(findings),
     }
 
 

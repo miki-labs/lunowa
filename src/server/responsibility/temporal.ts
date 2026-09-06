@@ -160,7 +160,24 @@ export function createTemporalReconsiderationCommand(
   context: TemporalEvaluationContext,
   decision: TemporalDecision
 ): TrustedResponsibilityCommand {
-  if (decision.command) return decision.command;
+  // RETURN_ATTENTION is deliberately narrower than a generic trusted APPLY.
+  // A scheduler/evaluator cannot smuggle world-state effects through a return
+  // decision, even if it accidentally supplies its own patch or command.
+  const acceptedDecision: TemporalDecision = decision.kind === 'RETURN_ATTENTION'
+    ? {
+        kind: 'RETURN_ATTENTION',
+        reasonCode: decision.reasonCode,
+        patch: {
+          fieldChanges: [{
+            fieldKey: 'attentionMode',
+            value: 'PRESENT',
+            authorityKind: 'TEMPORAL_ATTENTION',
+            provenance: context.evidence.references
+          }]
+        }
+      }
+    : decision;
+  if (acceptedDecision.command) return acceptedDecision.command;
   const provenance = context.evidence.references[0] ?? {
     evidenceKind: 'EXTERNAL_AUTHORITATIVE_FACT',
     providerObservationKey: `temporal:${context.trigger.id}`,
@@ -183,7 +200,7 @@ export function createTemporalReconsiderationCommand(
       responsibilityRef: context.state.id,
       expectedAggregateVersion: context.state.aggregateVersion,
       effectKey: 'reconsider',
-      patch: decision.patch,
+      patch: acceptedDecision.patch,
       provenance: [provenance]
     }]
   };
@@ -212,6 +229,18 @@ export class InMemoryTemporalStore {
       evidence: clone([...this.evidence.entries()].map(([responsibilityId, value]) => ({responsibilityId, value}))),
       audits: clone(this.audits)
     };
+  }
+
+  public restore(snapshot: TemporalSnapshot): void {
+    this.contracts.clear();
+    this.triggers.clear();
+    this.responsibilities.clear();
+    this.evidence.clear();
+    for (const contract of snapshot.contracts) this.contracts.set(contract.id, clone(contract));
+    for (const trigger of snapshot.triggers) this.triggers.set(trigger.id, clone(trigger));
+    for (const state of snapshot.responsibilities) this.responsibilities.set(state.id, clone(state));
+    for (const item of snapshot.evidence) this.evidence.set(item.responsibilityId, clone(item.value));
+    this.audits = clone(snapshot.audits);
   }
 
   public setResponsibility(state: ResponsibilityState): void { this.responsibilities.set(state.id, clone(state)); }
@@ -244,6 +273,7 @@ export class InMemoryTemporalStore {
     if (existing && (existing.userId !== input.userId || existing.connectedAccountId !== input.connectedAccountId || existing.responsibilityId !== input.responsibilityId)) {
       throw new Error('temporal contract scope mismatch');
     }
+    if (existing && input.id === existing.id) return clone(existing);
     const version = (existing?.version ?? 0) + 1;
     const id = existing
       ? stableId(`${input.userId}:${input.responsibilityId}:contract:${version}`)
@@ -347,34 +377,52 @@ export class TemporalRuntime {
     const state = this.store.getResponsibility(input.state.id);
     if (!state) throw new Error('Responsibility was not found');
     if (input.contract.responsibilityId !== state.id || input.contract.userId !== state.userId || input.contract.connectedAccountId !== state.connectedAccountId) throw new Error('temporal contract scope mismatch');
-    const contract = this.store.upsertContract(input.contract);
-    const command = createDeferAttentionCommand({state, requestKey: input.requestKey, returnConditionKey: contract.id, evidenceRevision: state.acceptedEvidenceRevision, now: input.now});
-    const next = applyAttentionCommand(state, command, input.now);
-    this.store.updateResponsibility(next);
-    return {contract, state: next};
+    const before = this.store.snapshot();
+    try {
+      const contractInput = input.contract.id ? input.contract : {
+        ...input.contract,
+        id: stableId(`${state.userId}:${state.connectedAccountId}:${state.id}:defer:${input.requestKey}`)
+      };
+      const priorRequest = contractInput.id ? this.store.getContract(contractInput.id) : undefined;
+      const contract = this.store.upsertContract(contractInput);
+      if (priorRequest) return {contract, state};
+      const command = createDeferAttentionCommand({state, requestKey: input.requestKey, returnConditionKey: contract.id, evidenceRevision: state.acceptedEvidenceRevision, now: input.now});
+      const next = applyAttentionCommand(state, command, input.now);
+      this.store.updateResponsibility(next);
+      return {contract, state: next};
+    } catch (error) {
+      this.store.restore(before);
+      throw error;
+    }
   }
 
   public returnAttention(input: {responsibilityId: string; requestKey: string; now?: Date}): ResponsibilityState {
     const state = this.store.getResponsibility(input.responsibilityId);
     if (!state) throw new Error('Responsibility was not found');
-    const command = createReturnAttentionCommand({state, requestKey: input.requestKey, evidenceRevision: state.acceptedEvidenceRevision, now: input.now});
-    const next = applyAttentionCommand(state, command, input.now);
-    this.store.updateResponsibility(next);
-    for (const trigger of this.store.listTriggers()) {
-      const contract = this.store.getContract(trigger.temporalContractId);
-      if (contract?.responsibilityId === state.id && ['SCHEDULED', 'CLAIMED', 'FAILED'].includes(trigger.status)) {
-        trigger.status = 'CANCELLED';
-        trigger.updatedAt = (input.now ?? new Date()).toISOString();
-        this.store.saveTrigger(trigger);
+    const before = this.store.snapshot();
+    try {
+      const command = createReturnAttentionCommand({state, requestKey: input.requestKey, evidenceRevision: state.acceptedEvidenceRevision, now: input.now});
+      const next = applyAttentionCommand(state, command, input.now);
+      this.store.updateResponsibility(next);
+      for (const trigger of this.store.listTriggers()) {
+        const contract = this.store.getContract(trigger.temporalContractId);
+        if (contract?.responsibilityId === state.id && ['SCHEDULED', 'CLAIMED', 'FAILED'].includes(trigger.status)) {
+          trigger.status = 'CANCELLED';
+          trigger.updatedAt = (input.now ?? new Date()).toISOString();
+          this.store.saveTrigger(trigger);
+        }
+        if (contract?.responsibilityId === state.id && contract.status === 'ACTIVE') {
+          contract.status = 'RESOLVED';
+          contract.resolvedAt = (input.now ?? new Date()).toISOString();
+          contract.updatedAt = (input.now ?? new Date()).toISOString();
+          this.store.saveContract(contract);
+        }
       }
-      if (contract?.responsibilityId === state.id && contract.status === 'ACTIVE') {
-        contract.status = 'RESOLVED';
-        contract.resolvedAt = (input.now ?? new Date()).toISOString();
-        contract.updatedAt = (input.now ?? new Date()).toISOString();
-        this.store.saveContract(contract);
-      }
+      return next;
+    } catch (error) {
+      this.store.restore(before);
+      throw error;
     }
-    return next;
   }
 
   public async processTemporalTrigger(id: string, now = new Date()): Promise<TemporalProcessResult> {
@@ -429,20 +477,38 @@ export class TemporalRuntime {
         this.store.addAudit({responsibilityId: claimed.responsibilityId, temporalContractId: claimed.temporalContractId, triggerId: claimed.id, reasonCode: 'STALE_TEMPORAL_TRIGGER', outcome: 'STALE', attentionBefore: currentState?.attentionMode, attentionAfter: currentState?.attentionMode, createdAt: iso(now)});
         return {status: 'STALE', triggerId: id, trigger: claimed};
       }
-      let next = state;
+      const currentContext: TemporalEvaluationContext = {contract: currentContract, trigger: claimed, state: currentState, evidence: currentEvidence, now};
+      let next = currentState;
       if (decision.kind !== 'NO_OP') {
-        const command = createTemporalReconsiderationCommand(context, decision.kind === 'RETURN_ATTENTION'
-          ? {...decision, patch: {fieldChanges: [{fieldKey: 'attentionMode', value: 'PRESENT', authorityKind: 'TEMPORAL_RECONSIDERATION', provenance: evidence.references}]}}
-          : decision);
+        const command = createTemporalReconsiderationCommand(currentContext, decision);
         const result = reduceResponsibility(command, {
-          currentEvidenceRevision: evidence.evidenceRevision,
+          currentEvidenceRevision: currentEvidence.evidenceRevision,
           existingResponsibilities: [state],
-          evidenceBasis: {evidenceRevision: evidence.evidenceRevision, sourceEventKey: command.sourceEventKey, references: command.provenance ?? evidence.references},
+          evidenceBasis: {evidenceRevision: currentEvidence.evidenceRevision, sourceEventKey: command.sourceEventKey, references: command.provenance ?? currentEvidence.references},
           now
         });
         if (result.status !== 'APPLIED' || !result.effects[0]?.state) throw new Error(result.status === 'APPLIED' ? 'temporal decision did not produce state' : result.reason);
         next = result.effects[0].state;
         this.store.updateResponsibility(next);
+      }
+      if (decision.kind === 'RETURN_ATTENTION') {
+        const timestamp = iso(now);
+        for (const sibling of this.store.listTriggers()) {
+          const siblingContract = this.store.getContract(sibling.temporalContractId);
+          if (siblingContract?.responsibilityId !== state.id) continue;
+          if (siblingContract.status === 'ACTIVE') {
+            siblingContract.status = 'RESOLVED';
+            siblingContract.resolvedAt = timestamp;
+            siblingContract.updatedAt = timestamp;
+            this.store.saveContract(siblingContract);
+          }
+          if (sibling.id !== claimed.id && ['SCHEDULED', 'CLAIMED', 'FAILED'].includes(sibling.status)) {
+            sibling.status = 'CANCELLED';
+            sibling.claimedAt = undefined;
+            sibling.updatedAt = timestamp;
+            this.store.saveTrigger(sibling);
+          }
+        }
       }
       claimed.status = 'FIRED';
       claimed.firedAt = iso(now);
@@ -452,7 +518,7 @@ export class TemporalRuntime {
       this.store.addAudit({responsibilityId: state.id, temporalContractId: contract.id, triggerId: claimed.id, reasonCode: decision.reasonCode, outcome: decision.kind === 'NO_OP' ? 'NO_OP' : 'FIRED', attentionBefore: state.attentionMode, attentionAfter: next.attentionMode, createdAt: iso(now)});
       let notificationStatus: 'NOT_ATTEMPTED' | 'DELIVERED' | 'FAILED' = 'NOT_ATTEMPTED';
       if (this.notify && decision.kind !== 'NO_OP') {
-        try { await this.notify(context); notificationStatus = 'DELIVERED'; }
+        try { await this.notify(currentContext); notificationStatus = 'DELIVERED'; }
         catch { notificationStatus = 'FAILED'; this.store.addAudit({responsibilityId: state.id, temporalContractId: contract.id, triggerId: claimed.id, reasonCode: 'NOTIFICATION_DELIVERY_FAILED', outcome: 'NOTIFICATION_FAILED', attentionBefore: next.attentionMode, attentionAfter: next.attentionMode, createdAt: iso(now)}); }
       }
       return {status: decision.kind === 'NO_OP' ? 'NO_OP' : 'FIRED', triggerId: id, trigger: claimed, state: next, projection: projectResponsibility(next), notificationStatus};

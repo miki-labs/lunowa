@@ -482,6 +482,24 @@ describe('deterministic Responsibility admission and reducer', () => {
       effects: [{operation: 'UPDATE', responsibilityRef: userState.id, effectKey: 'weaker-later', patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [{...friday, id: 'weak-later', resolvedDate: '2026-09-01', provenance: []}], authorityKind: 'INTERPRETATION'}]}}]
     }), {currentEvidenceRevision: 4, existingResponsibilities: [userState]});
     expect(weakerLater.status).toBe('REJECTED');
+
+    const temporalTruthBypass = reduce(candidate({
+      sourceEventKey: 'temporal-truth-bypass', candidateKey: 'temporal-truth-bypass', evidenceRevision: 4, responsibilityRef: userState.id,
+      effects: [{operation: 'UPDATE', responsibilityRef: userState.id, effectKey: 'temporal-truth-bypass', patch: {fieldChanges: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: [{...friday, id: 'temporal-bypass', resolvedDate: '2026-09-02', provenance: []}], authorityKind: 'TEMPORAL_ATTENTION'}]}}]
+    }), {currentEvidenceRevision: 4, existingResponsibilities: [userState]});
+    expect(temporalTruthBypass.status).toBe('REJECTED');
+
+    const temporalTruthWithoutCorrection = reduce(candidate({
+      sourceEventKey: 'temporal-unprotected-bypass', candidateKey: 'temporal-unprotected-bypass', evidenceRevision: 2, responsibilityRef: initial.id,
+      effects: [{operation: 'UPDATE', responsibilityRef: initial.id, effectKey: 'temporal-unprotected-bypass', patch: {fieldChanges: [{fieldKey: 'operationalOutcome', value: 'temporal invented outcome', authorityKind: 'TEMPORAL_ATTENTION'}]}}]
+    }), {currentEvidenceRevision: 2, existingResponsibilities: [initial]});
+    expect(temporalTruthWithoutCorrection.status).toBe('REJECTED');
+
+    const temporalDeferBypass = reduce(candidate({
+      sourceEventKey: 'temporal-defer-bypass', candidateKey: 'temporal-defer-bypass', evidenceRevision: 2, responsibilityRef: initial.id,
+      effects: [{operation: 'UPDATE', responsibilityRef: initial.id, effectKey: 'temporal-defer-bypass', patch: {fieldChanges: [{fieldKey: 'attentionMode', value: 'DEFERRED', authorityKind: 'TEMPORAL_ATTENTION'}]}}]
+    }), {currentEvidenceRevision: 2, existingResponsibilities: [initial]});
+    expect(temporalDeferBypass.status).toBe('REJECTED');
   });
 
   it('keeps historical candidates inactive and makes conditional obligations wait', () => {

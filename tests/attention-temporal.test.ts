@@ -6,7 +6,7 @@ import {
   projectConversationAttention,
   projectResponsibility
 } from '../src/server/responsibility';
-import type {ObligationLeg, ResponsibilityState, TemporalEvidence} from '../src/server/responsibility';
+import type {ObligationLeg, ResponsibilityState, TemporalEvidence, TrustedResponsibilityCommand} from '../src/server/responsibility';
 
 const reference = {
   evidenceKind: 'PROVIDER_MESSAGE_OBSERVED' as const,
@@ -98,17 +98,42 @@ describe('G32 attention and Temporal runtime', () => {
     const firstRuntime = new TemporalRuntime(firstStore);
     const deferred = await firstRuntime.deferAttention({state: initial, requestKey: 'defer-1', contract: {
       ...contractInput(now),
-      triggers: [{id: 'return-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}]
+      triggers: [
+        {id: 'return-trigger', triggerType: 'TIME', triggerAt: now.toISOString()},
+        {id: 'sibling-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}
+      ]
     }});
     expect(deferred.state.attentionMode).toBe('DEFERRED');
     expect(projectResponsibility(deferred.state).bucket).toBe('LATER');
+    const repeated = await firstRuntime.deferAttention({state: initial, requestKey: 'defer-1', contract: {
+      ...contractInput(now),
+      triggers: [
+        {id: 'return-trigger', triggerType: 'TIME', triggerAt: now.toISOString()},
+        {id: 'sibling-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}
+      ]
+    }});
+    expect(repeated.contract.id).toBe(deferred.contract.id);
+    expect(repeated.state.aggregateVersion).toBe(deferred.state.aggregateVersion);
+    expect(firstStore.listTriggers()).toHaveLength(2);
 
     const restarted = new InMemoryTemporalStore(firstStore.snapshot());
     const result = await new TemporalRuntime(restarted).processTemporalTrigger('return-trigger', now);
     expect(result.status).toBe('FIRED');
     expect(result.state?.attentionMode).toBe('PRESENT');
     expect(result.projection?.bucket).toBe('WAITING');
+    expect(restarted.getContract(deferred.contract.id)?.status).toBe('RESOLVED');
+    expect(restarted.getTrigger('sibling-trigger')?.status).toBe('CANCELLED');
     expect((await new TemporalRuntime(restarted).processTemporalTrigger('return-trigger', now)).status).toBe('ALREADY_PROCESSED');
+    const completedReplay = await new TemporalRuntime(restarted).deferAttention({state: initial, requestKey: 'defer-1', contract: {
+      ...contractInput(now),
+      triggers: [
+        {id: 'return-trigger', triggerType: 'TIME', triggerAt: now.toISOString()},
+        {id: 'sibling-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}
+      ]
+    }});
+    expect(completedReplay.contract.status).toBe('RESOLVED');
+    expect(completedReplay.state.attentionMode).toBe('PRESENT');
+    expect(restarted.getTrigger('sibling-trigger')?.status).toBe('CANCELLED');
   });
 
   it('turns an old contract version into an audited no-op and never resurrects it', async () => {
@@ -157,6 +182,40 @@ describe('G32 attention and Temporal runtime', () => {
     expect(result.state?.attentionMode).toBe('PRESENT');
   });
 
+  it('confines Return Attention to attention even if an evaluator supplies a command', async () => {
+    const now = new Date('2026-09-06T00:00:00.000Z');
+    const initial = state({attentionMode: 'DEFERRED'});
+    const store = new InMemoryTemporalStore();
+    store.setResponsibility(initial);
+    store.setEvidence(initial.id, {evidenceRevision: 1, references: [reference], userAttentionNeeded: true});
+    store.upsertContract({...contractInput(now), triggers: [{id: 'bounded-return-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}]});
+    const attemptedWorldStateCommand: TrustedResponsibilityCommand = {
+      commandSource: 'TRUSTED_SYSTEM',
+      userId: initial.userId,
+      connectedAccountId: initial.connectedAccountId,
+      conversationId: initial.conversationId,
+      sourceEventKey: 'attempted-world-state-return',
+      candidateKey: 'attempted-world-state-return',
+      evidenceRevision: 1,
+      admission: {decision: 'TRACK', reasonCodes: ['TEMPORAL_RECONSIDERATION']},
+      effects: [{
+        operation: 'UPDATE',
+        responsibilityRef: initial.id,
+        effectKey: 'attempted-world-state-return',
+        patch: {fieldChanges: [{fieldKey: 'operationalOutcome', value: 'fabricated by return', authorityKind: 'EXTERNAL_AUTHORITATIVE_FACT'}]}
+      }]
+    };
+    const runtime = new TemporalRuntime(store, {evaluate: () => ({
+      kind: 'RETURN_ATTENTION',
+      reasonCode: 'CURRENT_USER_ATTENTION_REQUIRED',
+      command: attemptedWorldStateCommand
+    })});
+    const result = await runtime.processTemporalTrigger('bounded-return-trigger', now);
+    expect(result.status).toBe('FIRED');
+    expect(result.state?.attentionMode).toBe('PRESENT');
+    expect(result.state?.operationalOutcome).toBe(initial.operationalOutcome);
+  });
+
   it('keeps a reply with no current user work quiet and separates notification failure from domain integrity', async () => {
     const now = new Date('2026-09-06T00:00:00.000Z');
     const store = new InMemoryTemporalStore();
@@ -169,6 +228,8 @@ describe('G32 attention and Temporal runtime', () => {
     expect(quiet.status).toBe('NO_OP');
     expect(store.getResponsibility(initial.id)?.attentionMode).toBe('DEFERRED');
     expect(contract.status).toBe('ACTIVE');
+    expect(store.getTrigger('reply-trigger')?.status).toBe('FIRED');
+    expect(store.listAudits()).toEqual(expect.arrayContaining([expect.objectContaining({outcome: 'NO_OP', triggerId: 'reply-trigger'})]));
 
     const notifyStore = new InMemoryTemporalStore();
     const notifyState = state({attentionMode: 'DEFERRED'});

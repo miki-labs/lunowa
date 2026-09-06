@@ -341,9 +341,7 @@ export class InMemoryTemporalStore {
         throw new Error('temporal trigger idempotency key must be non-empty and at most 256 characters');
       }
       const scopedIdempotencyKey = `${id}:${version}:${inputTrigger.triggerType}:${logicalIdempotencyKey}`;
-      const triggerId = existing
-        ? stableId(scopedIdempotencyKey)
-        : inputTrigger.id ?? stableId(scopedIdempotencyKey);
+      const triggerId = inputTrigger.id ?? stableId(scopedIdempotencyKey);
       const trigger: TemporalTrigger = {
         id: triggerId,
         temporalContractId: id,

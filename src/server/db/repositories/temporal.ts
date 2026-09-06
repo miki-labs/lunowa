@@ -204,7 +204,7 @@ export class TemporalRepository {
     if (!row) throw new Error('temporal contract was not persisted');
     for (const [index, triggerInput] of input.triggers.entries()) {
       const idempotencyKey = scopedTriggerIdempotencyKey(contractId, version, triggerInput.triggerType, triggerInput.idempotencyKey, index);
-      const triggerId = asUuid(existing ? undefined : triggerInput.id, `${contractId}:${version}:${triggerInput.triggerType}:${idempotencyKey}`);
+      const triggerId = asUuid(triggerInput.id, `${contractId}:${version}:${triggerInput.triggerType}:${idempotencyKey}`);
       await tx.insert(temporalTriggers).values({
         id: triggerId,
         temporalContractId: contractId,

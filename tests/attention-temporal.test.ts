@@ -196,7 +196,8 @@ describe('G32 attention and Temporal runtime', () => {
     store.setEvidence(initial.id, {evidenceRevision: 1, references: [reference], userAttentionNeeded: true});
     const runtime = new TemporalRuntime(store);
     await runtime.deferAttention({state: initial, requestKey: 'defer-1', contract: {...contractInput(now), triggers: [{id: 'old-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}]}});
-    store.upsertContract({...contractInput(now), triggers: [{id: 'new-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}]});
+    const replacement = store.upsertContract({...contractInput(now), triggers: [{id: 'new-trigger', triggerType: 'TIME', triggerAt: now.toISOString()}]});
+    expect(store.getTrigger('new-trigger')?.temporalContractId).toBe(replacement.id);
     const result = await runtime.processTemporalTrigger('old-trigger', now);
     expect(result.status).toBe('STALE');
     expect(store.getResponsibility(initial.id)?.attentionMode).toBe('DEFERRED');

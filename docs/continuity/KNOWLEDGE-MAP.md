@@ -19,8 +19,10 @@
 | exact dependency / parallelization / writer / FK topology | `docs/product/IMPLEMENTATION-GRAPH.md` | live implementation Issues + GitHub `blocked_by` | current graph + task contract + evidenceで判断 |
 | 今のtask contract | live GitHub Issue | owning canonical artifacts | acting前にlive fetch |
 | candidate / review / CI | live GitHub PR / reviews / checks | current Issue | exact-head evidence。review-ready != PASS |
-| ACP admission / model routing / concurrency / scheduler / recovery | `miki-labs/agent-control-plane` current repo + current ACP Issues | Lunowa Issue metadata only as caller intent | execution時にlive-read。Lunowa docsはACP implementation authorityではない |
-| RUNNING/READYが本当に実行中か / free slotか / retry可能か | ACP manifest + host process state + current GitHub authority | ACP scheduler/controller logs | labelsだけで判断しない。unknown/quarantineはfail closed |
+| implementation / verification procedure | `docs/implementation-workflow.md`, `docs/coding-agent-harness.md`, `.agents/skills/execute-task/SKILL.md` | task-specific repository instructions | task riskに応じてprogressive disclosure |
+| independent acceptance procedure | `.agents/skills/evaluate-change/SKILL.md` + current task contract | PR/CI/builder evidence | full cumulative exact-head candidateをfresh contextで監査 |
+| active implementation owner / branch / worktree / runtime | explicit task owner/launch authority + actual local Git/worktree/process evidence | PR status | action前にlive確認。同じIssue/worktreeのduplicate concurrent ownership禁止 |
+| task-relevant external/tool fact | authoritative CLI/API/MCP/plugin or primary source | dated local evidence | materialなmutable factだけlive query。local deterministic factを優先 |
 | 実際のruntime behavior | code / schema / migrations / tests / deployed evidence | intended canonical behavior | mismatchはreconcile。summaryで隠さない |
 | 人間向け現在地 | `docs/continuity/CURRENT.md` | canonical + live GitHub | mutable summary。常にcanonical/live sourceに負ける |
 | Product Discovery | current Product Discovery Issue | Product authorities + protected/public evidence | implementation progressでは代替不可 |
@@ -30,19 +32,23 @@
 
 ## 重要な境界
 
-### Product authority vs execution authority
+### Product authority vs task authority
 
-`miki-labs/lunowa` がLunowa Product/application authorityです。`miki-labs/agent-control-plane` はexecution/recovery infrastructureであり、Product semantics・Responsibility semantics・UI/UX・task contractを上書きしません。
+`miki-labs/lunowa` のowning artifactsがProduct/application authorityです。live GitHub Issue / `blocked_by` はbounded task/dependency authorityであり、execution engineはreplaceableです。Issueはowning Product・Responsibility・UI/UX semanticsをsilent overrideしません。
 
 ### Parallel work
 
-ACPはbounded parallel model executionをサポートしますが、parallel executionにはdistinct execution identity、current unblocked dependency、explicit authority、free slotが必要です。同じIssueを2 laneで走らせません。
+parallel implementationにはdistinct unblocked Issues、one active owner per Issue/worktree、isolated worktrees/runtime stateが必要です。同じIssue/worktreeを複数agentで同時に扱いません。
 
 worktree / runtime isolationは **execution isolation** であって **merge independence** ではありません。`package.json` / `pnpm-lock.yaml` 等のshared root assetやdependency-sensitive candidatesはserial mergeし、先行merge後に残りcandidateを再検証します。
 
-### Recovery
+### Correction and integration
 
-`agent:running` / `agent:ready` はGitHub authorityの一部ですが、unknown outcomeやquarantine時のrecovery判断には不十分です。manifest/process evidenceを確認し、scheduler restartや繰り返しをretry authorityとして扱いません。
+builder verificationはacceptanceではありません。PR/CI後、independent reviewerがcurrent task contract × full cumulative exact-head candidateを監査します。FAILではmaterial blockersを一括し、同じPR/worktreeで修正します。PASS前にmergeせず、materialなbase movement後はaffected candidatesのdependency/evidenceを再検証します。
+
+### Tool and effect authority
+
+repository files/search/local CLIなどequivalentなdeterministic evidenceを優先し、MCP/plugin/network/specialist skillはtaskにmaterialな最小surfaceだけを選びます。privileged/destructive external writeにはseparate explicit authorityが必要で、ordinary coding-agent capabilityへ常設しません。
 
 ### Production FK topology
 
@@ -60,4 +66,4 @@ provider capability、database table、scheduled job、AI outputが存在する�
 - question→source routingが変わった
 - freshness ruleが変わった
 
-current task statusやACP host stateの細部はここに書きません。navigation artifactとcanonical/live evidenceが衝突したら、owning sourceを確認し、stale routerを修復します。
+current task/worktree/runtime stateの細部はここに書きません。navigation artifactとcanonical/live evidenceが衝突したら、owning sourceを確認し、stale routerを修復します。

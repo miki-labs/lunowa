@@ -59,6 +59,25 @@ Use `templates/task-contract.md` as needed and include:
 
 Avoid prescribing speculative implementation detail before the agent inspects the repository unless the detail is an actual constraint.
 
+## Prefer direct task execution before orchestration
+
+The default non-trivial delivery path should remain legible without a custom control plane:
+
+```text
+live task contract + dependency gate
+-> dedicated branch/worktree
+-> direct coding agent
+-> targeted and canonical verification
+-> PR/CI
+-> independent exact-head cumulative review
+-> correction on the same PR/worktree on FAIL
+-> merge only after PASS
+```
+
+One active implementation should own one task/worktree. Never run duplicate agents against the same task/worktree concurrently. Parallel implementation is appropriate only for distinct unblocked tasks with isolated worktrees and runtime state; that isolation does not establish parallel merge safety. Revalidate affected candidates after material base movement.
+
+Add orchestration only after measured throughput, coordination, or recovery pressure justifies its lifecycle and failure cost. Do not turn direct execution into a new daemon, workflow database, automatic replay system, or SDK control plane by default.
+
 ## Inspect before editing
 
 For non-trivial work, inspect the relevant subset of:
@@ -194,7 +213,9 @@ Re-evaluate harness workarounds when models or tools materially improve. Delete 
 
 Use repository files for durable accepted context and live integrations such as MCP/API tools for mutable external state that must be queried at execution time.
 
-Do not connect every possible tool merely because integration is available. Add a tool when it serves a recurring workflow and its permissions/data exposure have an acceptable trade-off.
+Start with repository files, search, and deterministic local CLI evidence. Select the smallest useful task-specific surface, adding MCP, plugins, network access, or specialist skills only when they provide material evidence or capability that the local path cannot provide equivalently. More connected tools increase context, permission, data-exposure, and failure cost; availability alone is not a reason to enable them.
+
+Query mutable external state live only when its freshness can change the implementation or acceptance decision. Privileged or destructive external writes require separate explicit authority and containment; they should not become ambient coding-agent capability.
 
 ## Harness feedback loop
 

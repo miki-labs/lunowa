@@ -234,6 +234,11 @@ class DirectAgentControlTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "incomplete"):
                 control.remote_fleet_inputs()
 
+    def test_ensure_local_main_avoids_remote_fetch_when_already_current(self) -> None:
+        with mock.patch.object(control, "run", return_value="same-main"), \
+             mock.patch.object(control, "refresh_main", side_effect=AssertionError("must not fetch")):
+            control.ensure_local_main("same-main")
+
     def test_refresh_main_fails_closed_when_remote_head_moves(self) -> None:
         control._METRIC_COUNTS["remote_git"] = 0
         with mock.patch.object(control, "run", side_effect=["", "new-main"]):

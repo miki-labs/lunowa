@@ -88,6 +88,12 @@ def refresh_main(expected_main: str) -> None:
         raise RuntimeError(f"STALE_PRECONDITION expected_main={expected_main} actual_main={actual}")
 
 
+def ensure_local_main(expected_main: str) -> None:
+    local = run(["git", "rev-parse", "--verify", "origin/main"], cwd=MAIN, check=False)
+    if local != expected_main:
+        refresh_main(expected_main)
+
+
 def remote_fleet_inputs() -> tuple[str, list[dict[str, Any]], dict[int, list[dict[str, Any]]], list[dict[str, Any]]]:
     query = """query($owner:String!,$name:String!,$label:String!){repository(owner:$owner,name:$name){ref(qualifiedName:"refs/heads/main"){target{... on Commit{oid}}} issues(first:100,states:OPEN,labels:[$label],orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title url blockedBy(first:30){nodes{number state title} pageInfo{hasNextPage}}} pageInfo{hasNextPage}} pullRequests(first:100,states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){nodes{number title headRefName headRefOid baseRefName url closingIssuesReferences(first:20){nodes{number} pageInfo{hasNextPage}}} pageInfo{hasNextPage}}}}"""
     payload = gh("api", "graphql", "-F", f"owner={OWNER}", "-F", f"name={NAME}", "-F", f"label={PRIORITY_LABEL}", "-f", f"query={query}")
@@ -525,6 +531,7 @@ def fleet_snapshot(*, include_capabilities: bool = True) -> dict[str, Any]:
         f_quota = pool.submit(quota_snapshot)
         main, issues, deps, prs = f_remote.result()
         quota = f_quota.result()
+    ensure_local_main(main)
     agents = agent_records(); classified = classify_issues(issues, deps, prs, agents); resources = resource_snapshot()
     active = sum(1 for row in agents if row.get("active")); unknown = sum(1 for row in agents if row.get("unknown"))
     lanes = lane_calculation(ready=len(classified["ready"]), active=active, unknown=unknown,

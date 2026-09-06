@@ -8,7 +8,7 @@
 
 - Last reconciled: **2026-09-06**
 - Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
-- Accepted Product/application base at this reconcile includes **G00 / G11 / G10 / G19 / G30**
+- Accepted Product/application base at this reconcile includes **G00 / G11 / G10 / G19 / G20 / G30 / G31**
 - Current Issue / PR / CI / GitHub dependency / worktree/runtime state: **必ずlive確認**
 
 ## NOW — 今どこまで出来ている？
@@ -29,7 +29,9 @@ v1は広いメールクライアント機能を先に揃えるのではなく、
 - **G11** — Product shell / responsive / accessibility / IME / fixture-read-model UI foundation
 - **G10** — Better Auth + PostgreSQL app auth / UUID persistence proof
 - **G19** — provider-neutral Source/evidence production persistence
+- **G20** — Gmail authorization / watch / history reconciliation / attachment evidence
 - **G30** — frozen Responsibility L2 production persistence + interpretation provenance foundation
+- **G31** — deterministic Responsibility admission / reducer / accepted-state boundary
 - Cloudflare preview foundation — developer visibility infrastructure。Product authorityではない
 
 重要な区別:
@@ -44,14 +46,14 @@ specified
 
 ### Current implementation frontier
 
-現在のProduct frontierは **G20 Gmail provider** と **G31 deterministic Responsibility reducer** の2本です。
+現在のProduct frontierは **G21 Source** と **G32 Attention / Temporal** の2本です。
 
-- G20: real Gmail authorization / watch / history reconciliation / attachment evidence
-- G31: probabilistic candidateからtrusted accepted Responsibility stateへ入るdeterministic admission/reducer boundary
+- G21: real Source list/detail / authorized exact search / attachment evidence access
+- G32: Needs You / Managed / Review等のattention projectionとdurable Temporal reconsideration
 
 この2本のcurrent Issue / PR / exact head / CI / review dispositionは変動するため、このfileの番号やheadをexecution authorityにしません。**live GitHubを読むこと。**
 
-G20がacceptedされるとG21 Source/Searchへ、G31がacceptedされるとG32 Attention/Temporalへ進むのがimplementation graph上の主経路です。正確なdependencyは `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub `blocked_by` がauthorityです。
+G21とG32がacceptedされると、accepted済みのG11/G31と合わせてG40 Product surfacesのdependencyが満たされます。正確なdependencyは `docs/product/IMPLEMENTATION-GRAPH.md` + live GitHub `blocked_by` がauthorityです。
 
 ## EXECUTION — direct coding agent workflow
 

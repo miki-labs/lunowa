@@ -109,6 +109,7 @@ h3 { font-size: 1rem; margin-bottom: 8px; }
 .status-affordance { min-height: 32px; border: 1px solid #c6b9df; border-radius: 8px; background: var(--review-bg); color: var(--review-fg); font-size: .75rem; font-weight: 700; padding: 5px 8px; }
 .search-box { display: grid; gap: 8px; color: var(--foreground); font-size: .875rem; font-weight: 700; }
 .search-box input, .auth-form input, textarea { width: 100%; border: 1px solid #aeb9cb; border-radius: 9px; background: white; color: var(--foreground); font-size: 1rem; line-height: 1.5; padding: 10px 12px; }
+.search-box select { width: 100%; min-height: 42px; border: 1px solid #aeb9cb; border-radius: 9px; background: white; color: var(--foreground); padding: 8px 10px; }
 .empty-state { border: 1px dashed #b9c7dd; border-radius: 12px; color: var(--muted-foreground); line-height: 1.6; padding: 20px; }
 .settings-card { border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
 .settings-card dl { display: grid; gap: 10px; font-size: .875rem; }
@@ -120,6 +121,21 @@ h3 { font-size: 1rem; margin-bottom: 8px; }
 .detail-content { max-width: 720px; }.detail-content h2 { font-size: clamp(1.375rem, 2.2vw, 1.875rem); margin-top: 14px; }.detail-lead { color: #384255; font-size: 1.0625rem; line-height: 1.65; }.detail-content section:not(.composer) { border-top: 1px solid var(--border); margin-top: 24px; padding-top: 20px; }.detail-content section p { font-size: .9375rem; line-height: 1.65; }
 .trust-block { border: 1px solid #b9c7dd; border-radius: 14px; background: #fafcff; padding: 18px; }.trust-block h3 { color: #234f86; }
 .primary-button, .danger-button, .choice-button { min-height: 44px; border: 1px solid transparent; border-radius: 9px; font-weight: 750; padding: 10px 14px; }.primary-button { background: var(--brand-navy); color: white; }.primary-button:hover { background: #1a2d5d; }.danger-button { background: white; border-color: #a83b36; color: #8d332e; }.choice-button { display: block; width: 100%; background: white; border-color: #b9c7dd; color: var(--foreground); margin-top: 8px; text-align: left; }.choice-button:hover { border-color: var(--review-fg); background: #faf8ff; }
+ .source-detail-state { color: var(--muted-foreground); line-height: 1.6; margin-top: 28px; }
+.source-conversation-body { display: grid; gap: 20px; }
+.source-message { border: 1px solid var(--border); border-radius: 14px; background: white; padding: 18px; }
+.source-message header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.source-message header span, .source-message header time { color: var(--muted-foreground); font-size: .75rem; }
+.source-message header time { margin-left: auto; }
+.source-text, .source-html { line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
+.source-html { white-space: normal; }
+.source-html pre { overflow-x: auto; white-space: pre-wrap; }
+.attachment-list { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px; }
+.attachment-list h3 { margin-bottom: 8px; }
+.attachment-list ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.attachment-item { display: grid; gap: 6px; border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
+.attachment-item > div { display: grid; gap: 3px; }
+.attachment-item .quiet-button { padding-left: 0; }
 fieldset { border: 0; margin: 24px 0; padding: 0; } legend { font-weight: 700; margin-bottom: 10px; }.message-card { border-left: 4px solid var(--waiting-fg); background: white; box-shadow: 0 1px 3px rgb(23 32 51 / .08); padding: 16px; }.composer { border: 1px solid var(--border); border-radius: 14px; background: white; margin-top: 28px; padding: 18px; }.composer label { display: grid; gap: 8px; font-size: .875rem; font-weight: 700; }.composer textarea { margin-bottom: 10px; resize: vertical; }.composer .primary-button { margin-top: 6px; }.empty-detail { max-width: 460px; color: var(--muted-foreground); margin: 22vh auto 0; text-align: center; }.empty-detail h2 { color: var(--foreground); }.status-region { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .mobile-header, .scrim { display: none; }
 .session-panel { display: grid; width: min(100% - 32px, 520px); min-height: 100dvh; align-content: center; gap: 12px; margin: auto; }.session-panel p { color: var(--muted-foreground); line-height: 1.6; }.session-panel .fixture-switch { margin-top: 30px; }

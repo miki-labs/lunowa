@@ -9,6 +9,13 @@ import {
   type SendLifecycle,
   type ShellFixture
 } from './lunowa-shell-model';
+import {
+  FixtureSourceList,
+  RealSourceList,
+  RealSourceSearch,
+  SourceConversationDetail
+} from './source-ui';
+import type {SourceConversationReadModel, SourcePageReadModel} from './source-types';
 
 export * from './lunowa-shell-model';
 
@@ -42,7 +49,7 @@ export function isImeKeyboardEvent(event: Pick<KeyboardEvent, 'isComposing' | 'k
   return event.isComposing || event.keyCode === 229;
 }
 
-export type AppUserSummary = {name: string; email: string};
+export type AppUserSummary = {id?: string; name: string; email: string};
 
 export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActionError = ''}: {
   appUser?: AppUserSummary;
@@ -63,6 +70,18 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const [sendOverride, setSendOverride] = useState<SendLifecycle | null>(null);
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [searchAccountId, setSearchAccountId] = useState('');
+  const [sourceModel, setSourceModel] = useState<SourcePageReadModel | null>(null);
+  const [sourceLoading, setSourceLoading] = useState(() => Boolean(appUser?.id));
+  const [sourceError, setSourceError] = useState('');
+  const [sourceReload, setSourceReload] = useState(0);
+  const [sourceSearchModel, setSourceSearchModel] = useState<SourcePageReadModel | null>(null);
+  const [sourceSearchLoading, setSourceSearchLoading] = useState(false);
+  const [sourceSearchError, setSourceSearchError] = useState('');
+  const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [sourceConversation, setSourceConversation] = useState<SourceConversationReadModel | null>(null);
+  const [sourceConversationLoading, setSourceConversationLoading] = useState(false);
+  const [sourceConversationError, setSourceConversationError] = useState('');
   const navTrigger = useRef<HTMLButtonElement>(null);
   const drawerPanel = useRef<HTMLElement>(null);
   const detailHeading = useRef<HTMLHeadingElement>(null);
@@ -85,6 +104,13 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     window.setTimeout(() => {
       if (window.matchMedia?.('(max-width: 719px)').matches) detailHeading.current?.focus();
     }, 0);
+  };
+
+  const openConversation = (origin: string, conversationId = origin) => {
+    setSelectedConversationId(conversationId);
+    setSourceConversation(null);
+    setSourceConversationError('');
+    openDetail('conversation', origin);
   };
 
   const selectSurface = (next: Surface) => {
@@ -136,6 +162,82 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   useEffect(() => {
     if (drawerOpen) window.setTimeout(() => drawerPanel.current?.querySelector<HTMLElement>('button')?.focus(), 0);
   }, [drawerOpen]);
+
+  useEffect(() => {
+    if (!appUser?.id) return;
+    const controller = new AbortController();
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?limit=50`, {
+      credentials: 'same-origin',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('SOURCE_LIST_FAILED');
+        return response.json() as Promise<SourcePageReadModel>;
+      })
+      .then((result) => setSourceModel(result))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setSourceError(error instanceof Error ? error.message : 'SOURCE_LIST_FAILED');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSourceLoading(false);
+      });
+    return () => controller.abort();
+  }, [appUser?.id, sourceReload]);
+
+  useEffect(() => {
+    if (!appUser?.id) return;
+    if (!search.trim()) {
+      return;
+    }
+    const controller = new AbortController();
+    const userId = appUser.id;
+    const timer = window.setTimeout(() => {
+      setSourceSearchLoading(true);
+      setSourceSearchError('');
+      const query = new URLSearchParams({q: search});
+      if (searchAccountId) query.set('accountId', searchAccountId);
+      void fetch(`/api/bff/users/${encodeURIComponent(userId)}/source/search?${query.toString()}`, {
+        credentials: 'same-origin',
+        signal: controller.signal
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error('SOURCE_SEARCH_FAILED');
+          return response.json() as Promise<SourcePageReadModel>;
+        })
+        .then((result) => setSourceSearchModel(result))
+        .catch((error: unknown) => {
+          if (!controller.signal.aborted) setSourceSearchError(error instanceof Error ? error.message : 'SOURCE_SEARCH_FAILED');
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSourceSearchLoading(false);
+        });
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [appUser?.id, search, searchAccountId, sourceModel]);
+
+  useEffect(() => {
+    if (!appUser?.id || detail !== 'conversation' || !selectedConversationId) return;
+    const controller = new AbortController();
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations/${encodeURIComponent(selectedConversationId)}`, {
+      credentials: 'same-origin',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('SOURCE_CONVERSATION_FAILED');
+        return response.json() as Promise<SourceConversationReadModel>;
+      })
+      .then((result) => setSourceConversation(result))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setSourceConversationError(error instanceof Error ? error.message : 'SOURCE_CONVERSATION_FAILED');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSourceConversationLoading(false);
+      });
+    return () => controller.abort();
+  }, [appUser?.id, detail, selectedConversationId]);
 
   if (fixture.session === 'session_expired') {
     return (
@@ -203,10 +305,23 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
           sessionActionError={sessionActionError}
           search={search}
           onSearch={setSearch}
+          searchAccountId={searchAccountId}
+          onSearchAccount={setSearchAccountId}
+          sourceModel={sourceModel}
+          sourceLoading={sourceLoading}
+          sourceError={sourceError}
+          onRetrySource={() => {
+            setSourceError('');
+            setSourceLoading(true);
+            setSourceReload((current) => current + 1);
+          }}
+          sourceSearchModel={sourceSearchModel}
+          sourceSearchLoading={sourceSearchLoading}
+          sourceSearchError={sourceSearchError}
           openMoment={(origin = attentionItem.id) => openDetail('moment', origin)}
           openManaged={() => openDetail('managed-detail', 'managed-estimate')}
           openReview={() => openDetail('review-detail', 'review-condition')}
-          openConversation={(origin) => openDetail('conversation', origin)}
+          openConversation={openConversation}
         />
         <FixtureSwitch fixtureId={fixtureId} onChange={changeFixture} />
       </section>
@@ -221,6 +336,10 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             commonMutations={commonMutations}
             sendState={sendState}
             fixture={fixture}
+            sourceConversation={sourceConversation}
+            sourceConversationLoading={sourceConversationLoading || Boolean(appUser?.id && detail === 'conversation' && selectedConversationId && !sourceConversation && !sourceConversationError)}
+            sourceConversationError={sourceConversationError}
+            sourceUserId={appUser?.id}
             onBack={() => {
               setDetail(null);
               setStatus('一覧に戻りました');
@@ -233,7 +352,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             }}
             onOpenSource={() => {
               setSurface('source');
-              openDetail('conversation', sourceItem.id);
+              openConversation(sourceItem.id, sourceModel?.conversations[0]?.id ?? sourceItem.id);
             }}
           />
         ) : (
@@ -256,7 +375,7 @@ function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; on
   );
 }
 
-function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessionActionError, search, onSearch, openMoment, openManaged, openReview, openConversation}: {
+function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessionActionError, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openConversation}: {
   surface: Surface;
   fixture: ShellFixture;
   appUser?: AppUserSummary;
@@ -265,10 +384,19 @@ function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessi
   sessionActionError: string;
   search: string;
   onSearch: (value: string) => void;
+  searchAccountId: string;
+  onSearchAccount: (value: string) => void;
+  sourceModel: SourcePageReadModel | null;
+  sourceLoading: boolean;
+  sourceError: string;
+  onRetrySource: () => void;
+  sourceSearchModel: SourcePageReadModel | null;
+  sourceSearchLoading: boolean;
+  sourceSearchError: string;
   openMoment: (origin?: string) => void;
   openManaged: () => void;
   openReview: () => void;
-  openConversation: (origin: string) => void;
+  openConversation: (origin: string, conversationId?: string) => void;
 }) {
   const title = navigation.find((item) => item.id === surface)?.label ?? 'ホーム';
   const integrity = fixture.integrity === 'degraded';
@@ -278,17 +406,21 @@ function SurfaceContent({surface, fixture, appUser, onSignOut, signingOut, sessi
     <>
       <div className="surface-header">
         <div><p className="eyebrow">LUNOWA</p><h1 id="surface-heading">{title}</h1></div>
-        <button id={`surface-open-conversation-${surface}`} className="quiet-button" type="button" onClick={(event) => openConversation(event.currentTarget.id)}>会話を見る</button>
+        <button id={`surface-open-conversation-${surface}`} className="quiet-button" type="button" onClick={(event) => openConversation(event.currentTarget.id, sourceModel?.conversations[0]?.id ?? event.currentTarget.id)}>会話を見る</button>
       </div>
       {integrity && <IntegrityBanner />}
       {partial && <p className="coverage-notice" role="status">一部の会話のみを表示しています。最新の確認範囲: 10:15。</p>}
       {loading && <LoadingState />}
       {!loading && surface === 'home' && <Home fixture={fixture} openMoment={openMoment} openReview={openReview} openManaged={openManaged} />}
-      {!loading && surface === 'needs' && <NeedsYou fixture={fixture} openMoment={openMoment} openConversation={openConversation} />}
+      {!loading && surface === 'needs' && <NeedsYou fixture={fixture} openMoment={openMoment} openConversation={(origin) => openConversation(origin, sourceModel?.conversations[0]?.id ?? origin)} />}
       {!loading && surface === 'managed' && <Managed fixture={fixture} openManaged={openManaged} />}
       {!loading && surface === 'review' && <Review fixture={fixture} openReview={openReview} />}
-      {!loading && surface === 'source' && <SourceList openConversation={openConversation} openMoment={openMoment} />}
-      {!loading && surface === 'search' && <Search search={search} onSearch={onSearch} openConversation={openConversation} />}
+      {!loading && surface === 'source' && (appUser?.id
+        ? <RealSourceList model={sourceModel} loading={sourceLoading} error={sourceError} onRetry={onRetrySource} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} />
+        : <FixtureSourceList openConversation={openConversation} openMoment={openMoment} />)}
+      {!loading && surface === 'search' && (appUser?.id
+        ? <RealSourceSearch model={sourceSearchModel ?? sourceModel} loading={sourceSearchLoading} error={sourceSearchError} text={search} accountId={searchAccountId} onText={onSearch} onAccount={onSearchAccount} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} />
+        : <Search search={search} onSearch={onSearch} openConversation={openConversation} />)}
       {!loading && surface === 'settings' && (
         <Settings
           fixture={fixture}
@@ -331,10 +463,6 @@ function Review({fixture, openReview}: {fixture: ShellFixture; openReview: () =>
   return <div className="surface-content"><p className="surface-intro">小さく、判断が必要な確認だけを表示しています。</p>{fixture.hasReview ? <button id="review-condition" className="list-row review-row" type="button" onClick={openReview}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>更新日が会話内で一致していません。</span></button> : <p className="empty-state">現在、確認が必要な事項はありません。</p>}</div>;
 }
 
-function SourceList({openConversation, openMoment}: {openConversation: (origin: string) => void; openMoment: (origin?: string) => void}) {
-  return <div className="surface-content"><p className="surface-intro">元の会話をそのまま確認できます。</p><article className="source-row"><button id={sourceItem.id} className="source-main" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.sender}</strong><span>{sourceItem.subject}</span><span>{sourceItem.preview}</span></button><button className="status-affordance" type="button" onClick={() => openMoment(sourceItem.id)} aria-label="この会話の対応状況を見る">対応</button><time>{sourceItem.time}</time></article></div>;
-}
-
 function Search({search, onSearch, openConversation}: {search: string; onSearch: (value: string) => void; openConversation: (origin: string) => void}) {
   return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button id="search-result-estimate" className="list-row" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
 }
@@ -363,7 +491,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError}:
   </div>;
 }
 
-function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sendState, fixture, onBack, onCommonMutation, onSend, onOpenSource}: {
+function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sendState, fixture, sourceConversation, sourceConversationLoading, sourceConversationError, sourceUserId, onBack, onCommonMutation, onSend, onOpenSource}: {
   detail: Detail;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   draft: string;
@@ -371,17 +499,35 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
   commonMutations: Record<Exclude<CommonMutationTarget, null>, MutationState>;
   sendState: SendLifecycle;
   fixture: ShellFixture;
+  sourceConversation: SourceConversationReadModel | null;
+  sourceConversationLoading: boolean;
+  sourceConversationError: string;
+  sourceUserId?: string;
   onBack: () => void;
   onCommonMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void;
   onSend: () => void;
   onOpenSource: () => void;
 }) {
-  const title = detail === 'conversation' ? sourceItem.subject : detail === 'review-detail' ? '契約更新の条件を確認してください' : detail === 'managed-detail' ? '来期の見積書を見守っています' : attentionItem.action;
+  const title = detail === 'conversation'
+    ? sourceUserId ? sourceConversation?.subject ?? 'Sourceの会話' : sourceItem.subject
+    : detail === 'review-detail' ? '契約更新の条件を確認してください' : detail === 'managed-detail' ? '来期の見積書を見守っています' : attentionItem.action;
   return <div className="detail-content"><button className="back-button" type="button" onClick={onBack}>‹ 一覧に戻る</button><h2 ref={headingRef} tabIndex={-1}>{title}</h2>
     {detail === 'moment' && <MomentBody onSource={onOpenSource} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />}
     {detail === 'managed-detail' && <ManagedDetail mutation={commonMutations['stop-tracking']} onMutation={onCommonMutation} />}
     {detail === 'review-detail' && <ReviewDetail mutation={commonMutations['review-answer']} onMutation={onCommonMutation} />}
-    {detail === 'conversation' && <Conversation draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />}
+    {detail === 'conversation' && (sourceUserId
+      ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError}>
+        {sourceConversation && <Composer
+          draft={draft}
+          onDraft={onDraft}
+          sendState={sendState}
+          fixture={fixture}
+          onSend={onSend}
+          toLabel={sourceConversation.messages[0]?.recipients[0]?.displayName ?? sourceConversation.messages[0]?.recipients[0]?.email ?? '宛先情報なし'}
+          fromLabel={sourceConversation.account.emailAddress}
+        />}
+      </SourceConversationDetail>
+      : <Conversation draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />)}
   </div>;
 }
 
@@ -401,7 +547,7 @@ function Conversation({draft, onDraft, sendState, fixture, onSend}: {draft: stri
   return <><div className="message-card"><p className="metadata">佐藤ひろ子 · 10:24</p><p>添付の見積書をご確認いただけますか。明日の打ち合わせで確認できれば助かります。</p></div><p className="metadata">この会話は Source の原文です。要約や判断を必須にはしません。</p><Composer draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} /></>;
 }
 
-function Composer({draft, onDraft, sendState, fixture, onSend}: {draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void}) {
+function Composer({draft, onDraft, sendState, fixture, onSend, toLabel = '佐藤ひろ子', fromLabel = 'work@example.jp'}: {draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void; toLabel?: string; fromLabel?: string}) {
   const unavailable = fixture.sourceRead === 'temporarily_unavailable';
   const awaitingResult = sendState === 'request_pending' || sendState === 'provider_ambiguous' || sendState === 'provider_confirmed_reconciling';
   const feedback = sendState === 'request_pending' ? '送信をリクエストしています。確認されるまで、状態は変わりません。'
@@ -409,7 +555,7 @@ function Composer({draft, onDraft, sendState, fixture, onSend}: {draft: string; 
       : sendState === 'provider_ambiguous' ? '送信結果を確認しています。重複送信を避けるため、再試行はできません。'
         : sendState === 'provider_confirmed_reconciling' ? '送信を確認しました。状態を更新しています。'
           : null;
-  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3><p className="metadata">宛先: 佐藤ひろ子 · From: work@example.jp</p><label htmlFor="reply-body">本文<textarea id="reply-body" value={draft} onChange={(event) => onDraft(event.target.value)} placeholder="返信を入力" rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={!draft || awaitingResult || unavailable} type="button" onClick={onSend}>{sendState === 'request_pending' ? '送信をリクエストしています' : sendState === 'provider_ambiguous' ? '送信結果を確認しています' : sendState === 'provider_confirmed_reconciling' ? '状態を更新しています' : sendState === 'provider_failed' ? '再試行する' : '送信する'}</button><p className="metadata">Enterだけでは送信されません。</p></section>;
+  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3><p className="metadata">宛先: {toLabel} · From: {fromLabel}</p><label htmlFor="reply-body">本文<textarea id="reply-body" value={draft} onChange={(event) => onDraft(event.target.value)} placeholder="返信を入力" rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={!draft || awaitingResult || unavailable} type="button" onClick={onSend}>{sendState === 'request_pending' ? '送信をリクエストしています' : sendState === 'provider_ambiguous' ? '送信結果を確認しています' : sendState === 'provider_confirmed_reconciling' ? '状態を更新しています' : sendState === 'provider_failed' ? '再試行する' : '送信する'}</button><p className="metadata">Enterだけでは送信されません。</p></section>;
 }
 
 function IntegrityBanner() {

@@ -25,6 +25,9 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
+      - name: Verify direct-agent control
+        run: python3 -m unittest scripts/test_parallel_task_preflight.py scripts/test_direct_agent_control.py
+
       - name: Install pnpm
         run: npm install --global pnpm@11.20.0
 

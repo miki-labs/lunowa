@@ -38,6 +38,7 @@ GitHub Issue task contract + blocked_by
 
 - One active implementation owns one Issue/worktree. Never run duplicate agents against the same Issue/worktree concurrently.
 - Parallel implementation requires distinct unblocked Issues plus isolated worktrees and runtime state. Isolation never implies parallel merge safety.
+- For terminal-driven multi-agent work, inspect `python scripts/direct_agent_control.py fleet` (host shortcut: `lw fleet`) before dispatch. Target about 3 top-level implementation lanes, cap at 4, and reduce that dynamically for dependency, candidate/review WIP, quota, or resource pressure. One Issue keeps one top-level write owner; native subagents may parallelize independent read-heavy work.
 - Prefer deterministic repository/local CLI evidence. Add MCP, plugins, network, or specialist skills only when the task materially needs them.
 - Query mutable external facts live when they can change the solution or acceptance evidence.
 - Privileged or destructive external writes require separate explicit authority; they are not ambient coding-agent capability.

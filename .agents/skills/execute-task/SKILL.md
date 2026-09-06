@@ -30,6 +30,8 @@ For parallel implementation, additionally require all of the following before ed
 - the worktree starts clean from the intended base ref;
 - runtime/state resources that verification will mutate have a deterministic task namespace.
 
+Within one Issue, keep one top-level write owner. Native subagents may parallelize independent read-heavy exploration, research, hypothesis testing, and test/log analysis when that saves time; do not create competing writers against the same task/files merely because subagents are available.
+
 Run `python scripts/parallel-task-preflight.py` with the expected repository, worktree,
 branch, base ref, owner, and task relationship before editing when this repository is
 the target. The command fails closed on contamination or an unresolved dependency;

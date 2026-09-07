@@ -133,7 +133,9 @@ export class ResponsibilityInterpretationRuntime {
       const modelOutput = validateInterpretationOutput(parseResponseJson(raw), {
         basisEvidenceRevision: context.evidenceRevision,
         allowedMessageIds: built.allowedMessageIds,
-        allowedParticipantIds: built.allowedParticipantIds
+        allowedParticipantIds: built.allowedParticipantIds,
+        allowedSourceZones: built.allowedSourceZones,
+        authorizedMessageBodies: built.authorizedMessageBodies
       });
       const current = await currentRevision(this.deps, {userId: context.user.id, connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId});
       if (current !== modelOutput.basisEvidenceRevision) {

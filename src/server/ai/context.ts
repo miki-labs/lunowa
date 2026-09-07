@@ -1,4 +1,11 @@
 import type {JsonObject} from '../evidence/normalized';
+import {MODEL_SOURCE_ZONES, type ModelSourceZone} from './contracts';
+
+export type AuthorizedAISourceZone = {
+  zone: ModelSourceZone;
+  start: number;
+  end: number;
+};
 
 export type AuthorizedAIMessage = {
   id: string;
@@ -9,7 +16,7 @@ export type AuthorizedAIMessage = {
   subject: string;
   body: string;
   sentAt: string;
-  sourceZones?: readonly {zone: string; start: number; end: number}[];
+  sourceZones?: readonly AuthorizedAISourceZone[];
 };
 
 export type AuthorizedInterpretationContext = {
@@ -49,6 +56,8 @@ export type BuiltAIContext = {
   manifest: AIContextManifest;
   allowedMessageIds: ReadonlySet<string>;
   allowedParticipantIds: ReadonlySet<string>;
+  allowedSourceZones: ReadonlyMap<string, readonly AuthorizedAISourceZone[]>;
+  authorizedMessageBodies: ReadonlyMap<string, string>;
 };
 
 const MAX_MESSAGES = 24;
@@ -64,6 +73,7 @@ function bounded(value: string, label: string, max: number): string {
 
 function validateMessage(message: AuthorizedAIMessage, label: string): void {
   bounded(message.id, `${label}.id`, 256);
+  if (message.direction !== 'INBOUND' && message.direction !== 'OUTBOUND') throw new Error(`${label}.direction is invalid`);
   bounded(message.subject, `${label}.subject`, MAX_SUBJECT_LENGTH);
   bounded(message.body, `${label}.body`, MAX_BODY_LENGTH);
   if (!EMAIL.test(message.sender.email.trim())) throw new Error(`${label}.sender.email is invalid`);
@@ -72,7 +82,7 @@ function validateMessage(message: AuthorizedAIMessage, label: string): void {
   }
   if (Number.isNaN(Date.parse(message.sentAt))) throw new Error(`${label}.sentAt is invalid`);
   for (const span of message.sourceZones ?? []) {
-    if (!span.zone || !Number.isSafeInteger(span.start) || !Number.isSafeInteger(span.end) || span.start < 0 || span.end < span.start || span.end > message.body.length) throw new Error(`${label}.sourceZones contains an invalid span`);
+    if (!MODEL_SOURCE_ZONES.includes(span.zone) || !Number.isSafeInteger(span.start) || !Number.isSafeInteger(span.end) || span.start < 0 || span.end < span.start || span.end > message.body.length) throw new Error(`${label}.sourceZones contains an invalid span`);
   }
 }
 
@@ -124,8 +134,11 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
     ids.add(message.id);
   }
   if (!ids.has(input.focalMessageId)) throw new Error('interpretation focal message is not in the authorized context');
+  if (!input.messages.every((message) => (message.sourceZones?.length ?? 0) > 0)) throw new Error('interpretation context requires trusted source zones for every message');
   const participantIds = new Set(input.participantIds ?? []);
   for (const id of participantIds) bounded(id, 'interpretation participant ID', 128);
+  const allowedSourceZones = new Map(input.messages.map((message) => [message.id, message.sourceZones ?? []] as const));
+  const authorizedMessageBodies = new Map(input.messages.map((message) => [message.id, message.body] as const));
   const payload = {
     lane: 'responsibility_interpretation',
     schemaVersion: 1,
@@ -147,7 +160,9 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
       fieldsIncluded: ['message.id', 'message.direction', 'message.sender', 'message.recipients', 'message.cc', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants']
     },
     allowedMessageIds: ids,
-    allowedParticipantIds: participantIds
+    allowedParticipantIds: participantIds,
+    allowedSourceZones,
+    authorizedMessageBodies
   };
 }
 
@@ -175,6 +190,8 @@ export function buildDraftContext(input: AuthorizedReplyContext): BuiltAIContext
     },
     allowedMessageIds: messageIds,
     allowedParticipantIds: new Set(),
+    allowedSourceZones: new Map([[input.message.id, input.message.sourceZones ?? []]]),
+    authorizedMessageBodies: new Map([[input.message.id, input.message.body]]),
     trustedRecipientLabels: input.trustedRecipientLabels
   };
 }

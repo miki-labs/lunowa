@@ -20,7 +20,8 @@ import {
 
 const messageId = 'message-1';
 const participantId = '00000000-0000-4000-8000-000000000010';
-const sourceRef = {messageId, zone: 'AUTHORED_CURRENT' as const, excerpt: '修正版を明日までに送ってください。'};
+const messageBody = '修正版を明日までに送ってください。';
+const sourceRef = {messageId, zone: 'AUTHORED_CURRENT' as const, excerpt: messageBody, start: 0, end: messageBody.length};
 
 function interpretationOutput(overrides: Partial<ModelInterpretationOutput> = {}): ModelInterpretationOutput {
   return {
@@ -49,7 +50,7 @@ function interpretationContext(): AuthorizedInterpretationContext {
     participantIds: [participantId],
     messages: [{
       id: messageId, direction: 'INBOUND', sender: {email: 'partner@example.com', displayName: 'Partner'}, recipients: [{email: 'user@example.com'}],
-      subject: '修正版', body: '修正版を明日までに送ってください。', sentAt: '2026-08-24T09:00:00+09:00'
+      subject: '修正版', body: messageBody, sentAt: '2026-08-24T09:00:00+09:00', sourceZones: [{zone: 'AUTHORED_CURRENT', start: 0, end: messageBody.length}]
     }]
   };
 }
@@ -157,7 +158,15 @@ describe('G70 bounded AI runtime', () => {
   });
 
   it('rejects unauthorized source IDs and trusted authority fields outside the candidate contract', () => {
-    expect(() => validateInterpretationOutput({...interpretationOutput(), sourceRefs: [{...sourceRef, messageId: 'other-message'}]}, {basisEvidenceRevision: 1, allowedMessageIds: new Set([messageId]), allowedParticipantIds: new Set([participantId])})).toThrow(AIContractError);
-    expect(() => validateInterpretationOutput({...interpretationOutput(), sender: 'attacker'}, {basisEvidenceRevision: 1, allowedMessageIds: new Set([messageId]), allowedParticipantIds: new Set([participantId])})).toThrow('outside the model authority');
+    const validationInput = {
+      basisEvidenceRevision: 1,
+      allowedMessageIds: new Set([messageId]),
+      allowedParticipantIds: new Set([participantId]),
+      allowedSourceZones: new Map([[messageId, [{zone: 'AUTHORED_CURRENT' as const, start: 0, end: messageBody.length}]]]),
+      authorizedMessageBodies: new Map([[messageId, messageBody]])
+    };
+    expect(() => validateInterpretationOutput({...interpretationOutput(), sourceRefs: [{...sourceRef, messageId: 'other-message'}]}, validationInput)).toThrow(AIContractError);
+    expect(() => validateInterpretationOutput({...interpretationOutput(), sender: 'attacker'}, validationInput)).toThrow('outside the model authority');
+    expect(() => validateInterpretationOutput({...interpretationOutput(), sourceRefs: [{...sourceRef, zone: 'QUOTED_HISTORY'}]}, validationInput)).toThrow('unauthorized source zone');
   });
 });

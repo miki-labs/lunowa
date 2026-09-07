@@ -6,8 +6,8 @@ Status: Issue #74 bounded implementation evidence. This manifest routes AI-layer
 
 | Layer | Evidence / oracle | Mechanical check owned here | Not claimed here |
 | --- | --- | --- | --- |
-| Context | authorized normalized message context | tenant/account/message scope, minimum draft context, untrusted-source framing, bounded payload, no raw-body run manifest | provider authorization or database query correctness |
-| Structured interpretation | `T0-001/002`, `T0-009..044`, `PG-22/23/50/60` | version/revision/source IDs, semantic shape, source-zone provenance, explicit ambiguity/abstention, no trusted authority fields | semantic accuracy beyond the executable candidate checks |
+| Context | authorized normalized message context | tenant/account/message scope, trusted source-zone spans, minimum draft context, untrusted-source framing, bounded payload, no raw-body run manifest | provider authorization or database query correctness |
+| Structured interpretation | `T0-001/002`, `T0-009..044`, `PG-22/23/50/60` | version/revision/source IDs, source-zone/span/excerpt resolution, semantic shape, explicit ambiguity/abstention, no trusted authority fields | semantic accuracy beyond the executable candidate checks |
 | Candidate boundary | ADR 0007; `src/server/responsibility/interpretation.ts` | candidate can derive only through existing trusted admission/reducer boundary; provider observations are not model evidence | accepted Responsibility persistence/reducer correctness |
 | Draft assistance | `PG-29`, `PG-42`, `PG-45`, `PG-52` | editable body only, currentness, no sender/recipient/send fields, manual fallback remains available | G50 draft persistence or G51 provider Send |
 | Data control | current execution-time OpenAI evidence | `store:false` is explicit in every request; no raw prompt/output logging; model/config, declared data-control mode, and run manifest are versioned | organization/project retention mode or ZDR eligibility, which require deployment evidence |

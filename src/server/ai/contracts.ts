@@ -418,7 +418,15 @@ function decodedJsonValue(value: ModelJSONValue, label: string): unknown {
   }
 }
 
-function sourceRefs(value: unknown, label: string, allowedMessageIds: ReadonlySet<string>): ModelSourceRef[] {
+type AuthorizedSourceZone = {zone: ModelSourceZone; start: number; end: number};
+
+function sourceRefs(
+  value: unknown,
+  label: string,
+  allowedMessageIds: ReadonlySet<string>,
+  allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>,
+  authorizedMessageBodies: ReadonlyMap<string, string>
+): ModelSourceRef[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > 32) throw new AIContractError(`${label} must contain one to 32 source references`);
   return value.map((item, index) => {
     const source = record(item, `${label}[${index}]`);
@@ -429,7 +437,21 @@ function sourceRefs(value: unknown, label: string, allowedMessageIds: ReadonlySe
     const excerpt = optionalString(source.excerpt, `${label}[${index}].excerpt`, 512);
     const start = source.start === undefined || source.start === null ? undefined : boundedInteger(source.start, `${label}[${index}].start`, 0, 100_000);
     const end = source.end === undefined || source.end === null ? undefined : boundedInteger(source.end, `${label}[${index}].end`, 0, 100_000);
+    if ((start === undefined) !== (end === undefined)) throw new AIContractError(`${label}[${index}] must provide both source span bounds or neither`);
     if (start !== undefined && end !== undefined && end < start) throw new AIContractError(`${label}[${index}] has inverted source span`);
+    const authorizedZones = allowedSourceZones.get(messageId) ?? [];
+    const matchingZones = authorizedZones.filter((candidate) => candidate.zone === zone);
+    if (matchingZones.length === 0) throw new AIContractError(`${label}[${index}] cites an unauthorized source zone`);
+    if (start !== undefined && end !== undefined && !matchingZones.some((candidate) => start >= candidate.start && end <= candidate.end)) {
+      throw new AIContractError(`${label}[${index}] cites a source span outside the authorized zone`);
+    }
+    const body = authorizedMessageBodies.get(messageId);
+    if (body !== undefined && excerpt) {
+      const excerptMatches = start !== undefined && end !== undefined
+        ? body.slice(start, end) === excerpt
+        : matchingZones.some((candidate) => body.slice(candidate.start, candidate.end).includes(excerpt));
+      if (!excerptMatches) throw new AIContractError(`${label}[${index}] excerpt does not match the authorized source`);
+    }
     return {messageId, zone, ...(excerpt ? {excerpt} : {}), ...(start !== undefined ? {start} : {}), ...(end !== undefined ? {end} : {})};
   });
 }
@@ -457,12 +479,25 @@ function validateIdentity(value: unknown, label: string): ModelIdentityRelation 
   return {kind, ...(priorOperationalOutcome ? {priorOperationalOutcome} : {})};
 }
 
-function validateSourceProvenanced(value: unknown, label: string, allowedMessageIds: ReadonlySet<string>): ModelSourceRef[] {
+function validateSourceProvenanced(
+  value: unknown,
+  label: string,
+  allowedMessageIds: ReadonlySet<string>,
+  allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>,
+  authorizedMessageBodies: ReadonlyMap<string, string>
+): ModelSourceRef[] {
   const item = record(value, label);
-  return sourceRefs(item.sourceRefs, `${label}.sourceRefs`, allowedMessageIds);
+  return sourceRefs(item.sourceRefs, `${label}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies);
 }
 
-function validateSemanticUnit(value: unknown, label: string, allowedMessageIds: ReadonlySet<string>, allowedParticipantIds: ReadonlySet<string>): ModelSemanticUnit {
+function validateSemanticUnit(
+  value: unknown,
+  label: string,
+  allowedMessageIds: ReadonlySet<string>,
+  allowedParticipantIds: ReadonlySet<string>,
+  allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>,
+  authorizedMessageBodies: ReadonlyMap<string, string>
+): ModelSemanticUnit {
   const item = record(value, label);
   exact(item, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs'], label);
   const candidateUnitKey = stringValue(item.candidateUnitKey, `${label}.candidateUnitKey`, 128);
@@ -470,7 +505,9 @@ function validateSemanticUnit(value: unknown, label: string, allowedMessageIds: 
   const operationalOutcome = optionalString(item.operationalOutcome, `${label}.operationalOutcome`, 2048);
   if (materiality === 'MATERIAL' && !operationalOutcome) throw new AIContractError(`${label}.operationalOutcome is required for material units`);
   const identityRelation = validateIdentity(item.identityRelation, `${label}.identityRelation`);
-  const refs = validateSourceProvenanced(item, label, allowedMessageIds);
+  const refs = validateSourceProvenanced(item, label, allowedMessageIds, allowedSourceZones, authorizedMessageBodies);
+  const refsFor = (value: unknown, nestedLabel: string): ModelSourceRef[] =>
+    validateSourceProvenanced(value, nestedLabel, allowedMessageIds, allowedSourceZones, authorizedMessageBodies);
   const list = <T>(key: string, mapper: (value: unknown, label: string) => T): T[] => {
     const values = item[key];
     if (!Array.isArray(values) || values.length > 64) throw new AIContractError(`${label}.${key} must be a bounded array`);
@@ -482,7 +519,7 @@ function validateSemanticUnit(value: unknown, label: string, allowedMessageIds: 
     const bearerCandidate = enumValue(leg.bearerCandidate, ['USER', 'PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const, `${nestedLabel}.bearerCandidate`);
     const participantId = optionalString(leg.participantId, `${nestedLabel}.participantId`, 128);
     if (bearerCandidate !== 'USER' && (!participantId || !allowedParticipantIds.has(participantId))) throw new AIContractError(`${nestedLabel} needs an authorized participantId`);
-    return {id: stringValue(leg.id, `${nestedLabel}.id`, 128), bearerCandidate, ...(participantId ? {participantId} : {}), actionCode: stringValue(leg.actionCode, `${nestedLabel}.actionCode`, 128), ...(optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048) ? {actionSummary: optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048)} : {}), ...(optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048) ? {objectSummary: optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048)} : {}), ...(optionalString(leg.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(leg.basisKind, `${nestedLabel}.basisKind`, 128)} : {}), blockedByCondition: booleanValue(leg.blockedByCondition, `${nestedLabel}.blockedByCondition`), sourceRefs: sourceRefs(leg.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds)};
+    return {id: stringValue(leg.id, `${nestedLabel}.id`, 128), bearerCandidate, ...(participantId ? {participantId} : {}), actionCode: stringValue(leg.actionCode, `${nestedLabel}.actionCode`, 128), ...(optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048) ? {actionSummary: optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048)} : {}), ...(optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048) ? {objectSummary: optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048)} : {}), ...(optionalString(leg.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(leg.basisKind, `${nestedLabel}.basisKind`, 128)} : {}), blockedByCondition: booleanValue(leg.blockedByCondition, `${nestedLabel}.blockedByCondition`), sourceRefs: sourceRefs(leg.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)};
   });
   const expectedEvents = list('expectedEvents', (value, nestedLabel) => {
     const event = record(value, nestedLabel);
@@ -490,7 +527,7 @@ function validateSemanticUnit(value: unknown, label: string, allowedMessageIds: 
     const actor = enumValue(event.actor, ['PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const, `${nestedLabel}.actor`);
     const participantId = optionalString(event.participantId, `${nestedLabel}.participantId`, 128);
     if (actor !== 'EXTERNAL' && (!participantId || !allowedParticipantIds.has(participantId))) throw new AIContractError(`${nestedLabel} needs an authorized participantId`);
-    return {id: stringValue(event.id, `${nestedLabel}.id`, 128), actor, ...(participantId ? {participantId} : {}), eventCode: stringValue(event.eventCode, `${nestedLabel}.eventCode`, 128), ...(optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048) ? {eventSummary: optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048)} : {}), ...(optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128)} : {}), ...(optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128) ? {expectationStrength: optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128)} : {}), sourceRefs: validateSourceProvenanced(event, nestedLabel, allowedMessageIds)};
+    return {id: stringValue(event.id, `${nestedLabel}.id`, 128), actor, ...(participantId ? {participantId} : {}), eventCode: stringValue(event.eventCode, `${nestedLabel}.eventCode`, 128), ...(optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048) ? {eventSummary: optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048)} : {}), ...(optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128)} : {}), ...(optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128) ? {expectationStrength: optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128)} : {}), sourceRefs: validateSourceProvenanced(event, nestedLabel, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)};
   });
   const temporalFacts = list('temporalFacts', (value, nestedLabel) => {
     const fact = record(value, nestedLabel);
@@ -504,21 +541,34 @@ function validateSemanticUnit(value: unknown, label: string, allowedMessageIds: 
     const temporalKind = enumValue(fact.temporalKind, ['SOURCE_DUE', 'EXPECTED_EVENT_TIME', 'USER_TARGET'] as const, `${nestedLabel}.temporalKind`);
     const obligationLegId = optionalString(fact.obligationLegId, `${nestedLabel}.obligationLegId`, 128);
     const expectedEventId = optionalString(fact.expectedEventId, `${nestedLabel}.expectedEventId`, 128);
-    return {id: stringValue(fact.id, `${nestedLabel}.id`, 128), temporalKind, ...(obligationLegId ? {obligationLegId} : {}), ...(expectedEventId ? {expectedEventId} : {}), ...(optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512) ? {originalExpression: optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512)} : {}), valueKind, ...(resolvedDate ? {resolvedDate} : {}), ...(resolvedAt ? {resolvedAt} : {}), precisionCode: stringValue(fact.precisionCode, `${nestedLabel}.precisionCode`, 64), ...(optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128) ? {referenceTimezone: optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128)} : {}), ...(optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128) ? {anchorKind: optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128)} : {}), ...(optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256) ? {anchorReference: optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256)} : {}), ...(fact.anchorOffsetSeconds === undefined || fact.anchorOffsetSeconds === null ? {} : {anchorOffsetSeconds: boundedInteger(fact.anchorOffsetSeconds, `${nestedLabel}.anchorOffsetSeconds`, -31_536_000, 31_536_000)}), conflictCandidate: booleanValue(fact.conflictCandidate, `${nestedLabel}.conflictCandidate`), ...(optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128) ? {authorityStatus: optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128)} : {}), sourceRefs: validateSourceProvenanced(fact, nestedLabel, allowedMessageIds)};
+    return {
+      id: stringValue(fact.id, `${nestedLabel}.id`, 128), temporalKind,
+      ...(obligationLegId ? {obligationLegId} : {}), ...(expectedEventId ? {expectedEventId} : {}),
+      ...(optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512) ? {originalExpression: optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512)} : {}),
+      valueKind, ...(resolvedDate ? {resolvedDate} : {}), ...(resolvedAt ? {resolvedAt} : {}),
+      precisionCode: stringValue(fact.precisionCode, `${nestedLabel}.precisionCode`, 64),
+      ...(optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128) ? {referenceTimezone: optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128)} : {}),
+      ...(optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128) ? {anchorKind: optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128)} : {}),
+      ...(optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256) ? {anchorReference: optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256)} : {}),
+      ...(fact.anchorOffsetSeconds === undefined || fact.anchorOffsetSeconds === null ? {} : {anchorOffsetSeconds: boundedInteger(fact.anchorOffsetSeconds, `${nestedLabel}.anchorOffsetSeconds`, -31_536_000, 31_536_000)}),
+      conflictCandidate: booleanValue(fact.conflictCandidate, `${nestedLabel}.conflictCandidate`),
+      ...(optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128) ? {authorityStatus: optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128)} : {}),
+      sourceRefs: refsFor(fact, nestedLabel)
+    };
   });
-  const completionCriteria = list('completionCriteria', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), sourceRefs: validateSourceProvenanced(item, nestedLabel, allowedMessageIds)}; });
-  const constraints = list('constraints', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'conditionRef', 'sourceRefs'], nestedLabel); const condition = item.conditionRef === undefined || item.conditionRef === null ? undefined : record(item.conditionRef, `${nestedLabel}.conditionRef`); if (condition) exact(condition, ['kind', 'id', 'code'], `${nestedLabel}.conditionRef`); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), ...(condition ? {conditionRef: {kind: enumValue(condition.kind, ['EXPECTED_EVENT', 'OTHER'] as const, `${nestedLabel}.conditionRef.kind`), ...(optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128) ? {id: optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128)} : {}), ...(optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128) ? {code: optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128)} : {})}} : {}), sourceRefs: validateSourceProvenanced(item, nestedLabel, allowedMessageIds)}; });
-  const proposals = list('pendingProposals', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'candidateStatus', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(item.candidateStatus === undefined || item.candidateStatus === null ? {} : {candidateStatus: enumValue(item.candidateStatus, ['PENDING', 'REJECTED'] as const, `${nestedLabel}.candidateStatus`)}), sourceRefs: validateSourceProvenanced(item, nestedLabel, allowedMessageIds)}; });
-  const agreedFacts = list('agreedFacts', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encodedJsonValue(item.value, `${nestedLabel}.value`), sourceRefs: validateSourceProvenanced(item, nestedLabel, allowedMessageIds)}; });
-  const uncertainties = list('uncertainties', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'fieldKey', 'reasonCode', 'material', 'reviewRequired', 'candidateRefs', 'sourceRefs'], nestedLabel); const refs = item.candidateRefs === undefined || item.candidateRefs === null ? undefined : (() => { if (!Array.isArray(item.candidateRefs)) throw new AIContractError(`${nestedLabel}.candidateRefs must be an array`); return item.candidateRefs.map((ref, index) => stringValue(ref, `${nestedLabel}.candidateRefs[${index}]`, 128)); })(); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), fieldKey: stringValue(item.fieldKey, `${nestedLabel}.fieldKey`, 128), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), material: booleanValue(item.material, `${nestedLabel}.material`), reviewRequired: booleanValue(item.reviewRequired, `${nestedLabel}.reviewRequired`), ...(refs ? {candidateRefs: refs} : {}), sourceRefs: validateSourceProvenanced(item, nestedLabel, allowedMessageIds)}; });
-  const riskDetails = list('riskDetails', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'targetKind', 'targetId', 'riskClass', 'reasonCode', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), targetKind: stringValue(item.targetKind, `${nestedLabel}.targetKind`, 128), ...(optionalString(item.targetId, `${nestedLabel}.targetId`, 128) ? {targetId: optionalString(item.targetId, `${nestedLabel}.targetId`, 128)} : {}), riskClass: enumValue(item.riskClass, ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const, `${nestedLabel}.riskClass`), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), sourceRefs: validateSourceProvenanced(item, nestedLabel, allowedMessageIds)}; });
-  const corrections = list('corrections', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['fieldKey', 'value', 'semanticTime', 'relation', 'sourceRefs'], nestedLabel); return {fieldKey: enumValue(item.fieldKey, ['operationalOutcome', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'temporalFacts.SOURCE_DUE', 'temporalFacts.EXPECTED_EVENT_TIME', 'temporalFacts.USER_TARGET', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails'] as const, `${nestedLabel}.fieldKey`), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128) ? {semanticTime: optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128)} : {}), relation: enumValue(item.relation, ['CORRECTION', 'SUPERSEDES', 'CONFLICT'] as const, `${nestedLabel}.relation`), sourceRefs: validateSourceProvenanced(item, nestedLabel, allowedMessageIds)}; });
+  const completionCriteria = list('completionCriteria', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
+  const constraints = list('constraints', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'conditionRef', 'sourceRefs'], nestedLabel); const condition = item.conditionRef === undefined || item.conditionRef === null ? undefined : record(item.conditionRef, `${nestedLabel}.conditionRef`); if (condition) exact(condition, ['kind', 'id', 'code'], `${nestedLabel}.conditionRef`); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), ...(condition ? {conditionRef: {kind: enumValue(condition.kind, ['EXPECTED_EVENT', 'OTHER'] as const, `${nestedLabel}.conditionRef.kind`), ...(optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128) ? {id: optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128)} : {}), ...(optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128) ? {code: optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128)} : {})}} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
+  const proposals = list('pendingProposals', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'candidateStatus', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(item.candidateStatus === undefined || item.candidateStatus === null ? {} : {candidateStatus: enumValue(item.candidateStatus, ['PENDING', 'REJECTED'] as const, `${nestedLabel}.candidateStatus`)}), sourceRefs: refsFor(item, nestedLabel)}; });
+  const agreedFacts = list('agreedFacts', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encodedJsonValue(item.value, `${nestedLabel}.value`), sourceRefs: refsFor(item, nestedLabel)}; });
+  const uncertainties = list('uncertainties', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'fieldKey', 'reasonCode', 'material', 'reviewRequired', 'candidateRefs', 'sourceRefs'], nestedLabel); const refs = item.candidateRefs === undefined || item.candidateRefs === null ? undefined : (() => { if (!Array.isArray(item.candidateRefs)) throw new AIContractError(`${nestedLabel}.candidateRefs must be an array`); return item.candidateRefs.map((ref, index) => stringValue(ref, `${nestedLabel}.candidateRefs[${index}]`, 128)); })(); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), fieldKey: stringValue(item.fieldKey, `${nestedLabel}.fieldKey`, 128), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), material: booleanValue(item.material, `${nestedLabel}.material`), reviewRequired: booleanValue(item.reviewRequired, `${nestedLabel}.reviewRequired`), ...(refs ? {candidateRefs: refs} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
+  const riskDetails = list('riskDetails', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'targetKind', 'targetId', 'riskClass', 'reasonCode', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), targetKind: stringValue(item.targetKind, `${nestedLabel}.targetKind`, 128), ...(optionalString(item.targetId, `${nestedLabel}.targetId`, 128) ? {targetId: optionalString(item.targetId, `${nestedLabel}.targetId`, 128)} : {}), riskClass: enumValue(item.riskClass, ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const, `${nestedLabel}.riskClass`), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), sourceRefs: refsFor(item, nestedLabel)}; });
+  const corrections = list('corrections', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['fieldKey', 'value', 'semanticTime', 'relation', 'sourceRefs'], nestedLabel); return {fieldKey: enumValue(item.fieldKey, ['operationalOutcome', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'temporalFacts.SOURCE_DUE', 'temporalFacts.EXPECTED_EVENT_TIME', 'temporalFacts.USER_TARGET', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails'] as const, `${nestedLabel}.fieldKey`), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128) ? {semanticTime: optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128)} : {}), relation: enumValue(item.relation, ['CORRECTION', 'SUPERSEDES', 'CONFLICT'] as const, `${nestedLabel}.relation`), sourceRefs: refsFor(item, nestedLabel)}; });
   const assignment = item.assignmentSemantics === undefined || item.assignmentSemantics === null ? undefined : (() => { const value = record(item.assignmentSemantics, `${label}.assignmentSemantics`); exact(value, ['id', 'shape', 'candidateParticipantIds', 'selectedParticipantId'], `${label}.assignmentSemantics`); if (!Array.isArray(value.candidateParticipantIds)) throw new AIContractError(`${label}.assignmentSemantics.candidateParticipantIds must be an array`); const ids = value.candidateParticipantIds.map((id, index) => stringValue(id, `${label}.assignmentSemantics.candidateParticipantIds[${index}]`, 128)); if (ids.some((id) => !allowedParticipantIds.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unauthorized participant`); const selected = optionalString(value.selectedParticipantId, `${label}.assignmentSemantics.selectedParticipantId`, 128); if (selected && !allowedParticipantIds.has(selected)) throw new AIContractError(`${label}.assignmentSemantics.selectedParticipantId is unauthorized`); return {id: stringValue(value.id, `${label}.assignmentSemantics.id`, 128), shape: enumValue(value.shape, ['ANY_OF', 'ALL_OF', 'UNSPECIFIED_GROUP'] as const, `${label}.assignmentSemantics.shape`), candidateParticipantIds: ids, ...(selected ? {selectedParticipantId: selected} : {})}; })();
-  const terminal = item.terminalSignal === undefined || item.terminalSignal === null ? undefined : (() => { const value = record(item.terminalSignal, `${label}.terminalSignal`); exact(value, ['kind', 'sourceRefs'], `${label}.terminalSignal`); return {kind: enumValue(value.kind, ['NONE', 'COMPLETED', 'DECLINED', 'CANCELLED', 'INVALIDATED'] as const, `${label}.terminalSignal.kind`), sourceRefs: sourceRefs(value.sourceRefs, `${label}.terminalSignal.sourceRefs`, allowedMessageIds)}; })();
+  const terminal = item.terminalSignal === undefined || item.terminalSignal === null ? undefined : (() => { const value = record(item.terminalSignal, `${label}.terminalSignal`); exact(value, ['kind', 'sourceRefs'], `${label}.terminalSignal`); return {kind: enumValue(value.kind, ['NONE', 'COMPLETED', 'DECLINED', 'CANCELLED', 'INVALIDATED'] as const, `${label}.terminalSignal.kind`), sourceRefs: sourceRefs(value.sourceRefs, `${label}.terminalSignal.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)}; })();
   return {candidateUnitKey, materiality, ...(operationalOutcome ? {operationalOutcome} : {}), ...(identityRelation ? {identityRelation} : {}), obligationLegs, expectedEvents, temporalFacts, completionCriteria, constraints, pendingProposals: proposals, agreedFacts, uncertainties, riskDetails, ...(assignment ? {assignmentSemantics: assignment} : {}), corrections, ...(terminal ? {terminalSignal: terminal} : {}), sourceRefs: refs};
 }
 
-export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>}): ModelInterpretationOutput {
+export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>}): ModelInterpretationOutput {
   assertNoForbiddenKeys(value);
   const item = record(value, 'interpretation output');
   exact(item, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'], 'interpretation output');
@@ -531,10 +581,10 @@ export function validateInterpretationOutput(value: unknown, input: {basisEviden
   if (status === 'ABSTAINED' && !abstentionReason) throw new AIContractError('abstained interpretation needs a reason');
   if (status === 'CANDIDATE' && abstentionReason) throw new AIContractError('candidate interpretation cannot carry an abstention reason');
   if (!Array.isArray(item.semanticUnits) || item.semanticUnits.length > 32) throw new AIContractError('interpretation semanticUnits must be a bounded array');
-  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds));
+  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds, input.allowedSourceZones, input.authorizedMessageBodies));
   if (new Set(semanticUnits.map((unit) => unit.candidateUnitKey)).size !== semanticUnits.length) throw new AIContractError('interpretation semantic unit keys must be unique');
   if (status === 'ABSTAINED' && semanticUnits.length > 0) throw new AIContractError('abstained interpretation cannot include semantic units');
-  return {schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, basisEvidenceRevision: input.basisEvidenceRevision, status, sourceMessageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits, sourceRefs: sourceRefs(item.sourceRefs, 'interpretation output.sourceRefs', input.allowedMessageIds)};
+  return {schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, basisEvidenceRevision: input.basisEvidenceRevision, status, sourceMessageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits, sourceRefs: sourceRefs(item.sourceRefs, 'interpretation output.sourceRefs', input.allowedMessageIds, input.allowedSourceZones, input.authorizedMessageBodies)};
 }
 
 export function validateDraftOutput(value: unknown, expectedRevision: number): ModelDraftOutput {

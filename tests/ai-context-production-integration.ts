@@ -222,6 +222,7 @@ try {
   assert(currentRevision.rows[0]?.semantic_evidence_revision === '8', 'post-capture currentness did not observe the new revision');
 
   let providerCalls = 0;
+  let providerObservedCapturedRun = false;
   const runtime = new ResponsibilityInterpretationRuntime({
     transport: {
       kind: 'test',
@@ -237,7 +238,7 @@ try {
               AND status = 'CAPTURED'`,
           [user1, conversation1, message1]
         );
-        assert(visibleRuns.rows.length === 1, 'provider observed no unique pre-call captured AIInterpretationRun for revision 8');
+        providerObservedCapturedRun = visibleRuns.rows.length === 1;
         return {status: 'completed', output_text: JSON.stringify({
           schemaVersion: 1,
           basisEvidenceRevision: 8,
@@ -260,7 +261,9 @@ try {
     }
   });
   const runtimeResult = await runtime.run({...request, sourceEventKey: 'g70-runtime-revision-8'});
-  assert(runtimeResult.status === 'NO_RESPONSIBILITY' && providerCalls === 1, 'runtime did not use the captured production context before the fake provider call');
+  assert(providerCalls === 1, `runtime called the fake provider ${providerCalls} times instead of exactly once`);
+  assert(providerObservedCapturedRun, 'provider observed no unique pre-call captured AIInterpretationRun for revision 8');
+  assert(runtimeResult.status === 'NO_RESPONSIBILITY', `runtime production-context result was ${JSON.stringify(runtimeResult)}`);
 
   console.log(JSON.stringify({
     kind: 'g70-ai-context-production-result-v1',

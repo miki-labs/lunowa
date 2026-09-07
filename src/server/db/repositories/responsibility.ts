@@ -592,6 +592,7 @@ export class ResponsibilityRepository {
         sourceEventKey: row.sourceEventKey,
         candidateKey: row.candidateKey,
         evidenceRevision: row.basisEvidenceRevision,
+        aggregateVersion: row.aggregateVersion,
         reasonCodes: row.reasonCodes,
         candidateSummary: row.candidateSummary,
         status: row.reviewStatus as AdmissionReviewState['status'],
@@ -787,6 +788,7 @@ export class ResponsibilityRepository {
             sourceEventKey: sameRevision.sourceEventKey,
             candidateKey: sameRevision.candidateKey,
             evidenceRevision: sameRevision.basisEvidenceRevision,
+            aggregateVersion: sameRevision.aggregateVersion,
             reasonCodes: sameRevision.reasonCodes,
             candidateSummary: sameRevision.candidateSummary,
             status: sameRevision.reviewStatus as AdmissionReviewState['status'],
@@ -833,6 +835,7 @@ export class ResponsibilityRepository {
           sourceEventKey: candidate.sourceEventKey,
           candidateKey: candidate.candidateKey,
           evidenceRevision: existing?.basisEvidenceRevision ?? candidate.evidenceRevision,
+          ...(existing ? {aggregateVersion: existing.aggregateVersion} : {}),
           reasonCodes: existing?.reasonCodes ?? candidate.admission.reasonCodes,
           candidateSummary: (existing?.candidateSummary ?? candidate.admission.candidateSummary ?? {}) as Record<string, unknown>,
           status: 'OPEN'
@@ -969,15 +972,39 @@ export class ResponsibilityRepository {
     reviewId: string;
     resolution: 'TRACK' | 'DO_NOT_TRACK';
     actorKind: string;
+    connectedAccountId?: string;
+    evidenceRevision?: number;
+    expectedAggregateVersion?: number;
+    requestKey?: string;
   }): Promise<void> {
     await this.db.transaction(async (tx) => {
-      const [review] = await tx.select().from(responsibilityAdmissionReviews).where(and(eq(responsibilityAdmissionReviews.id, input.reviewId), eq(responsibilityAdmissionReviews.userId, input.userId))).for('update');
-      if (!review) throw new Error('admission review is not owned by the current user');
+      const predicates = [eq(responsibilityAdmissionReviews.id, input.reviewId), eq(responsibilityAdmissionReviews.userId, input.userId)];
+      if (input.connectedAccountId) predicates.push(eq(responsibilityAdmissionReviews.connectedAccountId, input.connectedAccountId));
+      const [unlockedReview] = await tx.select().from(responsibilityAdmissionReviews).where(and(...predicates));
+      if (!unlockedReview) throw new Error('admission review is not owned by the current user');
+      const [conversation] = await tx.select({semanticEvidenceRevision: conversations.semanticEvidenceRevision})
+        .from(conversations)
+        .where(and(
+          eq(conversations.id, unlockedReview.conversationId),
+          eq(conversations.userId, input.userId),
+          eq(conversations.connectedAccountId, unlockedReview.connectedAccountId)
+        ))
+        .for('update');
+      const [review] = await tx.select().from(responsibilityAdmissionReviews).where(and(...predicates)).for('update');
+      if (!review || !conversation) throw new Error('admission review is not owned by the current user');
       if (review.reviewStatus === 'RESOLVED') {
         if (review.resolution !== input.resolution) throw new Error('admission review already has a different terminal resolution');
         return;
       }
       if (input.resolution === 'TRACK') throw new Error('TRACK review resolution must be applied with an admitted Responsibility candidate');
+      if (input.evidenceRevision !== undefined) {
+        if (conversation.semanticEvidenceRevision !== input.evidenceRevision || review.basisEvidenceRevision !== input.evidenceRevision) {
+          throw new Error(`admission review evidence revision ${input.evidenceRevision} is not current`);
+        }
+      }
+      if (input.expectedAggregateVersion !== undefined && review.aggregateVersion !== input.expectedAggregateVersion) {
+        throw new Error(`admission review changed after it was read; re-open the current review`);
+      }
       await tx.update(responsibilityAdmissionReviews).set({
         reviewStatus: 'RESOLVED',
         resolution: 'DO_NOT_TRACK',

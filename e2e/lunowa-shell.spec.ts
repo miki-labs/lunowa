@@ -1,4 +1,5 @@
 import {expect, test} from '@playwright/test';
+import type {AttentionItemReadModel, AttentionReadModel} from '../src/lib/attention-types';
 
 const nav = (page: import('@playwright/test').Page, label: string) => page.getByRole('button', {name: `${label}を表示`});
 const waitForAuthenticatedShell = async (page: import('@playwright/test').Page) => {
@@ -143,6 +144,52 @@ test('renders the shell and navigates a Needs You item to its Moment', async ({p
   await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
   await expect(page.getByRole('button', {name: '返信を書く'})).toBeVisible();
   expect(consoleErrors).toEqual([]);
+});
+
+test('keeps trusted delegation and LATER actions on the authenticated Product path', async ({page}) => {
+  await page.unroute('**/api/bff/users/**/attention');
+  const initialAttention = attentionReadModel as unknown as AttentionReadModel;
+  const candidate: AttentionItemReadModel = {
+    ...initialAttention.needsYou[0],
+    subjectKind: 'RESPONSIBILITY',
+    id: 'responsibility-candidate', responsibilityId: 'responsibility-candidate', conversationId: 'conversation-candidate',
+    connectedAccountId: 'source-account-1', acceptedEvidenceRevision: 4, aggregateVersion: 2, liveTrackingState: 'HISTORICAL_INACTIVE',
+    surface: 'NONE', projection: {bucket: 'NONE', subjectKind: 'NONE', primaryReason: 'historical-candidate-is-not-live-work'},
+    operationalOutcome: '契約条件を確認する', primaryAction: null, awaitedEvent: '相手からの確認返信', returnCondition: '返信が届くまで'
+  };
+  const later: AttentionItemReadModel = {
+    ...candidate,
+    id: 'responsibility-later', responsibilityId: 'responsibility-later', conversationId: 'conversation-later',
+    aggregateVersion: 3, liveTrackingState: 'TRACKING_ACTIVE', surface: 'LATER',
+    projection: {bucket: 'LATER', subjectKind: 'RESPONSIBILITY', primaryReason: 'user-intentionally-deferred-attention'},
+    operationalOutcome: '納品日の回答を見守る', awaitedEvent: '取引先からの納品日回答', returnCondition: '9月10日'
+  };
+  const waiting: AttentionItemReadModel = {...later, surface: 'MANAGED', projection: {bucket: 'WAITING', subjectKind: 'RESPONSIBILITY', primaryReason: 'open-loop-awaits-counterpart-or-external-event'}};
+  let model: AttentionReadModel = {...initialAttention, needsYou: [], managed: [], later: [], review: [], done: [], delegationCandidates: [candidate], strictZero: true, managedCount: 0, delegatedCount: 0};
+  const actionBodies: Record<string, unknown>[] = [];
+  await page.route('**/api/bff/users/**/attention', (route) => route.fulfill({json: model}));
+  await page.route('**/api/bff/users/**/attention/actions', async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    actionBodies.push(body);
+    if (body.action === 'DELEGATE') model = {...model, delegationCandidates: [], managed: [waiting], managedCount: 1, strictZero: true, delegatedCount: 1};
+    if (body.action === 'RETURN_ATTENTION') model = {...model, later: [], managed: [waiting], managedCount: 1, strictZero: true, delegatedCount: 1};
+    await route.fulfill({json: {accepted: true}});
+  });
+
+  await page.goto('/ja');
+  await page.getByRole('button', {name: /契約条件を確認する/}).click();
+  await page.getByRole('button', {name: 'この件を任せる'}).click();
+  await expect(page.getByText('任せる操作を保存しました。現在の状態を更新しています。')).toBeVisible();
+  expect(actionBodies[0]?.action).toBe('DELEGATE');
+
+  model = {...initialAttention, needsYou: [], managed: [], later: [later], review: [], done: [], delegationCandidates: [], strictZero: false, managedCount: 0, delegatedCount: 1};
+  await page.reload();
+  await nav(page, '管理中').click();
+  await expect(page.getByRole('button', {name: /納品日の回答を見守る/})).toBeVisible();
+  await page.getByRole('button', {name: /納品日の回答を見守る/}).click();
+  await page.getByRole('button', {name: '今、確認する'}).click();
+  await expect(page.getByText('注意を戻しました。現在の対応状態を再確認しています。')).toBeVisible();
+  expect(actionBodies[1]?.action).toBe('RETURN_ATTENTION');
 });
 
 test('keeps the real Source Conversation read-only and exposes a usable compact navigation drawer', async ({page}) => {

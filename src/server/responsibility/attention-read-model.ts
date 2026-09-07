@@ -72,7 +72,11 @@ function itemFromResponsibility(item: AttentionProjectionItem): AttentionItemRea
     awaitedEvent: awaitedEvent(item.state),
     returnCondition: returnCondition(item.state),
     nearestRelevantTime: item.nearestRelevantTime ?? null,
-    overdue: item.overdue
+    overdue: item.overdue,
+    connectedAccountId: item.state.connectedAccountId,
+    acceptedEvidenceRevision: item.state.acceptedEvidenceRevision,
+    aggregateVersion: item.state.aggregateVersion,
+    liveTrackingState: item.state.liveTrackingState
   };
 }
 
@@ -93,7 +97,10 @@ function itemFromAdmissionReview(review: AdmissionReviewState): AttentionItemRea
     awaitedEvent: null,
     returnCondition: null,
     nearestRelevantTime: null,
-    overdue: false
+    overdue: false,
+    connectedAccountId: review.connectedAccountId,
+    acceptedEvidenceRevision: review.evidenceRevision,
+    ...(review.aggregateVersion !== undefined ? {aggregateVersion: review.aggregateVersion} : {})
   };
 }
 
@@ -120,6 +127,9 @@ export function buildAttentionReadModel(input: {
   const later = bySurface('LATER');
   const review = bySurface('REVIEW');
   const done = bySurface('DONE');
+  const delegationCandidates = projection.none
+    .filter((item) => item.state.resolutionStatus === 'OPEN' && item.state.liveTrackingState === 'HISTORICAL_INACTIVE')
+    .map(itemFromResponsibility);
   const integrity: AttentionReadModel['integrity'] = input.sourceReadiness === 'degraded'
     ? {status: 'degraded', message: 'Sourceの確認範囲に問題があります。管理中の安心表示を保留しています。'}
     : trustworthySource
@@ -134,7 +144,8 @@ export function buildAttentionReadModel(input: {
     later,
     review,
     done,
-    strictZero: trustworthySource && integrity.status === 'healthy' && needsYou.length === 0 && review.length === 0,
+    delegationCandidates,
+    strictZero: trustworthySource && integrity.status === 'healthy' && needsYou.length === 0 && review.length === 0 && later.length === 0,
     managedCount: trustworthySource && integrity.status === 'healthy' ? managed.length : 0,
     delegatedCount: managed.length + later.length + needsYou.length,
     derivedAt: now.toISOString()

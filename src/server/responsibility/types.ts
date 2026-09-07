@@ -400,6 +400,7 @@ export type AdmissionReviewState = ResponsibilityScope & {
   sourceEventKey: string;
   candidateKey: string;
   evidenceRevision: number;
+  aggregateVersion?: number;
   reasonCodes: string[];
   candidateSummary: Record<string, unknown>;
   status: 'OPEN' | 'RESOLVED';

@@ -110,4 +110,37 @@ describe('G40 attention read model', () => {
     expect(model.managedCount).toBe(0);
     expect(model.strictZero).toBe(false);
   });
+
+  it('keeps an inactive accepted Responsibility available only as an explicit delegation candidate', () => {
+    const model = buildAttentionReadModel({
+      responsibilities: [state({liveTrackingState: 'HISTORICAL_INACTIVE'})],
+      sourceReadiness: 'ready',
+      dataThroughAt: '2030-01-01T00:00:00.000Z',
+      now: new Date('2030-01-01T00:00:00.000Z')
+    });
+
+    expect(model.needsYou).toHaveLength(0);
+    expect(model.managed).toHaveLength(0);
+    expect(model.delegationCandidates ?? []).toHaveLength(1);
+    expect(model.delegationCandidates?.[0]).toMatchObject({
+      id: 'responsibility-1',
+      surface: 'NONE',
+      projection: {bucket: 'NONE', subjectKind: 'NONE'},
+      liveTrackingState: 'HISTORICAL_INACTIVE'
+    });
+  });
+
+  it('keeps LATER inspectable and distinct from no monitoring', () => {
+    const model = buildAttentionReadModel({
+      responsibilities: [state({attentionMode: 'DEFERRED'})],
+      sourceReadiness: 'ready',
+      dataThroughAt: '2030-01-01T00:00:00.000Z',
+      now: new Date('2030-01-01T00:00:00.000Z')
+    });
+
+    expect(model.managedCount).toBe(0);
+    expect(model.later).toHaveLength(1);
+    expect(model.strictZero).toBe(false);
+    expect(model.later[0]?.projection.bucket).toBe('LATER');
+  });
 });

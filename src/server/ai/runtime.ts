@@ -227,7 +227,8 @@ export class ResponsibilityInterpretationRuntime {
         allowedMessageIds: built.allowedMessageIds,
         allowedParticipantIds: built.allowedParticipantIds,
         allowedSourceZones: built.allowedSourceZones,
-        authorizedMessageBodies: built.authorizedMessageBodies
+        authorizedMessageBodies: built.authorizedMessageBodies,
+        expectedSourceMessageId: context.focalMessageId
       });
       const current = await currentRevision(this.deps, {userId: context.user.id, connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId});
       if (current !== modelOutput.basisEvidenceRevision) {

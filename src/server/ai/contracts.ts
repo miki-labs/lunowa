@@ -31,7 +31,7 @@ export const MODEL_SOURCE_ZONES = [
 ] as const;
 export type ModelSourceZone = (typeof MODEL_SOURCE_ZONES)[number];
 
-export const AI_INTERPRETATION_SCHEMA_VERSION = 1 as const;
+export const AI_INTERPRETATION_SCHEMA_VERSION = 2 as const;
 export const AI_DRAFT_SCHEMA_VERSION = 1 as const;
 
 export type ModelSourceRef = {
@@ -56,7 +56,7 @@ export type ModelObligationLeg = ModelProvenanced<{
   actionCode: string;
   actionSummary?: string;
   objectSummary?: string;
-  basisKind?: string;
+  basisKind: string;
   blockedByCondition?: boolean;
 }>;
 
@@ -248,7 +248,7 @@ const obligationLegSchema = sourceProvenanced({
   actionCode: stringSchema(128),
   actionSummary: nullable(stringSchema(2048)),
   objectSummary: nullable(stringSchema(2048)),
-  basisKind: nullable(stringSchema(128)),
+  basisKind: stringSchema(128),
   blockedByCondition: {type: 'boolean'}
 }, ['id', 'bearerCandidate', 'participantId', 'actionCode', 'actionSummary', 'objectSummary', 'basisKind', 'blockedByCondition']);
 
@@ -315,7 +315,7 @@ const semanticUnitSchema = objectSchema({
 }, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs']);
 
 export const INTERPRETATION_RESPONSE_FORMAT: StructuredResponseFormat = {
-  type: 'json_schema', name: 'lunowa_responsibility_interpretation_v1', strict: true,
+  type: 'json_schema', name: 'lunowa_responsibility_interpretation_v2', strict: true,
   schema: objectSchema({
     schemaVersion: {type: 'integer', enum: [AI_INTERPRETATION_SCHEMA_VERSION]}, basisEvidenceRevision: {type: 'integer', minimum: 0}, status: enumSchema(['CANDIDATE', 'ABSTAINED']), sourceMessageId: stringSchema(256), abstentionReason: nullable(enumSchema(['AMBIGUOUS', 'MISSING_CONTEXT', 'UNSAFE_HIGH_RISK', 'UNINTERPRETABLE'])), semanticUnits: arraySchema(semanticUnitSchema), sourceRefs: arraySchema(sourceRefSchema)
   }, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'])
@@ -370,6 +370,23 @@ function enumValue<T extends string>(value: unknown, values: readonly T[], label
 function boundedInteger(value: unknown, label: string, minimum = 0, maximum = Number.MAX_SAFE_INTEGER): number {
   if (!Number.isSafeInteger(value) || (value as number) < minimum || (value as number) > maximum) throw new AIContractError(`${label} must be a bounded integer`);
   return value as number;
+}
+
+function validCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(0, 0, 0, 0);
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function validIsoInstant(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return false;
+  return validCalendarDate(value.slice(0, 10)) && !Number.isNaN(Date.parse(value));
 }
 
 const FORBIDDEN_AUTHORITY_KEYS = new Set([
@@ -519,7 +536,7 @@ function validateSemanticUnit(
     const bearerCandidate = enumValue(leg.bearerCandidate, ['USER', 'PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const, `${nestedLabel}.bearerCandidate`);
     const participantId = optionalString(leg.participantId, `${nestedLabel}.participantId`, 128);
     if (bearerCandidate !== 'USER' && (!participantId || !allowedParticipantIds.has(participantId))) throw new AIContractError(`${nestedLabel} needs an authorized participantId`);
-    return {id: stringValue(leg.id, `${nestedLabel}.id`, 128), bearerCandidate, ...(participantId ? {participantId} : {}), actionCode: stringValue(leg.actionCode, `${nestedLabel}.actionCode`, 128), ...(optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048) ? {actionSummary: optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048)} : {}), ...(optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048) ? {objectSummary: optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048)} : {}), ...(optionalString(leg.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(leg.basisKind, `${nestedLabel}.basisKind`, 128)} : {}), blockedByCondition: booleanValue(leg.blockedByCondition, `${nestedLabel}.blockedByCondition`), sourceRefs: sourceRefs(leg.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)};
+    return {id: stringValue(leg.id, `${nestedLabel}.id`, 128), bearerCandidate, ...(participantId ? {participantId} : {}), actionCode: stringValue(leg.actionCode, `${nestedLabel}.actionCode`, 128), ...(optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048) ? {actionSummary: optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048)} : {}), ...(optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048) ? {objectSummary: optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048)} : {}), basisKind: stringValue(leg.basisKind, `${nestedLabel}.basisKind`, 128), blockedByCondition: booleanValue(leg.blockedByCondition, `${nestedLabel}.blockedByCondition`), sourceRefs: sourceRefs(leg.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)};
   });
   const expectedEvents = list('expectedEvents', (value, nestedLabel) => {
     const event = record(value, nestedLabel);
@@ -535,8 +552,8 @@ function validateSemanticUnit(
     const valueKind = enumValue(fact.valueKind, ['DATE', 'INSTANT', 'UNRESOLVED'] as const, `${nestedLabel}.valueKind`);
     const resolvedDate = optionalString(fact.resolvedDate, `${nestedLabel}.resolvedDate`, 32);
     const resolvedAt = optionalString(fact.resolvedAt, `${nestedLabel}.resolvedAt`, 64);
-    if (valueKind === 'DATE' && resolvedDate && !/^\d{4}-\d{2}-\d{2}$/.test(resolvedDate)) throw new AIContractError(`${nestedLabel}.resolvedDate must retain date precision`);
-    if (valueKind === 'INSTANT' && resolvedAt && Number.isNaN(Date.parse(resolvedAt))) throw new AIContractError(`${nestedLabel}.resolvedAt must be an ISO instant`);
+    if (valueKind === 'DATE' && (!resolvedDate || resolvedAt || !validCalendarDate(resolvedDate))) throw new AIContractError(`${nestedLabel}.DATE must contain a valid date only`);
+    if (valueKind === 'INSTANT' && (!resolvedAt || resolvedDate || !validIsoInstant(resolvedAt))) throw new AIContractError(`${nestedLabel}.INSTANT must contain a valid ISO instant only`);
     if (valueKind === 'UNRESOLVED' && (resolvedDate || resolvedAt)) throw new AIContractError(`${nestedLabel} unresolved time cannot carry a resolved value`);
     const temporalKind = enumValue(fact.temporalKind, ['SOURCE_DUE', 'EXPECTED_EVENT_TIME', 'USER_TARGET'] as const, `${nestedLabel}.temporalKind`);
     const obligationLegId = optionalString(fact.obligationLegId, `${nestedLabel}.obligationLegId`, 128);
@@ -568,7 +585,7 @@ function validateSemanticUnit(
   return {candidateUnitKey, materiality, ...(operationalOutcome ? {operationalOutcome} : {}), ...(identityRelation ? {identityRelation} : {}), obligationLegs, expectedEvents, temporalFacts, completionCriteria, constraints, pendingProposals: proposals, agreedFacts, uncertainties, riskDetails, ...(assignment ? {assignmentSemantics: assignment} : {}), corrections, ...(terminal ? {terminalSignal: terminal} : {}), sourceRefs: refs};
 }
 
-export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>}): ModelInterpretationOutput {
+export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; expectedSourceMessageId?: string}): ModelInterpretationOutput {
   assertNoForbiddenKeys(value);
   const item = record(value, 'interpretation output');
   exact(item, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'], 'interpretation output');
@@ -577,6 +594,7 @@ export function validateInterpretationOutput(value: unknown, input: {basisEviden
   const status = enumValue(item.status, ['CANDIDATE', 'ABSTAINED'] as const, 'interpretation output.status');
   const sourceMessageId = stringValue(item.sourceMessageId, 'interpretation output.sourceMessageId', 256);
   if (!input.allowedMessageIds.has(sourceMessageId)) throw new AIContractError('interpretation sourceMessageId is unauthorized');
+  if (input.expectedSourceMessageId && sourceMessageId !== input.expectedSourceMessageId) throw new AIContractError('interpretation sourceMessageId is not the focal message');
   const abstentionReason = item.abstentionReason === undefined || item.abstentionReason === null ? undefined : enumValue(item.abstentionReason, ['AMBIGUOUS', 'MISSING_CONTEXT', 'UNSAFE_HIGH_RISK', 'UNINTERPRETABLE'] as const, 'interpretation output.abstentionReason');
   if (status === 'ABSTAINED' && !abstentionReason) throw new AIContractError('abstained interpretation needs a reason');
   if (status === 'CANDIDATE' && abstentionReason) throw new AIContractError('candidate interpretation cannot carry an abstention reason');

@@ -240,7 +240,7 @@ try {
         );
         providerObservedCapturedRun = visibleRuns.rows.length === 1;
         return {status: 'completed', output_text: JSON.stringify({
-          schemaVersion: 1,
+          schemaVersion: 2,
           basisEvidenceRevision: 8,
           status: 'CANDIDATE',
           sourceMessageId: message1,

@@ -17,6 +17,7 @@ import {
   checkInterpretationRuntimeOracle,
   G70_EVAL_CASES,
   OpenAISdkResponsesTransport,
+  buildDraftContext,
   buildInterpretationContext,
   type AuthorizedInterpretationContext,
   type AuthorizedReplyContext,
@@ -40,7 +41,7 @@ const sourceRef = sourceRefFor(messageBody);
 
 function interpretationOutput(overrides: Partial<ModelInterpretationOutput> = {}, ref = sourceRef): ModelInterpretationOutput {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     basisEvidenceRevision: 1,
     status: 'CANDIDATE',
     sourceMessageId: messageId,
@@ -48,7 +49,7 @@ function interpretationOutput(overrides: Partial<ModelInterpretationOutput> = {}
       candidateUnitKey: 'unit-1',
       materiality: 'MATERIAL',
       operationalOutcome: 'send the revised document',
-      obligationLegs: [{id: 'leg-1', bearerCandidate: 'USER', actionCode: 'SEND_REVISED_DOCUMENT', blockedByCondition: false, sourceRefs: [ref]}],
+      obligationLegs: [{id: 'leg-1', bearerCandidate: 'USER', actionCode: 'SEND_REVISED_DOCUMENT', basisKind: 'COMMUNICATED_REQUEST', blockedByCondition: false, sourceRefs: [ref]}],
       expectedEvents: [], temporalFacts: [{id: 'due-1', temporalKind: 'SOURCE_DUE', valueKind: 'DATE', resolvedDate: '2026-08-25', precisionCode: 'DATE', conflictCandidate: false, sourceRefs: [ref]}],
       completionCriteria: [], constraints: [], pendingProposals: [], agreedFacts: [], uncertainties: [], riskDetails: [], corrections: [], sourceRefs: [ref]
     }],
@@ -215,6 +216,19 @@ describe('G70 bounded AI runtime', () => {
     expect(result.manualFallbackAvailable).toBe(true);
     expect(transport.requests[0]?.store).toBe(false);
     expect(transport.requests[0]?.text.format.name).toBe(DRAFT_RESPONSE_FORMAT.name);
+  });
+
+  it('keeps trusted reply routing outside the draft prompt and validates reply scope', () => {
+    const built = buildDraftContext(replyContext());
+    const prompt = built.input[1]?.content[0]?.text ?? '';
+    const payload = JSON.parse(prompt.slice(prompt.indexOf('{'), prompt.lastIndexOf('}') + 1)) as Record<string, unknown>;
+    expect(payload.currentMessage).toEqual(expect.objectContaining({id: messageId, sender: expect.any(Object), subject: '確認', body: 'ご確認をお願いします。'}));
+    expect(payload.currentMessage).not.toHaveProperty('recipients');
+    expect(payload.currentMessage).not.toHaveProperty('cc');
+    expect(payload.currentMessage).not.toHaveProperty('sourceZones');
+    expect(built.manifest.fieldsIncluded).not.toContain('message.recipients');
+    expect(() => buildDraftContext({...replyContext(), replyMode: 'FORWARD'} as never)).toThrow('replyMode is invalid');
+    expect(() => buildDraftContext({...replyContext(), trustedRecipientLabels: ['']})).toThrow('trustedRecipientLabels');
   });
 
   it('degrades draft assistance without blocking manual composition', async () => {
@@ -413,5 +427,24 @@ describe('G70 bounded AI runtime', () => {
     expect(() => validateInterpretationOutput({...interpretationOutput(), sourceRefs: [{...sourceRef, messageId: 'other-message'}]}, validationInput)).toThrow(AIContractError);
     expect(() => validateInterpretationOutput({...interpretationOutput(), sender: 'attacker'}, validationInput)).toThrow('outside the model authority');
     expect(() => validateInterpretationOutput({...interpretationOutput(), sourceRefs: [{...sourceRef, zone: 'QUOTED_HISTORY'}]}, validationInput)).toThrow('unauthorized source zone');
+  });
+
+  it('rejects reducer-invalid obligation and temporal values at the model boundary', () => {
+    const validationInput = {
+      basisEvidenceRevision: 1,
+      allowedMessageIds: new Set([messageId]),
+      allowedParticipantIds: new Set([participantId]),
+      allowedSourceZones: new Map([[messageId, [{zone: 'AUTHORED_CURRENT' as const, start: 0, end: messageBody.length}]]]),
+      authorizedMessageBodies: new Map([[messageId, messageBody]])
+    };
+    expect(() => validateInterpretationOutput({
+      ...interpretationOutput(),
+      semanticUnits: [{...interpretationOutput().semanticUnits[0]!, obligationLegs: [{...interpretationOutput().semanticUnits[0]!.obligationLegs[0]!, basisKind: null}]}]
+    }, validationInput)).toThrow('basisKind');
+    expect(() => validateInterpretationOutput({
+      ...interpretationOutput(),
+      semanticUnits: [{...interpretationOutput().semanticUnits[0]!, temporalFacts: [{...interpretationOutput().semanticUnits[0]!.temporalFacts[0]!, resolvedDate: '2026-02-30'}]}]
+    }, validationInput)).toThrow('valid date');
+    expect(() => validateInterpretationOutput({...interpretationOutput(), sourceMessageId: 'message-2'}, {...validationInput, allowedMessageIds: new Set([messageId, 'message-2']), expectedSourceMessageId: messageId})).toThrow('focal message');
   });
 });

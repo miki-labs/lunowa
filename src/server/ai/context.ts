@@ -1,5 +1,5 @@
 import type {JsonObject} from '../evidence/normalized';
-import {MODEL_SOURCE_ZONES, type ModelSourceZone} from './contracts';
+import {AI_INTERPRETATION_SCHEMA_VERSION, MODEL_SOURCE_ZONES, type ModelSourceZone} from './contracts';
 
 export type AuthorizedAISourceZone = {
   zone: ModelSourceZone;
@@ -111,6 +111,22 @@ function messageForModel(message: AuthorizedAIMessage): JsonObject {
   };
 }
 
+/**
+ * Draft assistance must not receive trusted route fields. The composer owns
+ * sender/recipient authority; the model only needs the message content and
+ * the small amount of conversation metadata required to write a reply.
+ */
+function replyMessageForModel(message: AuthorizedAIMessage): JsonObject {
+  return {
+    id: message.id,
+    direction: message.direction,
+    sender: {email: message.sender.email, displayName: message.sender.displayName ?? null},
+    subject: message.subject,
+    body: message.body,
+    sentAt: message.sentAt
+  };
+}
+
 function safeJson(value: unknown): string {
   const result = JSON.stringify(value);
   if (!result || result.length > 160_000) throw new Error('AI context is too large');
@@ -142,7 +158,7 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
   const authorizedMessageBodies = new Map(input.messages.map((message) => [message.id, message.body] as const));
   const payload = {
     lane: 'responsibility_interpretation',
-    schemaVersion: 1,
+    schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION,
     basisEvidenceRevision: input.evidenceRevision,
     sourceEventKey: input.sourceEventKey,
     focalMessageId: input.focalMessageId,
@@ -156,7 +172,7 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
       {role: 'user', content: [{type: 'input_text', text: `<untrusted_source>${safeJson(payload)}</untrusted_source>`}]}
     ],
     manifest: {
-      lane: 'interpretation', schemaVersion: 1, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
+      lane: 'interpretation', schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
       conversationId: input.conversationId, messageIds: [...ids], basisEvidenceRevision: input.evidenceRevision,
       focalMessageId: input.focalMessageId,
       fieldsIncluded: ['message.id', 'message.direction', 'message.sender', 'message.recipients', 'message.cc', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants']
@@ -171,13 +187,14 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
 export function buildDraftContext(input: AuthorizedReplyContext): BuiltAIContext & {trustedRecipientLabels: readonly string[]} {
   validateCommonScope(input, 'draft context');
   validateMessage(input.message, 'draft context.message');
-  bounded(input.replyMode, 'draft context.replyMode', 16);
-  if (input.trustedRecipientLabels.length > 16) throw new Error('draft recipient labels are too numerous');
+  if (input.replyMode !== 'REPLY' && input.replyMode !== 'REPLY_ALL') throw new Error('draft context.replyMode is invalid');
+  if (!Array.isArray(input.trustedRecipientLabels) || input.trustedRecipientLabels.length > 16) throw new Error('draft recipient labels are too numerous');
+  input.trustedRecipientLabels.forEach((label, index) => bounded(label, `draft context.trustedRecipientLabels[${index}]`, 256));
   const messageIds = new Set([input.message.id]);
   const payload = {
     lane: 'contextual_reply_draft', schemaVersion: 1, basisEvidenceRevision: input.evidenceRevision,
     replyMode: input.replyMode, user: {locale: input.user.locale ?? null, timezone: input.user.timezone ?? null},
-    currentMessage: messageForModel(input.message),
+    currentMessage: replyMessageForModel(input.message),
     draftingConstraints: ['editable_body_only', 'do_not_add_recipients', 'do_not_send', 'do_not_claim_facts_not_in_context']
   };
   return {
@@ -188,7 +205,7 @@ export function buildDraftContext(input: AuthorizedReplyContext): BuiltAIContext
     manifest: {
       lane: 'draft', schemaVersion: 1, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
       conversationId: input.conversationId, messageIds: [...messageIds], basisEvidenceRevision: input.evidenceRevision,
-      fieldsIncluded: ['message.id', 'message.direction', 'message.sender', 'message.recipients', 'message.cc', 'message.subject', 'message.body', 'message.sentAt', 'replyMode', 'draftingConstraints']
+      fieldsIncluded: ['message.id', 'message.direction', 'message.sender', 'message.subject', 'message.body', 'message.sentAt', 'replyMode', 'draftingConstraints']
     },
     allowedMessageIds: messageIds,
     allowedParticipantIds: new Set(),

@@ -57,7 +57,38 @@ describe('G40 live attention surfaces', () => {
     render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
     await waitFor(() => expect(screen.getByRole('button', {name: /返信する/})).toBeTruthy());
     expect(screen.queryByText('見積書を確認して返信する')).toBeNull();
+    fireEvent.change(screen.getByLabelText('表示状態'), {target: {value: 'degraded'}});
+    expect(screen.queryByText('一部の監視を確認できていません')).toBeNull();
     fireEvent.click(screen.getByRole('button', {name: /返信する/}));
     expect(screen.getByRole('heading', {name: '見積書の確認を終える'})).toBeTruthy();
+  });
+
+  it('uses live coverage truth on attention surfaces instead of fixture coverage', async () => {
+    const liveCoverage = {
+      ...attention,
+      source: {readiness: 'partial', dataThroughAt: null},
+      integrity: {status: 'unknown', message: 'ライブの確認範囲がまだ十分ではありません。'}
+    };
+    const source = {
+      accounts: [],
+      conversations: [],
+      readiness: 'ready',
+      dataThroughAt: '2030-01-01T00:00:00.000Z',
+      query: {text: '', accountId: null, sender: null, from: null, to: null},
+      total: 0,
+      nextCursor: null
+    };
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('/attention')
+        ? new Response(JSON.stringify(liveCoverage), {headers: {'Content-Type': 'application/json'}})
+        : new Response(JSON.stringify(source), {headers: {'Content-Type': 'application/json'}})
+    ));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    await waitFor(() => expect(screen.getByRole('button', {name: /返信する/})).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', {name: '対応が必要を表示'}));
+
+    expect(screen.getByText('ライブの確認範囲がまだ十分ではありません。')).toBeTruthy();
+    expect(screen.queryByText('最新の確認範囲: 10:15。')).toBeNull();
   });
 });

@@ -56,6 +56,34 @@ const sourcePage = {
   total: 1,
   nextCursor: null
 };
+const attentionReadModel = {
+  source: {readiness: 'ready', dataThroughAt: '2030-01-01T00:00:00.000Z'},
+  integrity: {status: 'healthy', message: null},
+  needsYou: [{
+    id: 'responsibility-1',
+    subjectKind: 'RESPONSIBILITY',
+    responsibilityId: 'responsibility-1',
+    admissionReviewId: null,
+    conversationId: 'source-conversation-1',
+    surface: 'NEEDS_YOU',
+    projection: {bucket: 'MY_TURN', subjectKind: 'RESPONSIBILITY', primaryReason: 'open-user-obligation:REPLY'},
+    operationalOutcome: '見積書の確認を終える',
+    reviewQuestion: null,
+    primaryAction: '返信する',
+    awaitedEvent: null,
+    returnCondition: null,
+    nearestRelevantTime: null,
+    overdue: false
+  }],
+  managed: [],
+  later: [],
+  review: [],
+  done: [],
+  strictZero: false,
+  managedCount: 0,
+  delegatedCount: 1,
+  derivedAt: '2030-01-01T00:00:00.000Z'
+};
 const sourceDetail = {
   id: 'source-conversation-1',
   providerThreadId: 'source-thread-1',
@@ -94,6 +122,7 @@ const sourceDetail = {
 
 test.beforeEach(async ({page}) => {
   await page.route('**/api/auth/get-session**', (route) => route.fulfill({json: appSession}));
+  await page.route('**/api/bff/users/**/attention', (route) => route.fulfill({json: attentionReadModel}));
   await page.route('**/api/bff/users/**/source/search**', (route) => route.fulfill({json: sourcePage}));
   await page.route('**/api/bff/users/**/source/conversations**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -110,8 +139,8 @@ test('renders the shell and navigates a Needs You item to its Moment', async ({p
   await page.goto('/ja');
   await expect(page.getByTestId('lunowa-shell')).toBeVisible();
   await nav(page, '対応が必要').click();
-  await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
-  await expect(page.getByRole('heading', {name: '見積書を確認して返信する'})).toBeVisible();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
   await expect(page.getByRole('button', {name: '返信を書く'})).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });
@@ -182,7 +211,7 @@ test('preserves core reading and focus visibility at 125, 150, and 200 percent b
     }, scale);
     if (width < 900) await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
     await nav(page, '対応が必要').click();
-    await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
+    await page.getByRole('button', {name: /返信する/}).click();
     const draft = page.getByLabel('本文');
     await draft.focus();
     const result = await page.evaluate(() => {
@@ -210,7 +239,7 @@ test('returns focus to compact conversation-entry controls', async ({page}) => {
   await nav(page, '対応が必要').click();
   await page.getByRole('button', {name: '元の会話を開く'}).click();
   await page.getByRole('button', {name: /一覧に戻る/}).click();
-  await expect(page.locator('#needs-open-source')).toBeFocused();
+  await expect(page.locator('#source-responsibility-1')).toBeFocused();
 
   await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '検索').click();
@@ -240,9 +269,9 @@ test('does not activate global search for editable input or Japanese IME composi
   await expect(page.getByRole('heading', {name: 'ホーム'})).toBeVisible();
 
   await nav(page, '対応が必要').click();
-  await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
+  await page.getByRole('button', {name: /返信する/}).click();
   await page.getByLabel('本文').press('/');
-  await expect(page.getByRole('heading', {name: '見積書を確認して返信する'})).toBeVisible();
+  await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
 });
 
 test('expires, re-authenticates, and signs out without changing mailbox monitoring semantics', async ({page}) => {

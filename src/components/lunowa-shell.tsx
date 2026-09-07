@@ -518,9 +518,10 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   openConversation: (origin: string, conversationId?: string) => void;
 }) {
   const title = navigation.find((item) => item.id === surface)?.label ?? 'ホーム';
-  const integrity = fixture.integrity === 'degraded';
-  const partial = fixture.sourceReadiness === 'partial';
-  const loading = fixture.sourceReadiness === 'loading';
+  const integrity = attention ? attention.integrity.status === 'degraded' : fixture.integrity === 'degraded';
+  const partial = attention ? attention.source.readiness === 'partial' : fixture.sourceReadiness === 'partial';
+  const loading = attention ? attention.source.readiness === 'loading' : fixture.sourceReadiness === 'loading';
+  const liveCoverageMessage = attention?.integrity.message ?? '会話の確認範囲がまだ十分ではありません。対応なしとは表示しません。';
   const attentionSurface = surface === 'home' || surface === 'needs' || surface === 'managed' || surface === 'review';
   if (appUser?.id && attentionSurface && !attention && attentionLoading) return <LoadingState />;
   if (appUser?.id && attentionSurface && !attention && attentionError) return <AttentionUnavailable />;
@@ -530,8 +531,9 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
         <div><p className="eyebrow">LUNOWA</p><h1 id="surface-heading">{title}</h1></div>
         <button id={`surface-open-conversation-${surface}`} className="quiet-button" type="button" onClick={(event) => openConversation(event.currentTarget.id, sourceModel?.conversations[0]?.id ?? event.currentTarget.id)}>会話を見る</button>
       </div>
-      {integrity && <IntegrityBanner />}
-      {partial && <p className="coverage-notice" role="status">一部の会話のみを表示しています。最新の確認範囲: 10:15。</p>}
+      {!attention && integrity && <IntegrityBanner />}
+      {!attention && partial && <p className="coverage-notice" role="status">一部の会話のみを表示しています。最新の確認範囲: 10:15。</p>}
+      {attention && surface !== 'home' && attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{liveCoverageMessage}</p>}
       {loading && <LoadingState />}
       {!loading && surface === 'home' && <Home fixture={fixture} attention={attention} openMoment={openMoment} openReview={openReview} openManaged={openManaged} />}
       {!loading && surface === 'needs' && <NeedsYou fixture={fixture} attention={attention} openMoment={openMoment} openConversation={(origin, conversationId) => openConversation(origin, conversationId ?? sourceModel?.conversations[0]?.id ?? origin)} />}
@@ -665,8 +667,8 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
     : detail === 'review-detail' ? attentionItem?.reviewQuestion ?? '契約更新の条件を確認してください' : detail === 'managed-detail' ? attentionItem?.operationalOutcome ?? '来期の見積書を見守っています' : attentionItem?.operationalOutcome ?? attentionItemStatic.action;
   return <div className="detail-content"><button className="back-button" type="button" onClick={onBack}>‹ 一覧に戻る</button><h2 ref={headingRef} tabIndex={-1}>{title}</h2>
     {detail === 'moment' && <MomentBody item={attentionItem} onSource={onOpenSource} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />}
-    {detail === 'managed-detail' && <ManagedDetail item={attentionItem} mutation={commonMutations['stop-tracking']} onMutation={onCommonMutation} />}
-    {detail === 'review-detail' && <ReviewDetail item={attentionItem} mutation={commonMutations['review-answer']} onMutation={onCommonMutation} />}
+    {detail === 'managed-detail' && <ManagedDetail item={attentionItem} mutation={commonMutations['stop-tracking']} onMutation={onCommonMutation} onSource={onOpenSource} />}
+    {detail === 'review-detail' && <ReviewDetail item={attentionItem} mutation={commonMutations['review-answer']} onMutation={onCommonMutation} onSource={onOpenSource} />}
     {detail === 'conversation' && (sourceUserId
       ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError} />
       : <Conversation draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />)}
@@ -679,12 +681,12 @@ function MomentBody({item, onSource, draft, onDraft, sendState, fixture, onSend}
   return <><p className="detail-lead">{item ? `現在の対応: ${action}` : attentionItemStatic.whyNow}</p><section className="trust-block"><h3>いま行うこと</h3><p>{item ? `${outcome}。` : '見積書を確認して、必要な点を返信してください。'}</p><button className="primary-button" type="button" onClick={() => document.getElementById('reply-body')?.focus()}>返信を書く</button></section><section><h3>変わったこと</h3><p>{item ? `このResponsibilityは「${item.projection.primaryReason}」として現在の状態に投影されています。` : '佐藤さんから、打ち合わせ前の確認依頼が届きました。'}</p></section><section><h3>残っていること</h3><p>{item ? outcome : '見積書の条件について、あなたからの確認を待っています。'}</p></section><button className="source-link" type="button" onClick={() => onSource(item?.conversationId)}>元の会話を確認する</button><Composer draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} /></>;
 }
 
-function ManagedDetail({item, mutation, onMutation}: {item: AttentionItemReadModel | null; mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void}) {
-  return <><p className="detail-lead">{item?.awaitedEvent ?? '佐藤ひろ子からの返信'}、または{item?.returnCondition ?? '再確認条件'}を見守っています。</p><section><h3>監視の状態</h3><p><span className="state-chip waiting">待機中</span> {item ? '現在のResponsibilityを監視しています。' : '監視は正常です。'}</p></section><section><h3>元の会話</h3><p>{item ? item.conversationId : sourceItem.subject}</p></section><button className="danger-button" disabled={mutation === 'pending'} type="button" onClick={() => onMutation('stop-tracking', '監視を停止しています')}>{mutation === 'pending' ? '監視を停止しています' : '監視を停止する'}</button>{mutation === 'failed' && <p className="inline-status" role="status">監視を停止できませんでした。現在の監視は継続しています。</p>}<p className="metadata">停止は、確認されるまで完了や対応不要を意味しません。</p></>;
+function ManagedDetail({item, mutation, onMutation, onSource}: {item: AttentionItemReadModel | null; mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void; onSource: (conversationId?: string) => void}) {
+  return <><p className="detail-lead">{item?.awaitedEvent ?? '佐藤ひろ子からの返信'}、または{item?.returnCondition ?? '再確認条件'}を見守っています。</p><section><h3>監視の状態</h3><p><span className="state-chip waiting">待機中</span> {item ? '現在のResponsibilityを監視しています。' : '監視は正常です。'}</p></section><section><h3>元の会話</h3><p>{item ? item.conversationId : sourceItem.subject}</p></section>{item && <button className="source-link" type="button" onClick={() => onSource(item.conversationId)}>元の会話を確認する</button>}<button className="danger-button" disabled={mutation === 'pending'} type="button" onClick={() => onMutation('stop-tracking', '監視を停止しています')}>{mutation === 'pending' ? '監視を停止しています' : '監視を停止する'}</button>{mutation === 'failed' && <p className="inline-status" role="status">監視を停止できませんでした。現在の監視は継続しています。</p>}<p className="metadata">停止は、確認されるまで完了や対応不要を意味しません。</p></>;
 }
 
-function ReviewDetail({item, mutation, onMutation}: {item: AttentionItemReadModel | null; mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void}) {
-  return <><p className="detail-lead">{item?.reviewQuestion ?? '会話内で更新日が2つ示されています。正しい条件を選んでください。'}</p><section><h3>根拠</h3><p>{item ? item.projection.primaryReason : '8月29日のメッセージ: 9月30日。8月30日の添付: 10月1日。'}</p></section><fieldset disabled={mutation === 'pending'}><legend>採用する条件</legend><button className="choice-button" type="button" onClick={() => onMutation('review-answer', '回答を保存しています')}>確認して保存する</button></fieldset>{mutation === 'pending' && <p className="inline-status" role="status">回答を保存しています。確認されるまでこの確認は残ります。</p>}{mutation === 'confirmed' && <p className="inline-status" role="status">回答を保存しました。会話の状態を確認しています。</p>}{mutation === 'failed' && <p className="inline-status" role="status">回答を保存できませんでした。選択はまだ確定していません。</p>}</>;
+function ReviewDetail({item, mutation, onMutation, onSource}: {item: AttentionItemReadModel | null; mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void; onSource: (conversationId?: string) => void}) {
+  return <><p className="detail-lead">{item?.reviewQuestion ?? '会話内で更新日が2つ示されています。正しい条件を選んでください。'}</p><section><h3>対象</h3><p>{item?.operationalOutcome ?? '契約更新の条件'}</p></section><section><h3>根拠</h3><p>{item ? item.projection.primaryReason : '8月29日のメッセージ: 9月30日。8月30日の添付: 10月1日。'}</p></section>{item && <button className="source-link" type="button" onClick={() => onSource(item.conversationId)}>元の会話を確認する</button>}<fieldset disabled={mutation === 'pending'}><legend>採用する条件</legend><button className="choice-button" type="button" onClick={() => onMutation('review-answer', '回答を保存しています')}>確認して保存する</button></fieldset>{mutation === 'pending' && <p className="inline-status" role="status">回答を保存しています。確認されるまでこの確認は残ります。</p>}{mutation === 'confirmed' && <p className="inline-status" role="status">回答を保存しました。会話の状態を確認しています。</p>}{mutation === 'failed' && <p className="inline-status" role="status">回答を保存できませんでした。選択はまだ確定していません。</p>}</>;
 }
 
 function Conversation({draft, onDraft, sendState, fixture, onSend}: {draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void}) {

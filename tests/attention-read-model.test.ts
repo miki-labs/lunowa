@@ -1,0 +1,79 @@
+import {describe, expect, it} from 'vitest';
+
+import {buildAttentionReadModel} from '@/server/responsibility/attention-read-model';
+import type {ObligationLeg, ResponsibilityState} from '@/server/responsibility';
+
+const evidence = {evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'} as const;
+
+function state(overrides: Partial<ResponsibilityState> = {}): ResponsibilityState {
+  const userLeg: ObligationLeg = {
+    id: 'user-action',
+    bearer: 'USER',
+    actionCode: 'REPLY',
+    actionSummary: '返信する',
+    status: 'OPEN',
+    actionability: 'ACTIONABLE',
+    basisKind: 'COMMUNICATED_REQUEST',
+    provenance: [evidence]
+  };
+  return {
+    id: 'responsibility-1',
+    userId: 'user-1',
+    connectedAccountId: 'account-1',
+    conversationId: 'conversation-1',
+    operationalOutcome: '見積書の確認を終える',
+    resolutionStatus: 'OPEN',
+    liveTrackingState: 'TRACKING_ACTIVE',
+    attentionMode: 'PRESENT',
+    acceptedEvidenceRevision: 1,
+    aggregateVersion: 1,
+    obligationLegs: [userLeg],
+    expectedEvents: [],
+    temporalFacts: [],
+    details: {
+      completionCriteria: [],
+      constraints: [],
+      pendingProposals: [],
+      agreedFacts: [],
+      uncertainties: [],
+      riskDetails: []
+    },
+    fieldDecisions: [],
+    provenance: [evidence],
+    resolutionHistory: [],
+    ...overrides
+  };
+}
+
+describe('G40 attention read model', () => {
+  it('keeps actionable work, managed work, and strict zero derived from accepted state', () => {
+    const model = buildAttentionReadModel({
+      responsibilities: [
+        state(),
+        state({id: 'responsibility-2', obligationLegs: [{...state().obligationLegs[0]!, id: 'waiting', actionability: 'BLOCKED', bearer: 'OTHER_PARTY'}]})
+      ],
+      sourceReadiness: 'ready',
+      dataThroughAt: '2030-01-01T00:00:00.000Z',
+      now: new Date('2030-01-01T00:00:00.000Z')
+    });
+
+    expect(model.needsYou).toHaveLength(1);
+    expect(model.needsYou[0]).toMatchObject({operationalOutcome: '見積書の確認を終える', primaryAction: '返信する'});
+    expect(model.managed).toHaveLength(1);
+    expect(model.managedCount).toBe(1);
+    expect(model.strictZero).toBe(false);
+  });
+
+  it('never presents strict zero or healthy Managed reassurance for incomplete Source coverage', () => {
+    const model = buildAttentionReadModel({
+      responsibilities: [state({obligationLegs: [{...state().obligationLegs[0]!, actionability: 'BLOCKED', bearer: 'OTHER_PARTY'}]})],
+      sourceReadiness: 'partial',
+      dataThroughAt: null,
+      now: new Date('2030-01-01T00:00:00.000Z')
+    });
+
+    expect(model.strictZero).toBe(false);
+    expect(model.managedCount).toBe(0);
+    expect(model.integrity.status).toBe('unknown');
+  });
+});

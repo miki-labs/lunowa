@@ -1,0 +1,70 @@
+name: G70 AI context production boundary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/g70-ai-context.yml'
+      - 'drizzle/**'
+      - 'drizzle.config.ts'
+      - 'src/server/ai/**'
+      - 'src/server/db/repositories/ai.ts'
+      - 'src/server/db/schema/**'
+      - 'tests/ai-context-production-integration.ts'
+      - 'tests/ai-context-snapshot.test.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  g70-ai-context-production:
+    name: PostgreSQL 18.6 AI context snapshot acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: lunowa_g70_clean
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55470:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lunowa_g70_clean"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.20.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify committed production migration is current
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- drizzle drizzle.config.ts src/server/db/schema package.json
+          test -z "$(git ls-files --others --exclude-standard -- drizzle)"
+
+      - name: Run G70 PostgreSQL context acceptance
+        env:
+          G70_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55470/lunowa_g70_clean
+        run: node --import tsx tests/ai-context-production-integration.ts

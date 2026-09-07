@@ -1,6 +1,7 @@
 import type {
   CandidateAgreedFact,
   CandidateCompletionCriterion,
+  CandidateCommunicatedClaim,
   CandidateConstraint,
   CandidateExpectedEvent,
   CandidateFieldCorrection,
@@ -124,6 +125,12 @@ export type ModelAgreedFact = ModelProvenanced<{
   value: ModelJSONValue;
 }>;
 
+export type ModelCommunicatedClaim = ModelProvenanced<{
+  id: string;
+  kind: 'ATTACHMENT_DELIVERED' | 'COMPLETION' | 'DELIVERY' | 'ACKNOWLEDGEMENT' | 'OTHER';
+  value: ModelJSONValue;
+}>;
+
 export type ModelUncertainty = ModelProvenanced<{
   id: string;
   fieldKey: string;
@@ -159,6 +166,7 @@ export type ModelSemanticUnit = {
   completionCriteria: ModelCompletionCriterion[];
   constraints: ModelConstraint[];
   pendingProposals: ModelPendingProposal[];
+  communicatedClaims: ModelCommunicatedClaim[];
   agreedFacts: ModelAgreedFact[];
   uncertainties: ModelUncertainty[];
   riskDetails: ModelRiskDetail[];
@@ -297,6 +305,9 @@ const proposalSchema = sourceProvenanced({
 const agreedFactSchema = sourceProvenanced({
   id: stringSchema(128), kind: stringSchema(128), value: jsonValueSchema
 }, ['id', 'kind', 'value']);
+const communicatedClaimSchema = sourceProvenanced({
+  id: stringSchema(128), kind: enumSchema(['ATTACHMENT_DELIVERED', 'COMPLETION', 'DELIVERY', 'ACKNOWLEDGEMENT', 'OTHER']), value: jsonValueSchema
+}, ['id', 'kind', 'value']);
 const uncertaintySchema = sourceProvenanced({
   id: stringSchema(128), fieldKey: stringSchema(128), reasonCode: stringSchema(128), material: {type: 'boolean'}, reviewRequired: {type: 'boolean'}, candidateRefs: nullable(arraySchema(stringSchema(128)))
 }, ['id', 'fieldKey', 'reasonCode', 'material', 'reviewRequired', 'candidateRefs']);
@@ -315,8 +326,8 @@ const terminalSchema = nullable(objectSchema({
 }, ['kind', 'sourceRefs']));
 const semanticUnitSchema = objectSchema({
   candidateUnitKey: stringSchema(128), materiality: enumSchema(['MATERIAL', 'NOT_MATERIAL', 'UNCERTAIN']), operationalOutcome: nullable(stringSchema(2048)), identityRelation: identitySchema,
-  obligationLegs: arraySchema(obligationLegSchema), expectedEvents: arraySchema(expectedEventSchema), temporalFacts: arraySchema(temporalFactSchema), completionCriteria: arraySchema(completionSchema), constraints: arraySchema(constraintSchema), pendingProposals: arraySchema(proposalSchema), agreedFacts: arraySchema(agreedFactSchema), uncertainties: arraySchema(uncertaintySchema), riskDetails: arraySchema(riskSchema), assignmentSemantics: assignmentSchema, corrections: arraySchema(correctionSchema), terminalSignal: terminalSchema, sourceRefs: arraySchema(sourceRefSchema)
-}, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs']);
+  obligationLegs: arraySchema(obligationLegSchema), expectedEvents: arraySchema(expectedEventSchema), temporalFacts: arraySchema(temporalFactSchema), completionCriteria: arraySchema(completionSchema), constraints: arraySchema(constraintSchema), pendingProposals: arraySchema(proposalSchema), communicatedClaims: arraySchema(communicatedClaimSchema), agreedFacts: arraySchema(agreedFactSchema), uncertainties: arraySchema(uncertaintySchema), riskDetails: arraySchema(riskSchema), assignmentSemantics: assignmentSchema, corrections: arraySchema(correctionSchema), terminalSignal: terminalSchema, sourceRefs: arraySchema(sourceRefSchema)
+}, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'communicatedClaims', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs']);
 
 export const INTERPRETATION_RESPONSE_FORMAT: StructuredResponseFormat = {
   type: 'json_schema', name: 'lunowa_responsibility_interpretation_v3', strict: true,
@@ -543,6 +554,10 @@ function validateSourceProvenanced(
   return sourceRefs(item.sourceRefs, `${label}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies);
 }
 
+function hasCurrentTurnSource(refs: readonly ModelSourceRef[]): boolean {
+  return refs.some((ref) => ref.zone === 'AUTHORED_CURRENT');
+}
+
 type ParticipantRole = 'CONNECTED_USER' | 'OTHER_PARTY';
 
 function assertCounterpartyParticipant(participantId: string, label: string, allowedParticipantRoles: ReadonlyMap<string, ParticipantRole>): void {
@@ -636,7 +651,7 @@ function validateSemanticUnit(
   allowedExistingResponsibilityOutcomes: ReadonlyMap<string, string>
 ): ModelSemanticUnit {
   const item = record(value, label);
-  exact(item, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs'], label);
+  exact(item, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'communicatedClaims', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs'], label);
   const candidateUnitKey = stringValue(item.candidateUnitKey, `${label}.candidateUnitKey`, 128);
   const materiality = enumValue(item.materiality, ['MATERIAL', 'NOT_MATERIAL', 'UNCERTAIN'] as const, `${label}.materiality`);
   const operationalOutcome = optionalString(item.operationalOutcome, `${label}.operationalOutcome`, 2048);
@@ -704,13 +719,24 @@ function validateSemanticUnit(
   const completionCriteria = list('completionCriteria', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const constraints = list('constraints', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'conditionRef', 'sourceRefs'], nestedLabel); const condition = item.conditionRef === undefined || item.conditionRef === null ? undefined : record(item.conditionRef, `${nestedLabel}.conditionRef`); if (condition) exact(condition, ['kind', 'id', 'code'], `${nestedLabel}.conditionRef`); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), ...(condition ? {conditionRef: {kind: enumValue(condition.kind, ['EXPECTED_EVENT', 'OTHER'] as const, `${nestedLabel}.conditionRef.kind`), ...(optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128) ? {id: optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128)} : {}), ...(optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128) ? {code: optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128)} : {})}} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const proposals = list('pendingProposals', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'candidateStatus', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encoded, ...(item.candidateStatus === undefined || item.candidateStatus === null ? {} : {candidateStatus: enumValue(item.candidateStatus, ['PENDING', 'REJECTED'] as const, `${nestedLabel}.candidateStatus`)}), sourceRefs: refs}; });
+  const communicatedClaims = list('communicatedClaims', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: enumValue(item.kind, ['ATTACHMENT_DELIVERED', 'COMPLETION', 'DELIVERY', 'ACKNOWLEDGEMENT', 'OTHER'] as const, `${nestedLabel}.kind`), value: encoded, sourceRefs: refs}; });
   const agreedFacts = list('agreedFacts', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encoded, sourceRefs: refs}; });
-  const uncertainties = list('uncertainties', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'fieldKey', 'reasonCode', 'material', 'reviewRequired', 'candidateRefs', 'sourceRefs'], nestedLabel); const refs = item.candidateRefs === undefined || item.candidateRefs === null ? undefined : (() => { if (!Array.isArray(item.candidateRefs)) throw new AIContractError(`${nestedLabel}.candidateRefs must be an array`); return item.candidateRefs.map((ref, index) => stringValue(ref, `${nestedLabel}.candidateRefs[${index}]`, 128)); })(); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), fieldKey: stringValue(item.fieldKey, `${nestedLabel}.fieldKey`, 128), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), material: booleanValue(item.material, `${nestedLabel}.material`), reviewRequired: booleanValue(item.reviewRequired, `${nestedLabel}.reviewRequired`), ...(refs ? {candidateRefs: refs} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
+  const uncertainties = list('uncertainties', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'fieldKey', 'reasonCode', 'material', 'reviewRequired', 'candidateRefs', 'sourceRefs'], nestedLabel); const refs = item.candidateRefs === undefined || item.candidateRefs === null ? undefined : (() => { if (!Array.isArray(item.candidateRefs)) throw new AIContractError(`${nestedLabel}.candidateRefs must be an array`); return item.candidateRefs.map((ref, index) => stringValue(ref, `${nestedLabel}.candidateRefs[${index}]`, 128)); })(); const reasonCode = stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128); if (reasonCode === 'PROVIDER_CONTRADICTION') throw new AIContractError(`${nestedLabel}.PROVIDER_CONTRADICTION is trusted application evidence, not a model claim`); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), fieldKey: stringValue(item.fieldKey, `${nestedLabel}.fieldKey`, 128), reasonCode, material: booleanValue(item.material, `${nestedLabel}.material`), reviewRequired: booleanValue(item.reviewRequired, `${nestedLabel}.reviewRequired`), ...(refs ? {candidateRefs: refs} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const riskDetails = list('riskDetails', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'targetKind', 'targetId', 'riskClass', 'reasonCode', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), targetKind: stringValue(item.targetKind, `${nestedLabel}.targetKind`, 128), ...(optionalString(item.targetId, `${nestedLabel}.targetId`, 128) ? {targetId: optionalString(item.targetId, `${nestedLabel}.targetId`, 128)} : {}), riskClass: enumValue(item.riskClass, ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const, `${nestedLabel}.riskClass`), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), sourceRefs: refsFor(item, nestedLabel)}; });
   const corrections = list('corrections', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['fieldKey', 'value', 'semanticTime', 'relation', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {fieldKey: enumValue(item.fieldKey, ['operationalOutcome', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'temporalFacts.SOURCE_DUE', 'temporalFacts.EXPECTED_EVENT_TIME', 'temporalFacts.USER_TARGET', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails'] as const, `${nestedLabel}.fieldKey`), value: encoded, ...(optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128) ? {semanticTime: optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128)} : {}), relation: enumValue(item.relation, ['CORRECTION', 'SUPERSEDES', 'CONFLICT'] as const, `${nestedLabel}.relation`), sourceRefs: refs}; });
   const assignment = item.assignmentSemantics === undefined || item.assignmentSemantics === null ? undefined : (() => { const value = record(item.assignmentSemantics, `${label}.assignmentSemantics`); exact(value, ['id', 'shape', 'candidateParticipantIds', 'selectedParticipantId'], `${label}.assignmentSemantics`); if (!Array.isArray(value.candidateParticipantIds)) throw new AIContractError(`${label}.assignmentSemantics.candidateParticipantIds must be an array`); const ids = value.candidateParticipantIds.map((id, index) => stringValue(id, `${label}.assignmentSemantics.candidateParticipantIds[${index}]`, 128)); if (ids.some((id) => !allowedParticipantIds.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unauthorized participant`); ids.forEach((id) => { assertCounterpartyParticipant(id, `${label}.assignmentSemantics`, allowedParticipantRoles); assertParticipantIsCited(id, refs, `${label}.assignmentSemantics`, allowedParticipantEmails, messageParticipantEmails); }); const selected = optionalString(value.selectedParticipantId, `${label}.assignmentSemantics.selectedParticipantId`, 128); if (selected && !allowedParticipantIds.has(selected)) throw new AIContractError(`${label}.assignmentSemantics.selectedParticipantId is unauthorized`); if (selected) { assertCounterpartyParticipant(selected, `${label}.assignmentSemantics.selectedParticipantId`, allowedParticipantRoles); assertParticipantIsCited(selected, refs, `${label}.assignmentSemantics.selectedParticipantId`, allowedParticipantEmails, messageParticipantEmails); } return {id: stringValue(value.id, `${label}.assignmentSemantics.id`, 128), shape: enumValue(value.shape, ['ANY_OF', 'ALL_OF', 'UNSPECIFIED_GROUP'] as const, `${label}.assignmentSemantics.shape`), candidateParticipantIds: ids, ...(selected ? {selectedParticipantId: selected} : {})}; })();
   const terminal = item.terminalSignal === undefined || item.terminalSignal === null ? undefined : (() => { const value = record(item.terminalSignal, `${label}.terminalSignal`); exact(value, ['kind', 'sourceRefs'], `${label}.terminalSignal`); return {kind: enumValue(value.kind, ['NONE', 'COMPLETED', 'DECLINED', 'CANCELLED', 'INVALIDATED'] as const, `${label}.terminalSignal.kind`), sourceRefs: refsFor({sourceRefs: value.sourceRefs}, `${label}.terminalSignal`)}; })();
-  return {candidateUnitKey, materiality, ...(operationalOutcome ? {operationalOutcome} : {}), ...(identityRelation ? {identityRelation} : {}), obligationLegs, expectedEvents, temporalFacts, completionCriteria, constraints, pendingProposals: proposals, agreedFacts, uncertainties, riskDetails, ...(assignment ? {assignmentSemantics: assignment} : {}), corrections, ...(terminal ? {terminalSignal: terminal} : {}), sourceRefs: refs};
+  const decisionBearingRefs = [
+    ...obligationLegs.flatMap((entry) => entry.sourceRefs), ...expectedEvents.flatMap((entry) => entry.sourceRefs),
+    ...temporalFacts.flatMap((entry) => entry.sourceRefs), ...completionCriteria.flatMap((entry) => entry.sourceRefs),
+    ...constraints.flatMap((entry) => entry.sourceRefs), ...proposals.flatMap((entry) => entry.sourceRefs),
+    ...communicatedClaims.flatMap((entry) => entry.sourceRefs), ...agreedFacts.flatMap((entry) => entry.sourceRefs),
+    ...corrections.flatMap((entry) => entry.sourceRefs), ...(terminal?.sourceRefs ?? [])
+  ];
+  if (materiality === 'MATERIAL' && decisionBearingRefs.length > 0 && !hasCurrentTurnSource(decisionBearingRefs)) {
+    throw new AIContractError(`${label} material semantics must be grounded in current-turn communicative evidence`);
+  }
+  return {candidateUnitKey, materiality, ...(operationalOutcome ? {operationalOutcome} : {}), ...(identityRelation ? {identityRelation} : {}), obligationLegs, expectedEvents, temporalFacts, completionCriteria, constraints, pendingProposals: proposals, communicatedClaims, agreedFacts, uncertainties, riskDetails, ...(assignment ? {assignmentSemantics: assignment} : {}), corrections, ...(terminal ? {terminalSignal: terminal} : {}), sourceRefs: refs};
 }
 
 export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedParticipantEmails?: ReadonlyMap<string, string>; allowedParticipantRoles?: ReadonlyMap<string, ParticipantRole>; messageParticipantEmails?: ReadonlyMap<string, ReadonlySet<string>>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; authorizedMessageSentAt?: ReadonlyMap<string, string>; allowedExistingResponsibilityOutcomes?: ReadonlyMap<string, string>; expectedSourceMessageId?: string}): ModelInterpretationOutput {
@@ -784,6 +810,7 @@ function mapCandidateUnit(unit: ModelSemanticUnit): CandidateResponsibilitySeman
     completionCriteria: provenanced(unit.completionCriteria) as CandidateCompletionCriterion[],
     constraints: provenanced(unit.constraints) as CandidateConstraint[],
     pendingProposals: unit.pendingProposals.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `pending proposal ${item.id}.value`)})) as CandidatePendingProposal[],
+    communicatedClaims: unit.communicatedClaims.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `communicated claim ${item.id}.value`)})) as CandidateCommunicatedClaim[],
     agreedFacts: unit.agreedFacts.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `agreed fact ${item.id}.value`)})) as CandidateAgreedFact[],
     uncertainties: provenanced(unit.uncertainties) as Uncertainty[],
     riskDetails: provenanced(unit.riskDetails) as RiskDetail[],

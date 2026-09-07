@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "ai:eval": "node --import tsx scripts/ai-runtime-eval.ts",
+    "ai:eval:fixtures": "node --import tsx scripts/ai-fixture-eval.ts",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "test:auth-production": "node --import tsx tests/auth-production-integration.ts",
     "test:evidence-foundation": "node --import tsx tests/evidence-foundation-integration.ts",
@@ -38,7 +39,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test e2e/deployed-preview-smoke.spec.ts",
-    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare && pnpm check:cloudflare:deploy"
+    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm ai:eval:fixtures && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare && pnpm check:cloudflare:deploy"
   },
   "dependencies": {
     "@vinext/cloudflare": "1.0.0-beta.7",

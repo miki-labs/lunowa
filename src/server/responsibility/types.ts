@@ -324,6 +324,14 @@ export type CandidateCompletionCriterion = Omit<CompletionCriterion, 'status' | 
 export type CandidateConstraint = Omit<Constraint, 'status'>;
 export type CandidatePendingProposal = Omit<PendingProposal, 'status'> & {candidateStatus?: 'PENDING' | 'REJECTED'};
 export type CandidateAgreedFact = Omit<AgreedFact, 'status'>;
+/** A model interpretation may preserve what a message communicated, but this
+ * is not a provider observation and is not accepted state by itself. */
+export type CandidateCommunicatedClaim = {
+  id: string;
+  kind: string;
+  value: unknown;
+  provenance: ProvenanceInput[];
+};
 export type CandidateTemporalFact = Omit<TemporalFact, 'currentnessStatus' | 'supersededAt'> & {conflictCandidate?: boolean};
 
 export type CandidateResponsibilitySemantics = {
@@ -337,6 +345,7 @@ export type CandidateResponsibilitySemantics = {
   completionCriteria?: CandidateCompletionCriterion[];
   constraints?: CandidateConstraint[];
   pendingProposals?: CandidatePendingProposal[];
+  communicatedClaims?: CandidateCommunicatedClaim[];
   agreedFacts?: CandidateAgreedFact[];
   uncertainties?: Uncertainty[];
   riskDetails?: RiskDetail[];

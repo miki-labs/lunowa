@@ -9,7 +9,7 @@ import {
   validateDraftOutput,
   validateInterpretationOutput
 } from './contracts';
-import {buildDraftContext, buildInterpretationContext, type AuthorizedInterpretationContext, type AuthorizedReplyContext, type BuiltAIContext} from './context';
+import {buildDraftContext, buildInterpretationContext, type AuthorizedInterpretationContext, type AuthorizedReplyContext, type BuiltAIContext, type AuthorizedAIProviderObservation} from './context';
 import {AIProviderError, parseResponseJson, responseRequest, type ResponsesTransport} from './openai';
 import {deriveResponsibilityCommand} from '../responsibility/interpretation';
 import type {ResponsibilityEvidenceBasis, ResponsibilityInterpretationCandidate, ResponsibilityState} from '../responsibility/types';
@@ -208,7 +208,37 @@ function interpretationEvidenceBasis(context: AuthorizedInterpretationContext): 
   return {
     evidenceRevision: context.evidenceRevision,
     sourceEventKey: context.sourceEventKey,
-    references: context.messages.map((message) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: message.id}))
+    references: [
+      ...context.messages.map((message) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: message.id})),
+      ...(context.providerObservations ?? []).map((observation) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: observation.messageId, providerObservationKey: observation.key}))
+    ]
+  };
+}
+
+function trustedProviderFindings(output: import('./contracts').ModelInterpretationOutput, observations: readonly AuthorizedAIProviderObservation[]): import('./contracts').ModelInterpretationOutput {
+  if (output.status === 'ABSTAINED' || observations.length === 0) return output;
+  const attachmentAbsence = new Set(observations.filter((item) => item.kind === 'ATTACHMENT_PRESENCE' && item.attachmentCount === 0).map((item) => item.messageId));
+  if (attachmentAbsence.size === 0) return output;
+  return {
+    ...output,
+    semanticUnits: output.semanticUnits.map((unit) => {
+      const claims = unit.communicatedClaims.filter((claim) => claim.kind === 'ATTACHMENT_DELIVERED' && claim.sourceRefs.some((ref) => attachmentAbsence.has(ref.messageId)));
+      if (claims.length === 0) return unit;
+      const existing = unit.uncertainties.some((item) => item.reasonCode === 'PROVIDER_CONTRADICTION');
+      if (existing) return unit;
+      return {
+        ...unit,
+        uncertainties: [...unit.uncertainties, {
+          id: `provider-contradiction:${claims[0]?.id}`,
+          fieldKey: 'expectedEvents',
+          reasonCode: 'PROVIDER_CONTRADICTION',
+          material: true,
+          reviewRequired: true,
+          candidateRefs: claims.map((claim) => claim.id),
+          sourceRefs: claims.flatMap((claim) => claim.sourceRefs)
+        }]
+      };
+    })
   };
 }
 
@@ -248,8 +278,9 @@ export class ResponsibilityInterpretationRuntime {
         await mark(this.deps, runId, context.user.id, 'ABSTAINED');
         return {status: 'ABSTAINED', runId, reason: modelOutput.abstentionReason ?? 'model abstained'};
       }
+      const enrichedOutput = trustedProviderFindings(modelOutput, built.providerObservations);
       const candidate = toResponsibilityInterpretationCandidate({
-        output: modelOutput,
+        output: enrichedOutput,
         userId: context.user.id,
         connectedAccountId: context.connectedAccount.id,
         conversationId: context.conversationId,

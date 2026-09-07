@@ -9,8 +9,6 @@ import {
   ResponsibilityInterpretationRuntime,
   ContextualDraftRuntime,
   assertFamilyStratifiedHoldout,
-  assertExecutableFixtureCoverage,
-  assertExecutableFixtureStratification,
   checkInterpretationOracle,
   G70_EVAL_CASES,
   OpenAISdkResponsesTransport,
@@ -46,7 +44,7 @@ function interpretationOutput(overrides: Partial<ModelInterpretationOutput> = {}
       operationalOutcome: 'send the revised document',
       obligationLegs: [{id: 'leg-1', bearerCandidate: 'USER', actionCode: 'SEND_REVISED_DOCUMENT', basisKind: 'COMMUNICATED_REQUEST', blockedByCondition: false, sourceRefs: [ref]}],
       expectedEvents: [], temporalFacts: [{id: 'due-1', temporalKind: 'SOURCE_DUE', originalExpression: '明日', valueKind: 'DATE', resolvedDate: '2026-08-25', precisionCode: 'DATE', conflictCandidate: false, sourceRefs: [ref]}],
-      completionCriteria: [], constraints: [], pendingProposals: [], agreedFacts: [], uncertainties: [], riskDetails: [], corrections: [], sourceRefs: [ref]
+      completionCriteria: [], constraints: [], pendingProposals: [], communicatedClaims: [], agreedFacts: [], uncertainties: [], riskDetails: [], corrections: [], sourceRefs: [ref]
     }],
     sourceRefs: [ref],
     ...overrides
@@ -128,11 +126,59 @@ describe('G70 bounded AI runtime', () => {
     expect(abstainedResult.status).toBe('ABSTAINED');
   });
 
+  it('keeps communicated claims separate from trusted provider observations', async () => {
+    const body = '修正版を添付しました。';
+    const ref = {messageId, participantId: null, zone: 'AUTHORED_CURRENT' as const, excerpt: body, start: 0, end: body.length};
+    const output = interpretationOutput({
+      semanticUnits: [{
+        candidateUnitKey: 'attachment-loop', materiality: 'MATERIAL', operationalOutcome: 'receive the revised document',
+        obligationLegs: [], expectedEvents: [], temporalFacts: [], completionCriteria: [], constraints: [], pendingProposals: [],
+        communicatedClaims: [{id: 'claim-1', kind: 'ATTACHMENT_DELIVERED', value: JSON.stringify('添付しました'), sourceRefs: [ref]}],
+        agreedFacts: [], uncertainties: [], riskDetails: [], corrections: [], sourceRefs: [ref]
+      }], sourceRefs: [ref]
+    });
+    const context = {...interpretationContext(body), providerObservations: [{key: 'attachment-observation-1', kind: 'ATTACHMENT_PRESENCE' as const, messageId, attachmentCount: 0}]};
+    const result = await new ResponsibilityInterpretationRuntime({transport: new FakeTransport(response(output)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision}).run(context);
+    expect(result.status).toBe('CANDIDATE');
+    if (result.status !== 'CANDIDATE' || result.derivation.status !== 'DERIVED') return;
+    expect(result.derivation.command.admission.decision).toBe('NEEDS_REVIEW');
+    expect(result.candidate.semantics[0]?.communicatedClaims?.[0]?.kind).toBe('ATTACHMENT_DELIVERED');
+    expect(result.candidate.semantics[0]?.uncertainties?.[0]?.reasonCode).toBe('PROVIDER_CONTRADICTION');
+  });
+
+  it('does not let current acknowledgement plus quoted history create a material action', () => {
+    const body = '了解しました。\n> 修正版を明日までに送ってください。';
+    const currentRef = {messageId, participantId: null, zone: 'AUTHORED_CURRENT' as const, excerpt: '了解しました。', start: 0, end: 7};
+    const quotedStart = body.indexOf('>');
+    const quotedRef = {messageId, participantId: null, zone: 'QUOTED_HISTORY' as const, excerpt: '> 修正版を明日までに送ってください。', start: quotedStart, end: body.length};
+    const built = buildInterpretationContext({...interpretationContext(body), messages: [{...interpretationContext(body).messages[0]!, sourceZones: [
+      {zone: 'AUTHORED_CURRENT' as const, start: 0, end: 7}, {zone: 'QUOTED_HISTORY' as const, start: quotedStart, end: body.length}
+    ]}]});
+    const unit = interpretationOutput().semanticUnits[0]!;
+    expect(() => validateInterpretationOutput({
+      ...interpretationOutput({sourceRefs: [currentRef]}, currentRef),
+      semanticUnits: [{...unit, sourceRefs: [currentRef, quotedRef], obligationLegs: [{...unit.obligationLegs[0]!, sourceRefs: [quotedRef]}], temporalFacts: []}]
+    }, {
+      basisEvidenceRevision: 1, allowedMessageIds: built.allowedMessageIds, allowedParticipantIds: built.allowedParticipantIds,
+      allowedParticipantEmails: built.allowedParticipantEmails, allowedParticipantRoles: built.allowedParticipantRoles,
+      messageParticipantEmails: built.messageParticipantEmails, allowedSourceZones: built.allowedSourceZones,
+      authorizedMessageBodies: built.authorizedMessageBodies, authorizedMessageSentAt: built.authorizedMessageSentAt
+    })).toThrow('current-turn communicative evidence');
+  });
+
   it('rejects model authority injection and does not create a domain effect', async () => {
     const injected = {...interpretationOutput(), effects: [{operation: 'RESOLVE'}]} as unknown;
     const result = await new ResponsibilityInterpretationRuntime({transport: new FakeTransport(response(injected)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision}).run(interpretationContext());
     expect(result.status).toBe('FAILED');
     if (result.status === 'FAILED') expect(result.reason).toContain('outside the model authority');
+  });
+
+  it('does not accept provider contradiction as a model-authored reason', async () => {
+    const unit = interpretationOutput().semanticUnits[0]!;
+    const injected = {...interpretationOutput(), semanticUnits: [{...unit, uncertainties: [{id: 'provider', fieldKey: 'expectedEvents', reasonCode: 'PROVIDER_CONTRADICTION', material: true, reviewRequired: true, sourceRefs: [sourceRef]}]}]};
+    const result = await new ResponsibilityInterpretationRuntime({transport: new FakeTransport(response(injected)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision}).run(interpretationContext());
+    expect(result.status).toBe('FAILED');
+    if (result.status === 'FAILED') expect(result.reason).toContain('trusted application evidence');
   });
 
   it('rejects stale evidence before candidate derivation', async () => {
@@ -278,11 +324,12 @@ describe('G70 bounded AI runtime', () => {
     expect(G70_EVAL_CASES.filter((item) => item.split === 'HOLDOUT').length).toBeGreaterThan(0);
   });
 
-  it('keeps the declared eval manifest family-stratified without treating fixtures as model evidence', () => {
+  it('binds the eval manifest to the explicit canonical fixture corpus', () => {
     expect(() => assertFamilyStratifiedHoldout()).not.toThrow();
-    const manifests = G70_EVAL_CASES.map(({id, family, lane, split}) => ({id, family, lane, split}));
-    expect(() => assertExecutableFixtureCoverage(manifests)).not.toThrow();
-    expect(() => assertExecutableFixtureStratification(manifests)).not.toThrow();
+    expect(G70_EVAL_CASES.map((item) => item.id)).toEqual([
+      ...Array.from({length: 44}, (_, index) => `T0-${String(index + 1).padStart(3, '0')}`),
+      'PG-22', 'PG-23', 'PG-42', 'PG-43', 'PG-45', 'PG-46', 'PG-47', 'PG-50', 'PG-52', 'PG-60', 'PG-29'
+    ]);
     expect(G70_EVAL_CASES.every((item) => item.oracle.includes(':'))).toBe(true);
   });
 

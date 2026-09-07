@@ -99,6 +99,7 @@ function unitProvenance(unit: CandidateResponsibilitySemantics): ProvenanceInput
     ...(unit.completionCriteria?.flatMap((item) => item.provenance) ?? []),
     ...(unit.constraints?.flatMap((item) => item.provenance) ?? []),
     ...(unit.pendingProposals?.flatMap((item) => item.provenance) ?? []),
+    ...(unit.communicatedClaims?.flatMap((item) => item.provenance) ?? []),
     ...(unit.agreedFacts?.flatMap((item) => item.provenance) ?? []),
     ...(unit.uncertainties?.flatMap((item) => item.provenance) ?? []),
     ...(unit.riskDetails?.flatMap((item) => item.provenance) ?? [])
@@ -170,7 +171,7 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
 }
 
 function admissionFor(candidate: ResponsibilityInterpretationCandidate): {decision: AdmissionDecision; reasonCodes: string[]} {
-  if (candidate.admissionUncertainties?.some((item) => item.material && item.reviewRequired) || candidate.semantics.some((unit) => unit.materiality === 'UNCERTAIN')) {
+  if (candidate.admissionUncertainties?.some((item) => item.material && item.reviewRequired) || candidate.semantics.some((unit) => unit.materiality === 'UNCERTAIN' || unit.uncertainties?.some((item) => item.material && item.reviewRequired))) {
     return {decision: 'NEEDS_REVIEW', reasonCodes: ['RESPONSIBILITY_ADMISSION_UNCERTAIN']};
   }
   if (candidate.semantics.some((unit) => unit.materiality === 'MATERIAL')) {

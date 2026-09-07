@@ -244,8 +244,15 @@ try {
           basisEvidenceRevision: 8,
           status: 'CANDIDATE',
           sourceMessageId: message1,
+          abstentionReason: null,
           semanticUnits: [],
-          sourceRefs: []
+          sourceRefs: [{
+            messageId: message1,
+            zone: 'AUTHORED_CURRENT',
+            excerpt: changedBody,
+            start: 0,
+            end: changedBody.length
+          }]
         })};
       }
     },

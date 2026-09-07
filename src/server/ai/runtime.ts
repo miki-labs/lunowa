@@ -210,7 +210,12 @@ function interpretationEvidenceBasis(context: AuthorizedInterpretationContext): 
     sourceEventKey: context.sourceEventKey,
     references: [
       ...context.messages.map((message) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: message.id})),
-      ...(context.providerObservations ?? []).map((observation) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: observation.messageId, providerObservationKey: observation.key}))
+      ...(context.providerObservations ?? []).map((observation) => ({
+        evidenceKind: observation.kind === 'ATTACHMENT_PRESENCE' && observation.attachmentCount === 0 ? 'PROVIDER_NON_DELIVERY' : 'PROVIDER_MESSAGE_OBSERVED',
+        messageId: observation.messageId,
+        providerObservationKey: observation.key,
+        sourceLocator: {authorized: true, authorityReference: observation.key}
+      }))
     ]
   };
 }
@@ -235,6 +240,7 @@ function trustedProviderFindings(output: import('./contracts').ModelInterpretati
           material: true,
           reviewRequired: true,
           candidateRefs: claims.map((claim) => claim.id),
+          providerObservationKey: observations.find((observation) => observation.messageId === claims[0]?.sourceRefs[0]?.messageId)?.key,
           sourceRefs: claims.flatMap((claim) => claim.sourceRefs)
         }]
       };
@@ -266,6 +272,7 @@ export class ResponsibilityInterpretationRuntime {
         allowedSourceZones: built.allowedSourceZones,
         authorizedMessageBodies: built.authorizedMessageBodies,
         authorizedMessageSentAt: built.authorizedMessageSentAt,
+        referenceTimezone: built.referenceTimezone,
         allowedExistingResponsibilityOutcomes: built.allowedExistingResponsibilityOutcomes,
         expectedSourceMessageId: context.focalMessageId
       });

@@ -596,10 +596,30 @@ function addCalendarDays(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
-function groundedDate(expression: string, messageId: string, sentAt: ReadonlyMap<string, string>): string | undefined {
+function calendarDateInTimezone(sentAt: string, timezone: string | undefined): string | undefined {
+  const date = new Date(sentAt);
+  if (Number.isNaN(date.getTime())) return undefined;
+  if (!timezone) return sentAt.slice(0, 10);
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(date);
+    const values = new Map(parts.map((part) => [part.type, part.value]));
+    const year = values.get('year');
+    const month = values.get('month');
+    const day = values.get('day');
+    return year && month && day ? `${year}-${month}-${day}` : undefined;
+  } catch {
+    throw new AIContractError('authorized reference timezone is invalid');
+  }
+}
+
+function groundedDate(expression: string, messageId: string, sentAt: ReadonlyMap<string, string>, referenceTimezone?: string): string | undefined {
   const literal = expression.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
   if (literal) return literal;
-  const base = sentAt.get(messageId)?.slice(0, 10);
+  const sourceSentAt = sentAt.get(messageId);
+  const base = sourceSentAt ? calendarDateInTimezone(sourceSentAt, referenceTimezone) : undefined;
   if (!base) return undefined;
   if (/明後日|day after tomorrow/i.test(expression)) return addCalendarDays(base, 2);
   if (/明日|tomorrow/i.test(expression)) return addCalendarDays(base, 1);
@@ -621,7 +641,8 @@ function assertTemporalValueGrounded(
   refs: readonly ModelSourceRef[],
   label: string,
   bodies: ReadonlyMap<string, string>,
-  sentAt: ReadonlyMap<string, string>
+  sentAt: ReadonlyMap<string, string>,
+  referenceTimezone?: string
 ): void {
   const resolvedDate = optionalString(item.resolvedDate, `${label}.resolvedDate`, 32);
   const resolvedAt = optionalString(item.resolvedAt, `${label}.resolvedAt`, 64);
@@ -630,7 +651,7 @@ function assertTemporalValueGrounded(
   if (!expression || !citedText(refs, bodies).includes(expression)) throw new AIContractError(`${label} resolved value needs an originalExpression grounded in its cited source text`);
   if (resolvedDate) {
     const sourceMessage = refs.find((ref) => citedText([ref], bodies).includes(expression))?.messageId ?? refs[0]?.messageId ?? '';
-    const expected = groundedDate(expression, sourceMessage, sentAt);
+    const expected = groundedDate(expression, sourceMessage, sentAt, referenceTimezone);
     if (expected && expected !== resolvedDate) throw new AIContractError(`${label}.resolvedDate is not derived from its cited originalExpression`);
     if (!expected && !citedText(refs, bodies).includes(resolvedDate)) throw new AIContractError(`${label}.resolvedDate is not grounded in its cited source text`);
   }
@@ -648,7 +669,8 @@ function validateSemanticUnit(
   allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>,
   authorizedMessageBodies: ReadonlyMap<string, string>,
   authorizedMessageSentAt: ReadonlyMap<string, string>,
-  allowedExistingResponsibilityOutcomes: ReadonlyMap<string, string>
+  allowedExistingResponsibilityOutcomes: ReadonlyMap<string, string>,
+  referenceTimezone?: string
 ): ModelSemanticUnit {
   const item = record(value, label);
   exact(item, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'communicatedClaims', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs'], label);
@@ -699,15 +721,19 @@ function validateSemanticUnit(
     const temporalKind = enumValue(fact.temporalKind, ['SOURCE_DUE', 'EXPECTED_EVENT_TIME', 'USER_TARGET'] as const, `${nestedLabel}.temporalKind`);
     const obligationLegId = optionalString(fact.obligationLegId, `${nestedLabel}.obligationLegId`, 128);
     const expectedEventId = optionalString(fact.expectedEventId, `${nestedLabel}.expectedEventId`, 128);
+    const reportedReferenceTimezone = optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128);
+    if (referenceTimezone && reportedReferenceTimezone && referenceTimezone !== reportedReferenceTimezone) {
+      throw new AIContractError(`${nestedLabel}.referenceTimezone does not match the authorized reference timezone`);
+    }
     const sourceRefs = refsFor(fact, nestedLabel);
-    assertTemporalValueGrounded(fact, sourceRefs, nestedLabel, authorizedMessageBodies, authorizedMessageSentAt);
+    assertTemporalValueGrounded(fact, sourceRefs, nestedLabel, authorizedMessageBodies, authorizedMessageSentAt, referenceTimezone);
     return {
       id: stringValue(fact.id, `${nestedLabel}.id`, 128), temporalKind,
       ...(obligationLegId ? {obligationLegId} : {}), ...(expectedEventId ? {expectedEventId} : {}),
       ...(optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512) ? {originalExpression: optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512)} : {}),
       valueKind, ...(resolvedDate ? {resolvedDate} : {}), ...(resolvedAt ? {resolvedAt} : {}),
       precisionCode: stringValue(fact.precisionCode, `${nestedLabel}.precisionCode`, 64),
-      ...(optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128) ? {referenceTimezone: optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128)} : {}),
+      ...((referenceTimezone ?? reportedReferenceTimezone) ? {referenceTimezone: referenceTimezone ?? reportedReferenceTimezone} : {}),
       ...(optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128) ? {anchorKind: optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128)} : {}),
       ...(optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256) ? {anchorReference: optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256)} : {}),
       ...(fact.anchorOffsetSeconds === undefined || fact.anchorOffsetSeconds === null ? {} : {anchorOffsetSeconds: boundedInteger(fact.anchorOffsetSeconds, `${nestedLabel}.anchorOffsetSeconds`, -31_536_000, 31_536_000)}),
@@ -716,6 +742,16 @@ function validateSemanticUnit(
       sourceRefs
     };
   });
+  const obligationLegIds = new Set(obligationLegs.map((leg) => leg.id));
+  const expectedEventIds = new Set(expectedEvents.map((event) => event.id));
+  for (const [index, fact] of temporalFacts.entries()) {
+    if (fact.obligationLegId && !obligationLegIds.has(fact.obligationLegId)) {
+      throw new AIContractError(`${label}.temporalFacts[${index}].obligationLegId references an unknown obligation leg`);
+    }
+    if (fact.expectedEventId && !expectedEventIds.has(fact.expectedEventId)) {
+      throw new AIContractError(`${label}.temporalFacts[${index}].expectedEventId references an unknown expected event`);
+    }
+  }
   const completionCriteria = list('completionCriteria', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const constraints = list('constraints', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'conditionRef', 'sourceRefs'], nestedLabel); const condition = item.conditionRef === undefined || item.conditionRef === null ? undefined : record(item.conditionRef, `${nestedLabel}.conditionRef`); if (condition) exact(condition, ['kind', 'id', 'code'], `${nestedLabel}.conditionRef`); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), ...(condition ? {conditionRef: {kind: enumValue(condition.kind, ['EXPECTED_EVENT', 'OTHER'] as const, `${nestedLabel}.conditionRef.kind`), ...(optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128) ? {id: optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128)} : {}), ...(optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128) ? {code: optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128)} : {})}} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const proposals = list('pendingProposals', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'candidateStatus', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encoded, ...(item.candidateStatus === undefined || item.candidateStatus === null ? {} : {candidateStatus: enumValue(item.candidateStatus, ['PENDING', 'REJECTED'] as const, `${nestedLabel}.candidateStatus`)}), sourceRefs: refs}; });
@@ -763,7 +799,7 @@ function validateSemanticUnit(
   return {candidateUnitKey, materiality, ...(operationalOutcome ? {operationalOutcome} : {}), ...(identityRelation ? {identityRelation} : {}), obligationLegs, expectedEvents, temporalFacts, completionCriteria, constraints, pendingProposals: proposals, communicatedClaims, agreedFacts, uncertainties, riskDetails, ...(assignment ? {assignmentSemantics: assignment} : {}), corrections, ...(terminal ? {terminalSignal: terminal} : {}), sourceRefs: refs};
 }
 
-export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedParticipantEmails?: ReadonlyMap<string, string>; allowedParticipantRoles?: ReadonlyMap<string, ParticipantRole>; messageParticipantEmails?: ReadonlyMap<string, ReadonlySet<string>>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; authorizedMessageSentAt?: ReadonlyMap<string, string>; allowedExistingResponsibilityOutcomes?: ReadonlyMap<string, string>; expectedSourceMessageId?: string}): ModelInterpretationOutput {
+export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedParticipantEmails?: ReadonlyMap<string, string>; allowedParticipantRoles?: ReadonlyMap<string, ParticipantRole>; messageParticipantEmails?: ReadonlyMap<string, ReadonlySet<string>>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; authorizedMessageSentAt?: ReadonlyMap<string, string>; allowedExistingResponsibilityOutcomes?: ReadonlyMap<string, string>; expectedSourceMessageId?: string; referenceTimezone?: string}): ModelInterpretationOutput {
   assertNoForbiddenKeys(value);
   const item = record(value, 'interpretation output');
   exact(item, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'], 'interpretation output');
@@ -783,7 +819,7 @@ export function validateInterpretationOutput(value: unknown, input: {basisEviden
   const authorizedMessageSentAt = input.authorizedMessageSentAt ?? new Map<string, string>();
   const allowedExistingResponsibilityOutcomes = input.allowedExistingResponsibilityOutcomes ?? new Map<string, string>();
   const outputSourceRefs = validateParticipantRefs(sourceRefs(item.sourceRefs, 'interpretation output.sourceRefs', input.allowedMessageIds, input.allowedSourceZones, input.authorizedMessageBodies), 'interpretation output.sourceRefs', allowedParticipantEmails, messageParticipantEmails);
-  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds, allowedParticipantEmails, messageParticipantEmails, allowedParticipantRoles, input.allowedSourceZones, input.authorizedMessageBodies, authorizedMessageSentAt, allowedExistingResponsibilityOutcomes));
+  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds, allowedParticipantEmails, messageParticipantEmails, allowedParticipantRoles, input.allowedSourceZones, input.authorizedMessageBodies, authorizedMessageSentAt, allowedExistingResponsibilityOutcomes, input.referenceTimezone));
   if (new Set(semanticUnits.map((unit) => unit.candidateUnitKey)).size !== semanticUnits.length) throw new AIContractError('interpretation semantic unit keys must be unique');
   if (status === 'ABSTAINED' && semanticUnits.length > 0) throw new AIContractError('abstained interpretation cannot include semantic units');
   return {schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, basisEvidenceRevision: input.basisEvidenceRevision, status, sourceMessageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits, sourceRefs: outputSourceRefs};
@@ -809,6 +845,19 @@ export function validateDraftOutput(value: unknown, expectedRevision: number): M
 
 function mapCandidateUnit(unit: ModelSemanticUnit): CandidateResponsibilitySemantics {
   const provenanced = <T extends {sourceRefs: ModelSourceRef[]}>(items: readonly T[] | undefined) => (items ?? []).map((item) => mapProvenanced(item));
+  const uncertainties = unit.uncertainties.map((item) => {
+    const providerObservationKey = (item as ModelUncertainty & {providerObservationKey?: unknown}).providerObservationKey;
+    if (item.reasonCode !== 'PROVIDER_CONTRADICTION' || typeof providerObservationKey !== 'string' || !providerObservationKey.trim()) {
+      return mapProvenanced(item);
+    }
+    const {sourceRefs, ...rest} = item;
+    const provenance = mapSourceRefs(sourceRefs, 'PROVIDER_NON_DELIVERY').map((reference) => ({
+      ...reference,
+      providerObservationKey,
+      sourceLocator: {...(reference.sourceLocator ?? {}), authorized: true, authorityReference: providerObservationKey}
+    }));
+    return {...rest, provenance};
+  });
   const unitEvidenceKind: ProvenanceInput['evidenceKind'] = unit.identityRelation?.kind === 'SAME_UNSATISFIED_OUTCOME'
     ? 'COUNTERPART_FAILURE_REPORT'
     : unit.identityRelation?.kind === 'REPLACES'
@@ -836,7 +885,7 @@ function mapCandidateUnit(unit: ModelSemanticUnit): CandidateResponsibilitySeman
     pendingProposals: unit.pendingProposals.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `pending proposal ${item.id}.value`)})) as CandidatePendingProposal[],
     communicatedClaims: unit.communicatedClaims.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `communicated claim ${item.id}.value`)})) as CandidateCommunicatedClaim[],
     agreedFacts: unit.agreedFacts.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `agreed fact ${item.id}.value`)})) as CandidateAgreedFact[],
-    uncertainties: provenanced(unit.uncertainties) as Uncertainty[],
+    uncertainties: uncertainties as Uncertainty[],
     riskDetails: provenanced(unit.riskDetails) as RiskDetail[],
     ...(unit.assignmentSemantics ? {assignmentSemantics: unit.assignmentSemantics} : {}),
     corrections: unit.corrections.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `field correction ${item.fieldKey}.value`)})) as CandidateFieldCorrection[],
@@ -855,6 +904,10 @@ export function toResponsibilityInterpretationCandidate(input: {
   interpretationRunId?: string;
 }): ResponsibilityInterpretationCandidate | undefined {
   if (input.output.status === 'ABSTAINED') return undefined;
+  const semantics = input.output.semanticUnits.map(mapCandidateUnit);
+  const trustedApplicationProvenance = semantics.flatMap((unit) => unit.uncertainties?.flatMap((item) =>
+    item.provenance.filter((reference) => reference.evidenceKind === 'PROVIDER_NON_DELIVERY')
+  ) ?? []);
   return {
     userId: input.userId,
     connectedAccountId: input.connectedAccountId,
@@ -862,8 +915,11 @@ export function toResponsibilityInterpretationCandidate(input: {
     sourceEventKey: input.sourceEventKey,
     candidateKey: input.candidateKey,
     evidenceRevision: input.output.basisEvidenceRevision,
-    semantics: input.output.semanticUnits.map(mapCandidateUnit),
-    provenance: mapSourceRefs(input.output.sourceRefs),
+    semantics,
+    // Admission-review persistence receives the root provenance only. Carry
+    // trusted application findings here so their observation key is never
+    // lost while remaining distinct from model-authored source claims.
+    provenance: [...mapSourceRefs(input.output.sourceRefs), ...trustedApplicationProvenance],
     sourceMessageId: input.output.sourceMessageId,
     ...(input.interpretationRunId ? {interpretationRunId: input.interpretationRunId} : {})
   };

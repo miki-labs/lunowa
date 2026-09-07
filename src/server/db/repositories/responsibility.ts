@@ -265,6 +265,10 @@ export async function loadResponsibilityStatesInTransaction(
 function persistedStateIds(state: ResponsibilityState): ResponsibilityState {
   const legIds = new Map(state.obligationLegs.map((leg) => [leg.id, isUuid(leg.id) ? leg.id : stableUuid(`${state.id}:leg:${leg.id}`)]));
   const eventIds = new Map(state.expectedEvents.map((event) => [event.id, isUuid(event.id) ? event.id : stableUuid(`${state.id}:event:${event.id}`)]));
+  for (const fact of state.temporalFacts) {
+    if (fact.obligationLegId && !legIds.has(fact.obligationLegId)) throw new Error(`temporal fact ${fact.id} references unknown obligation leg ${fact.obligationLegId}`);
+    if (fact.expectedEventId && !eventIds.has(fact.expectedEventId)) throw new Error(`temporal fact ${fact.id} references unknown expected event ${fact.expectedEventId}`);
+  }
   const result: ResponsibilityState = {
     ...state,
     obligationLegs: state.obligationLegs.map((leg) => ({
@@ -374,7 +378,11 @@ function commandAuthorityIsConsistent(candidate: TrustedResponsibilityCommand): 
     ...(candidate.effects?.flatMap((effect) => effect.resolutionEvidence?.kinds ?? []) ?? [])
   ];
   if (evidenceKinds.some((kind) => kind === 'USER_ASSERTION' || kind === 'USER_OFF_CHANNEL_ASSERTION') && candidate.commandSource !== 'TRUSTED_USER') return false;
-  if (evidenceKinds.some((kind) => kind.startsWith('PROVIDER_')) && candidate.commandSource !== 'TRUSTED_SYSTEM') return false;
+  const providerFindings = candidateProvenance(candidate).filter((item) => item.evidenceKind.startsWith('PROVIDER_'));
+  if (providerFindings.some((item) =>
+    candidate.commandSource !== 'TRUSTED_SYSTEM' &&
+    !(item.evidenceKind === 'PROVIDER_NON_DELIVERY' && item.providerObservationKey && item.sourceLocator?.authorized === true)
+  )) return false;
   return true;
 }
 

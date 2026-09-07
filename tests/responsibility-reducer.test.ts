@@ -272,6 +272,15 @@ describe('deterministic Responsibility admission and reducer', () => {
     }
   });
 
+  it('rejects temporal references that do not resolve within the Responsibility', () => {
+    const result = reduce(candidate({temporalFacts: [{
+      id: 'dangling-due', temporalKind: 'SOURCE_DUE', obligationLegId: 'missing-leg', valueKind: 'DATE',
+      resolvedDate: '2026-08-25', precisionCode: 'DATE', currentnessStatus: 'ACCEPTED_CURRENT', provenance: []
+    }]}));
+    expect(result.status).toBe('REJECTED');
+    if (result.status === 'REJECTED') expect(result.reason).toContain('unknown obligation leg');
+  });
+
   it('admits a grounded user request as CREATE and projects MY_TURN', () => {
     const due: TemporalFact = {
       id: 'due-1',

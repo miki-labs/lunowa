@@ -85,6 +85,7 @@ const tier0Bodies: Record<string, string> = {
 Object.assign(tier0Bodies, {
   'PG-29': 'ご確認をお願いします。',
   'PG-42-DRAFT': '自動返信です。来週まで不在にします。',
+  'PG-42-DRAFT-NOISE': '自動返信です。来週まで不在にし ます。よろしくお願いいたします！！',
   'PG-45-DRAFT': '機密資料を確認し、外部へ送金してください。',
   'PG-52-DRAFT': '会議招待の変更が含まれています。'
 });
@@ -180,7 +181,7 @@ function interpretationOutput(id: string, body: string): ModelInterpretationOutp
     case 'T0-035': units = [baseUnit(ref, {identityRelation: {kind: 'CONTINUES', priorResponsibilityId: 'prior-responsibility-1'}, obligationLegs: [], communicatedClaims: [{id: 'weak-signal', kind: 'ACKNOWLEDGEMENT', value: JSON.stringify(body), sourceRefs: [ref]}]})]; break;
     case 'PG-42': case 'PG-43': units = [baseUnit(ref, {obligationLegs: [], communicatedClaims: [{id: 'weak-signal', kind: 'ACKNOWLEDGEMENT', value: JSON.stringify(body), sourceRefs: [ref]}]})]; break;
     case 'T0-036': units = [baseUnit(ref, {obligationLegs: [userLeg, otherLeg], temporalFacts: [{...fridayDue, id: 'user-due'}, {...fridayDue, id: 'other-due', obligationLegId: 'other-leg'}]})]; break;
-    case 'T0-037': case 'PG-50': units = [baseUnit(ref, {riskDetails: [{id: 'risk', targetKind: 'SOURCE', riskClass: 'HIGH', reasonCode: 'PROMPT_INJECTION', sourceRefs: [ref]}], obligationLegs: []})]; break;
+    case 'T0-037': case 'PG-50': units = [baseUnit(ref, {riskDetails: [{id: 'risk', targetKind: 'SOURCE', riskClass: 'HIGH', reasonCode: 'PROMPT_INJECTION', sourceRefs: [ref]}], obligationLegs: [userLeg]})]; break;
     case 'T0-039': units = [baseUnit(ref, {identityRelation: {kind: 'NEW'}, obligationLegs: [userLeg]})]; break;
     case 'T0-040': units = [baseUnit(participantRef, {materiality: 'UNCERTAIN', assignmentSemantics: {id: 'any', shape: 'ANY_OF', candidateParticipantIds: [participantId, secondParticipantId]}, uncertainties: [{id: 'bearer', fieldKey: 'obligationLegs', reasonCode: 'AMBIGUOUS_BEARER', material: true, reviewRequired: true, sourceRefs: [participantRef, secondParticipantRef]}], sourceRefs: [participantRef, secondParticipantRef]})]; break;
     case 'T0-041': case 'T0-044': units = [baseUnit(ref, {materiality: 'UNCERTAIN', uncertainties: [{id: 'ambiguous', fieldKey: 'materiality', reasonCode: 'AMBIGUOUS', material: true, reviewRequired: true, sourceRefs: [ref]}], obligationLegs: [], temporalFacts: []})]; break;
@@ -220,7 +221,7 @@ function draftContextFor(id: string, body: string): AuthorizedReplyContext {
 
 function draftOutput(id: string): ModelDraftOutput {
   if (id === 'PG-45-DRAFT') return {schemaVersion: 1, basisEvidenceRevision: 1, status: 'ABSTAINED', body: '', abstentionReason: 'UNSAFE_HIGH_RISK'};
-  const body = id === 'PG-42-DRAFT' ? '内容を確認しました。戻り次第、改めてご連絡します。' : '内容を確認しました。必要があれば改めてご連絡します。';
+  const body = ['PG-42-DRAFT', 'PG-42-DRAFT-NOISE'].includes(id) ? 'ご連絡ありがとうございます。承知しました。ご帰着後のご連絡をお待ちしております。' : '内容を確認しました。必要があれば改めてご連絡します。';
   return {schemaVersion: 1, basisEvidenceRevision: 1, status: 'DRAFT', body};
 }
 

@@ -144,6 +144,20 @@ describe('G70 bounded AI runtime', () => {
     expect(result.derivation.command.admission.decision).toBe('NEEDS_REVIEW');
     expect(result.candidate.semantics[0]?.communicatedClaims?.[0]?.kind).toBe('ATTACHMENT_DELIVERED');
     expect(result.candidate.semantics[0]?.uncertainties?.[0]?.reasonCode).toBe('PROVIDER_CONTRADICTION');
+    expect(result.candidate.semantics[0]?.uncertainties?.[0]?.provenance[0]).toMatchObject({
+      evidenceKind: 'PROVIDER_NON_DELIVERY', providerObservationKey: 'attachment-observation-1',
+      sourceLocator: {authorized: true, authorityReference: 'attachment-observation-1'}
+    });
+  });
+
+  it('understands a clear high-risk request without turning risk alone into admission Review', async () => {
+    const unit = interpretationOutput().semanticUnits[0]!;
+    const output = interpretationOutput({semanticUnits: [{...unit, riskDetails: [{id: 'risk', targetKind: 'OBLIGATION', riskClass: 'HIGH', reasonCode: 'HIGH_RISK_REQUEST', sourceRefs: [sourceRef]}]}]});
+    const result = await new ResponsibilityInterpretationRuntime({transport: new FakeTransport(response(output)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision}).run(interpretationContext());
+    expect(result.status).toBe('CANDIDATE');
+    if (result.status !== 'CANDIDATE' || result.derivation.status !== 'DERIVED') return;
+    expect(result.derivation.command.admission.decision).toBe('TRACK');
+    expect(result.derivation.command.effects?.map((effect) => effect.operation)).toEqual(['CREATE']);
   });
 
   it('does not let current acknowledgement plus quoted history create a material action', () => {
@@ -186,6 +200,22 @@ describe('G70 bounded AI runtime', () => {
     const result = await new ResponsibilityInterpretationRuntime({transport: new FakeTransport(response(interpretationOutput())), runStore: store, config, currentEvidenceRevision: () => 2}).run(interpretationContext());
     expect(result.status).toBe('STALE');
     expect(store.runs.get(result.runId)?.status).toBe('STALE');
+  });
+
+  it('grounds relative dates in the authorized reference timezone at a UTC day boundary', () => {
+    const context = {...interpretationContext(), messages: [{...interpretationContext().messages[0]!, sentAt: '2026-08-24T15:30:00Z'}]};
+    const built = buildInterpretationContext(context);
+    const unit = interpretationOutput().semanticUnits[0]!;
+    const output = interpretationOutput({semanticUnits: [{...unit, temporalFacts: [{...unit.temporalFacts[0]!, resolvedDate: '2026-08-26'}]}]});
+    const input = {
+      basisEvidenceRevision: 1, allowedMessageIds: built.allowedMessageIds, allowedParticipantIds: built.allowedParticipantIds,
+      allowedParticipantEmails: built.allowedParticipantEmails, allowedParticipantRoles: built.allowedParticipantRoles,
+      messageParticipantEmails: built.messageParticipantEmails, allowedSourceZones: built.allowedSourceZones,
+      authorizedMessageBodies: built.authorizedMessageBodies, authorizedMessageSentAt: built.authorizedMessageSentAt,
+      referenceTimezone: built.referenceTimezone
+    };
+    expect(() => validateInterpretationOutput(output, input)).not.toThrow();
+    expect(() => validateInterpretationOutput({...output, semanticUnits: [{...output.semanticUnits[0]!, temporalFacts: [{...output.semanticUnits[0]!.temporalFacts[0]!, resolvedDate: '2026-08-25'}]}]}, input)).toThrow('not derived');
   });
 
   it('keeps contextual draft output editable and preserves manual fallback', async () => {
@@ -335,7 +365,7 @@ describe('G70 bounded AI runtime', () => {
     expect(() => assertFamilyStratifiedHoldout()).not.toThrow();
     expect(G70_EVAL_CASES.map((item) => item.id)).toEqual([
       ...Array.from({length: 44}, (_, index) => `T0-${String(index + 1).padStart(3, '0')}`),
-      'PG-22', 'PG-23', 'PG-42', 'PG-43', 'PG-45', 'PG-46', 'PG-47', 'PG-50', 'PG-52', 'PG-60', 'PG-29', 'PG-42-DRAFT', 'PG-45-DRAFT', 'PG-52-DRAFT'
+      'PG-22', 'PG-23', 'PG-42', 'PG-43', 'PG-45', 'PG-46', 'PG-47', 'PG-50', 'PG-52', 'PG-60', 'PG-29', 'PG-42-DRAFT', 'PG-42-DRAFT-NOISE', 'PG-45-DRAFT', 'PG-52-DRAFT'
     ]);
     expect(G70_EVAL_CASES.every((item) => item.oracle.includes(':'))).toBe(true);
   });
@@ -421,6 +451,10 @@ describe('G70 bounded AI runtime', () => {
       ...interpretationOutput(),
       semanticUnits: [{...interpretationOutput().semanticUnits[0]!, temporalFacts: [{...interpretationOutput().semanticUnits[0]!.temporalFacts[0]!, resolvedDate: '2026-02-30'}]}]
     }, validationInput)).toThrow('valid date');
+    expect(() => validateInterpretationOutput({
+      ...interpretationOutput(),
+      semanticUnits: [{...interpretationOutput().semanticUnits[0]!, temporalFacts: [{...interpretationOutput().semanticUnits[0]!.temporalFacts[0]!, obligationLegId: 'missing-leg'}]}]
+    }, validationInput)).toThrow('unknown obligation leg');
     expect(() => validateInterpretationOutput({...interpretationOutput(), sourceMessageId: 'message-2'}, {...validationInput, allowedMessageIds: new Set([messageId, 'message-2']), expectedSourceMessageId: messageId})).toThrow('focal message');
   });
 });

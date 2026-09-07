@@ -162,7 +162,17 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
   const provenance = allProvenance(candidate);
   if (provenance.length === 0 || basisKeys.size === 0) return 'candidate needs authorized source provenance';
   for (const item of provenance) {
-    if (MODEL_FORBIDDEN_EVIDENCE.has(item.evidenceKind)) return `interpretation candidate cannot assert trusted evidence kind ${item.evidenceKind}`;
+    if (MODEL_FORBIDDEN_EVIDENCE.has(item.evidenceKind)) {
+      const trustedProviderFinding = item.evidenceKind === 'PROVIDER_NON_DELIVERY' &&
+        Boolean(item.providerObservationKey) &&
+        item.sourceLocator?.authorized === true &&
+        basis.references.some((reference) =>
+          reference.evidenceKind === 'PROVIDER_NON_DELIVERY' &&
+          reference.providerObservationKey === item.providerObservationKey &&
+          reference.messageId === item.messageId
+        );
+      if (!trustedProviderFinding) return `interpretation candidate cannot assert trusted evidence kind ${item.evidenceKind}`;
+    }
     const key = referenceKey(item);
     if (!key || !basisKeys.has(key)) return 'candidate provenance is not contained in the current authorized evidence basis';
   }
@@ -173,9 +183,6 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
 function admissionFor(candidate: ResponsibilityInterpretationCandidate): {decision: AdmissionDecision; reasonCodes: string[]} {
   if (candidate.admissionUncertainties?.some((item) => item.material && item.reviewRequired) || candidate.semantics.some((unit) => unit.materiality === 'UNCERTAIN' || unit.uncertainties?.some((item) => item.material && item.reviewRequired))) {
     return {decision: 'NEEDS_REVIEW', reasonCodes: ['RESPONSIBILITY_ADMISSION_UNCERTAIN']};
-  }
-  if (candidate.semantics.some((unit) => unit.riskDetails?.some((risk) => risk.riskClass === 'HIGH' || risk.riskClass === 'CRITICAL'))) {
-    return {decision: 'NEEDS_REVIEW', reasonCodes: ['HIGH_IMPACT_INTERPRETATION_REQUIRES_REVIEW']};
   }
   if (candidate.semantics.some((unit) => unit.materiality === 'MATERIAL')) {
     return {decision: 'TRACK', reasonCodes: ['MATERIAL_OPEN_LOOP_DERIVED']};

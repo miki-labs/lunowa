@@ -391,7 +391,13 @@ function validateState(state: ResponsibilityState): void {
     if (criterion.status === 'SATISFIED' && !criterion.satisfiedAt) throw new Error(`satisfied completion criterion ${criterion.id} needs genuine satisfaction time`);
     if (criterion.status !== 'SATISFIED' && criterion.satisfiedAt) throw new Error(`non-satisfied completion criterion ${criterion.id} cannot have satisfiedAt`);
   }
-  for (const fact of state.temporalFacts) validateTemporalFact(fact);
+  const obligationLegIds = new Set(state.obligationLegs.map((leg) => leg.id));
+  const expectedEventIds = new Set(state.expectedEvents.map((event) => event.id));
+  for (const fact of state.temporalFacts) {
+    validateTemporalFact(fact);
+    if (fact.obligationLegId && !obligationLegIds.has(fact.obligationLegId)) throw new Error(`temporal fact ${fact.id} references unknown obligation leg ${fact.obligationLegId}`);
+    if (fact.expectedEventId && !expectedEventIds.has(fact.expectedEventId)) throw new Error(`temporal fact ${fact.id} references unknown expected event ${fact.expectedEventId}`);
+  }
 }
 
 function candidateEffects(candidate: TrustedResponsibilityCommand): ResponsibilityEffectInput[] {

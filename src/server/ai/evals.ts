@@ -44,6 +44,34 @@ export function assertFamilyStratifiedHoldout(cases: readonly G70EvalCase[] = G7
   if (!cases.some((item) => item.split === 'HOLDOUT')) throw new Error('AI eval manifest needs a holdout split');
 }
 
+export type G70ExecutableFixture = Pick<G70EvalCase, 'id' | 'family' | 'lane' | 'split'>;
+
+/**
+ * Runtime fixtures must identify a manifest case exactly. This keeps a test
+ * from silently relabelling a development example as a held-out falsifier or
+ * executing a family that is present in both splits.
+ */
+export function assertExecutableFixtureStratification(
+  fixtures: readonly G70ExecutableFixture[],
+  cases: readonly G70EvalCase[] = G70_EVAL_CASES
+): void {
+  assertFamilyStratifiedHoldout(cases);
+  const byId = new Map(cases.map((item) => [item.id, item]));
+  const ids = new Set<string>();
+  for (const fixture of fixtures) {
+    if (ids.has(fixture.id)) throw new Error(`duplicate executable AI eval fixture: ${fixture.id}`);
+    ids.add(fixture.id);
+    const manifest = byId.get(fixture.id);
+    if (!manifest || manifest.family !== fixture.family || manifest.lane !== fixture.lane || manifest.split !== fixture.split) {
+      throw new Error(`executable fixture does not match G70 manifest: ${fixture.id}`);
+    }
+  }
+  const developmentFamilies = new Set(fixtures.filter((item) => item.split === 'DEVELOPMENT').map((item) => item.family));
+  const overlap = fixtures.filter((item) => item.split === 'HOLDOUT' && developmentFamilies.has(item.family));
+  if (overlap.length > 0) throw new Error(`executable holdout family overlaps development: ${overlap.map((item) => item.family).join(', ')}`);
+  if (!fixtures.some((item) => item.split === 'HOLDOUT')) throw new Error('executable AI evals need a holdout split');
+}
+
 export type InterpretationOracleCheck = {
   caseId: string;
   passed: boolean;

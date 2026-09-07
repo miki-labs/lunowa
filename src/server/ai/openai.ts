@@ -1,3 +1,6 @@
+import OpenAI from 'openai';
+import type {ResponseCreateParamsNonStreaming} from 'openai/resources/responses/responses';
+
 import type {JsonSchema, StructuredResponseFormat} from './contracts';
 
 export type ResponsesInputItem = {
@@ -14,22 +17,45 @@ export type ResponsesRequest = {
 };
 
 export type ResponsesTransport = {
+  readonly kind: 'official' | 'test';
   create(request: ResponsesRequest): Promise<unknown>;
 };
 
-/** Structural boundary for the official `openai` SDK. Keeping this type
- * local prevents SDK response classes from crossing into Lunowa contracts. */
-export type OfficialOpenAIResponsesClient = {
-  responses: {
-    create(request: ResponsesRequest): Promise<unknown>;
-  };
-};
-
 export class OpenAISdkResponsesTransport implements ResponsesTransport {
-  public constructor(private readonly client: OfficialOpenAIResponsesClient) {}
+  public readonly kind = 'official' as const;
+  private readonly client: OpenAI;
+
+  public constructor(input: {apiKey?: string; timeoutMs?: number; client?: OpenAI} = {}) {
+    if (input.client) {
+      this.client = input.client;
+      return;
+    }
+    const apiKey = input.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
+    if (!apiKey) throw new AIProviderError('CONFIGURATION_MISSING', 'OPENAI_API_KEY is not configured');
+    this.client = new OpenAI({apiKey, timeout: input.timeoutMs ?? 30_000, maxRetries: 0});
+  }
 
   public async create(request: ResponsesRequest): Promise<unknown> {
-    return this.client.responses.create(request);
+    try {
+      return await this.client.responses.create({
+        model: request.model,
+        input: request.input as ResponseCreateParamsNonStreaming['input'],
+        store: false,
+        max_output_tokens: request.max_output_tokens,
+        text: request.text as ResponseCreateParamsNonStreaming['text']
+      });
+    } catch (error) {
+      if (error instanceof OpenAI.APIConnectionTimeoutError || error instanceof OpenAI.APIConnectionError) {
+        throw new AIProviderError('UNAVAILABLE', 'OpenAI Responses request could not be completed');
+      }
+      if (error instanceof OpenAI.APIError) {
+        if (error.status === 408 || error.status === 429 || error.status >= 500) {
+          throw new AIProviderError('UNAVAILABLE', `OpenAI Responses request was unavailable (${error.status})`);
+        }
+        throw new AIProviderError('REQUEST_FAILED', `OpenAI Responses request failed (${error.status})`);
+      }
+      throw new AIProviderError('UNAVAILABLE', 'OpenAI Responses request could not be completed');
+    }
   }
 }
 
@@ -42,78 +68,10 @@ export class AIProviderError extends Error {
   }
 }
 
-type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
 function boundedModel(value: string): string {
   const model = value.trim();
   if (!model || model.length > 128) throw new AIProviderError('CONFIGURATION_MISSING', 'AI model configuration is invalid');
   return model;
-}
-
-/**
- * Thin HTTP adapter for the official Responses endpoint. Provider-shaped
- * request/response values stop here; callers only receive parsed JSON text.
- * The adapter has no tools and always sets store:false for email content.
- */
-export class OpenAIResponsesTransport implements ResponsesTransport {
-  private readonly apiKey: string;
-  private readonly model: string;
-  private readonly endpoint: string;
-  private readonly fetchImpl: FetchLike;
-  private readonly timeoutMs: number;
-
-  public constructor(input: {
-    apiKey?: string;
-    model: string;
-    endpoint?: string;
-    fetchImpl?: FetchLike;
-    timeoutMs?: number;
-  }) {
-    this.apiKey = input.apiKey?.trim() ?? '';
-    this.model = boundedModel(input.model);
-    this.endpoint = input.endpoint?.trim() || 'https://api.openai.com/v1/responses';
-    this.fetchImpl = input.fetchImpl ?? fetch;
-    this.timeoutMs = input.timeoutMs ?? 30_000;
-    if (!/^https:\/\//.test(this.endpoint)) throw new AIProviderError('CONFIGURATION_MISSING', 'AI endpoint must use HTTPS');
-  }
-
-  public async create(request: ResponsesRequest): Promise<unknown> {
-    if (!this.apiKey) throw new AIProviderError('CONFIGURATION_MISSING', 'OPENAI_API_KEY is not configured');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      const response = await this.fetchImpl(this.endpoint, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${this.apiKey}`,
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: this.model,
-          input: request.input,
-          store: false,
-          max_output_tokens: request.max_output_tokens,
-          text: {format: request.text.format}
-        }),
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        if (response.status === 408 || response.status === 429 || response.status >= 500) throw new AIProviderError('UNAVAILABLE', `OpenAI Responses request was unavailable (${response.status})`);
-        throw new AIProviderError('REQUEST_FAILED', `OpenAI Responses request failed (${response.status})`);
-      }
-      try {
-        return await response.json() as unknown;
-      } catch {
-        throw new AIProviderError('INVALID_RESPONSE', 'OpenAI Responses response was not valid JSON');
-      }
-    } catch (error) {
-      if (error instanceof AIProviderError) throw error;
-      if (error instanceof DOMException && error.name === 'AbortError') throw new AIProviderError('UNAVAILABLE', 'OpenAI Responses request timed out');
-      throw new AIProviderError('UNAVAILABLE', 'OpenAI Responses request could not be completed');
-    } finally {
-      clearTimeout(timer);
-    }
-  }
 }
 
 export function responseJsonText(value: unknown): string {

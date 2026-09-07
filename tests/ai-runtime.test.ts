@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import OpenAI from 'openai';
 
 import {
   AIContractError,
@@ -8,8 +9,11 @@ import {
   ResponsibilityInterpretationRuntime,
   ContextualDraftRuntime,
   assertFamilyStratifiedHoldout,
+  assertExecutableFixtureStratification,
   checkInterpretationOracle,
   G70_EVAL_CASES,
+  OpenAISdkResponsesTransport,
+  buildInterpretationContext,
   type AuthorizedInterpretationContext,
   type AuthorizedReplyContext,
   type ModelInterpretationOutput,
@@ -65,6 +69,7 @@ function replyContext(): AuthorizedReplyContext {
 }
 
 class FakeTransport implements ResponsesTransport {
+  public readonly kind = 'test' as const;
   public readonly requests: ResponsesRequest[] = [];
   public constructor(private readonly response: unknown) {}
   public async create(request: ResponsesRequest): Promise<unknown> {
@@ -144,10 +149,106 @@ describe('G70 bounded AI runtime', () => {
 
   it('degrades draft assistance without blocking manual composition', async () => {
     const store = new InMemoryAIRunStore();
-    const transport: ResponsesTransport = {create: async () => {throw new Error('provider unavailable');}};
+    const transport: ResponsesTransport = {kind: 'test', create: async () => {throw new Error('provider unavailable');}};
     const result = await new ContextualDraftRuntime({transport, runStore: store, config, currentEvidenceRevision}).run(replyContext());
     expect(result.status).toBe('FAILED');
     expect(result.manualFallbackAvailable).toBe(true);
+  });
+
+  it('uses the official SDK Responses adapter with explicit store:false and no tools', async () => {
+    const requests: RequestInit[] = [];
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      maxRetries: 0,
+      dangerouslyAllowBrowser: true,
+      fetch: async (_input, init) => {
+        requests.push(init ?? {});
+        return new Response(JSON.stringify(response(interpretationOutput())), {headers: {'content-type': 'application/json'}});
+      }
+    });
+    const transport = new OpenAISdkResponsesTransport({client});
+    await transport.create({
+      model: 'gpt-5.6',
+      input: [{role: 'user', content: [{type: 'input_text', text: 'fixture'}]}],
+      store: false,
+      max_output_tokens: 100,
+      text: {format: INTERPRETATION_RESPONSE_FORMAT}
+    });
+    const body = JSON.parse(String(requests[0]?.body)) as Record<string, unknown>;
+    expect(body.store).toBe(false);
+    expect(body.tools).toBeUndefined();
+    expect(body.text).toEqual({format: INTERPRETATION_RESPONSE_FORMAT});
+  });
+
+  it('fails closed for UNVERIFIED production data control before any provider call', async () => {
+    const store = new InMemoryAIRunStore();
+    let calls = 0;
+    const transport: ResponsesTransport = {
+      kind: 'official',
+      create: async () => {
+        calls += 1;
+        return response(interpretationOutput());
+      }
+    };
+    const context = interpretationContext();
+    const built = buildInterpretationContext(context);
+    const run = await store.capture({
+      lane: 'interpretation', schemaVersion: built.manifest.schemaVersion, userId: context.user.id,
+      connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId,
+      messageIds: built.manifest.messageIds, sourceMessageId: context.focalMessageId,
+      basisEvidenceRevision: built.manifest.basisEvidenceRevision, modelConfigVersion: config.modelConfigVersion,
+      providerModelIdentifier: config.model, contextManifest: built.manifest
+    });
+    const snapshot = {
+      captureInterpretation: async () => ({context, built, runId: run.id}),
+      captureDraft: async () => { throw new Error('not used'); }
+    };
+    const result = await new ResponsibilityInterpretationRuntime({transport, runStore: store, contextSnapshot: snapshot, config, currentEvidenceRevision}).run({
+      userId: context.user.id, connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId,
+      sourceEventKey: context.sourceEventKey, focalMessageId: context.focalMessageId, messageIds: [messageId]
+    });
+    expect(result.status).toBe('FAILED');
+    expect(calls).toBe(0);
+    expect(store.runs.get(run.id)?.status).toBe('FAILED');
+  });
+
+  it('keeps one captured revision/message manifest when evidence arrives during the model call', async () => {
+    const context = interpretationContext();
+    const built = buildInterpretationContext(context);
+    const store = new InMemoryAIRunStore();
+    let evidenceArrived = false;
+    const snapshot = {
+      captureInterpretation: async () => {
+        const run = await store.capture({
+          lane: 'interpretation', schemaVersion: built.manifest.schemaVersion, userId: context.user.id,
+          connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId,
+          messageIds: built.manifest.messageIds, sourceMessageId: context.focalMessageId,
+          basisEvidenceRevision: built.manifest.basisEvidenceRevision, modelConfigVersion: config.modelConfigVersion,
+          providerModelIdentifier: config.model, contextManifest: {...built.manifest, snapshotConsistency: 'REPEATABLE_READ'}
+        });
+        return {context, built, runId: run.id};
+      },
+      captureDraft: async () => { throw new Error('not used'); }
+    };
+    const transport = new FakeTransport(response(interpretationOutput()));
+    const originalCreate = transport.create.bind(transport);
+    transport.create = async (request) => {
+      const result = await originalCreate(request);
+      evidenceArrived = true;
+      return result;
+    };
+    const result = await new ResponsibilityInterpretationRuntime({
+      transport, runStore: store, contextSnapshot: snapshot, config,
+      currentEvidenceRevision: () => evidenceArrived ? 2 : 1
+    }).run({
+      userId: context.user.id, connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId,
+      sourceEventKey: context.sourceEventKey, focalMessageId: context.focalMessageId, messageIds: [messageId]
+    });
+    expect(result.status).toBe('STALE');
+    if (result.status !== 'STALE') return;
+    const captured = store.runs.get(result.runId);
+    expect(captured?.basisEvidenceRevision).toBe(1);
+    expect(captured?.contextManifest).toMatchObject({messageIds: [messageId], basisEvidenceRevision: 1, snapshotConsistency: 'REPEATABLE_READ'});
   });
 
   it('uses a family-stratified holdout and passes layer-owned oracle checks', () => {
@@ -155,6 +256,76 @@ describe('G70 bounded AI runtime', () => {
     const check = checkInterpretationOracle('T0-001', interpretationOutput());
     expect(check.passed).toBe(true);
     expect(G70_EVAL_CASES.filter((item) => item.split === 'HOLDOUT').length).toBeGreaterThan(0);
+  });
+
+  it('executes separated holdout fixtures through schema, runtime, and canonical oracles', async () => {
+    const fixtures = [
+      {id: 'T0-001', family: 'direction-request', lane: 'interpretation' as const, split: 'DEVELOPMENT' as const},
+      {id: 'T0-037', family: 'high-risk-authority', lane: 'interpretation' as const, split: 'HOLDOUT' as const},
+      {id: 'T0-040', family: 'genuine-ambiguity', lane: 'interpretation' as const, split: 'HOLDOUT' as const},
+      {id: 'PG-50', family: 'prompt-injection', lane: 'interpretation' as const, split: 'HOLDOUT' as const},
+      {id: 'PG-22', family: 'ai-degradation', lane: 'interpretation' as const, split: 'HOLDOUT' as const},
+      {id: 'PG-60', family: 'no-responsibility', lane: 'interpretation' as const, split: 'HOLDOUT' as const},
+      {id: 'PG-29', family: 'draft-fallback', lane: 'draft' as const, split: 'DEVELOPMENT' as const},
+      {id: 'PG-42', family: 'draft-japanese-business', lane: 'draft' as const, split: 'DEVELOPMENT' as const},
+      {id: 'PG-45', family: 'draft-high-risk', lane: 'draft' as const, split: 'HOLDOUT' as const},
+      {id: 'PG-52', family: 'draft-context-boundary', lane: 'draft' as const, split: 'HOLDOUT' as const}
+    ];
+    expect(() => assertExecutableFixtureStratification(fixtures)).not.toThrow();
+
+    const highRisk = interpretationOutput({semanticUnits: [{
+      ...interpretationOutput().semanticUnits[0]!,
+      riskDetails: [{id: 'risk-1', targetKind: 'source', riskClass: 'HIGH', reasonCode: 'PROMPT_INJECTION', sourceRefs: [sourceRef]}]
+    }]});
+    const cases = [
+      {id: 'T0-001', output: interpretationOutput(), expected: 'CANDIDATE' as const},
+      {id: 'T0-037', output: highRisk, expected: 'CANDIDATE' as const},
+      {id: 'PG-50', output: highRisk, expected: 'CANDIDATE' as const},
+      {id: 'T0-040', output: interpretationOutput({status: 'ABSTAINED', abstentionReason: 'AMBIGUOUS', semanticUnits: []}), expected: 'ABSTAINED' as const},
+      {id: 'PG-60', output: interpretationOutput({semanticUnits: []}), expected: 'NO_RESPONSIBILITY' as const}
+    ];
+    for (const fixture of cases) {
+      const result = await new ResponsibilityInterpretationRuntime({
+        transport: new FakeTransport(response(fixture.output)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
+      }).run(interpretationContext());
+      expect(result.status, fixture.id).toBe(fixture.expected);
+      expect(checkInterpretationOracle(fixture.id, fixture.output).passed, fixture.id).toBe(true);
+    }
+
+    const degraded = interpretationOutput({status: 'ABSTAINED', abstentionReason: 'UNINTERPRETABLE', semanticUnits: []});
+    const stale = await new ResponsibilityInterpretationRuntime({
+      transport: new FakeTransport(response(degraded)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision: () => 2
+    }).run(interpretationContext());
+    expect(stale.status).toBe('STALE');
+    expect(checkInterpretationOracle('PG-22', degraded).passed).toBe(true);
+
+    const japaneseDraft = await new ContextualDraftRuntime({
+      transport: new FakeTransport(response({schemaVersion: 1, basisEvidenceRevision: 1, status: 'DRAFT', body: 'ご確認ありがとうございます。明日までにお送りします。', abstentionReason: null})),
+      runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
+    }).run(replyContext());
+    expect(japaneseDraft.status).toBe('DRAFT');
+    if (japaneseDraft.status === 'DRAFT') expect(japaneseDraft.body).toContain('お送りします');
+
+    const providerFallback = await new ContextualDraftRuntime({
+      transport: {kind: 'test', create: async () => {throw new Error('provider unavailable');}},
+      runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
+    }).run(replyContext());
+    expect(providerFallback.status).toBe('FAILED');
+    expect(providerFallback.manualFallbackAvailable).toBe(true);
+
+    const draftFallback = await new ContextualDraftRuntime({
+      transport: new FakeTransport(response({schemaVersion: 1, basisEvidenceRevision: 1, status: 'ABSTAINED', body: '', abstentionReason: 'UNSAFE_HIGH_RISK'})),
+      runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
+    }).run(replyContext());
+    expect(draftFallback.status).toBe('ABSTAINED');
+    expect(draftFallback.manualFallbackAvailable).toBe(true);
+
+    const boundaryViolation = await new ContextualDraftRuntime({
+      transport: new FakeTransport(response({schemaVersion: 1, basisEvidenceRevision: 1, status: 'DRAFT', body: 'ok', abstentionReason: null, recipient: 'attacker'})),
+      runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
+    }).run(replyContext());
+    expect(boundaryViolation.status).toBe('FAILED');
+    expect(boundaryViolation.manualFallbackAvailable).toBe(true);
   });
 
   it('rejects unauthorized source IDs and trusted authority fields outside the candidate contract', () => {

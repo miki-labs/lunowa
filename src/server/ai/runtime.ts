@@ -10,7 +10,7 @@ import {
   validateInterpretationOutput
 } from './contracts';
 import {buildDraftContext, buildInterpretationContext, type AuthorizedInterpretationContext, type AuthorizedReplyContext, type BuiltAIContext} from './context';
-import {parseResponseJson, responseRequest, type ResponsesTransport} from './openai';
+import {AIProviderError, parseResponseJson, responseRequest, type ResponsesTransport} from './openai';
 import {deriveResponsibilityCommand} from '../responsibility/interpretation';
 import type {ResponsibilityEvidenceBasis, ResponsibilityInterpretationCandidate} from '../responsibility/types';
 
@@ -28,6 +28,7 @@ export type AIRunCapture = {
   modelConfigVersion: string;
   providerModelIdentifier: string;
   contextManifest: Record<string, unknown>;
+  sourceMessageId?: string;
 };
 
 export type AIRunStore = {
@@ -60,10 +61,59 @@ export type AIModelRuntimeConfig = {
   maxDraftOutputTokens?: number;
 };
 
-type RuntimeDependencies = {
+export type InterpretationContextRequest = {
+  userId: string;
+  connectedAccountId: string;
+  conversationId: string;
+  sourceEventKey: string;
+  focalMessageId: string;
+  /** Exact message scope; every ID is re-authorized by the snapshot repository. */
+  messageIds: readonly string[];
+  locale?: string;
+  timezone?: string;
+};
+
+export type DraftContextRequest = {
+  userId: string;
+  connectedAccountId: string;
+  conversationId: string;
+  messageId: string;
+  replyMode: 'REPLY' | 'REPLY_ALL';
+  trustedRecipientLabels: readonly string[];
+  locale?: string;
+  timezone?: string;
+};
+
+export type AIRunCaptureConfig = Pick<AIModelRuntimeConfig, 'model' | 'modelConfigVersion' | 'dataControlMode'>;
+
+export type CapturedInterpretationContext = {
+  context: AuthorizedInterpretationContext;
+  built: BuiltAIContext;
+  runId: string;
+};
+
+export type CapturedDraftContext = {
+  context: AuthorizedReplyContext;
+  built: BuiltAIContext & {trustedRecipientLabels: readonly string[]};
+  runId: string;
+};
+
+/**
+ * Production callers provide identifiers only. The repository implementation
+ * reads the tenant/account/evidence rows and captures the run in one short DB
+ * transaction before the model call. Direct contexts remain available only to
+ * explicit test transports.
+ */
+export type AIContextSnapshotStore = {
+  captureInterpretation(input: InterpretationContextRequest, config: AIRunCaptureConfig): Promise<CapturedInterpretationContext>;
+  captureDraft(input: DraftContextRequest, config: AIRunCaptureConfig): Promise<CapturedDraftContext>;
+};
+
+export type RuntimeDependencies = {
   transport: ResponsesTransport;
   runStore: AIRunStore;
   config: AIModelRuntimeConfig;
+  contextSnapshot?: AIContextSnapshotStore;
   currentEvidenceRevision: (input: {userId: string; connectedAccountId: string; conversationId: string}) => Promise<number> | number;
 };
 
@@ -96,6 +146,7 @@ async function captureRun(deps: RuntimeDependencies, context: BuiltAIContext, co
     basisEvidenceRevision: context.manifest.basisEvidenceRevision,
     modelConfigVersion: config.modelConfigVersion,
     providerModelIdentifier: config.model,
+    sourceMessageId: context.manifest.focalMessageId ?? context.manifest.messageIds[0],
     contextManifest: {
       ...context.manifest,
       dataControlMode: config.dataControlMode,
@@ -103,6 +154,46 @@ async function captureRun(deps: RuntimeDependencies, context: BuiltAIContext, co
     }
   });
   return captured.id;
+}
+
+function isInterpretationContextRequest(input: AuthorizedInterpretationContext | InterpretationContextRequest): input is InterpretationContextRequest {
+  return !('messages' in input);
+}
+
+function isDraftContextRequest(input: AuthorizedReplyContext | DraftContextRequest): input is DraftContextRequest {
+  return !('message' in input);
+}
+
+function assertProviderDataControl(deps: RuntimeDependencies): void {
+  if (deps.config.dataControlMode === 'UNVERIFIED' && deps.transport.kind !== 'test') {
+    throw new AIProviderError('CONFIGURATION_MISSING', 'AI email-content requests require verified data-control configuration');
+  }
+}
+
+async function captureInterpretationContext(
+  deps: RuntimeDependencies,
+  input: AuthorizedInterpretationContext | InterpretationContextRequest
+): Promise<CapturedInterpretationContext> {
+  if (isInterpretationContextRequest(input)) {
+    if (!deps.contextSnapshot) throw new AIProviderError('CONFIGURATION_MISSING', 'production interpretation requires an authorized context snapshot');
+    return deps.contextSnapshot.captureInterpretation(input, deps.config);
+  }
+  if (deps.transport.kind !== 'test') throw new AIProviderError('CONFIGURATION_MISSING', 'production interpretation requires an authorized context snapshot');
+  const built = buildInterpretationContext(input);
+  return {context: input, built, runId: await captureRun(deps, built, deps.config)};
+}
+
+async function captureDraftContext(
+  deps: RuntimeDependencies,
+  input: AuthorizedReplyContext | DraftContextRequest
+): Promise<CapturedDraftContext> {
+  if (isDraftContextRequest(input)) {
+    if (!deps.contextSnapshot) throw new AIProviderError('CONFIGURATION_MISSING', 'production drafting requires an authorized context snapshot');
+    return deps.contextSnapshot.captureDraft(input, deps.config);
+  }
+  if (deps.transport.kind !== 'test') throw new AIProviderError('CONFIGURATION_MISSING', 'production drafting requires an authorized context snapshot');
+  const built = buildDraftContext(input);
+  return {context: input, built, runId: await captureRun(deps, built, deps.config)};
 }
 
 async function mark(deps: RuntimeDependencies, runId: string, userId: string, status: AIRunStatus): Promise<void> {
@@ -120,10 +211,11 @@ function interpretationEvidenceBasis(context: AuthorizedInterpretationContext): 
 export class ResponsibilityInterpretationRuntime {
   public constructor(private readonly deps: RuntimeDependencies) {}
 
-  public async run(context: AuthorizedInterpretationContext): Promise<InterpretationRuntimeResult> {
-    const built = buildInterpretationContext(context);
-    const runId = await captureRun(this.deps, built, this.deps.config);
+  public async run(input: AuthorizedInterpretationContext | InterpretationContextRequest): Promise<InterpretationRuntimeResult> {
+    const captured = await captureInterpretationContext(this.deps, input);
+    const {context, built, runId} = captured;
     try {
+      assertProviderDataControl(this.deps);
       const raw = await this.deps.transport.create(responseRequest({
         model: this.deps.config.model,
         messages: [...built.input],
@@ -173,10 +265,11 @@ export class ResponsibilityInterpretationRuntime {
 export class ContextualDraftRuntime {
   public constructor(private readonly deps: RuntimeDependencies) {}
 
-  public async run(context: AuthorizedReplyContext): Promise<DraftRuntimeResult> {
-    const built = buildDraftContext(context);
-    const runId = await captureRun(this.deps, built, this.deps.config);
+  public async run(input: AuthorizedReplyContext | DraftContextRequest): Promise<DraftRuntimeResult> {
+    const captured = await captureDraftContext(this.deps, input);
+    const {context, built, runId} = captured;
     try {
+      assertProviderDataControl(this.deps);
       const raw = await this.deps.transport.create(responseRequest({
         model: this.deps.config.model,
         messages: [...built.input],

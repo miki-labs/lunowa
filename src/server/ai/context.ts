@@ -47,6 +47,7 @@ export type AIContextManifest = {
   connectedAccountId: string;
   conversationId: string;
   messageIds: readonly string[];
+  focalMessageId?: string;
   basisEvidenceRevision: number;
   fieldsIncluded: readonly string[];
 };
@@ -157,6 +158,7 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
     manifest: {
       lane: 'interpretation', schemaVersion: 1, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
       conversationId: input.conversationId, messageIds: [...ids], basisEvidenceRevision: input.evidenceRevision,
+      focalMessageId: input.focalMessageId,
       fieldsIncluded: ['message.id', 'message.direction', 'message.sender', 'message.recipients', 'message.cc', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants']
     },
     allowedMessageIds: ids,

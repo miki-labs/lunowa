@@ -182,8 +182,9 @@ async function captureInterpretationContext(
     return deps.contextSnapshot.captureInterpretation(input, deps.config);
   }
   if (deps.transport.kind !== 'test') throw new AIProviderError('CONFIGURATION_MISSING', 'production interpretation requires an authorized context snapshot');
-  const built = buildInterpretationContext(input);
-  return {context: input, built, runId: await captureRun(deps, built, deps.config)};
+  const context = {...input, existingResponsibilities: input.existingResponsibilities ?? deps.existingResponsibilities};
+  const built = buildInterpretationContext(context);
+  return {context, built, runId: await captureRun(deps, built, deps.config), existingResponsibilities: context.existingResponsibilities};
 }
 
 async function captureDraftContext(
@@ -230,9 +231,12 @@ export class ResponsibilityInterpretationRuntime {
         allowedMessageIds: built.allowedMessageIds,
         allowedParticipantIds: built.allowedParticipantIds,
         allowedParticipantEmails: built.allowedParticipantEmails,
+        allowedParticipantRoles: built.allowedParticipantRoles,
         messageParticipantEmails: built.messageParticipantEmails,
         allowedSourceZones: built.allowedSourceZones,
         authorizedMessageBodies: built.authorizedMessageBodies,
+        authorizedMessageSentAt: built.authorizedMessageSentAt,
+        allowedExistingResponsibilityOutcomes: built.allowedExistingResponsibilityOutcomes,
         expectedSourceMessageId: context.focalMessageId
       });
       const current = await currentRevision(this.deps, {userId: context.user.id, connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId});

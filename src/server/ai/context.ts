@@ -1,4 +1,5 @@
 import type {JsonObject} from '../evidence/normalized';
+import type {ResponsibilityState} from '../responsibility/types';
 import {AI_INTERPRETATION_SCHEMA_VERSION, MODEL_SOURCE_ZONES, type ModelSourceZone} from './contracts';
 
 export type AuthorizedAISourceZone = {
@@ -11,6 +12,7 @@ export type AuthorizedAIParticipant = {
   id: string;
   email: string;
   displayName?: string;
+  role?: 'CONNECTED_USER' | 'OTHER_PARTY';
 };
 
 export type AuthorizedAIParty = {
@@ -41,6 +43,8 @@ export type AuthorizedInterpretationContext = {
   messages: readonly AuthorizedAIMessage[];
   /** Every participant ID used by a candidate is paired with its authorized address. */
   participantIdentities?: readonly AuthorizedAIParticipant[];
+  /** Scoped accepted state is context for identity continuity, never model authority. */
+  existingResponsibilities?: readonly ResponsibilityState[];
 };
 
 export type AuthorizedReplyContext = {
@@ -71,9 +75,12 @@ export type BuiltAIContext = {
   allowedMessageIds: ReadonlySet<string>;
   allowedParticipantIds: ReadonlySet<string>;
   allowedParticipantEmails: ReadonlyMap<string, string>;
+  allowedParticipantRoles: ReadonlyMap<string, 'CONNECTED_USER' | 'OTHER_PARTY'>;
   messageParticipantEmails: ReadonlyMap<string, ReadonlySet<string>>;
   allowedSourceZones: ReadonlyMap<string, readonly AuthorizedAISourceZone[]>;
   authorizedMessageBodies: ReadonlyMap<string, string>;
+  authorizedMessageSentAt: ReadonlyMap<string, string>;
+  allowedExistingResponsibilityOutcomes: ReadonlyMap<string, string>;
 };
 
 const MAX_MESSAGES = 24;
@@ -175,6 +182,7 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
   if (!input.messages.every((message) => (message.sourceZones?.length ?? 0) > 0)) throw new Error('interpretation context requires trusted source zones for every message');
   const identities = input.participantIdentities ?? [];
   const allowedParticipantEmails = new Map<string, string>();
+  const allowedParticipantRoles = new Map<string, 'CONNECTED_USER' | 'OTHER_PARTY'>();
   const participantEmails = new Set<string>();
   for (const [index, identity] of identities.entries()) {
     bounded(identity.id, `interpretation participantIdentities[${index}].id`, 128);
@@ -182,6 +190,9 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
     const email = identity.email.trim().toLocaleLowerCase('und');
     if (allowedParticipantEmails.has(identity.id) || participantEmails.has(email)) throw new Error('interpretation participant identities must be unique');
     allowedParticipantEmails.set(identity.id, email);
+    const derivedRole = email === input.connectedAccount.emailAddress.trim().toLocaleLowerCase('und') || email === input.user.email.trim().toLocaleLowerCase('und') ? 'CONNECTED_USER' : 'OTHER_PARTY';
+    if (identity.role && identity.role !== derivedRole) throw new Error(`interpretation participant role does not match the trusted account address: ${identity.id}`);
+    allowedParticipantRoles.set(identity.id, derivedRole);
     participantEmails.add(email);
   }
   const participantIds = new Set(allowedParticipantEmails.keys());
@@ -204,6 +215,8 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
   }
   const allowedSourceZones = new Map(input.messages.map((message) => [message.id, message.sourceZones ?? []] as const));
   const authorizedMessageBodies = new Map(input.messages.map((message) => [message.id, message.body] as const));
+  const authorizedMessageSentAt = new Map(input.messages.map((message) => [message.id, message.sentAt] as const));
+  const allowedExistingResponsibilityOutcomes = new Map((input.existingResponsibilities ?? []).map((state) => [state.id, state.operationalOutcome] as const));
   const payload = {
     lane: 'responsibility_interpretation',
     schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION,
@@ -211,7 +224,8 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
     sourceEventKey: input.sourceEventKey,
     focalMessageId: input.focalMessageId,
     user: {id: input.user.id, locale: input.user.locale ?? null, timezone: input.user.timezone ?? null},
-    authorizedParticipants: identities.map((identity) => ({id: identity.id, email: identity.email, displayName: identity.displayName ?? null})),
+    authorizedParticipants: identities.map((identity) => ({id: identity.id, email: identity.email, displayName: identity.displayName ?? null, role: allowedParticipantRoles.get(identity.id)})),
+    existingResponsibilities: (input.existingResponsibilities ?? []).map((state) => ({id: state.id, operationalOutcome: state.operationalOutcome, resolutionStatus: state.resolutionStatus})),
     messages: input.messages.map(messageForModel)
   };
   return {
@@ -223,14 +237,17 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
       lane: 'interpretation', schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
       conversationId: input.conversationId, messageIds: [...ids], basisEvidenceRevision: input.evidenceRevision,
       focalMessageId: input.focalMessageId,
-      fieldsIncluded: ['message.id', 'message.direction', 'message.sender.participantId', 'message.sender.email', 'message.recipients.participantId', 'message.recipients.email', 'message.cc.participantId', 'message.cc.email', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants.id', 'authorizedParticipants.email']
+      fieldsIncluded: ['message.id', 'message.direction', 'message.sender.participantId', 'message.sender.email', 'message.recipients.participantId', 'message.recipients.email', 'message.cc.participantId', 'message.cc.email', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants.id', 'authorizedParticipants.email', 'authorizedParticipants.role', 'existingResponsibilities.id', 'existingResponsibilities.operationalOutcome', 'existingResponsibilities.resolutionStatus']
     },
     allowedMessageIds: ids,
     allowedParticipantIds: participantIds,
     allowedParticipantEmails,
+    allowedParticipantRoles,
     messageParticipantEmails,
     allowedSourceZones,
-    authorizedMessageBodies
+    authorizedMessageBodies,
+    authorizedMessageSentAt,
+    allowedExistingResponsibilityOutcomes
   };
 }
 
@@ -260,6 +277,7 @@ export function buildDraftContext(input: AuthorizedReplyContext): BuiltAIContext
     allowedMessageIds: messageIds,
     allowedParticipantIds: new Set(),
     allowedParticipantEmails: new Map(),
+    allowedParticipantRoles: new Map(),
     messageParticipantEmails: new Map([[input.message.id, new Set([
       input.message.sender.email.trim().toLocaleLowerCase('und'),
       ...input.message.recipients.map((recipient) => recipient.email.trim().toLocaleLowerCase('und')),
@@ -267,6 +285,8 @@ export function buildDraftContext(input: AuthorizedReplyContext): BuiltAIContext
     ])]]),
     allowedSourceZones: new Map([[input.message.id, input.message.sourceZones ?? []]]),
     authorizedMessageBodies: new Map([[input.message.id, input.message.body]]),
+    authorizedMessageSentAt: new Map([[input.message.id, input.message.sentAt]]),
+    allowedExistingResponsibilityOutcomes: new Map(),
     trustedRecipientLabels: input.trustedRecipientLabels
   };
 }

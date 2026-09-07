@@ -19,6 +19,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "ai:eval": "node --import tsx scripts/ai-runtime-eval.ts",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "test:auth-production": "node --import tsx tests/auth-production-integration.ts",
     "test:evidence-foundation": "node --import tsx tests/evidence-foundation-integration.ts",

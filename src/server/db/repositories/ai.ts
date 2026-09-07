@@ -251,6 +251,11 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         messages: normalized.messages
       });
       const messagesWithZones = normalized.messages.map((message) => ({...message, sourceZones: [...(sourceZones.get(message.id) ?? [])]}));
+      const existingResponsibilities = await loadResponsibilityStatesInTransaction(tx, {
+        userId: input.userId,
+        connectedAccountId: input.connectedAccountId,
+        conversationId: input.conversationId
+      });
       const context: AuthorizedInterpretationContext = {
         user: {id: scope.owner.id, email: scope.owner.email, locale: input.locale, timezone: input.timezone},
         connectedAccount: scope.account,
@@ -259,14 +264,10 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         evidenceRevision: scope.conversation.semanticEvidenceRevision,
         focalMessageId: input.focalMessageId,
         messages: messagesWithZones,
-        participantIdentities: normalized.participantIdentities
+        participantIdentities: normalized.participantIdentities,
+        existingResponsibilities
       };
       const built = buildInterpretationContext(context);
-      const existingResponsibilities = await loadResponsibilityStatesInTransaction(tx, {
-        userId: context.user.id,
-        connectedAccountId: context.connectedAccount.id,
-        conversationId: context.conversationId
-      });
       const run = await this.captureInTransaction(tx, {
         lane: 'interpretation',
         schemaVersion: built.manifest.schemaVersion,

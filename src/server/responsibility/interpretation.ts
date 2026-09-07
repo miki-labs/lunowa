@@ -180,8 +180,14 @@ function admissionFor(candidate: ResponsibilityInterpretationCandidate): {decisi
 }
 
 function findPrior(unit: CandidateResponsibilitySemantics, candidate: ResponsibilityInterpretationCandidate, states: readonly ResponsibilityState[]): ResponsibilityState {
+  const priorId = unit.identityRelation?.priorResponsibilityId;
+  if (priorId) {
+    const match = states.filter((state) => state.id === priorId && state.userId === candidate.userId && state.connectedAccountId === candidate.connectedAccountId && state.conversationId === candidate.conversationId);
+    if (match.length !== 1) throw new Error(`identity relation for ${unit.candidateUnitKey} must match exactly one scoped Responsibility`);
+    return match[0] as ResponsibilityState;
+  }
   const priorOutcome = unit.identityRelation?.priorOperationalOutcome;
-  if (!priorOutcome) throw new Error('continuation needs a prior operational outcome');
+  if (!priorOutcome) throw new Error('continuation needs a prior Responsibility selection');
   const matches = states.filter((state) =>
     state.userId === candidate.userId &&
     state.connectedAccountId === candidate.connectedAccountId &&

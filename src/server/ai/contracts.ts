@@ -45,6 +45,8 @@ export type ModelSourceRef = {
 
 export type ModelIdentityRelation = {
   kind: 'NEW' | 'CONTINUES' | 'REPLACES' | 'SAME_UNSATISFIED_OUTCOME' | 'NEW_EPISODE';
+  /** The model selects only from the scoped trusted options supplied in context. */
+  priorResponsibilityId?: string;
   priorOperationalOutcome?: string;
 };
 
@@ -240,8 +242,8 @@ const jsonValueSchema: JsonSchema = {
 
 const identitySchema = nullable(objectSchema({
   kind: enumSchema(['NEW', 'CONTINUES', 'REPLACES', 'SAME_UNSATISFIED_OUTCOME', 'NEW_EPISODE']),
-  priorOperationalOutcome: nullable(stringSchema(2048))
-}, ['kind', 'priorOperationalOutcome']));
+  priorResponsibilityId: nullable(stringSchema(128))
+}, ['kind', 'priorResponsibilityId']));
 
 const obligationLegSchema = sourceProvenanced({
   id: stringSchema(128),
@@ -519,14 +521,15 @@ function mapProvenanced<T extends {sourceRefs: ModelSourceRef[]}>(item: T): Omit
   return {...rest, provenance: mapSourceRefs(refs)};
 }
 
-function validateIdentity(value: unknown, label: string): ModelIdentityRelation | undefined {
+function validateIdentity(value: unknown, label: string, allowedExistingResponsibilityOutcomes: ReadonlyMap<string, string>): ModelIdentityRelation | undefined {
   if (value === undefined || value === null) return undefined;
   const item = record(value, label);
-  exact(item, ['kind', 'priorOperationalOutcome'], label);
+  exact(item, ['kind', 'priorResponsibilityId'], label);
   const kind = enumValue(item.kind, ['NEW', 'CONTINUES', 'REPLACES', 'SAME_UNSATISFIED_OUTCOME', 'NEW_EPISODE'] as const, `${label}.kind`);
-  const priorOperationalOutcome = optionalString(item.priorOperationalOutcome, `${label}.priorOperationalOutcome`, 2048);
-  if (kind !== 'NEW' && kind !== 'NEW_EPISODE' && !priorOperationalOutcome) throw new AIContractError(`${label} needs priorOperationalOutcome`);
-  return {kind, ...(priorOperationalOutcome ? {priorOperationalOutcome} : {})};
+  const priorResponsibilityId = optionalString(item.priorResponsibilityId, `${label}.priorResponsibilityId`, 128);
+  if (kind !== 'NEW' && kind !== 'NEW_EPISODE' && !priorResponsibilityId) throw new AIContractError(`${label} needs priorResponsibilityId`);
+  if (priorResponsibilityId && !allowedExistingResponsibilityOutcomes.has(priorResponsibilityId)) throw new AIContractError(`${label}.priorResponsibilityId is outside the authorized scoped Responsibilities`);
+  return {kind, ...(priorResponsibilityId ? {priorResponsibilityId, priorOperationalOutcome: allowedExistingResponsibilityOutcomes.get(priorResponsibilityId)} : {})};
 }
 
 function validateSourceProvenanced(
@@ -540,6 +543,85 @@ function validateSourceProvenanced(
   return sourceRefs(item.sourceRefs, `${label}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies);
 }
 
+type ParticipantRole = 'CONNECTED_USER' | 'OTHER_PARTY';
+
+function assertCounterpartyParticipant(participantId: string, label: string, allowedParticipantRoles: ReadonlyMap<string, ParticipantRole>): void {
+  if (allowedParticipantRoles.get(participantId) === 'CONNECTED_USER') {
+    throw new AIContractError(`${label} cannot assign the connected user's participant identity to a counterpart semantic`);
+  }
+}
+
+function citedText(refs: readonly ModelSourceRef[], bodies: ReadonlyMap<string, string>): string {
+  return refs.map((ref) => {
+    if (ref.excerpt) return ref.excerpt;
+    const body = bodies.get(ref.messageId) ?? '';
+    return ref.start !== undefined && ref.end !== undefined ? body.slice(ref.start, ref.end) : '';
+  }).join('\n');
+}
+
+function assertEncodedValueGrounded(value: ModelJSONValue, refs: readonly ModelSourceRef[], label: string, bodies: ReadonlyMap<string, string>): void {
+  const parsed = decodedJsonValue(value, label);
+  const text = citedText(refs, bodies);
+  const leaves: unknown[] = [];
+  const collect = (item: unknown): void => {
+    if (typeof item === 'string' || typeof item === 'number') leaves.push(item);
+    else if (Array.isArray(item)) item.forEach(collect);
+    else if (item && typeof item === 'object') Object.values(item).forEach(collect);
+  };
+  collect(parsed);
+  for (const leaf of leaves) {
+    const rendered = String(leaf).trim();
+    if (rendered.length >= 2 && !text.includes(rendered)) throw new AIContractError(`${label} contains a material value not grounded in its cited source text`);
+  }
+}
+
+function addCalendarDays(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function groundedDate(expression: string, messageId: string, sentAt: ReadonlyMap<string, string>): string | undefined {
+  const literal = expression.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
+  if (literal) return literal;
+  const base = sentAt.get(messageId)?.slice(0, 10);
+  if (!base) return undefined;
+  if (/明後日|day after tomorrow/i.test(expression)) return addCalendarDays(base, 2);
+  if (/明日|tomorrow/i.test(expression)) return addCalendarDays(base, 1);
+  if (/今日|today/i.test(expression)) return base;
+  const weekdayMatch = /(?:(日|月|火|水|木|金|土)曜|\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\b)/i.exec(expression);
+  const weekday = weekdayMatch?.[1] ?? weekdayMatch?.[2];
+  if (weekday) {
+    const names = ['日', '月', '火', '水', '木', '金', '土'];
+    const english = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const target = names.indexOf(weekday) >= 0 ? names.indexOf(weekday) : english.indexOf(weekday.toLowerCase());
+    const current = new Date(`${base}T00:00:00Z`).getUTCDay();
+    return addCalendarDays(base, (target - current + 7) % 7 || 7);
+  }
+  return undefined;
+}
+
+function assertTemporalValueGrounded(
+  item: RecordValue,
+  refs: readonly ModelSourceRef[],
+  label: string,
+  bodies: ReadonlyMap<string, string>,
+  sentAt: ReadonlyMap<string, string>
+): void {
+  const resolvedDate = optionalString(item.resolvedDate, `${label}.resolvedDate`, 32);
+  const resolvedAt = optionalString(item.resolvedAt, `${label}.resolvedAt`, 64);
+  if (!resolvedDate && !resolvedAt) return;
+  const expression = optionalString(item.originalExpression, `${label}.originalExpression`, 512);
+  if (!expression || !citedText(refs, bodies).includes(expression)) throw new AIContractError(`${label} resolved value needs an originalExpression grounded in its cited source text`);
+  if (resolvedDate) {
+    const sourceMessage = refs.find((ref) => citedText([ref], bodies).includes(expression))?.messageId ?? refs[0]?.messageId ?? '';
+    const expected = groundedDate(expression, sourceMessage, sentAt);
+    if (expected && expected !== resolvedDate) throw new AIContractError(`${label}.resolvedDate is not derived from its cited originalExpression`);
+    if (!expected && !citedText(refs, bodies).includes(resolvedDate)) throw new AIContractError(`${label}.resolvedDate is not grounded in its cited source text`);
+  }
+  if (resolvedAt && !citedText(refs, bodies).includes(resolvedAt) && !expression.includes(resolvedAt)) throw new AIContractError(`${label}.resolvedAt is not grounded in its cited source text`);
+}
+
 function validateSemanticUnit(
   value: unknown,
   label: string,
@@ -547,8 +629,11 @@ function validateSemanticUnit(
   allowedParticipantIds: ReadonlySet<string>,
   allowedParticipantEmails: ReadonlyMap<string, string>,
   messageParticipantEmails: ReadonlyMap<string, ReadonlySet<string>>,
+  allowedParticipantRoles: ReadonlyMap<string, ParticipantRole>,
   allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>,
-  authorizedMessageBodies: ReadonlyMap<string, string>
+  authorizedMessageBodies: ReadonlyMap<string, string>,
+  authorizedMessageSentAt: ReadonlyMap<string, string>,
+  allowedExistingResponsibilityOutcomes: ReadonlyMap<string, string>
 ): ModelSemanticUnit {
   const item = record(value, label);
   exact(item, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs'], label);
@@ -556,7 +641,7 @@ function validateSemanticUnit(
   const materiality = enumValue(item.materiality, ['MATERIAL', 'NOT_MATERIAL', 'UNCERTAIN'] as const, `${label}.materiality`);
   const operationalOutcome = optionalString(item.operationalOutcome, `${label}.operationalOutcome`, 2048);
   if (materiality === 'MATERIAL' && !operationalOutcome) throw new AIContractError(`${label}.operationalOutcome is required for material units`);
-  const identityRelation = validateIdentity(item.identityRelation, `${label}.identityRelation`);
+  const identityRelation = validateIdentity(item.identityRelation, `${label}.identityRelation`, allowedExistingResponsibilityOutcomes);
   const refs = validateParticipantRefs(validateSourceProvenanced(item, label, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), label, allowedParticipantEmails, messageParticipantEmails);
   const refsFor = (value: unknown, nestedLabel: string): ModelSourceRef[] =>
     validateParticipantRefs(validateSourceProvenanced(value, nestedLabel, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), nestedLabel, allowedParticipantEmails, messageParticipantEmails);
@@ -571,6 +656,7 @@ function validateSemanticUnit(
     const bearerCandidate = enumValue(leg.bearerCandidate, ['USER', 'PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const, `${nestedLabel}.bearerCandidate`);
     const participantId = optionalString(leg.participantId, `${nestedLabel}.participantId`, 128);
     if (bearerCandidate !== 'USER' && (!participantId || !allowedParticipantIds.has(participantId))) throw new AIContractError(`${nestedLabel} needs an authorized participantId`);
+    if (participantId && bearerCandidate !== 'USER') assertCounterpartyParticipant(participantId, `${nestedLabel}.participantId`, allowedParticipantRoles);
     const refs = validateParticipantRefs(sourceRefs(leg.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), `${nestedLabel}.sourceRefs`, allowedParticipantEmails, messageParticipantEmails);
     if (participantId) assertParticipantIsCited(participantId, refs, `${nestedLabel}.participantId`, allowedParticipantEmails, messageParticipantEmails);
     return {id: stringValue(leg.id, `${nestedLabel}.id`, 128), bearerCandidate, ...(participantId ? {participantId} : {}), actionCode: stringValue(leg.actionCode, `${nestedLabel}.actionCode`, 128), ...(optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048) ? {actionSummary: optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048)} : {}), ...(optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048) ? {objectSummary: optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048)} : {}), basisKind: stringValue(leg.basisKind, `${nestedLabel}.basisKind`, 128), blockedByCondition: booleanValue(leg.blockedByCondition, `${nestedLabel}.blockedByCondition`), sourceRefs: refs};
@@ -581,6 +667,7 @@ function validateSemanticUnit(
     const actor = enumValue(event.actor, ['PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const, `${nestedLabel}.actor`);
     const participantId = optionalString(event.participantId, `${nestedLabel}.participantId`, 128);
     if (actor !== 'EXTERNAL' && (!participantId || !allowedParticipantIds.has(participantId))) throw new AIContractError(`${nestedLabel} needs an authorized participantId`);
+    if (participantId) assertCounterpartyParticipant(participantId, `${nestedLabel}.participantId`, allowedParticipantRoles);
     const refs = validateParticipantRefs(sourceRefs(event.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), `${nestedLabel}.sourceRefs`, allowedParticipantEmails, messageParticipantEmails);
     if (participantId) assertParticipantIsCited(participantId, refs, `${nestedLabel}.participantId`, allowedParticipantEmails, messageParticipantEmails);
     return {id: stringValue(event.id, `${nestedLabel}.id`, 128), actor, ...(participantId ? {participantId} : {}), eventCode: stringValue(event.eventCode, `${nestedLabel}.eventCode`, 128), ...(optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048) ? {eventSummary: optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048)} : {}), ...(optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128) } : {}), ...(optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128) ? {expectationStrength: optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128)} : {}), sourceRefs: refs};
@@ -597,6 +684,8 @@ function validateSemanticUnit(
     const temporalKind = enumValue(fact.temporalKind, ['SOURCE_DUE', 'EXPECTED_EVENT_TIME', 'USER_TARGET'] as const, `${nestedLabel}.temporalKind`);
     const obligationLegId = optionalString(fact.obligationLegId, `${nestedLabel}.obligationLegId`, 128);
     const expectedEventId = optionalString(fact.expectedEventId, `${nestedLabel}.expectedEventId`, 128);
+    const sourceRefs = refsFor(fact, nestedLabel);
+    assertTemporalValueGrounded(fact, sourceRefs, nestedLabel, authorizedMessageBodies, authorizedMessageSentAt);
     return {
       id: stringValue(fact.id, `${nestedLabel}.id`, 128), temporalKind,
       ...(obligationLegId ? {obligationLegId} : {}), ...(expectedEventId ? {expectedEventId} : {}),
@@ -609,22 +698,22 @@ function validateSemanticUnit(
       ...(fact.anchorOffsetSeconds === undefined || fact.anchorOffsetSeconds === null ? {} : {anchorOffsetSeconds: boundedInteger(fact.anchorOffsetSeconds, `${nestedLabel}.anchorOffsetSeconds`, -31_536_000, 31_536_000)}),
       conflictCandidate: booleanValue(fact.conflictCandidate, `${nestedLabel}.conflictCandidate`),
       ...(optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128) ? {authorityStatus: optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128)} : {}),
-      sourceRefs: refsFor(fact, nestedLabel)
+      sourceRefs
     };
   });
   const completionCriteria = list('completionCriteria', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const constraints = list('constraints', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'conditionRef', 'sourceRefs'], nestedLabel); const condition = item.conditionRef === undefined || item.conditionRef === null ? undefined : record(item.conditionRef, `${nestedLabel}.conditionRef`); if (condition) exact(condition, ['kind', 'id', 'code'], `${nestedLabel}.conditionRef`); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), ...(condition ? {conditionRef: {kind: enumValue(condition.kind, ['EXPECTED_EVENT', 'OTHER'] as const, `${nestedLabel}.conditionRef.kind`), ...(optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128) ? {id: optionalString(condition.id, `${nestedLabel}.conditionRef.id`, 128)} : {}), ...(optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128) ? {code: optionalString(condition.code, `${nestedLabel}.conditionRef.code`, 128)} : {})}} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
-  const proposals = list('pendingProposals', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'candidateStatus', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(item.candidateStatus === undefined || item.candidateStatus === null ? {} : {candidateStatus: enumValue(item.candidateStatus, ['PENDING', 'REJECTED'] as const, `${nestedLabel}.candidateStatus`)}), sourceRefs: refsFor(item, nestedLabel)}; });
-  const agreedFacts = list('agreedFacts', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encodedJsonValue(item.value, `${nestedLabel}.value`), sourceRefs: refsFor(item, nestedLabel)}; });
+  const proposals = list('pendingProposals', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'candidateStatus', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encoded, ...(item.candidateStatus === undefined || item.candidateStatus === null ? {} : {candidateStatus: enumValue(item.candidateStatus, ['PENDING', 'REJECTED'] as const, `${nestedLabel}.candidateStatus`)}), sourceRefs: refs}; });
+  const agreedFacts = list('agreedFacts', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'kind', 'value', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), kind: stringValue(item.kind, `${nestedLabel}.kind`, 128), value: encoded, sourceRefs: refs}; });
   const uncertainties = list('uncertainties', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'fieldKey', 'reasonCode', 'material', 'reviewRequired', 'candidateRefs', 'sourceRefs'], nestedLabel); const refs = item.candidateRefs === undefined || item.candidateRefs === null ? undefined : (() => { if (!Array.isArray(item.candidateRefs)) throw new AIContractError(`${nestedLabel}.candidateRefs must be an array`); return item.candidateRefs.map((ref, index) => stringValue(ref, `${nestedLabel}.candidateRefs[${index}]`, 128)); })(); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), fieldKey: stringValue(item.fieldKey, `${nestedLabel}.fieldKey`, 128), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), material: booleanValue(item.material, `${nestedLabel}.material`), reviewRequired: booleanValue(item.reviewRequired, `${nestedLabel}.reviewRequired`), ...(refs ? {candidateRefs: refs} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const riskDetails = list('riskDetails', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'targetKind', 'targetId', 'riskClass', 'reasonCode', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), targetKind: stringValue(item.targetKind, `${nestedLabel}.targetKind`, 128), ...(optionalString(item.targetId, `${nestedLabel}.targetId`, 128) ? {targetId: optionalString(item.targetId, `${nestedLabel}.targetId`, 128)} : {}), riskClass: enumValue(item.riskClass, ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const, `${nestedLabel}.riskClass`), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), sourceRefs: refsFor(item, nestedLabel)}; });
-  const corrections = list('corrections', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['fieldKey', 'value', 'semanticTime', 'relation', 'sourceRefs'], nestedLabel); return {fieldKey: enumValue(item.fieldKey, ['operationalOutcome', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'temporalFacts.SOURCE_DUE', 'temporalFacts.EXPECTED_EVENT_TIME', 'temporalFacts.USER_TARGET', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails'] as const, `${nestedLabel}.fieldKey`), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128) ? {semanticTime: optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128)} : {}), relation: enumValue(item.relation, ['CORRECTION', 'SUPERSEDES', 'CONFLICT'] as const, `${nestedLabel}.relation`), sourceRefs: refsFor(item, nestedLabel)}; });
-  const assignment = item.assignmentSemantics === undefined || item.assignmentSemantics === null ? undefined : (() => { const value = record(item.assignmentSemantics, `${label}.assignmentSemantics`); exact(value, ['id', 'shape', 'candidateParticipantIds', 'selectedParticipantId'], `${label}.assignmentSemantics`); if (!Array.isArray(value.candidateParticipantIds)) throw new AIContractError(`${label}.assignmentSemantics.candidateParticipantIds must be an array`); const ids = value.candidateParticipantIds.map((id, index) => stringValue(id, `${label}.assignmentSemantics.candidateParticipantIds[${index}]`, 128)); if (ids.some((id) => !allowedParticipantIds.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unauthorized participant`); ids.forEach((id) => assertParticipantIsCited(id, refs, `${label}.assignmentSemantics`, allowedParticipantEmails, messageParticipantEmails)); const selected = optionalString(value.selectedParticipantId, `${label}.assignmentSemantics.selectedParticipantId`, 128); if (selected && !allowedParticipantIds.has(selected)) throw new AIContractError(`${label}.assignmentSemantics.selectedParticipantId is unauthorized`); if (selected) assertParticipantIsCited(selected, refs, `${label}.assignmentSemantics.selectedParticipantId`, allowedParticipantEmails, messageParticipantEmails); return {id: stringValue(value.id, `${label}.assignmentSemantics.id`, 128), shape: enumValue(value.shape, ['ANY_OF', 'ALL_OF', 'UNSPECIFIED_GROUP'] as const, `${label}.assignmentSemantics.shape`), candidateParticipantIds: ids, ...(selected ? {selectedParticipantId: selected} : {})}; })();
+  const corrections = list('corrections', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['fieldKey', 'value', 'semanticTime', 'relation', 'sourceRefs'], nestedLabel); const refs = refsFor(item, nestedLabel); const encoded = encodedJsonValue(item.value, `${nestedLabel}.value`); assertEncodedValueGrounded(encoded, refs, `${nestedLabel}.value`, authorizedMessageBodies); return {fieldKey: enumValue(item.fieldKey, ['operationalOutcome', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'temporalFacts.SOURCE_DUE', 'temporalFacts.EXPECTED_EVENT_TIME', 'temporalFacts.USER_TARGET', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails'] as const, `${nestedLabel}.fieldKey`), value: encoded, ...(optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128) ? {semanticTime: optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128)} : {}), relation: enumValue(item.relation, ['CORRECTION', 'SUPERSEDES', 'CONFLICT'] as const, `${nestedLabel}.relation`), sourceRefs: refs}; });
+  const assignment = item.assignmentSemantics === undefined || item.assignmentSemantics === null ? undefined : (() => { const value = record(item.assignmentSemantics, `${label}.assignmentSemantics`); exact(value, ['id', 'shape', 'candidateParticipantIds', 'selectedParticipantId'], `${label}.assignmentSemantics`); if (!Array.isArray(value.candidateParticipantIds)) throw new AIContractError(`${label}.assignmentSemantics.candidateParticipantIds must be an array`); const ids = value.candidateParticipantIds.map((id, index) => stringValue(id, `${label}.assignmentSemantics.candidateParticipantIds[${index}]`, 128)); if (ids.some((id) => !allowedParticipantIds.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unauthorized participant`); ids.forEach((id) => { assertCounterpartyParticipant(id, `${label}.assignmentSemantics`, allowedParticipantRoles); assertParticipantIsCited(id, refs, `${label}.assignmentSemantics`, allowedParticipantEmails, messageParticipantEmails); }); const selected = optionalString(value.selectedParticipantId, `${label}.assignmentSemantics.selectedParticipantId`, 128); if (selected && !allowedParticipantIds.has(selected)) throw new AIContractError(`${label}.assignmentSemantics.selectedParticipantId is unauthorized`); if (selected) { assertCounterpartyParticipant(selected, `${label}.assignmentSemantics.selectedParticipantId`, allowedParticipantRoles); assertParticipantIsCited(selected, refs, `${label}.assignmentSemantics.selectedParticipantId`, allowedParticipantEmails, messageParticipantEmails); } return {id: stringValue(value.id, `${label}.assignmentSemantics.id`, 128), shape: enumValue(value.shape, ['ANY_OF', 'ALL_OF', 'UNSPECIFIED_GROUP'] as const, `${label}.assignmentSemantics.shape`), candidateParticipantIds: ids, ...(selected ? {selectedParticipantId: selected} : {})}; })();
   const terminal = item.terminalSignal === undefined || item.terminalSignal === null ? undefined : (() => { const value = record(item.terminalSignal, `${label}.terminalSignal`); exact(value, ['kind', 'sourceRefs'], `${label}.terminalSignal`); return {kind: enumValue(value.kind, ['NONE', 'COMPLETED', 'DECLINED', 'CANCELLED', 'INVALIDATED'] as const, `${label}.terminalSignal.kind`), sourceRefs: refsFor({sourceRefs: value.sourceRefs}, `${label}.terminalSignal`)}; })();
   return {candidateUnitKey, materiality, ...(operationalOutcome ? {operationalOutcome} : {}), ...(identityRelation ? {identityRelation} : {}), obligationLegs, expectedEvents, temporalFacts, completionCriteria, constraints, pendingProposals: proposals, agreedFacts, uncertainties, riskDetails, ...(assignment ? {assignmentSemantics: assignment} : {}), corrections, ...(terminal ? {terminalSignal: terminal} : {}), sourceRefs: refs};
 }
 
-export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedParticipantEmails?: ReadonlyMap<string, string>; messageParticipantEmails?: ReadonlyMap<string, ReadonlySet<string>>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; expectedSourceMessageId?: string}): ModelInterpretationOutput {
+export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedParticipantEmails?: ReadonlyMap<string, string>; allowedParticipantRoles?: ReadonlyMap<string, ParticipantRole>; messageParticipantEmails?: ReadonlyMap<string, ReadonlySet<string>>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; authorizedMessageSentAt?: ReadonlyMap<string, string>; allowedExistingResponsibilityOutcomes?: ReadonlyMap<string, string>; expectedSourceMessageId?: string}): ModelInterpretationOutput {
   assertNoForbiddenKeys(value);
   const item = record(value, 'interpretation output');
   exact(item, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'], 'interpretation output');
@@ -639,11 +728,15 @@ export function validateInterpretationOutput(value: unknown, input: {basisEviden
   if (status === 'CANDIDATE' && abstentionReason) throw new AIContractError('candidate interpretation cannot carry an abstention reason');
   if (!Array.isArray(item.semanticUnits) || item.semanticUnits.length > 32) throw new AIContractError('interpretation semanticUnits must be a bounded array');
   const allowedParticipantEmails = input.allowedParticipantEmails ?? new Map<string, string>();
+  const allowedParticipantRoles = input.allowedParticipantRoles ?? new Map<string, ParticipantRole>();
   const messageParticipantEmails = input.messageParticipantEmails ?? new Map<string, ReadonlySet<string>>();
-  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds, allowedParticipantEmails, messageParticipantEmails, input.allowedSourceZones, input.authorizedMessageBodies));
+  const authorizedMessageSentAt = input.authorizedMessageSentAt ?? new Map<string, string>();
+  const allowedExistingResponsibilityOutcomes = input.allowedExistingResponsibilityOutcomes ?? new Map<string, string>();
+  const outputSourceRefs = validateParticipantRefs(sourceRefs(item.sourceRefs, 'interpretation output.sourceRefs', input.allowedMessageIds, input.allowedSourceZones, input.authorizedMessageBodies), 'interpretation output.sourceRefs', allowedParticipantEmails, messageParticipantEmails);
+  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds, allowedParticipantEmails, messageParticipantEmails, allowedParticipantRoles, input.allowedSourceZones, input.authorizedMessageBodies, authorizedMessageSentAt, allowedExistingResponsibilityOutcomes));
   if (new Set(semanticUnits.map((unit) => unit.candidateUnitKey)).size !== semanticUnits.length) throw new AIContractError('interpretation semantic unit keys must be unique');
   if (status === 'ABSTAINED' && semanticUnits.length > 0) throw new AIContractError('abstained interpretation cannot include semantic units');
-  return {schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, basisEvidenceRevision: input.basisEvidenceRevision, status, sourceMessageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits, sourceRefs: validateParticipantRefs(sourceRefs(item.sourceRefs, 'interpretation output.sourceRefs', input.allowedMessageIds, input.allowedSourceZones, input.authorizedMessageBodies), 'interpretation output.sourceRefs', allowedParticipantEmails, messageParticipantEmails)};
+  return {schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, basisEvidenceRevision: input.basisEvidenceRevision, status, sourceMessageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits, sourceRefs: outputSourceRefs};
 }
 
 export function validateDraftOutput(value: unknown, expectedRevision: number): ModelDraftOutput {
@@ -655,6 +748,7 @@ export function validateDraftOutput(value: unknown, expectedRevision: number): M
   const status = enumValue(item.status, ['DRAFT', 'ABSTAINED'] as const, 'draft output.status');
   const body = typeof item.body === 'string' ? item.body : '';
   if (body.length > 12_000) throw new AIContractError('draft body is too long');
+  if (/^(?:from|to|cc|bcc|subject):/im.test(body)) throw new AIContractError('draft body cannot contain trusted routing headers');
   const abstentionReason = item.abstentionReason === undefined || item.abstentionReason === null ? undefined : enumValue(item.abstentionReason, ['MISSING_CONTEXT', 'UNSAFE_HIGH_RISK', 'UNINTERPRETABLE'] as const, 'draft output.abstentionReason');
   if (status === 'DRAFT' && !body.trim()) throw new AIContractError('draft output must contain editable text');
   if (status === 'ABSTAINED' && body.trim()) throw new AIContractError('abstained draft cannot contain a body');

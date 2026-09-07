@@ -1,4 +1,5 @@
 import {expect, test} from '@playwright/test';
+import type {AttentionItemReadModel, AttentionReadModel} from '../src/lib/attention-types';
 
 const nav = (page: import('@playwright/test').Page, label: string) => page.getByRole('button', {name: `${label}を表示`});
 const waitForAuthenticatedShell = async (page: import('@playwright/test').Page) => {
@@ -56,6 +57,34 @@ const sourcePage = {
   total: 1,
   nextCursor: null
 };
+const attentionReadModel = {
+  source: {readiness: 'ready', dataThroughAt: '2030-01-01T00:00:00.000Z'},
+  integrity: {status: 'healthy', message: null},
+  needsYou: [{
+    id: 'responsibility-1',
+    subjectKind: 'RESPONSIBILITY',
+    responsibilityId: 'responsibility-1',
+    admissionReviewId: null,
+    conversationId: 'source-conversation-1',
+    surface: 'NEEDS_YOU',
+    projection: {bucket: 'MY_TURN', subjectKind: 'RESPONSIBILITY', primaryReason: 'open-user-obligation:REPLY'},
+    operationalOutcome: '見積書の確認を終える',
+    reviewQuestion: null,
+    primaryAction: '返信する',
+    awaitedEvent: null,
+    returnCondition: null,
+    nearestRelevantTime: null,
+    overdue: false
+  }],
+  managed: [],
+  later: [],
+  review: [],
+  done: [],
+  strictZero: false,
+  managedCount: 0,
+  delegatedCount: 1,
+  derivedAt: '2030-01-01T00:00:00.000Z'
+};
 const sourceDetail = {
   id: 'source-conversation-1',
   providerThreadId: 'source-thread-1',
@@ -94,6 +123,7 @@ const sourceDetail = {
 
 test.beforeEach(async ({page}) => {
   await page.route('**/api/auth/get-session**', (route) => route.fulfill({json: appSession}));
+  await page.route('**/api/bff/users/**/attention', (route) => route.fulfill({json: attentionReadModel}));
   await page.route('**/api/bff/users/**/source/search**', (route) => route.fulfill({json: sourcePage}));
   await page.route('**/api/bff/users/**/source/conversations**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -110,10 +140,56 @@ test('renders the shell and navigates a Needs You item to its Moment', async ({p
   await page.goto('/ja');
   await expect(page.getByTestId('lunowa-shell')).toBeVisible();
   await nav(page, '対応が必要').click();
-  await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
-  await expect(page.getByRole('heading', {name: '見積書を確認して返信する'})).toBeVisible();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
   await expect(page.getByRole('button', {name: '返信を書く'})).toBeVisible();
   expect(consoleErrors).toEqual([]);
+});
+
+test('keeps trusted delegation and LATER actions on the authenticated Product path', async ({page}) => {
+  await page.unroute('**/api/bff/users/**/attention');
+  const initialAttention = attentionReadModel as unknown as AttentionReadModel;
+  const candidate: AttentionItemReadModel = {
+    ...initialAttention.needsYou[0],
+    subjectKind: 'RESPONSIBILITY',
+    id: 'responsibility-candidate', responsibilityId: 'responsibility-candidate', conversationId: 'conversation-candidate',
+    connectedAccountId: 'source-account-1', acceptedEvidenceRevision: 4, aggregateVersion: 2, liveTrackingState: 'HISTORICAL_INACTIVE',
+    surface: 'NONE', projection: {bucket: 'NONE', subjectKind: 'NONE', primaryReason: 'historical-candidate-is-not-live-work'},
+    operationalOutcome: '契約条件を確認する', primaryAction: null, awaitedEvent: '相手からの確認返信', returnCondition: '返信が届くまで'
+  };
+  const later: AttentionItemReadModel = {
+    ...candidate,
+    id: 'responsibility-later', responsibilityId: 'responsibility-later', conversationId: 'conversation-later',
+    aggregateVersion: 3, liveTrackingState: 'TRACKING_ACTIVE', surface: 'LATER',
+    projection: {bucket: 'LATER', subjectKind: 'RESPONSIBILITY', primaryReason: 'user-intentionally-deferred-attention'},
+    operationalOutcome: '納品日の回答を見守る', awaitedEvent: '取引先からの納品日回答', returnCondition: '9月10日'
+  };
+  const waiting: AttentionItemReadModel = {...later, surface: 'MANAGED', projection: {bucket: 'WAITING', subjectKind: 'RESPONSIBILITY', primaryReason: 'open-loop-awaits-counterpart-or-external-event'}};
+  let model: AttentionReadModel = {...initialAttention, needsYou: [], managed: [], later: [], review: [], done: [], delegationCandidates: [candidate], strictZero: true, managedCount: 0, delegatedCount: 0};
+  const actionBodies: Record<string, unknown>[] = [];
+  await page.route('**/api/bff/users/**/attention', (route) => route.fulfill({json: model}));
+  await page.route('**/api/bff/users/**/attention/actions', async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    actionBodies.push(body);
+    if (body.action === 'DELEGATE') model = {...model, delegationCandidates: [], managed: [waiting], managedCount: 1, strictZero: true, delegatedCount: 1};
+    if (body.action === 'RETURN_ATTENTION') model = {...model, later: [], managed: [waiting], managedCount: 1, strictZero: true, delegatedCount: 1};
+    await route.fulfill({json: {accepted: true}});
+  });
+
+  await page.goto('/ja');
+  await page.getByRole('button', {name: /契約条件を確認する/}).click();
+  await page.getByRole('button', {name: 'この件を任せる'}).click();
+  await expect(page.getByText('任せる操作を保存しました。現在の状態を更新しています。')).toBeVisible();
+  expect(actionBodies[0]?.action).toBe('DELEGATE');
+
+  model = {...initialAttention, needsYou: [], managed: [], later: [later], review: [], done: [], delegationCandidates: [], strictZero: false, managedCount: 0, delegatedCount: 1};
+  await page.reload();
+  await nav(page, '管理中').click();
+  await expect(page.getByRole('button', {name: /納品日の回答を見守る/})).toBeVisible();
+  await page.getByRole('button', {name: /納品日の回答を見守る/}).click();
+  await page.getByRole('button', {name: '今、確認する'}).click();
+  await expect(page.getByText('注意を戻しました。現在の対応状態を再確認しています。')).toBeVisible();
+  expect(actionBodies[1]?.action).toBe('RETURN_ATTENTION');
 });
 
 test('keeps the real Source Conversation read-only and exposes a usable compact navigation drawer', async ({page}) => {
@@ -182,7 +258,7 @@ test('preserves core reading and focus visibility at 125, 150, and 200 percent b
     }, scale);
     if (width < 900) await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
     await nav(page, '対応が必要').click();
-    await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
+    await page.getByRole('button', {name: /返信する/}).click();
     const draft = page.getByLabel('本文');
     await draft.focus();
     const result = await page.evaluate(() => {
@@ -210,7 +286,7 @@ test('returns focus to compact conversation-entry controls', async ({page}) => {
   await nav(page, '対応が必要').click();
   await page.getByRole('button', {name: '元の会話を開く'}).click();
   await page.getByRole('button', {name: /一覧に戻る/}).click();
-  await expect(page.locator('#needs-open-source')).toBeFocused();
+  await expect(page.locator('#source-responsibility-1')).toBeFocused();
 
   await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '検索').click();
@@ -240,9 +316,9 @@ test('does not activate global search for editable input or Japanese IME composi
   await expect(page.getByRole('heading', {name: 'ホーム'})).toBeVisible();
 
   await nav(page, '対応が必要').click();
-  await page.getByRole('button', {name: /見積書を確認して返信する/}).click();
+  await page.getByRole('button', {name: /返信する/}).click();
   await page.getByLabel('本文').press('/');
-  await expect(page.getByRole('heading', {name: '見積書を確認して返信する'})).toBeVisible();
+  await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
 });
 
 test('expires, re-authenticates, and signs out without changing mailbox monitoring semantics', async ({page}) => {

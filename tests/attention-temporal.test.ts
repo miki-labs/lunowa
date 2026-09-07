@@ -3,8 +3,13 @@ import {describe, expect, it} from 'vitest';
 import {
   InMemoryTemporalStore,
   TemporalRuntime,
+  applyAttentionCommand,
+  createDelegateResponsibilityCommand,
+  createOperationalOutcomeCorrectionCommand,
+  createStopTrackingCommand,
   projectConversationAttention,
-  projectResponsibility
+  projectResponsibility,
+  reduceResponsibility
 } from '../src/server/responsibility';
 import type {ObligationLeg, ResponsibilityState, TemporalEvidence, TrustedResponsibilityCommand} from '../src/server/responsibility';
 
@@ -76,6 +81,71 @@ function contractInput(now: Date, triggerType: 'TIME' | 'REPLY_RECEIVED' | 'DEAD
 }
 
 describe('G32 attention and Temporal runtime', () => {
+  it('closes tracking as USER_CLOSED without claiming SATISFIED completion', () => {
+    const initial = state({obligationLegs: [leg('user-leg', 'USER')]});
+    const stopped = applyAttentionCommand(initial, createStopTrackingCommand({
+      state: initial,
+      requestKey: 'stop-1',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 1
+    }), new Date('2026-09-06T00:00:00.000Z'));
+
+    expect(stopped).toMatchObject({
+      conversationId: initial.conversationId,
+      resolutionStatus: 'RESOLVED',
+      resolutionReason: 'USER_CLOSED',
+      liveTrackingState: 'HISTORICAL_INACTIVE',
+      attentionMode: 'PRESENT'
+    });
+    expect(stopped.resolutionReason).not.toBe('SATISFIED');
+    expect(stopped.obligationLegs[0]).toMatchObject({status: 'CLOSED', closureReason: 'USER_CLOSED'});
+    expect(projectResponsibility(stopped).bucket).toBe('NONE');
+  });
+
+  it('requires explicit currentness for delegation and correction of an inactive accepted loop', () => {
+    const inactive = state({liveTrackingState: 'HISTORICAL_INACTIVE'});
+    const delegated = applyAttentionCommand(inactive, createDelegateResponsibilityCommand({
+      state: inactive,
+      requestKey: 'delegate-1',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 1
+    }));
+    expect(delegated.liveTrackingState).toBe('TRACKING_ACTIVE');
+    expect(projectResponsibility(delegated).bucket).toBe('WAITING');
+
+    const corrected = applyAttentionCommand(delegated, createOperationalOutcomeCorrectionCommand({
+      state: delegated,
+      requestKey: 'correct-1',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 2,
+      value: 'updated operational outcome'
+    }));
+    expect(corrected.operationalOutcome).toBe('updated operational outcome');
+  });
+
+  it('rejects stale evidence and aggregate versions before an attention action can mutate accepted state', () => {
+    const inactive = state({liveTrackingState: 'HISTORICAL_INACTIVE'});
+    const staleEvidence = createDelegateResponsibilityCommand({
+      state: inactive,
+      requestKey: 'delegate-stale-evidence',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 1
+    });
+    const stale = reduceResponsibility(staleEvidence, {
+      currentEvidenceRevision: 2,
+      existingResponsibilities: [inactive]
+    });
+    expect(stale.status).toBe('STALE');
+    expect(stale.responsibilities[0]).toEqual(inactive);
+
+    expect(() => applyAttentionCommand(inactive, createDelegateResponsibilityCommand({
+      state: inactive,
+      requestKey: 'delegate-stale-aggregate',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 0
+    }))).toThrow(/changed after interpretation/);
+  });
+
   it('projects Waiting as Managed and does not fabricate Needs You on Return Attention', async () => {
     const initial = state({attentionMode: 'DEFERRED'});
     const store = new InMemoryTemporalStore();

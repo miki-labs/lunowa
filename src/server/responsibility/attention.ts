@@ -42,6 +42,7 @@ export type AttentionCommandInput = {
   state: ResponsibilityState;
   requestKey: string;
   evidenceRevision?: number;
+  expectedAggregateVersion?: number;
   now?: Date;
   returnConditionKey?: string;
 };
@@ -204,7 +205,7 @@ function attentionCommand(input: AttentionCommandInput, attentionMode: Attention
     effects: [{
       operation: 'UPDATE',
       responsibilityRef: input.state.id,
-      expectedAggregateVersion: input.state.aggregateVersion,
+      expectedAggregateVersion: input.expectedAggregateVersion ?? input.state.aggregateVersion,
       effectKey: `attention:${attentionMode.toLowerCase()}`,
       patch,
       provenance: [provenance]
@@ -225,6 +226,93 @@ export function createDeferAttentionCommand(input: AttentionCommandInput): Trust
   if (input.state.liveTrackingState !== 'TRACKING_ACTIVE') throw new Error('defer requires active tracking');
   if (!input.returnConditionKey?.trim()) throw new Error('defer requires a durable return condition');
   return attentionCommand(input, 'DEFERRED');
+}
+
+function trustedUserCommandBase(input: AttentionCommandInput, action: string): Pick<TrustedResponsibilityCommand, 'userId' | 'connectedAccountId' | 'conversationId' | 'commandSource' | 'sourceEventKey' | 'candidateKey' | 'evidenceRevision' | 'admission' | 'provenance' | 'applicationKey' | 'correlationId'> {
+  const provenance = userAssertion(input.requestKey);
+  return {
+    userId: input.state.userId,
+    connectedAccountId: input.state.connectedAccountId,
+    conversationId: input.state.conversationId,
+    commandSource: 'TRUSTED_USER',
+    sourceEventKey: `trusted-attention:${action}:${input.state.id}:${input.requestKey}`,
+    candidateKey: `trusted-attention:${action}:${input.state.id}:${input.requestKey}`,
+    evidenceRevision: input.evidenceRevision ?? input.state.acceptedEvidenceRevision,
+    admission: {decision: 'TRACK', reasonCodes: [`USER_${action}`]},
+    provenance: [provenance],
+    applicationKey: `trusted-attention:${action}:${input.state.id}:${input.requestKey}`,
+    correlationId: input.requestKey
+  };
+}
+
+/** Stops monitoring without asserting that the operational outcome was satisfied. */
+export function createStopTrackingCommand(input: AttentionCommandInput): TrustedResponsibilityCommand {
+  if (input.state.resolutionStatus !== 'OPEN') throw new Error('Stop Tracking requires an open Responsibility');
+  if (input.state.liveTrackingState !== 'TRACKING_ACTIVE') throw new Error('Stop Tracking requires active tracking');
+  const provenance = userAssertion(input.requestKey);
+  return {
+    ...trustedUserCommandBase(input, 'STOP_TRACKING'),
+    effects: [{
+      operation: 'RESOLVE',
+      responsibilityRef: input.state.id,
+      expectedAggregateVersion: input.expectedAggregateVersion ?? input.state.aggregateVersion,
+      effectKey: 'stop-tracking',
+      reason: 'USER_CLOSED',
+      resolutionEvidence: {strength: 'SUFFICIENT', kinds: ['USER_ASSERTION']},
+      patch: {fieldChanges: [{
+        fieldKey: 'liveTrackingState',
+        value: 'HISTORICAL_INACTIVE',
+        authorityKind: 'USER_CORRECTION',
+        provenance: [provenance]
+      }]},
+      provenance: [provenance]
+    }]
+  };
+}
+
+/** Explicitly activates one already accepted historical Responsibility. */
+export function createDelegateResponsibilityCommand(input: AttentionCommandInput): TrustedResponsibilityCommand {
+  if (input.state.resolutionStatus !== 'OPEN') throw new Error('delegation requires an open Responsibility');
+  if (input.state.liveTrackingState !== 'HISTORICAL_INACTIVE') throw new Error('delegation requires an inactive accepted Responsibility');
+  const provenance = userAssertion(input.requestKey);
+  return {
+    ...trustedUserCommandBase(input, 'DELEGATE'),
+    effects: [{
+      operation: 'UPDATE',
+      responsibilityRef: input.state.id,
+      expectedAggregateVersion: input.expectedAggregateVersion ?? input.state.aggregateVersion,
+      effectKey: 'delegate-responsibility',
+      patch: {fieldChanges: [
+        {fieldKey: 'liveTrackingState', value: 'TRACKING_ACTIVE', authorityKind: 'USER_CORRECTION', provenance: [provenance]},
+        {fieldKey: 'attentionMode', value: 'PRESENT', authorityKind: 'USER_CORRECTION', provenance: [provenance]}
+      ]},
+      provenance: [provenance]
+    }]
+  };
+}
+
+/** Applies the one supported state-level review correction without resolving a review by UI convention. */
+export function createOperationalOutcomeCorrectionCommand(input: AttentionCommandInput & {value: string}): TrustedResponsibilityCommand {
+  if (input.state.resolutionStatus !== 'OPEN') throw new Error('field correction requires an open Responsibility');
+  if (!input.value.trim()) throw new Error('operationalOutcome correction must be non-empty');
+  const provenance = userAssertion(input.requestKey);
+  return {
+    ...trustedUserCommandBase(input, 'CORRECT_OPERATIONAL_OUTCOME'),
+    effects: [{
+      operation: 'UPDATE',
+      responsibilityRef: input.state.id,
+      expectedAggregateVersion: input.expectedAggregateVersion ?? input.state.aggregateVersion,
+      effectKey: 'correct-operational-outcome',
+      patch: {fieldChanges: [{
+        fieldKey: 'operationalOutcome',
+        value: input.value.trim(),
+        authorityKind: 'USER_CORRECTION',
+        relation: 'CORRECTION',
+        provenance: [provenance]
+      }]},
+      provenance: [provenance]
+    }]
+  };
 }
 
 /** Applies an attention command through the same reducer/currentness boundary as all other effects. */

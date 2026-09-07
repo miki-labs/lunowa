@@ -260,10 +260,15 @@ export class TemporalRepository {
     });
   }
 
-  public async returnAttention(input: {userId: string; connectedAccountId: string; responsibilityId: string; requestKey: string; now?: Date}): Promise<NonNullable<Awaited<ReturnType<ResponsibilityRepository['getResponsibility']>>>['state']> {
+  public async returnAttention(input: {userId: string; connectedAccountId: string; responsibilityId: string; requestKey: string; evidenceRevision?: number; expectedAggregateVersion?: number; now?: Date}): Promise<NonNullable<Awaited<ReturnType<ResponsibilityRepository['getResponsibility']>>>['state']> {
     const current = await this.responsibilityRepository.getResponsibility(input);
     if (!current) throw new Error('Responsibility was not found');
-    const command = createReturnAttentionCommand({state: current.state, requestKey: input.requestKey, evidenceRevision: current.state.acceptedEvidenceRevision});
+    const command = createReturnAttentionCommand({
+      state: current.state,
+      requestKey: input.requestKey,
+      evidenceRevision: input.evidenceRevision,
+      expectedAggregateVersion: input.expectedAggregateVersion
+    });
     const now = input.now ?? new Date();
     return this.db.transaction(async (tx) => {
       const result = await this.responsibilityRepository.applyTrustedCommandInTransaction(tx, command);

@@ -7,6 +7,7 @@ import {Pool} from 'pg';
 
 import {CommunicationRepository} from '../src/server/db/repositories/communication';
 import {EvidenceRepository} from '../src/server/db/repositories/evidence';
+import {ResponsibilityRepository} from '../src/server/db/repositories/responsibility';
 import * as schema from '../src/server/db/schema';
 import {normalizeGmailMessage} from '../src/server/gmail/normalize';
 import {GmailSendService, buildGmailMessageId} from '../src/server/gmail/send';
@@ -75,7 +76,13 @@ try {
     listMessagesByRfc822MessageId: async () => ({messages: []})
   };
   const credentials = {getAccessToken: async () => 'g51-test-token'};
-  const service = new GmailSendService(provider, credentials as never, communication, evidence);
+  const service = new GmailSendService(
+    provider,
+    credentials as never,
+    communication,
+    evidence,
+    new ResponsibilityRepository(db)
+  );
   const reconciled = await service.dispatch({userId, sendOperationId: operation.id});
   assert(reconciled.status === 'RECONCILED', 'G51 provider acceptance did not reconcile the SendOperation');
   assert(sendCalls === 1, 'G51 dispatch did not perform exactly one provider send');

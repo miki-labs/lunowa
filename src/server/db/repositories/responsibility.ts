@@ -38,6 +38,7 @@ import type {
 } from '../../responsibility';
 
 type Database = ReturnType<typeof getDatabase>;
+export type ResponsibilityTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -529,6 +530,30 @@ export class ResponsibilityRepository {
     });
   }
 
+  public async getResponsibilityInTransaction(
+    tx: ResponsibilityTransaction,
+    input: {userId: string; connectedAccountId: string; responsibilityId: string}
+  ): Promise<{state: ResponsibilityState; projection: ReturnType<typeof projectResponsibility>; semanticEvidenceRevision: number} | null> {
+    const unlocked = await loadState(tx, input.responsibilityId, false);
+    if (!unlocked || unlocked.userId !== input.userId || unlocked.connectedAccountId !== input.connectedAccountId) return null;
+    const [conversation] = await tx.select({
+      id: conversations.id,
+      semanticEvidenceRevision: conversations.semanticEvidenceRevision
+    }).from(conversations).where(and(
+      eq(conversations.id, unlocked.conversationId),
+      eq(conversations.userId, input.userId),
+      eq(conversations.connectedAccountId, input.connectedAccountId)
+    )).for('update');
+    if (!conversation) return null;
+    const state = await loadState(tx, input.responsibilityId, true);
+    if (!state || state.userId !== input.userId || state.connectedAccountId !== input.connectedAccountId) return null;
+    return {
+      state,
+      projection: projectResponsibility(state),
+      semanticEvidenceRevision: conversation.semanticEvidenceRevision
+    };
+  }
+
   public async listResponsibilities(input: {
     userId: string;
     connectedAccountId?: string;
@@ -595,7 +620,18 @@ export class ResponsibilityRepository {
    * share the transaction and either all commit or none do.
    */
   public async applyTrustedCommand(candidate: TrustedResponsibilityCommand): Promise<ReductionResult> {
-    return this.db.transaction(async (tx) => {
+    return this.db.transaction((tx) => this.applyTrustedCommandInTransaction(tx, candidate));
+  }
+
+  /**
+   * Applies a trusted command inside a caller-owned transaction. Temporal
+   * operations use this entry point so accepted Responsibility state and
+   * durable contract intent share one commit boundary.
+   */
+  public async applyTrustedCommandInTransaction(
+    tx: ResponsibilityTransaction,
+    candidate: TrustedResponsibilityCommand
+  ): Promise<ReductionResult> {
       const [conversation] = await tx
         .select()
         .from(conversations)
@@ -887,7 +923,6 @@ export class ResponsibilityRepository {
           .map((effect) => effect.state)
           .filter((state): state is ResponsibilityState => Boolean(state))
       };
-    });
   }
 
   public async admitAndReduce(candidate: ResponsibilityInterpretationCandidate): Promise<ReductionResult> {

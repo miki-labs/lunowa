@@ -157,11 +157,23 @@ function applyFieldChange(
   evidenceRevision: number,
   now: Date
 ): void {
+  if (
+    change.authorityKind === 'TEMPORAL_ATTENTION' &&
+    (change.fieldKey !== 'attentionMode' || change.value !== 'PRESENT')
+  ) {
+    throw new Error('TEMPORAL_ATTENTION authority is limited to returning attention to PRESENT');
+  }
   const previousDecision = [...state.fieldDecisions].reverse().find((decision) => fieldsOverlap(decision.fieldKey, change.fieldKey));
   if (
     previousDecision &&
     previousDecision.authorityKind === 'USER_CORRECTION' &&
-    !['USER_CORRECTION', 'EXTERNAL_AUTHORITATIVE_FACT'].includes(change.authorityKind)
+    ![
+      'USER_CORRECTION',
+      'EXTERNAL_AUTHORITATIVE_FACT',
+      // Temporal reconsideration may return attention only. It is not truth
+      // authority for operational, obligation, event, or temporal fields.
+      'TEMPORAL_ATTENTION'
+    ].includes(change.authorityKind)
   ) {
     throw new Error(`field ${change.fieldKey} is protected by a user correction until authoritative evidence supersedes it`);
   }

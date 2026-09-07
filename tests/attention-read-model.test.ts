@@ -1,9 +1,22 @@
 import {describe, expect, it} from 'vitest';
 
 import {buildAttentionReadModel} from '@/server/responsibility/attention-read-model';
-import type {ObligationLeg, ResponsibilityState} from '@/server/responsibility';
+import type {AdmissionReviewState, ObligationLeg, ResponsibilityState} from '@/server/responsibility';
 
 const evidence = {evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: 'message-1'} as const;
+
+const admissionReview: AdmissionReviewState = {
+  id: 'admission-review-1',
+  userId: 'user-1',
+  connectedAccountId: 'account-1',
+  conversationId: 'conversation-2',
+  sourceEventKey: 'message-2',
+  candidateKey: 'candidate-2',
+  evidenceRevision: 2,
+  reasonCodes: ['RESPONSIBILITY_EXISTENCE_AMBIGUOUS'],
+  candidateSummary: {question: 'この依頼を引き受けますか？', subject: '契約更新'},
+  status: 'OPEN'
+};
 
 function state(overrides: Partial<ResponsibilityState> = {}): ResponsibilityState {
   const userLeg: ObligationLeg = {
@@ -75,5 +88,26 @@ describe('G40 attention read model', () => {
     expect(model.strictZero).toBe(false);
     expect(model.managedCount).toBe(0);
     expect(model.integrity.status).toBe('unknown');
+  });
+
+  it('keeps an open admission review visible and out of healthy Managed/strict zero', () => {
+    const model = buildAttentionReadModel({
+      responsibilities: [],
+      admissionReviews: [admissionReview],
+      sourceReadiness: 'ready',
+      dataThroughAt: '2030-01-01T00:00:00.000Z',
+      now: new Date('2030-01-01T00:00:00.000Z')
+    });
+
+    expect(model.review).toHaveLength(1);
+    expect(model.review[0]).toMatchObject({
+      id: 'admission-review-1',
+      subjectKind: 'ADMISSION_REVIEW',
+      responsibilityId: null,
+      admissionReviewId: 'admission-review-1',
+      reviewQuestion: 'この依頼を引き受けますか？'
+    });
+    expect(model.managedCount).toBe(0);
+    expect(model.strictZero).toBe(false);
   });
 });

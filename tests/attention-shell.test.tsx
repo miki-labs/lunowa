@@ -12,11 +12,15 @@ const attention = {
   source: {readiness: 'ready', dataThroughAt: '2030-01-01T00:00:00.000Z'},
   integrity: {status: 'healthy', message: null},
   needsYou: [{
+    id: 'responsibility-1',
+    subjectKind: 'RESPONSIBILITY',
     responsibilityId: 'responsibility-1',
+    admissionReviewId: null,
     conversationId: 'conversation-1',
     surface: 'NEEDS_YOU',
     projection: {bucket: 'MY_TURN', subjectKind: 'RESPONSIBILITY', primaryReason: 'open-user-obligation:REPLY'},
     operationalOutcome: '見積書の確認を終える',
+    reviewQuestion: null,
     primaryAction: '返信する',
     awaitedEvent: null,
     returnCondition: null,
@@ -51,9 +55,9 @@ describe('G40 live attention surfaces', () => {
     ));
 
     render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
-    await waitFor(() => expect(screen.getByRole('button', {name: /返信する/})).toBeInTheDocument());
-    expect(screen.queryByText('見積書を確認して返信する')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', {name: /返信する/})).toBeTruthy());
+    expect(screen.queryByText('見積書を確認して返信する')).toBeNull();
     fireEvent.click(screen.getByRole('button', {name: /返信する/}));
-    expect(screen.getByRole('heading', {name: '見積書を確認して返信する'})).toBeInTheDocument();
+    expect(screen.getByRole('heading', {name: '見積書の確認を終える'})).toBeTruthy();
   });
 });

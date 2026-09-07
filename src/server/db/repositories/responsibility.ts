@@ -569,6 +569,37 @@ export class ResponsibilityRepository {
     });
   }
 
+  public async listAdmissionReviews(input: {
+    userId: string;
+    connectedAccountId?: string;
+  }): Promise<AdmissionReviewState[]> {
+    return this.db.transaction(async (tx) => {
+      const predicates = [
+        eq(responsibilityAdmissionReviews.userId, input.userId),
+        eq(responsibilityAdmissionReviews.reviewStatus, 'OPEN')
+      ];
+      if (input.connectedAccountId) predicates.push(eq(responsibilityAdmissionReviews.connectedAccountId, input.connectedAccountId));
+      const rows = await tx
+        .select()
+        .from(responsibilityAdmissionReviews)
+        .where(and(...predicates))
+        .orderBy(asc(responsibilityAdmissionReviews.createdAt), asc(responsibilityAdmissionReviews.id));
+      return rows.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        connectedAccountId: row.connectedAccountId,
+        conversationId: row.conversationId,
+        sourceEventKey: row.sourceEventKey,
+        candidateKey: row.candidateKey,
+        evidenceRevision: row.basisEvidenceRevision,
+        reasonCodes: row.reasonCodes,
+        candidateSummary: row.candidateSummary,
+        status: row.reviewStatus as AdmissionReviewState['status'],
+        ...(row.resolution ? {resolution: row.resolution as AdmissionReviewState['resolution']} : {})
+      }));
+    });
+  }
+
   /**
    * Production interpretation lane. It can submit language-level semantics,
    * never admission/effect/identity/provider authority. The trusted command is

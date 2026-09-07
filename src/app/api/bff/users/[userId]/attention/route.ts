@@ -12,12 +12,15 @@ export async function GET(request: Request, context: RouteContext) {
   const {userId} = await context.params;
   try {
     await getOwnedAppSession(request.headers, userId);
-    const [responsibilities, source] = await Promise.all([
-      new ResponsibilityRepository().listResponsibilities({userId}),
+    const responsibilityRepository = new ResponsibilityRepository();
+    const [responsibilities, admissionReviews, source] = await Promise.all([
+      responsibilityRepository.listResponsibilities({userId}),
+      responsibilityRepository.listAdmissionReviews({userId}),
       new SourceRepository().listConversations({userId, limit: 1})
     ]);
     return Response.json(buildAttentionReadModel({
       responsibilities: responsibilities.map(({state}) => state),
+      admissionReviews,
       sourceReadiness: source.readiness,
       dataThroughAt: source.dataThroughAt
     }), {headers: {'Cache-Control': 'private, no-store'}});

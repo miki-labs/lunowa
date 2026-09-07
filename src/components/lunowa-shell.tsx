@@ -30,7 +30,7 @@ const navigation: readonly {id: Surface; label: string; icon: string}[] = [
   {id: 'settings', label: '設定', icon: '⚙'}
 ];
 
-const attentionItem = {
+const attentionItemStatic = {
   id: 'estimate-hiroko',
   person: '佐藤ひろ子',
   topic: '見積書の確認',
@@ -60,7 +60,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
 } = {}) {
   const [surface, setSurface] = useState<Surface>('home');
   const [detail, setDetail] = useState<Detail>(null);
-  const [detailOrigin, setDetailOrigin] = useState(attentionItem.id);
+  const [detailOrigin, setDetailOrigin] = useState(attentionItemStatic.id);
   const [fixtureId, setFixtureId] = useState<ShellFixture['id']>('normal');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -84,6 +84,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const [sourceConversationLoading, setSourceConversationLoading] = useState(false);
   const [sourceConversationError, setSourceConversationError] = useState('');
   const [attentionModel, setAttentionModel] = useState<AttentionReadModel | null>(null);
+  const [attentionOwnerId, setAttentionOwnerId] = useState<string | null>(null);
   const [attentionLoading, setAttentionLoading] = useState(() => Boolean(appUser?.id));
   const [attentionError, setAttentionError] = useState('');
   const navTrigger = useRef<HTMLButtonElement>(null);
@@ -298,8 +299,9 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
 
   useEffect(() => {
     if (!appUser?.id) return;
+    const userId = appUser.id;
     const controller = new AbortController();
-    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/attention`, {
+    void fetch(`/api/bff/users/${encodeURIComponent(userId)}/attention`, {
       credentials: 'same-origin',
       signal: controller.signal
     })
@@ -309,9 +311,17 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         if (!isAttentionReadModel(result)) throw new Error('ATTENTION_READ_MODEL_INVALID');
         return result;
       })
-      .then((result) => setAttentionModel(result))
+      .then((result) => {
+        setAttentionModel(result);
+        setAttentionOwnerId(userId);
+        setAttentionError('');
+      })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setAttentionError(error instanceof Error ? error.message : 'ATTENTION_LOAD_FAILED');
+        if (!controller.signal.aborted) {
+          setAttentionModel(null);
+          setAttentionOwnerId(userId);
+          setAttentionError(error instanceof Error ? error.message : 'ATTENTION_LOAD_FAILED');
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setAttentionLoading(false);
@@ -331,7 +341,15 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     );
   }
 
-  const hasReview = attentionModel ? attentionModel.review.length > 0 : fixture.hasReview;
+  const liveAttention = appUser?.id && attentionOwnerId === appUser.id ? attentionModel : null;
+  const liveAttentionLoading = Boolean(appUser?.id) && (attentionOwnerId !== appUser?.id || attentionLoading);
+  const liveAttentionError = attentionOwnerId === appUser?.id ? attentionError : '';
+  const hasReview = liveAttention ? liveAttention.review.length > 0 : fixture.hasReview;
+  const reviewCount = liveAttention?.review.length ?? (fixture.hasReview ? 1 : 0);
+  const selectedAttention = liveAttention
+    ? [...liveAttention.needsYou, ...liveAttention.managed, ...liveAttention.later, ...liveAttention.review, ...liveAttention.done]
+      .find((item) => detailOrigin === item.id || detailOrigin === `attention-${item.id}` || detailOrigin === `managed-${item.id}` || detailOrigin === `review-${item.id}`) ?? null
+    : null;
 
   const announceMutation = (target: Exclude<CommonMutationTarget, null>, message: string) => {
     setLocalCommonMutations((current) => ({...current, [target]: 'pending'}));
@@ -369,7 +387,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
               <span className="nav-icon" aria-hidden="true">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
               <span className="nav-tooltip" aria-hidden="true">{item.label}</span>
-              {item.id === 'review' && <span className="nav-count" aria-label="確認が1件">1</span>}
+              {item.id === 'review' && <span className="nav-count" aria-label={`確認が${reviewCount}件`}>{reviewCount}</span>}
             </button>
           ))}
         </nav>
@@ -381,9 +399,9 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         <SurfaceContent
           surface={surface}
           fixture={fixture}
-          attention={attentionModel}
-          attentionLoading={attentionLoading}
-          attentionError={attentionError}
+          attention={liveAttention}
+          attentionLoading={liveAttentionLoading}
+          attentionError={liveAttentionError}
           appUser={appUser}
           onSignOut={onSignOut}
           signingOut={signingOut}
@@ -401,9 +419,9 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
           sourceSearchModel={sourceSearchModel}
           sourceSearchLoading={sourceSearchLoading}
           sourceSearchError={sourceSearchError}
-          openMoment={(origin = attentionItem.id) => openDetail('moment', origin)}
-          openManaged={() => openDetail('managed-detail', 'managed-estimate')}
-          openReview={() => openDetail('review-detail', 'review-condition')}
+          openMoment={(origin = attentionItemStatic.id) => openDetail('moment', origin)}
+          openManaged={(origin = 'managed-estimate') => openDetail('managed-detail', origin)}
+          openReview={(origin = 'review-condition') => openDetail('review-detail', origin)}
           openConversation={openConversation}
           onLoadMoreSource={loadMoreSource}
           onLoadMoreSourceSearch={loadMoreSourceSearch}
@@ -431,6 +449,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             commonMutations={commonMutations}
             sendState={sendState}
             fixture={fixture}
+            attentionItem={selectedAttention}
             sourceConversation={sourceConversation}
             sourceConversationLoading={sourceConversationLoading || Boolean(appUser?.id && detail === 'conversation' && selectedConversationId && !sourceConversation && !sourceConversationError)}
             sourceConversationError={sourceConversationError}
@@ -445,9 +464,9 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
               setSendOverride('request_pending');
               setStatus('送信をリクエストしています');
             }}
-            onOpenSource={() => {
+            onOpenSource={(conversationId) => {
               setSurface('source');
-              openConversation(sourceItem.id, sourceModel?.conversations[0]?.id ?? sourceItem.id);
+              openConversation(sourceItem.id, conversationId ?? sourceModel?.conversations[0]?.id ?? sourceItem.id);
             }}
           />
         ) : (
@@ -494,8 +513,8 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   onLoadMoreSource: () => void;
   onLoadMoreSourceSearch: () => void;
   openMoment: (origin?: string) => void;
-  openManaged: () => void;
-  openReview: () => void;
+  openManaged: (origin?: string) => void;
+  openReview: (origin?: string) => void;
   openConversation: (origin: string, conversationId?: string) => void;
 }) {
   const title = navigation.find((item) => item.id === surface)?.label ?? 'ホーム';
@@ -537,60 +556,62 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   );
 }
 
-function Home({fixture, attention, openMoment, openReview, openManaged}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: () => void; openReview: () => void; openManaged: () => void}) {
+function Home({fixture, attention, openMoment, openReview, openManaged}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openReview: (origin?: string) => void; openManaged: (origin?: string) => void}) {
   if (attention) {
-    if (attention.strictZero) return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>会話の確認範囲は信頼でき、Lunowaが{attention.managedCount}件を見守っています。</p><button className="quiet-button" type="button" onClick={openManaged}>管理中を見る</button></section></div>;
+    if (attention.strictZero) return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>{attention.managedCount > 0 ? `会話の確認範囲は信頼でき、Lunowaが${attention.managedCount}件を見守っています。` : '現在、Lunowaが監視している件はありません。'}</p>{attention.managedCount > 0 && <button className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button>}</section></div>;
     return <div className="surface-content">
       {attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{attention.integrity.message}</p>}
       <section aria-labelledby="attention-heading"><div className="section-heading"><h2 id="attention-heading">今、確認が必要なこと</h2><span>{attention.needsYou.length + attention.review.length}件</span></div>
-        {attention.needsYou.map((item) => <LiveAttentionButton key={item.responsibilityId} item={item} onClick={openMoment} />)}
-        {attention.review.map((item) => <LiveReviewButton key={item.responsibilityId} item={item} onClick={openReview} />)}
+        {attention.needsYou.map((item) => <LiveAttentionButton key={item.id} item={item} onClick={openMoment} />)}
+        {attention.review.map((item) => <LiveReviewButton key={item.id} item={item} onClick={openReview} />)}
       </section>
       {attention.integrity.status === 'healthy' && attention.managedCount > 0
-        ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>{attention.managedCount}</strong></h2><p>今、追加対応が必要なものはありません。</p><button id="managed-estimate" className="quiet-button" type="button" onClick={openManaged}>管理中を見る</button></section>
-        : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}
+        ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>{attention.managedCount}</strong></h2><p>今、追加対応が必要なものはありません。</p><button id="managed-estimate" className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button></section>
+        : attention.integrity.status === 'healthy'
+          ? <p className="empty-state">現在、Lunowaが監視している件はありません。</p>
+          : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}
     </div>;
   }
-  if (!fixture.hasNeedsYou && !fixture.hasReview && fixture.integrity === 'healthy' && fixture.sourceReadiness === 'ready' && fixture.monitoringPosture === 'active') return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>会話の確認範囲は信頼でき、Lunowaが4件を見守っています。</p><button className="quiet-button" type="button" onClick={openManaged}>管理中を見る</button></section></div>;
-  if (fixture.monitoringPosture !== 'active') return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視の設定</p><h2>{fixture.monitoringPosture === 'stopped_by_user' ? '監視はあなたが停止しました' : '現在、任せている監視はありません'}</h2><p>{fixture.monitoringPosture === 'stopped_by_user' ? '停止は、会話が完了したことや対応不要を意味しません。' : '会話を確認しても、監視の約束はまだ作成されません。'}</p><button className="quiet-button" type="button" onClick={openManaged}>監視の状態を見る</button></section></div>;
+  if (!fixture.hasNeedsYou && !fixture.hasReview && fixture.integrity === 'healthy' && fixture.sourceReadiness === 'ready' && fixture.monitoringPosture === 'active') return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>会話の確認範囲は信頼でき、Lunowaが4件を見守っています。</p><button className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button></section></div>;
+  if (fixture.monitoringPosture !== 'active') return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視の設定</p><h2>{fixture.monitoringPosture === 'stopped_by_user' ? '監視はあなたが停止しました' : '現在、任せている監視はありません'}</h2><p>{fixture.monitoringPosture === 'stopped_by_user' ? '停止は、会話が完了したことや対応不要を意味しません。' : '会話を確認しても、監視の約束はまだ作成されません。'}</p><button className="quiet-button" type="button" onClick={() => openManaged()}>監視の状態を見る</button></section></div>;
   return <div className="surface-content">
     <section aria-labelledby="attention-heading"><div className="section-heading"><h2 id="attention-heading">今、確認が必要なこと</h2><span>2件</span></div>
-      {fixture.hasNeedsYou && <AttentionButton onClick={openMoment} />}
-      {fixture.hasReview && <button id="review-condition" className="list-row review-row" type="button" onClick={openReview}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>佐藤ひろ子との会話に、異なる更新日があります。</span></button>}
+      {fixture.hasNeedsYou && <AttentionButton onClick={() => openMoment()} />}
+      {fixture.hasReview && <button id="review-condition" className="list-row review-row" type="button" onClick={() => openReview()}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>佐藤ひろ子との会話に、異なる更新日があります。</span></button>}
     </section>
-    {fixture.integrity === 'healthy' && fixture.monitoringPosture === 'active' ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>4</strong></h2><p>今、追加対応が必要なものはありません。</p><p className="metadata">最終確認 2分前</p><button id="managed-estimate" className="quiet-button" type="button" onClick={openManaged}>管理中を見る</button></section> : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}
+    {fixture.integrity === 'healthy' && fixture.monitoringPosture === 'active' ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>4</strong></h2><p>今、追加対応が必要なものはありません。</p><p className="metadata">最終確認 2分前</p><button id="managed-estimate" className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button></section> : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}
   </div>;
 }
 
-function NeedsYou({fixture, attention, openMoment, openConversation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: () => void; openConversation: (origin: string, conversationId?: string) => void}) {
-  if (attention) return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{attention.needsYou.length > 0 ? attention.needsYou.map((item) => <div key={item.responsibilityId}><LiveAttentionButton item={item} onClick={openMoment} /><button className="source-link" type="button" onClick={() => openConversation(item.responsibilityId, item.conversationId)}>元の会話を開く</button></div>) : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
+function NeedsYou({fixture, attention, openMoment, openConversation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openConversation: (origin: string, conversationId?: string) => void}) {
+  if (attention) return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{attention.needsYou.length > 0 ? attention.needsYou.map((item) => <div key={item.id}><LiveAttentionButton item={item} onClick={openMoment} /><button id={`source-${item.id}`} className="source-link" type="button" onClick={() => openConversation(`source-${item.id}`, item.conversationId)}>元の会話を開く</button></div>) : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
   return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{fixture.hasNeedsYou ? <><AttentionButton onClick={openMoment} /><button id="needs-open-source" className="source-link" type="button" onClick={(event) => openConversation(event.currentTarget.id)}>元の会話を開く</button></> : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
 }
 
-function LiveAttentionButton({item, onClick}: {item: AttentionItemReadModel; onClick: () => void}) {
-  return <button className="list-row attention-row" type="button" onClick={onClick}><span className="state-chip action">対応</span><strong>{item.primaryAction ?? item.operationalOutcome}</strong><span>{item.operationalOutcome}</span>{item.nearestRelevantTime && <span className="metadata">{item.overdue ? '期限を過ぎています' : `期限・再確認: ${item.nearestRelevantTime}`}</span>}</button>;
+function LiveAttentionButton({item, onClick}: {item: AttentionItemReadModel; onClick: (origin?: string) => void}) {
+  return <button id={`attention-${item.id}`} className="list-row attention-row" type="button" onClick={() => onClick(`attention-${item.id}`)}><span className="state-chip action">対応</span><strong>{item.primaryAction ?? item.operationalOutcome}</strong><span>{item.operationalOutcome}</span>{item.nearestRelevantTime && <span className="metadata">{item.overdue ? '期限を過ぎています' : `期限・再確認: ${item.nearestRelevantTime}`}</span>}</button>;
 }
 
-function LiveReviewButton({item, onClick}: {item: AttentionItemReadModel; onClick: () => void}) {
-  return <button className="list-row review-row" type="button" onClick={onClick}><span className="state-chip review">確認</span><strong>{item.operationalOutcome}</strong><span>{item.projection.primaryReason}</span></button>;
+function LiveReviewButton({item, onClick}: {item: AttentionItemReadModel; onClick: (origin?: string) => void}) {
+  return <button id={`review-${item.id}`} className="list-row review-row" type="button" onClick={() => onClick(`review-${item.id}`)}><span className="state-chip review">確認</span><strong>{item.reviewQuestion ?? item.operationalOutcome}</strong><span>{item.operationalOutcome}</span></button>;
 }
 
 function AttentionButton({onClick}: {onClick: () => void}) {
-  return <button id={attentionItem.id} className="list-row attention-row" type="button" onClick={onClick}><span className="state-chip action">対応</span><strong>{attentionItem.action}</strong><span>{attentionItem.person} · {attentionItem.topic}</span><span className="metadata">{attentionItem.whyNow}</span></button>;
+  return <button id={attentionItemStatic.id} className="list-row attention-row" type="button" onClick={onClick}><span className="state-chip action">対応</span><strong>{attentionItemStatic.action}</strong><span>{attentionItemStatic.person} · {attentionItemStatic.topic}</span><span className="metadata">{attentionItemStatic.whyNow}</span></button>;
 }
 
-function Managed({fixture, attention, openManaged}: {fixture: ShellFixture; attention: AttentionReadModel | null; openManaged: () => void}) {
+function Managed({fixture, attention, openManaged}: {fixture: ShellFixture; attention: AttentionReadModel | null; openManaged: (origin?: string) => void}) {
   if (attention) {
-    if (attention.managedCount === 0) return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視の状態</p><h2>{attention.delegatedCount === 0 ? '監視中の会話はありません' : '管理中の安心表示を保留しています'}</h2><p>{attention.integrity.status === 'healthy' ? '任せる操作が確認されるまで、健康な監視件数は表示しません。' : attention.integrity.message}</p></section></div>;
-    return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視中</p><h2>Lunowaが見ています <strong>{attention.managedCount}</strong></h2><p>{attention.integrity.status === 'healthy' ? '監視は正常です。必要になるまで静かに見守ります。' : attention.integrity.message}</p></section>{attention.managed.map((item) => <button key={item.responsibilityId} className="list-row" type="button" onClick={openManaged}><span className="state-chip waiting">待機中</span><strong>{item.operationalOutcome}</strong><span>{item.awaitedEvent ?? '再確認条件を確認できます'}</span><span className="metadata">{item.returnCondition ?? '条件はSourceとともに確認できます'}</span></button>)}</div>;
+    if (attention.managedCount === 0) return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視の状態</p><h2>監視中の会話はありません</h2><p>{attention.integrity.status === 'healthy' ? '任せる操作が確認されるまで、健康な監視件数は表示しません。' : attention.integrity.message}</p></section></div>;
+    return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視中</p><h2>Lunowaが見ています <strong>{attention.managedCount}</strong></h2><p>{attention.integrity.status === 'healthy' ? '監視は正常です。必要になるまで静かに見守ります。' : attention.integrity.message}</p></section>{attention.managed.map((item) => <button id={`managed-${item.id}`} key={item.id} className="list-row" type="button" onClick={() => openManaged(`managed-${item.id}`)}><span className="state-chip waiting">待機中</span><strong>{item.operationalOutcome}</strong><span>{item.awaitedEvent ?? '再確認条件を確認できます'}</span><span className="metadata">{item.returnCondition ?? '条件はSourceとともに確認できます'}</span></button>)}</div>;
   }
   if (fixture.monitoringPosture !== 'active') return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視の状態</p><h2>{fixture.monitoringPosture === 'stopped_by_user' ? '停止した監視があります' : '監視中の会話はありません'}</h2><p>{fixture.monitoringPosture === 'stopped_by_user' ? '停止は、会話の結果を判断したものではありません。' : '任せる操作が確認されるまで、健康な監視件数は表示しません。'}</p></section></div>;
-  return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視中</p><h2>Lunowaが見ています <strong>4</strong></h2><p>監視は正常です。必要になるまで静かに見守ります。</p></section><button id="managed-estimate" className="list-row" type="button" onClick={openManaged}><span className="state-chip waiting">待機中</span><strong>来期の見積書</strong><span>佐藤ひろ子からの確認を待っています</span><span className="metadata">再確認条件: 9月3日、または返信</span></button></div>;
+  return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視中</p><h2>Lunowaが見ています <strong>4</strong></h2><p>監視は正常です。必要になるまで静かに見守ります。</p></section><button id="managed-estimate" className="list-row" type="button" onClick={() => openManaged()}><span className="state-chip waiting">待機中</span><strong>来期の見積書</strong><span>佐藤ひろ子からの確認を待っています</span><span className="metadata">再確認条件: 9月3日、または返信</span></button></div>;
 }
 
-function Review({fixture, attention, openReview}: {fixture: ShellFixture; attention: AttentionReadModel | null; openReview: () => void}) {
-  if (attention) return <div className="surface-content"><p className="surface-intro">小さく、判断が必要な確認だけを表示しています。</p>{attention.review.length > 0 ? attention.review.map((item) => <LiveReviewButton key={item.responsibilityId} item={item} onClick={openReview} />) : <p className="empty-state">現在、確認が必要な事項はありません。</p>}</div>;
-  return <div className="surface-content"><p className="surface-intro">小さく、判断が必要な確認だけを表示しています。</p>{fixture.hasReview ? <button id="review-condition" className="list-row review-row" type="button" onClick={openReview}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>更新日が会話内で一致していません。</span></button> : <p className="empty-state">現在、確認が必要な事項はありません。</p>}</div>;
+function Review({fixture, attention, openReview}: {fixture: ShellFixture; attention: AttentionReadModel | null; openReview: (origin?: string) => void}) {
+  if (attention) return <div className="surface-content"><p className="surface-intro">小さく、判断が必要な確認だけを表示しています。</p>{attention.review.length > 0 ? attention.review.map((item) => <LiveReviewButton key={item.id} item={item} onClick={openReview} />) : <p className="empty-state">現在、確認が必要な事項はありません。</p>}</div>;
+  return <div className="surface-content"><p className="surface-intro">小さく、判断が必要な確認だけを表示しています。</p>{fixture.hasReview ? <button id="review-condition" className="list-row review-row" type="button" onClick={() => openReview()}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>更新日が会話内で一致していません。</span></button> : <p className="empty-state">現在、確認が必要な事項はありません。</p>}</div>;
 }
 
 function Search({search, onSearch, openConversation}: {search: string; onSearch: (value: string) => void; openConversation: (origin: string) => void}) {
@@ -621,7 +642,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError}:
   </div>;
 }
 
-function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sendState, fixture, sourceConversation, sourceConversationLoading, sourceConversationError, sourceUserId, onBack, onCommonMutation, onSend, onOpenSource}: {
+function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sendState, fixture, attentionItem, sourceConversation, sourceConversationLoading, sourceConversationError, sourceUserId, onBack, onCommonMutation, onSend, onOpenSource}: {
   detail: Detail;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   draft: string;
@@ -629,6 +650,7 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
   commonMutations: Record<Exclude<CommonMutationTarget, null>, MutationState>;
   sendState: SendLifecycle;
   fixture: ShellFixture;
+  attentionItem: AttentionItemReadModel | null;
   sourceConversation: SourceConversationReadModel | null;
   sourceConversationLoading: boolean;
   sourceConversationError: string;
@@ -636,31 +658,33 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
   onBack: () => void;
   onCommonMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void;
   onSend: () => void;
-  onOpenSource: () => void;
+  onOpenSource: (conversationId?: string) => void;
 }) {
   const title = detail === 'conversation'
     ? sourceUserId ? sourceConversation?.subject ?? 'Sourceの会話' : sourceItem.subject
-    : detail === 'review-detail' ? '契約更新の条件を確認してください' : detail === 'managed-detail' ? '来期の見積書を見守っています' : attentionItem.action;
+    : detail === 'review-detail' ? attentionItem?.reviewQuestion ?? '契約更新の条件を確認してください' : detail === 'managed-detail' ? attentionItem?.operationalOutcome ?? '来期の見積書を見守っています' : attentionItem?.operationalOutcome ?? attentionItemStatic.action;
   return <div className="detail-content"><button className="back-button" type="button" onClick={onBack}>‹ 一覧に戻る</button><h2 ref={headingRef} tabIndex={-1}>{title}</h2>
-    {detail === 'moment' && <MomentBody onSource={onOpenSource} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />}
-    {detail === 'managed-detail' && <ManagedDetail mutation={commonMutations['stop-tracking']} onMutation={onCommonMutation} />}
-    {detail === 'review-detail' && <ReviewDetail mutation={commonMutations['review-answer']} onMutation={onCommonMutation} />}
+    {detail === 'moment' && <MomentBody item={attentionItem} onSource={onOpenSource} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />}
+    {detail === 'managed-detail' && <ManagedDetail item={attentionItem} mutation={commonMutations['stop-tracking']} onMutation={onCommonMutation} />}
+    {detail === 'review-detail' && <ReviewDetail item={attentionItem} mutation={commonMutations['review-answer']} onMutation={onCommonMutation} />}
     {detail === 'conversation' && (sourceUserId
       ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError} />
       : <Conversation draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />)}
   </div>;
 }
 
-function MomentBody({onSource, draft, onDraft, sendState, fixture, onSend}: {onSource: () => void; draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void}) {
-  return <><p className="detail-lead">{attentionItem.whyNow}</p><section className="trust-block"><h3>いま行うこと</h3><p>見積書を確認して、必要な点を返信してください。</p><button className="primary-button" type="button" onClick={() => document.getElementById('reply-body')?.focus()}>返信を書く</button></section><section><h3>変わったこと</h3><p>佐藤さんから、打ち合わせ前の確認依頼が届きました。</p></section><section><h3>残っていること</h3><p>見積書の条件について、あなたからの確認を待っています。</p></section><button className="source-link" type="button" onClick={onSource}>元の会話を確認する</button><Composer draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} /></>;
+function MomentBody({item, onSource, draft, onDraft, sendState, fixture, onSend}: {item: AttentionItemReadModel | null; onSource: (conversationId?: string) => void; draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void}) {
+  const action = item?.primaryAction ?? '内容を確認してください';
+  const outcome = item?.operationalOutcome ?? '見積書の条件について、確認を終える';
+  return <><p className="detail-lead">{item ? `現在の対応: ${action}` : attentionItemStatic.whyNow}</p><section className="trust-block"><h3>いま行うこと</h3><p>{item ? `${outcome}。` : '見積書を確認して、必要な点を返信してください。'}</p><button className="primary-button" type="button" onClick={() => document.getElementById('reply-body')?.focus()}>返信を書く</button></section><section><h3>変わったこと</h3><p>{item ? `このResponsibilityは「${item.projection.primaryReason}」として現在の状態に投影されています。` : '佐藤さんから、打ち合わせ前の確認依頼が届きました。'}</p></section><section><h3>残っていること</h3><p>{item ? outcome : '見積書の条件について、あなたからの確認を待っています。'}</p></section><button className="source-link" type="button" onClick={() => onSource(item?.conversationId)}>元の会話を確認する</button><Composer draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} /></>;
 }
 
-function ManagedDetail({mutation, onMutation}: {mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void}) {
-  return <><p className="detail-lead">佐藤ひろ子からの返信、または9月3日の再確認条件を見守っています。</p><section><h3>監視の状態</h3><p><span className="state-chip waiting">待機中</span> 監視は正常です。</p></section><section><h3>元の会話</h3><p>{sourceItem.subject}</p></section><button className="danger-button" disabled={mutation === 'pending'} type="button" onClick={() => onMutation('stop-tracking', '監視を停止しています')}>{mutation === 'pending' ? '監視を停止しています' : '監視を停止する'}</button>{mutation === 'failed' && <p className="inline-status" role="status">監視を停止できませんでした。現在の監視は継続しています。</p>}<p className="metadata">停止は、確認されるまで完了や対応不要を意味しません。</p></>;
+function ManagedDetail({item, mutation, onMutation}: {item: AttentionItemReadModel | null; mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void}) {
+  return <><p className="detail-lead">{item?.awaitedEvent ?? '佐藤ひろ子からの返信'}、または{item?.returnCondition ?? '再確認条件'}を見守っています。</p><section><h3>監視の状態</h3><p><span className="state-chip waiting">待機中</span> {item ? '現在のResponsibilityを監視しています。' : '監視は正常です。'}</p></section><section><h3>元の会話</h3><p>{item ? item.conversationId : sourceItem.subject}</p></section><button className="danger-button" disabled={mutation === 'pending'} type="button" onClick={() => onMutation('stop-tracking', '監視を停止しています')}>{mutation === 'pending' ? '監視を停止しています' : '監視を停止する'}</button>{mutation === 'failed' && <p className="inline-status" role="status">監視を停止できませんでした。現在の監視は継続しています。</p>}<p className="metadata">停止は、確認されるまで完了や対応不要を意味しません。</p></>;
 }
 
-function ReviewDetail({mutation, onMutation}: {mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void}) {
-  return <><p className="detail-lead">会話内で更新日が2つ示されています。正しい条件を選んでください。</p><section><h3>根拠</h3><p>8月29日のメッセージ: 9月30日。8月30日の添付: 10月1日。</p></section><fieldset disabled={mutation === 'pending'}><legend>採用する更新日</legend><button className="choice-button" type="button" onClick={() => onMutation('review-answer', '回答を保存しています')}>9月30日</button><button className="choice-button" type="button" onClick={() => onMutation('review-answer', '回答を保存しています')}>10月1日</button></fieldset>{mutation === 'pending' && <p className="inline-status" role="status">回答を保存しています。確認されるまでこの確認は残ります。</p>}{mutation === 'confirmed' && <p className="inline-status" role="status">回答を保存しました。会話の状態を確認しています。</p>}{mutation === 'failed' && <p className="inline-status" role="status">回答を保存できませんでした。選択はまだ確定していません。</p>}</>;
+function ReviewDetail({item, mutation, onMutation}: {item: AttentionItemReadModel | null; mutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void}) {
+  return <><p className="detail-lead">{item?.reviewQuestion ?? '会話内で更新日が2つ示されています。正しい条件を選んでください。'}</p><section><h3>根拠</h3><p>{item ? item.projection.primaryReason : '8月29日のメッセージ: 9月30日。8月30日の添付: 10月1日。'}</p></section><fieldset disabled={mutation === 'pending'}><legend>採用する条件</legend><button className="choice-button" type="button" onClick={() => onMutation('review-answer', '回答を保存しています')}>確認して保存する</button></fieldset>{mutation === 'pending' && <p className="inline-status" role="status">回答を保存しています。確認されるまでこの確認は残ります。</p>}{mutation === 'confirmed' && <p className="inline-status" role="status">回答を保存しました。会話の状態を確認しています。</p>}{mutation === 'failed' && <p className="inline-status" role="status">回答を保存できませんでした。選択はまだ確定していません。</p>}</>;
 }
 
 function Conversation({draft, onDraft, sendState, fixture, onSend}: {draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void}) {

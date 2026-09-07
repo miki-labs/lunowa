@@ -227,15 +227,17 @@ try {
       kind: 'test',
       create: async () => {
         providerCalls += 1;
-        const visibleRun = await pool.query<{status: string; basis_evidence_revision: string; message_id: string}>(
+        const visibleRuns = await pool.query<{status: string; basis_evidence_revision: string; message_id: string}>(
           `SELECT status, basis_evidence_revision::text, message_id
              FROM ai_interpretation_runs
-            WHERE user_id = $1 AND conversation_id = $2
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1`,
-          [user1, conversation1]
+            WHERE user_id = $1
+              AND conversation_id = $2
+              AND basis_evidence_revision = 8
+              AND message_id = $3
+              AND status = 'CAPTURED'`,
+          [user1, conversation1, message1]
         );
-        assert(visibleRun.rows[0]?.status === 'CAPTURED' && visibleRun.rows[0].basis_evidence_revision === '8' && visibleRun.rows[0].message_id === message1, 'provider observed no pre-call captured AIInterpretationRun');
+        assert(visibleRuns.rows.length === 1, 'provider observed no unique pre-call captured AIInterpretationRun for revision 8');
         return {status: 'completed', output_text: JSON.stringify({
           schemaVersion: 1,
           basisEvidenceRevision: 8,

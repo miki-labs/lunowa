@@ -24,8 +24,8 @@ const sentAt = '2026-08-24T09:00:00+09:00';
 const tier0Bodies: Record<string, string> = {
   'T0-001': '修正版を明日までに送ってください。',
   'T0-002': '修正版の見積書は明日送ります。',
-  'T0-003': 'こちらで修正版を明日送ります。',
-  'T0-004': '修正版を明日までに送ります。',
+  'T0-003': '修正版を明日までに送ってください。',
+  'T0-004': '修正版を明日送ります。',
   'T0-005': '修正版を明日送る予定です。',
   'T0-006': '修正版を明日送ろうと思っています。',
   'T0-007': '修正版を明日送れればと思っています。',
@@ -88,7 +88,18 @@ const draftManifest = G70_EVAL_CASES.find((item) => item.id === 'PG-29');
 if (!draftManifest) throw new Error('missing PG-29 draft manifest case');
 assertExecutableFixtureCoverage([...fixtureManifests, {id: draftManifest.id, family: draftManifest.family, lane: draftManifest.lane, split: draftManifest.split}]);
 
-const sourceRef = (messageId: string, body: string, participant?: string): ModelSourceRef => ({messageId, participantId: participant ?? null, zone: 'AUTHORED_CURRENT', excerpt: body, start: 0, end: body.length});
+const quotedIds = new Set(['T0-022', 'T0-023', 'PG-46']);
+const forwardedIds = new Set(['T0-024', 'T0-025']);
+const outboundIds = new Set(['T0-003', 'T0-004', 'T0-016', 'T0-017', 'T0-022', 'T0-023', 'T0-024', 'T0-025', 'T0-026', 'T0-027']);
+
+function sourceZonesFor(id: string, body: string): NonNullable<AuthorizedInterpretationContext['messages'][number]['sourceZones']> {
+  const newline = body.indexOf('\n');
+  if (newline < 0) return [{zone: 'AUTHORED_CURRENT', start: 0, end: body.length}];
+  const secondaryZone = quotedIds.has(id) ? 'QUOTED_HISTORY' : forwardedIds.has(id) ? 'FORWARDED_CONTENT' : 'AUTHORED_CURRENT';
+  return [{zone: 'AUTHORED_CURRENT', start: 0, end: newline}, {zone: secondaryZone, start: newline + 1, end: body.length}];
+}
+
+const sourceRef = (messageId: string, body: string, participant?: string, zone: ModelSourceRef['zone'] = 'AUTHORED_CURRENT', start = 0, end = body.length): ModelSourceRef => ({messageId, participantId: participant ?? null, zone, excerpt: body.slice(start, end), start, end});
 
 function baseUnit(ref: ModelSourceRef, overrides: Partial<ModelSemanticUnit> = {}): ModelSemanticUnit {
   return {
@@ -99,48 +110,64 @@ function baseUnit(ref: ModelSourceRef, overrides: Partial<ModelSemanticUnit> = {
 
 function interpretationOutput(id: string, body: string): ModelInterpretationOutput {
   const messageId = `fixture-${id}`;
-  const ref = sourceRef(messageId, body);
-  const participantRef = sourceRef(messageId, body, participantId);
-  const secondParticipantRef = sourceRef(messageId, body, secondParticipantId);
-  const userLeg = {id: 'user-leg', bearerCandidate: 'USER' as const, actionCode: 'COMPLETE_REQUEST', actionSummary: 'complete the request', basisKind: 'COMMUNICATED_REQUEST', blockedByCondition: false, sourceRefs: [ref]};
+  const zones = sourceZonesFor(id, body);
+  const authoredZone = zones.find((zone) => zone.zone === 'AUTHORED_CURRENT')!;
+  const contextualZone = zones.find((zone) => zone.zone !== 'AUTHORED_CURRENT');
+  const ref = sourceRef(messageId, body, undefined, authoredZone.zone, authoredZone.start, authoredZone.end);
+  const contextualRef = contextualZone ? sourceRef(messageId, body, undefined, contextualZone.zone, contextualZone.start, contextualZone.end) : undefined;
+  const requestRefs = contextualRef ? [ref, contextualRef] : [ref];
+  const participantRef = sourceRef(messageId, body, participantId, authoredZone.zone, authoredZone.start, authoredZone.end);
+  const secondParticipantRef = sourceRef(messageId, body, secondParticipantId, authoredZone.zone, authoredZone.start, authoredZone.end);
+  const userLeg = {id: 'user-leg', bearerCandidate: 'USER' as const, actionCode: 'COMPLETE_REQUEST', actionSummary: 'complete the request', basisKind: 'COMMUNICATED_REQUEST', blockedByCondition: false, sourceRefs: requestRefs};
   const otherLeg = {id: 'other-leg', bearerCandidate: 'PARTICIPANT' as const, participantId, actionCode: 'DELIVER_RESPONSE', actionSummary: 'deliver the response', basisKind: 'COMMUNICATED_REQUEST', blockedByCondition: false, sourceRefs: [participantRef]};
   const due = {id: 'due', temporalKind: 'SOURCE_DUE' as const, originalExpression: '明日', valueKind: 'DATE' as const, resolvedDate: '2026-08-25', precisionCode: 'DATE', referenceTimezone: 'Asia/Tokyo', conflictCandidate: false, sourceRefs: [ref]};
+  const todayDue = {...due, originalExpression: '本日', resolvedDate: '2026-08-24'};
+  const fridayDue = {...due, originalExpression: '金曜', resolvedDate: '2026-08-28'};
   const event = {id: 'event', actor: 'PARTICIPANT' as const, participantId, eventCode: 'DELIVER_RESPONSE', eventSummary: 'deliver the response', basisKind: 'COMMUNICATED_COMMITMENT', expectationStrength: 'FIRM', sourceRefs: [participantRef]};
   const eventTime = {...due, id: 'event-time', temporalKind: 'EXPECTED_EVENT_TIME' as const, expectedEventId: 'event'};
-  let units: ModelSemanticUnit[] = [baseUnit(ref, {obligationLegs: [userLeg], temporalFacts: [due]})];
+  let units: ModelSemanticUnit[] = [baseUnit(ref, {obligationLegs: [userLeg], temporalFacts: []})];
   let status: ModelInterpretationOutput['status'] = 'CANDIDATE';
   let abstentionReason: ModelInterpretationOutput['abstentionReason'] = undefined;
   switch (id) {
+    case 'T0-001': units = [baseUnit(ref, {obligationLegs: [userLeg], temporalFacts: [due]})]; break;
     case 'T0-002': units = [baseUnit(ref, {obligationLegs: [], expectedEvents: [event], temporalFacts: [eventTime]})]; break;
-    case 'T0-003': case 'T0-004': units = [baseUnit(ref, {obligationLegs: [userLeg]})]; break;
-    case 'T0-005': case 'T0-006': case 'T0-007': case 'T0-008': units = [baseUnit(ref, {obligationLegs: [userLeg], expectedEvents: [{...event, expectationStrength: id.slice(-1) === '5' ? 'PLAN' : id.slice(-1) === '6' ? 'INTENTION' : id.slice(-1) === '7' ? 'TENTATIVE' : 'CAPABILITY'}], temporalFacts: []})]; break;
+    case 'T0-003': units = [baseUnit(ref, {obligationLegs: [{...otherLeg, sourceRefs: [participantRef]}], temporalFacts: [{...due, obligationLegId: 'other-leg'}]})]; break;
+    case 'T0-004': units = [baseUnit(ref, {obligationLegs: [userLeg], temporalFacts: [due]})]; break;
+    case 'T0-005': case 'T0-006': case 'T0-007': {
+      const expectationStrength = id === 'T0-005' ? 'PLAN' : id === 'T0-006' ? 'INTENTION' : 'TENTATIVE';
+      units = [baseUnit(ref, {obligationLegs: [], expectedEvents: [{...event, expectationStrength}], temporalFacts: [eventTime]})];
+      break;
+    }
+    case 'T0-008': units = [baseUnit(ref, {obligationLegs: [], expectedEvents: [{...event, expectationStrength: 'CAPABILITY'}], temporalFacts: []})]; break;
     case 'T0-009': units = [baseUnit(ref, {pendingProposals: [{id: 'proposal', kind: 'SCHEDULE', value: JSON.stringify('金曜17時'), candidateStatus: 'PENDING', sourceRefs: [ref]}]})]; break;
     case 'T0-010': units = [baseUnit(ref, {agreedFacts: [{id: 'agreement', kind: 'SCHEDULE', value: JSON.stringify('金曜17時'), sourceRefs: [ref]}]})]; break;
-    case 'T0-011': units = [baseUnit(ref, {materiality: 'UNCERTAIN', uncertainties: [{id: 'preference', fieldKey: 'agreedFacts', reasonCode: 'PREFERENCE_NOT_FINAL', material: true, reviewRequired: true, sourceRefs: [ref]}]})]; break;
+    case 'T0-011': units = [baseUnit(ref, {materiality: 'UNCERTAIN', obligationLegs: [], temporalFacts: [], uncertainties: [{id: 'preference', fieldKey: 'agreedFacts', reasonCode: 'PREFERENCE_NOT_FINAL', material: true, reviewRequired: true, sourceRefs: [ref]}]})]; break;
     case 'T0-012': units = [baseUnit(ref, {obligationLegs: [{...userLeg, actionCode: 'CHECK'}]})]; break;
     case 'T0-013': units = [baseUnit(ref, {obligationLegs: [{...userLeg, actionCode: 'APPROVE'}]})]; break;
     case 'T0-014': units = [baseUnit(ref, {constraints: [{id: 'hold', code: 'DO_NOT_PROCEED', summary: 'wait for resume communication', sourceRefs: [ref]}]})]; break;
-    case 'T0-015': units = [baseUnit(ref, {terminalSignal: {kind: 'CANCELLED', sourceRefs: [ref]}})]; break;
-    case 'T0-016': units = [baseUnit(ref, {obligationLegs: [{...userLeg, actionCode: 'DELEGATE'}]})]; break;
-    case 'T0-017': case 'T0-021': units = [baseUnit(ref, {obligationLegs: [otherLeg]})]; break;
-    case 'T0-018': case 'T0-020': units = [baseUnit(ref, {obligationLegs: [userLeg]})]; break;
-    case 'T0-019': case 'T0-023': case 'T0-024': case 'T0-038': case 'PG-46': case 'PG-52': case 'PG-60': units = [baseUnit(ref, {materiality: 'NOT_MATERIAL', operationalOutcome: undefined, obligationLegs: [], temporalFacts: []})]; break;
-    case 'T0-022': case 'T0-025': units = [baseUnit(ref, {obligationLegs: [userLeg]})]; break;
+    case 'T0-015': units = [baseUnit(ref, {obligationLegs: [], temporalFacts: [], terminalSignal: {kind: 'CANCELLED', sourceRefs: [ref]}})]; break;
+    case 'T0-016': units = [baseUnit(ref, {obligationLegs: [{...userLeg, actionCode: 'DELEGATE'}], temporalFacts: []})]; break;
+    case 'T0-017': case 'T0-021': units = [baseUnit(ref, {obligationLegs: [otherLeg], temporalFacts: []})]; break;
+    case 'T0-018': units = [baseUnit(ref, {obligationLegs: [userLeg], temporalFacts: [todayDue]})]; break;
+    case 'T0-020': units = [baseUnit(ref, {obligationLegs: [userLeg], temporalFacts: []})]; break;
+    case 'T0-019': case 'T0-038': case 'PG-52': case 'PG-60': units = [baseUnit(ref, {materiality: 'NOT_MATERIAL', operationalOutcome: undefined, obligationLegs: [], temporalFacts: []})]; break;
+    case 'T0-023': case 'T0-024': case 'PG-46': units = [baseUnit(ref, {materiality: 'NOT_MATERIAL', operationalOutcome: undefined, obligationLegs: [], temporalFacts: [], sourceRefs: requestRefs})]; break;
+    case 'T0-022': case 'T0-025': units = [baseUnit(ref, {obligationLegs: [userLeg], sourceRefs: requestRefs})]; break;
     case 'T0-026': units = [baseUnit(ref, {temporalFacts: [{...due, id: 'source-due', originalExpression: '金曜', resolvedDate: '2026-08-28'}, {...due, id: 'user-target', temporalKind: 'USER_TARGET', originalExpression: '木曜', resolvedDate: '2026-08-27'}]})]; break;
-    case 'T0-027': units = [baseUnit(ref, {corrections: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: JSON.stringify('月曜'), relation: 'CORRECTION', sourceRefs: [ref]}]})]; break;
-    case 'T0-028': units = [baseUnit(ref, {uncertainties: [{id: 'conflict', fieldKey: 'temporalFacts', reasonCode: 'CONFLICTING_TIME', material: true, reviewRequired: true, sourceRefs: [ref]}]})]; break;
+    case 'T0-027': units = [baseUnit(ref, {temporalFacts: [{...due, id: 'corrected-due', originalExpression: '月曜', resolvedDate: '2026-08-31'}], corrections: [{fieldKey: 'temporalFacts.SOURCE_DUE', value: JSON.stringify('月曜'), relation: 'CORRECTION', sourceRefs: [ref]}]})]; break;
+    case 'T0-028': units = [baseUnit(ref, {obligationLegs: [], temporalFacts: [{...due, id: 'friday', originalExpression: '金曜', resolvedDate: '2026-08-28', conflictCandidate: true}, {...due, id: 'monday', originalExpression: '月曜', resolvedDate: '2026-08-31', conflictCandidate: true}], uncertainties: [{id: 'conflict', fieldKey: 'temporalFacts', reasonCode: 'CONFLICTING_TIME', material: true, reviewRequired: true, sourceRefs: [ref]}]})]; break;
     case 'T0-029': units = [baseUnit(ref, {identityRelation: {kind: 'SAME_UNSATISFIED_OUTCOME', priorResponsibilityId: 'prior-responsibility-1'}, obligationLegs: [userLeg]})]; break;
     case 'T0-030': units = [baseUnit(ref, {identityRelation: {kind: 'NEW_EPISODE', priorResponsibilityId: undefined}, obligationLegs: [userLeg]})]; break;
     case 'T0-031': units = [baseUnit(ref, {obligationLegs: [userLeg], completionCriteria: [{id: 'signed', code: 'SIGNED_AND_RETURNED', summary: 'signed and returned', sourceRefs: [ref]}]})]; break;
     case 'T0-032': units = [baseUnit(ref, {candidateUnitKey: 'contract-review', obligationLegs: [userLeg]}), baseUnit(ref, {candidateUnitKey: 'candidate-dates', obligationLegs: [{...userLeg, id: 'dates', actionCode: 'PROVIDE_DATES'}]})]; break;
-    case 'T0-033': units = [baseUnit(ref, {completionCriteria: [{id: 'front', code: 'ID_FRONT', summary: 'front', sourceRefs: [ref]}, {id: 'back', code: 'ID_BACK', summary: 'back', sourceRefs: [ref]}]})]; break;
+    case 'T0-033': units = [baseUnit(ref, {obligationLegs: [userLeg], completionCriteria: [{id: 'front', code: 'ID_FRONT', summary: 'front', sourceRefs: [ref]}, {id: 'back', code: 'ID_BACK', summary: 'back', sourceRefs: [ref]}]})]; break;
     case 'T0-034': case 'PG-45': units = [baseUnit(ref, {identityRelation: {kind: 'CONTINUES', priorResponsibilityId: 'prior-responsibility-1'}, obligationLegs: [], communicatedClaims: [{id: 'attachment-claim', kind: 'ATTACHMENT_DELIVERED', value: JSON.stringify('添付しました'), sourceRefs: [ref]}]})]; break;
     case 'T0-035': case 'PG-42': case 'PG-43': units = [baseUnit(ref, {obligationLegs: [], communicatedClaims: [{id: 'weak-signal', kind: 'ACKNOWLEDGEMENT', value: JSON.stringify(body), sourceRefs: [ref]}]})]; break;
-    case 'T0-036': units = [baseUnit(ref, {obligationLegs: [userLeg, otherLeg]})]; break;
+    case 'T0-036': units = [baseUnit(ref, {obligationLegs: [userLeg, otherLeg], temporalFacts: [{...fridayDue, id: 'user-due'}, {...fridayDue, id: 'other-due', obligationLegId: 'other-leg'}]})]; break;
     case 'T0-037': case 'PG-50': units = [baseUnit(ref, {riskDetails: [{id: 'risk', targetKind: 'SOURCE', riskClass: 'HIGH', reasonCode: 'PROMPT_INJECTION', sourceRefs: [ref]}], obligationLegs: []})]; break;
     case 'T0-039': units = [baseUnit(ref, {identityRelation: {kind: 'NEW'}, obligationLegs: [userLeg]})]; break;
-    case 'T0-040': units = [baseUnit(participantRef, {materiality: 'UNCERTAIN', assignmentSemantics: {id: 'any', shape: 'ANY_OF', candidateParticipantIds: [participantId, secondParticipantId], selectedParticipantId: undefined}, uncertainties: [{id: 'bearer', fieldKey: 'obligationLegs', reasonCode: 'AMBIGUOUS_BEARER', material: true, reviewRequired: true, sourceRefs: [participantRef, secondParticipantRef]}], sourceRefs: [participantRef, secondParticipantRef]})]; break;
-    case 'T0-041': case 'T0-044': units = [baseUnit(ref, {materiality: 'UNCERTAIN', uncertainties: [{id: 'ambiguous', fieldKey: 'materiality', reasonCode: 'AMBIGUOUS', material: true, reviewRequired: true, sourceRefs: [ref]}], obligationLegs: []})]; break;
+    case 'T0-040': units = [baseUnit(participantRef, {materiality: 'UNCERTAIN', assignmentSemantics: {id: 'any', shape: 'ANY_OF', candidateParticipantIds: [participantId, secondParticipantId]}, uncertainties: [{id: 'bearer', fieldKey: 'obligationLegs', reasonCode: 'AMBIGUOUS_BEARER', material: true, reviewRequired: true, sourceRefs: [participantRef, secondParticipantRef]}], sourceRefs: [participantRef, secondParticipantRef]})]; break;
+    case 'T0-041': case 'T0-044': units = [baseUnit(ref, {materiality: 'UNCERTAIN', uncertainties: [{id: 'ambiguous', fieldKey: 'materiality', reasonCode: 'AMBIGUOUS', material: true, reviewRequired: true, sourceRefs: [ref]}], obligationLegs: [], temporalFacts: []})]; break;
     case 'T0-042': status = 'ABSTAINED'; abstentionReason = 'AMBIGUOUS'; units = []; break;
     case 'T0-043': status = 'ABSTAINED'; abstentionReason = 'MISSING_CONTEXT'; units = []; break;
     case 'PG-22': status = 'ABSTAINED'; abstentionReason = 'UNINTERPRETABLE'; units = []; break;
@@ -151,8 +178,8 @@ function interpretationOutput(id: string, body: string): ModelInterpretationOutp
   return {schemaVersion: 3, basisEvidenceRevision: 1, status, sourceMessageId: messageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits: units, sourceRefs: [ref]};
 }
 
-function priorResponsibility(): ResponsibilityState {
-  return {id: 'prior-responsibility-1', userId, connectedAccountId: accountId, conversationId: 'fixture-conversation', operationalOutcome: 'complete the communicated work', resolutionStatus: 'RESOLVED', resolutionReason: 'SATISFIED', liveTrackingState: 'HISTORICAL_INACTIVE', attentionMode: 'PRESENT', acceptedEvidenceRevision: 1, aggregateVersion: 1, obligationLegs: [], expectedEvents: [], temporalFacts: [], details: {completionCriteria: [], constraints: [], pendingProposals: [], agreedFacts: [], uncertainties: [], riskDetails: []}, fieldDecisions: [], provenance: [], resolutionHistory: [{reason: 'SATISFIED', at: sentAt, basisEvidenceRevision: 1}]};
+function priorResponsibility(resolutionStatus: ResponsibilityState['resolutionStatus'] = 'RESOLVED', connectedAccountId = accountId): ResponsibilityState {
+  return {id: 'prior-responsibility-1', userId, connectedAccountId, conversationId: 'fixture-conversation', operationalOutcome: 'complete the communicated work', resolutionStatus, ...(resolutionStatus === 'RESOLVED' ? {resolutionReason: 'SATISFIED' as const} : {}), liveTrackingState: resolutionStatus === 'RESOLVED' ? 'HISTORICAL_INACTIVE' : 'TRACKING_ACTIVE', attentionMode: 'PRESENT', acceptedEvidenceRevision: 1, aggregateVersion: 1, obligationLegs: [], expectedEvents: [], temporalFacts: [], details: {completionCriteria: [], constraints: [], pendingProposals: [], agreedFacts: [], uncertainties: [], riskDetails: []}, fieldDecisions: [], provenance: [], resolutionHistory: resolutionStatus === 'RESOLVED' ? [{reason: 'SATISFIED', at: sentAt, basisEvidenceRevision: 1}] : []};
 }
 
 class FixtureTransport implements ResponsesTransport {
@@ -166,13 +193,20 @@ function contextFor(id: string, body: string): AuthorizedInterpretationContext {
   const observations = id === 'T0-034' || id === 'PG-45' ? [{key: `${id}-attachment`, kind: 'ATTACHMENT_PRESENCE' as const, messageId, attachmentCount: 0}] : [];
   const multipleParticipants = id === 'T0-040';
   const ccAssignment = id === 'T0-021' || id === 'PG-47';
-  return {user: {id: userId, email: 'user@example.com', locale: 'ja-JP', timezone: 'Asia/Tokyo'}, connectedAccount: {id: accountId, provider: 'gmail', emailAddress: 'user@example.com'}, conversationId: 'fixture-conversation', sourceEventKey: `fixture:${id}`, evidenceRevision: 1, focalMessageId: messageId, participantIdentities: [{id: participantId, email: 'partner@example.com', role: 'OTHER_PARTY'}, ...(multipleParticipants ? [{id: secondParticipantId, email: 'second-partner@example.com', role: 'OTHER_PARTY' as const}] : [])], existingResponsibilities: ['T0-029', 'T0-034', 'PG-45'].includes(id) ? [priorResponsibility()] : [], providerObservations: observations, messages: [{id: messageId, direction: 'INBOUND', sender: {participantId, email: 'partner@example.com'}, recipients: multipleParticipants ? [{email: 'user@example.com'}, {participantId, email: 'partner@example.com'}, {participantId: secondParticipantId, email: 'second-partner@example.com'}] : ccAssignment ? [{participantId, email: 'partner@example.com'}] : [{email: 'user@example.com'}], ...(ccAssignment ? {cc: [{email: 'user@example.com'}]} : {}), subject: id, body, sentAt, sourceZones: [{zone: 'AUTHORED_CURRENT', start: 0, end: body.length}]}]};
+  const outbound = outboundIds.has(id);
+  const priorOpen = new Set(['T0-005', 'T0-006', 'T0-007', 'T0-008', 'T0-014', 'T0-015', 'T0-016', 'T0-017', 'T0-026', 'T0-028']).has(id);
+  const hasPrior = priorOpen || ['T0-029', 'T0-030', 'T0-034', 'PG-45', 'T0-039'].includes(id);
+  const zones = sourceZonesFor(id, body);
+  const messageSentAt = id === 'T0-038' ? '2019-08-24T09:00:00+09:00' : sentAt;
+  const participants = [{id: participantId, email: 'partner@example.com', displayName: '田中', role: 'OTHER_PARTY' as const}, ...(multipleParticipants ? [{id: secondParticipantId, email: 'second-partner@example.com', displayName: '佐藤', role: 'OTHER_PARTY' as const}] : [])];
+  return {user: {id: userId, email: 'user@example.com', locale: 'ja-JP', timezone: 'Asia/Tokyo'}, connectedAccount: {id: id === 'T0-039' ? 'fixture-account-current' : accountId, provider: 'gmail', emailAddress: 'user@example.com'}, conversationId: 'fixture-conversation', sourceEventKey: `fixture:${id}`, evidenceRevision: 1, focalMessageId: messageId, participantIdentities: participants, existingResponsibilities: hasPrior ? [priorResponsibility(priorOpen ? 'OPEN' : 'RESOLVED', id === 'T0-039' ? 'fixture-account-other' : accountId)] : [], providerObservations: observations, messages: [{id: messageId, direction: outbound ? 'OUTBOUND' : 'INBOUND', sender: outbound ? {email: 'user@example.com'} : {participantId, email: 'partner@example.com'}, recipients: multipleParticipants ? [{email: 'user@example.com'}, {participantId, email: 'partner@example.com'}, {participantId: secondParticipantId, email: 'second-partner@example.com'}] : ccAssignment ? [{participantId, email: 'partner@example.com'}] : outbound ? [{participantId, email: 'partner@example.com'}] : [{email: 'user@example.com'}], ...(ccAssignment ? {cc: [{email: 'user@example.com'}]} : {}), subject: id, body, sentAt: messageSentAt, sourceZones: zones}]};
 }
 
 for (const id of interpretationIds) {
   const body = tier0Bodies[id]!;
   const output = interpretationOutput(id, body);
   const context = contextFor(id, body);
+  if (context.messages[0]?.direction !== (outboundIds.has(id) ? 'OUTBOUND' : 'INBOUND')) throw new Error(`${id} fixture direction does not match its canonical scenario`);
   const built = buildInterpretationContext(context);
   const runtime = new ResponsibilityInterpretationRuntime({transport: new FixtureTransport(output), runStore: new InMemoryAIRunStore(), config: {model: 'fixture', modelConfigVersion: 'g70-fixture-v1', dataControlMode: 'UNVERIFIED'}, currentEvidenceRevision: () => 1, existingResponsibilities: context.existingResponsibilities});
   const result = await runtime.run(context);
@@ -180,7 +214,7 @@ for (const id of interpretationIds) {
   const runtimeOracle = checkInterpretationRuntimeOracle(id, result);
   if (!modelOracle.passed) throw new Error(`${id} interpretation oracle failed: ${modelOracle.failures.join('; ')}`);
   if (!runtimeOracle.passed) throw new Error(`${id} runtime oracle failed: ${runtimeOracle.failures.join('; ')}`);
-  if (result.status === 'FAILED' || result.status === 'STALE') throw new Error(`${id} fixture runtime ${result.status}`);
+  if (result.status === 'FAILED' || result.status === 'STALE') throw new Error(`${id} fixture runtime ${result.status}: ${result.reason ?? ''}`);
   if (built.manifest.basisEvidenceRevision !== 1) throw new Error(`${id} fixture did not preserve basis revision`);
 }
 

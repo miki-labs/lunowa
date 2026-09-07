@@ -324,6 +324,13 @@ describe('G70 bounded AI runtime', () => {
     expect(G70_EVAL_CASES.filter((item) => item.split === 'HOLDOUT').length).toBeGreaterThan(0);
   });
 
+  it('keeps the outbound request/commitment direction pair distinct', () => {
+    const inboundRequest = interpretationOutput();
+    const check = checkInterpretationOracle('T0-003', inboundRequest);
+    expect(check.passed).toBe(false);
+    expect(check.failures.join(' ')).toContain('outbound request');
+  });
+
   it('binds the eval manifest to the explicit canonical fixture corpus', () => {
     expect(() => assertFamilyStratifiedHoldout()).not.toThrow();
     expect(G70_EVAL_CASES.map((item) => item.id)).toEqual([

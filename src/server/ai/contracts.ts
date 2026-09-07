@@ -603,7 +603,7 @@ function groundedDate(expression: string, messageId: string, sentAt: ReadonlyMap
   if (!base) return undefined;
   if (/明後日|day after tomorrow/i.test(expression)) return addCalendarDays(base, 2);
   if (/明日|tomorrow/i.test(expression)) return addCalendarDays(base, 1);
-  if (/今日|today/i.test(expression)) return base;
+  if (/今日|本日|today/i.test(expression)) return base;
   const weekdayMatch = /(?:(日|月|火|水|木|金|土)曜|\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\b)/i.exec(expression);
   const weekday = weekdayMatch?.[1] ?? weekdayMatch?.[2];
   if (weekday) {

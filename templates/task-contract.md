@@ -80,6 +80,8 @@ Write observable/testable conditions for completion.
 
 ## Verification
 
+For each material acceptance criterion, state the evidence that could falsify the claim when that is not already obvious from a canonical test/oracle. Prefer existing or independently grounded evidence over a check invented only to certify the same implementation.
+
 Specify evidence appropriate to the failure modes, for example:
 
 - targeted tests,

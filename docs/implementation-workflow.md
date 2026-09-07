@@ -85,8 +85,11 @@ Before substantial implementation, a non-trivial change SHOULD answer the releva
 - What can fail or become inconsistent?
 - Are trust/sensitive/commercial/AI boundaries changing?
 - What are the acceptance criteria?
+- What evidence could independently falsify each material acceptance claim?
 - How will behavior be verified?
 - What unresolved uncertainty can still invalidate the approach?
+
+For material behavior, prefer defining the falsifier before substantial implementation: reuse an existing test, invariant, schema/contract check, runtime reproduction, or other evidence source when it is strong enough. Do not manufacture a bespoke experiment for routine decisions already settled by repository authority or deterministic checks. Use comparative spikes/experiments only when uncertainty can materially change correctness, architecture, security, cost, or reversibility.
 
 If unresolved uncertainty can invalidate the design, return to discovery or run a spike.
 

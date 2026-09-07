@@ -88,6 +88,8 @@ Choose by lifecycle fit, not generation speed.
 
 Plan explicitly only when complexity, sequencing, risk, ambiguity, or reversibility justifies it. Resolve decisions capable of changing the solution; avoid speculative architecture and broad unrelated cleanup.
 
+Before substantial implementation, map each material acceptance claim to evidence that could falsify it. Prefer a pre-existing or independently grounded oracle. If a durable mechanical oracle is missing and the maintenance cost is justified, add the smallest reproduction test, invariant, contract check, or runtime proof before or alongside the implementation. Do not let a generated test merely restate the generated implementation's assumptions. Do not require comparative experiments for routine decisions whose answer is already owned by repository authority or deterministic evidence.
+
 ## 5. Implement in small coherent slices
 
 - Keep the patch focused on the accepted task and non-goals.

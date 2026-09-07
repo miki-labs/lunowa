@@ -335,7 +335,7 @@ describe('G70 bounded AI runtime', () => {
     expect(() => assertFamilyStratifiedHoldout()).not.toThrow();
     expect(G70_EVAL_CASES.map((item) => item.id)).toEqual([
       ...Array.from({length: 44}, (_, index) => `T0-${String(index + 1).padStart(3, '0')}`),
-      'PG-22', 'PG-23', 'PG-42', 'PG-43', 'PG-45', 'PG-46', 'PG-47', 'PG-50', 'PG-52', 'PG-60', 'PG-29'
+      'PG-22', 'PG-23', 'PG-42', 'PG-43', 'PG-45', 'PG-46', 'PG-47', 'PG-50', 'PG-52', 'PG-60', 'PG-29', 'PG-42-DRAFT', 'PG-45-DRAFT', 'PG-52-DRAFT'
     ]);
     expect(G70_EVAL_CASES.every((item) => item.oracle.includes(':'))).toBe(true);
   });

@@ -120,6 +120,12 @@ try {
      VALUES ($1, $2, $3, $4, $5, 'TO'), ($6, $7, $8, $9, $10, 'TO')`,
     [randomUUID(), user1, account1, message1, recipient1, randomUUID(), user2, account2, message2, recipient2]
   );
+  await pool.query(
+    `INSERT INTO attachments
+      (id, user_id, connected_account_id, message_id, provider_attachment_id, filename, mime_type, size_bytes, content_disposition, content_reference)
+     VALUES ($1, $2, $3, $4, 'g70-attachment-1', 'evidence.pdf', 'application/pdf', 12, 'attachment', 'gmail://g70-attachment-1')`,
+    [randomUUID(), user1, account1, message1]
+  );
 
   const request = {
     userId: user1,
@@ -166,6 +172,7 @@ try {
   assert(firstCapture.context.evidenceRevision === 7, 'authorized context did not read the conversation revision from PostgreSQL');
   assert(firstCapture.context.messages.length === 1 && firstCapture.context.messages[0]?.id === message1, 'authorized context did not preserve the exact message scope');
   assert(firstCapture.context.messages[0]?.body === initialBody, 'authorized context body was not read from PostgreSQL');
+  assert(firstCapture.context.providerObservations?.[0]?.messageId === message1 && firstCapture.context.providerObservations[0].attachmentCount === 1, 'authorized context did not include trusted persisted attachment observations');
   const firstRun = await pool.query<{basis_evidence_revision: string; message_id: string; context_manifest: Record<string, unknown>}>(
     'SELECT basis_evidence_revision::text, message_id, context_manifest FROM ai_interpretation_runs WHERE id = $1',
     [firstCapture.runId]
@@ -282,6 +289,7 @@ try {
       'mandatory exact message scope and focal-message authorization',
       'trusted source-zone resolver fail-closed capture',
       'DB-owned body and participant context capture',
+      'trusted persisted attachment observations capture',
       'AIInterpretationRun revision/message/focal manifest persistence',
       'PostgreSQL repeatable-read concurrent revision/body consistency',
       'post-capture currentness observes the new revision'

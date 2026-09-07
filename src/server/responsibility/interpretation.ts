@@ -174,6 +174,9 @@ function admissionFor(candidate: ResponsibilityInterpretationCandidate): {decisi
   if (candidate.admissionUncertainties?.some((item) => item.material && item.reviewRequired) || candidate.semantics.some((unit) => unit.materiality === 'UNCERTAIN' || unit.uncertainties?.some((item) => item.material && item.reviewRequired))) {
     return {decision: 'NEEDS_REVIEW', reasonCodes: ['RESPONSIBILITY_ADMISSION_UNCERTAIN']};
   }
+  if (candidate.semantics.some((unit) => unit.riskDetails?.some((risk) => risk.riskClass === 'HIGH' || risk.riskClass === 'CRITICAL'))) {
+    return {decision: 'NEEDS_REVIEW', reasonCodes: ['HIGH_IMPACT_INTERPRETATION_REQUIRES_REVIEW']};
+  }
   if (candidate.semantics.some((unit) => unit.materiality === 'MATERIAL')) {
     return {decision: 'TRACK', reasonCodes: ['MATERIAL_OPEN_LOOP_DERIVED']};
   }

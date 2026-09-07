@@ -4,6 +4,7 @@ import {getDatabase} from '../index';
 import {
   connectedAccounts,
   conversations,
+  attachments,
   messageParticipants,
   messages,
   participantIdentities
@@ -108,6 +109,7 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
     conversation: {id: string; semanticEvidenceRevision: number};
     messageRows: Array<typeof messages.$inferSelect>;
     participantRows: Array<{messageId: string; role: string; participantId: string; email: string; displayName: string | null}>;
+    attachmentCounts: ReadonlyMap<string, number>;
   }> {
     const [accountRow] = await tx.select({
       id: connectedAccounts.id,
@@ -174,12 +176,21 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
       }
     }
 
+    const attachmentRows = await tx.select({messageId: attachments.messageId}).from(attachments).where(and(
+      eq(attachments.userId, input.userId),
+      eq(attachments.connectedAccountId, input.connectedAccountId),
+      inArray(attachments.messageId, messageIds)
+    ));
+    const attachmentCounts = new Map<string, number>();
+    for (const row of attachmentRows) attachmentCounts.set(row.messageId, (attachmentCounts.get(row.messageId) ?? 0) + 1);
+
     return {
       account: {id: accountRow.id, provider: accountRow.provider, emailAddress: accountRow.emailAddress},
       owner: {id: accountRow.ownerId, email: accountRow.ownerEmail},
       conversation,
       messageRows,
-      participantRows
+      participantRows,
+      attachmentCounts
     };
   }
 
@@ -265,6 +276,12 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         focalMessageId: input.focalMessageId,
         messages: messagesWithZones,
         participantIdentities: normalized.participantIdentities,
+        providerObservations: scope.messageRows.map((message) => ({
+          key: `attachments:${message.id}`,
+          kind: 'ATTACHMENT_PRESENCE' as const,
+          messageId: message.id,
+          attachmentCount: scope.attachmentCounts.get(message.id) ?? 0
+        })),
         existingResponsibilities
       };
       const built = buildInterpretationContext(context);

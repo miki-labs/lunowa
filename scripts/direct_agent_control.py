@@ -43,6 +43,7 @@ TOOL_PROFILES = {
 }
 QUOTA_RE = re.compile(r"You've hit your usage limit.*?try again at\s+([A-Z][a-z]{2})\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+(\d{1,2}:\d{2}\s+[AP]M)", re.I | re.S)
 CLI_METRICS = Path(os.environ.get("LW_CLI_METRICS", str(Path.home() / ".cache/lw/direct-cli-metrics.jsonl"))).resolve()
+DELIVERY_EVENTS = Path(os.environ.get("LW_DELIVERY_EVENTS", str(Path.home() / ".cache/lw/delivery-events.jsonl"))).resolve()
 _METRIC_COUNTS = {"subprocess": 0, "github": 0, "remote_git": 0}
 _LAST_OUTPUT_BYTES = 0
 
@@ -721,6 +722,7 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
             raise RuntimeError(f"correction worktree HEAD {head} is not based on current PR head {base_pr_head}")
         preflight_text = f"correction ownership: explicit worktree={worktree} branch={branch} head={head} dirty={bool(status)}"
     run_dir = STATE / f"issue-{number}"; run_dir.mkdir(parents=True, exist_ok=True)
+    archive_current_delivery_attempt(number)
     events, stderr, last = run_dir / "events.jsonl", run_dir / "stderr.log", run_dir / "last.txt"
     meta = {**plan, "started_at": now_local().isoformat(), "events": str(events), "stderr": str(stderr), "last": str(last)}
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
@@ -737,6 +739,9 @@ def start_agent(number: int, model: str, effort: str, mode: str, dry_run: bool, 
         f"--property=WorkingDirectory={worktree}", "/bin/bash", "-lc", shell], text=True, capture_output=True, env=user_systemd_env())
     if start.returncode:
         raise RuntimeError((start.stderr or start.stdout).strip())
+    meta["launch_confirmed"] = True
+    (run_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
+    record_delivery_event({"event": "attempt_started", "repository": REPO, "issue": number, "mode": mode, "model": model, "effort": effort, "started_at": meta["started_at"]})
     return {**meta, "started": True, "preflight": preflight_text, "systemd": start.stdout.strip()}
 
 
@@ -791,6 +796,34 @@ def _last_completed_usage(path: Path) -> dict[str, int] | None:
         if isinstance(usage, dict):
             return {key: int(usage.get(key) or 0) for key in ("input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens")}
     return None
+
+
+def record_delivery_event(row: dict[str, Any]) -> None:
+    safe = {key: row.get(key) for key in ("event", "repository", "issue", "mode", "model", "effort", "started_at", "terminal_event", "usage") if key in row}
+    try:
+        DELIVERY_EVENTS.parent.mkdir(parents=True, exist_ok=True)
+        with DELIVERY_EVENTS.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(safe, sort_keys=True, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+
+
+def archive_current_delivery_attempt(issue: int) -> None:
+    root = STATE / f"issue-{issue}"
+    try:
+        meta = json.loads((root / "meta.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    started_at = meta.get("started_at")
+    if meta.get("launch_confirmed") is not True or not isinstance(started_at, str) or not started_at:
+        return
+    usage = _last_completed_usage(root / "events.jsonl")
+    record_delivery_event({
+        "event": "attempt_snapshot", "repository": REPO, "issue": issue,
+        "mode": meta.get("mode"), "model": meta.get("model"), "effort": meta.get("effort"),
+        "started_at": started_at, "terminal_event": terminal_event(root / "events.jsonl"),
+        "usage": usage,
+    })
 
 
 def codex_usage_snapshot(paths: list[Path] | None = None) -> dict[str, Any]:
@@ -886,6 +919,7 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("fleet")
     sn = sub.add_parser("snapshot"); sn.add_argument("--since")
     sub.add_parser("metrics")
+    sub.add_parser("throughput")
     sub.add_parser("capabilities")
     sg = sub.add_parser("guard-secrets"); sg.add_argument("--path", default=".")
     a = sub.add_parser("agent"); aa = a.add_subparsers(dest="action", required=True)
@@ -901,6 +935,9 @@ def main() -> int:
     if args.command == "fleet": emit(fleet_snapshot())
     elif args.command == "snapshot": emit(snapshot_response(snapshot_from_fleet(fleet_snapshot(include_capabilities=False)), args.since))
     elif args.command == "metrics": emit(cli_metrics_snapshot())
+    elif args.command == "throughput":
+        payload = as_json([sys.executable, str(Path(__file__).with_name("delivery_metrics.py"))])
+        emit(payload)
     elif args.command == "capabilities": emit(capability_snapshot())
     elif args.command == "guard-secrets":
         code = betterleaks_status_code(Path(args.path).expanduser().resolve())

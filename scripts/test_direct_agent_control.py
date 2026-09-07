@@ -325,5 +325,44 @@ class DirectAgentControlTest(unittest.TestCase):
         self.assertIn("not billing", result["interpretation"])
 
 
+    def test_archive_delivery_attempt_ignores_unconfirmed_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "state"
+            run_dir = root / "issue-6"
+            run_dir.mkdir(parents=True)
+            (run_dir / "meta.json").write_text(json.dumps({
+                "issue": 6, "mode": "fresh", "model": "gpt-5.6-luna", "effort": "high",
+                "started_at": "2026-09-07T00:00:00+00:00",
+            }))
+            target = Path(tmp) / "delivery.jsonl"
+            with mock.patch.object(control, "STATE", root), mock.patch.object(control, "DELIVERY_EVENTS", target):
+                control.archive_current_delivery_attempt(6)
+            self.assertFalse(target.exists())
+
+    def test_archive_delivery_attempt_persists_metadata_and_usage_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "state"
+            run_dir = root / "issue-7"
+            run_dir.mkdir(parents=True)
+            (run_dir / "meta.json").write_text(json.dumps({
+                "issue": 7, "mode": "fresh", "model": "gpt-5.6-luna", "effort": "high",
+                "started_at": "2026-09-07T00:00:00+00:00", "launch_confirmed": True,
+            }))
+            (run_dir / "events.jsonl").write_text(json.dumps({
+                "type": "turn.completed",
+                "usage": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 10},
+                "private": "must-not-be-copied",
+            }) + "\n")
+            target = Path(tmp) / "delivery.jsonl"
+            with mock.patch.object(control, "STATE", root), mock.patch.object(control, "DELIVERY_EVENTS", target):
+                control.archive_current_delivery_attempt(7)
+            row = json.loads(target.read_text())
+        self.assertEqual(row["issue"], 7)
+        self.assertEqual(row["usage"]["input_tokens"], 100)
+        self.assertNotIn("private", row)
+        self.assertNotIn("prompt", row)
+
+
+
 if __name__ == "__main__":
     unittest.main()

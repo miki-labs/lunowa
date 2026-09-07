@@ -29,6 +29,7 @@ import type {
   DraftContextRequest,
   InterpretationContextRequest
 } from '../../ai/runtime';
+import {loadResponsibilityStatesInTransaction} from './responsibility';
 
 type Database = ReturnType<typeof getDatabase>;
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -182,7 +183,10 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
     };
   }
 
-  private toMessages(scope: Awaited<ReturnType<AIInterpretationRunRepository['readScope']>>): {messages: SnapshotMessage[]; participantIds: string[]} {
+  private toMessages(scope: Awaited<ReturnType<AIInterpretationRunRepository['readScope']>>): {
+    messages: SnapshotMessage[];
+    participantIdentities: Array<{id: string; email: string; displayName?: string}>;
+  } {
     const participantsByMessage = new Map<string, Array<{role: string; participantId: string; email: string; displayName: string | null}>>();
     for (const participant of scope.participantRows) {
       const list = participantsByMessage.get(participant.messageId) ?? [];
@@ -197,17 +201,17 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
       const related = participantsByMessage.get(row.id) ?? [];
       const recipients = related.filter((participant) => participant.role === 'TO').map((participant) => {
         participantIds.add(participant.participantId);
-        return {email: participant.email, displayName: participant.displayName ?? undefined};
+        return {participantId: participant.participantId, email: participant.email, displayName: participant.displayName ?? undefined};
       });
       const cc = related.filter((participant) => participant.role === 'CC').map((participant) => {
         participantIds.add(participant.participantId);
-        return {email: participant.email, displayName: participant.displayName ?? undefined};
+        return {participantId: participant.participantId, email: participant.email, displayName: participant.displayName ?? undefined};
       });
       if (recipients.length === 0) throw new Error('AI interpretation requires authorized recipients');
       return {
         id: row.id,
         direction: row.direction as 'INBOUND' | 'OUTBOUND',
-        sender: {email: sender.email, displayName: sender.displayName ?? undefined},
+        sender: {participantId: sender.participantId, email: sender.email, displayName: sender.displayName ?? undefined},
         recipients,
         cc,
         subject: row.subject,
@@ -215,7 +219,15 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         sentAt: row.occurredAt.toISOString()
       } satisfies SnapshotMessage;
     });
-    return {messages: result, participantIds: [...participantIds]};
+    const identityRows = new Map(scope.participantRows.map((participant) => [participant.participantId, participant]));
+    return {
+      messages: result,
+      participantIdentities: [...participantIds].map((id) => {
+        const participant = identityRows.get(id);
+        if (!participant) throw new Error('AI interpretation participant identity is not authorized');
+        return {id, email: participant.email, displayName: participant.displayName ?? undefined};
+      })
+    };
   }
 
   public async captureInterpretation(input: InterpretationContextRequest, config: AIRunCaptureConfig): Promise<CapturedInterpretationContext> {
@@ -247,9 +259,14 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         evidenceRevision: scope.conversation.semanticEvidenceRevision,
         focalMessageId: input.focalMessageId,
         messages: messagesWithZones,
-        participantIds: normalized.participantIds
+        participantIdentities: normalized.participantIdentities
       };
       const built = buildInterpretationContext(context);
+      const existingResponsibilities = await loadResponsibilityStatesInTransaction(tx, {
+        userId: context.user.id,
+        connectedAccountId: context.connectedAccount.id,
+        conversationId: context.conversationId
+      });
       const run = await this.captureInTransaction(tx, {
         lane: 'interpretation',
         schemaVersion: built.manifest.schemaVersion,
@@ -263,7 +280,7 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         providerModelIdentifier: config.model,
         contextManifest: {...built.manifest, dataControlMode: config.dataControlMode, storageRequest: 'store:false', snapshotConsistency: 'REPEATABLE_READ'}
       });
-      return {context, built, runId: run.id};
+      return {context, built, runId: run.id, existingResponsibilities};
     });
   }
 

@@ -7,12 +7,24 @@ export type AuthorizedAISourceZone = {
   end: number;
 };
 
+export type AuthorizedAIParticipant = {
+  id: string;
+  email: string;
+  displayName?: string;
+};
+
+export type AuthorizedAIParty = {
+  participantId?: string;
+  email: string;
+  displayName?: string;
+};
+
 export type AuthorizedAIMessage = {
   id: string;
   direction: 'INBOUND' | 'OUTBOUND';
-  sender: {email: string; displayName?: string};
-  recipients: readonly {email: string; displayName?: string}[];
-  cc?: readonly {email: string; displayName?: string}[];
+  sender: AuthorizedAIParty;
+  recipients: readonly AuthorizedAIParty[];
+  cc?: readonly AuthorizedAIParty[];
   subject: string;
   body: string;
   sentAt: string;
@@ -27,7 +39,8 @@ export type AuthorizedInterpretationContext = {
   evidenceRevision: number;
   focalMessageId: string;
   messages: readonly AuthorizedAIMessage[];
-  participantIds?: readonly string[];
+  /** Every participant ID used by a candidate is paired with its authorized address. */
+  participantIdentities?: readonly AuthorizedAIParticipant[];
 };
 
 export type AuthorizedReplyContext = {
@@ -57,6 +70,8 @@ export type BuiltAIContext = {
   manifest: AIContextManifest;
   allowedMessageIds: ReadonlySet<string>;
   allowedParticipantIds: ReadonlySet<string>;
+  allowedParticipantEmails: ReadonlyMap<string, string>;
+  messageParticipantEmails: ReadonlyMap<string, ReadonlySet<string>>;
   allowedSourceZones: ReadonlyMap<string, readonly AuthorizedAISourceZone[]>;
   authorizedMessageBodies: ReadonlyMap<string, string>;
 };
@@ -77,8 +92,10 @@ function validateMessage(message: AuthorizedAIMessage, label: string): void {
   if (message.direction !== 'INBOUND' && message.direction !== 'OUTBOUND') throw new Error(`${label}.direction is invalid`);
   bounded(message.subject, `${label}.subject`, MAX_SUBJECT_LENGTH);
   bounded(message.body, `${label}.body`, MAX_BODY_LENGTH);
+  if (message.sender.participantId !== undefined) bounded(message.sender.participantId, `${label}.sender.participantId`, 128);
   if (!EMAIL.test(message.sender.email.trim())) throw new Error(`${label}.sender.email is invalid`);
   for (const [index, recipient] of [...message.recipients, ...(message.cc ?? [])].entries()) {
+    if (recipient.participantId !== undefined) bounded(recipient.participantId, `${label}.recipient[${index}].participantId`, 128);
     if (!EMAIL.test(recipient.email.trim())) throw new Error(`${label}.recipient[${index}].email is invalid`);
   }
   if (Number.isNaN(Date.parse(message.sentAt))) throw new Error(`${label}.sentAt is invalid`);
@@ -97,13 +114,17 @@ function validateCommonScope(input: {user: {id: string; email: string}; connecte
   if (!Number.isSafeInteger(input.evidenceRevision) || input.evidenceRevision < 0) throw new Error(`${label}.evidenceRevision is invalid`);
 }
 
+function partyForModel(party: AuthorizedAIParty): JsonObject {
+  return {participantId: party.participantId ?? null, email: party.email, displayName: party.displayName ?? null};
+}
+
 function messageForModel(message: AuthorizedAIMessage): JsonObject {
   return {
     id: message.id,
     direction: message.direction,
-    sender: {email: message.sender.email, displayName: message.sender.displayName ?? null},
-    recipients: message.recipients.map((recipient) => ({email: recipient.email, displayName: recipient.displayName ?? null})),
-    cc: (message.cc ?? []).map((recipient) => ({email: recipient.email, displayName: recipient.displayName ?? null})),
+    sender: partyForModel(message.sender),
+    recipients: message.recipients.map(partyForModel),
+    cc: (message.cc ?? []).map(partyForModel),
     subject: message.subject,
     body: message.body,
     sentAt: message.sentAt,
@@ -152,8 +173,35 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
   }
   if (!ids.has(input.focalMessageId)) throw new Error('interpretation focal message is not in the authorized context');
   if (!input.messages.every((message) => (message.sourceZones?.length ?? 0) > 0)) throw new Error('interpretation context requires trusted source zones for every message');
-  const participantIds = new Set(input.participantIds ?? []);
-  for (const id of participantIds) bounded(id, 'interpretation participant ID', 128);
+  const identities = input.participantIdentities ?? [];
+  const allowedParticipantEmails = new Map<string, string>();
+  const participantEmails = new Set<string>();
+  for (const [index, identity] of identities.entries()) {
+    bounded(identity.id, `interpretation participantIdentities[${index}].id`, 128);
+    if (!EMAIL.test(identity.email.trim())) throw new Error(`interpretation participantIdentities[${index}].email is invalid`);
+    const email = identity.email.trim().toLocaleLowerCase('und');
+    if (allowedParticipantEmails.has(identity.id) || participantEmails.has(email)) throw new Error('interpretation participant identities must be unique');
+    allowedParticipantEmails.set(identity.id, email);
+    participantEmails.add(email);
+  }
+  const participantIds = new Set(allowedParticipantEmails.keys());
+  const messageParticipantEmails = new Map<string, ReadonlySet<string>>();
+  for (const message of input.messages) {
+    const emails = new Set([
+      message.sender.email.trim().toLocaleLowerCase('und'),
+      ...message.recipients.map((recipient) => recipient.email.trim().toLocaleLowerCase('und')),
+      ...(message.cc ?? []).map((recipient) => recipient.email.trim().toLocaleLowerCase('und'))
+    ]);
+    messageParticipantEmails.set(message.id, emails);
+    for (const party of [message.sender, ...message.recipients, ...(message.cc ?? [])]) {
+      if (party.participantId && allowedParticipantEmails.get(party.participantId) !== party.email.trim().toLocaleLowerCase('und')) {
+        throw new Error(`interpretation message participant identity does not match its email: ${party.participantId}`);
+      }
+    }
+  }
+  for (const [id, email] of allowedParticipantEmails) {
+    if (![...messageParticipantEmails.values()].some((emails) => emails.has(email))) throw new Error(`interpretation participant identity is outside the authorized messages: ${id}`);
+  }
   const allowedSourceZones = new Map(input.messages.map((message) => [message.id, message.sourceZones ?? []] as const));
   const authorizedMessageBodies = new Map(input.messages.map((message) => [message.id, message.body] as const));
   const payload = {
@@ -163,7 +211,7 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
     sourceEventKey: input.sourceEventKey,
     focalMessageId: input.focalMessageId,
     user: {id: input.user.id, locale: input.user.locale ?? null, timezone: input.user.timezone ?? null},
-    authorizedParticipants: [...participantIds],
+    authorizedParticipants: identities.map((identity) => ({id: identity.id, email: identity.email, displayName: identity.displayName ?? null})),
     messages: input.messages.map(messageForModel)
   };
   return {
@@ -175,10 +223,12 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
       lane: 'interpretation', schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
       conversationId: input.conversationId, messageIds: [...ids], basisEvidenceRevision: input.evidenceRevision,
       focalMessageId: input.focalMessageId,
-      fieldsIncluded: ['message.id', 'message.direction', 'message.sender', 'message.recipients', 'message.cc', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants']
+      fieldsIncluded: ['message.id', 'message.direction', 'message.sender.participantId', 'message.sender.email', 'message.recipients.participantId', 'message.recipients.email', 'message.cc.participantId', 'message.cc.email', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants.id', 'authorizedParticipants.email']
     },
     allowedMessageIds: ids,
     allowedParticipantIds: participantIds,
+    allowedParticipantEmails,
+    messageParticipantEmails,
     allowedSourceZones,
     authorizedMessageBodies
   };
@@ -209,6 +259,12 @@ export function buildDraftContext(input: AuthorizedReplyContext): BuiltAIContext
     },
     allowedMessageIds: messageIds,
     allowedParticipantIds: new Set(),
+    allowedParticipantEmails: new Map(),
+    messageParticipantEmails: new Map([[input.message.id, new Set([
+      input.message.sender.email.trim().toLocaleLowerCase('und'),
+      ...input.message.recipients.map((recipient) => recipient.email.trim().toLocaleLowerCase('und')),
+      ...(input.message.cc ?? []).map((recipient) => recipient.email.trim().toLocaleLowerCase('und'))
+    ])]]),
     allowedSourceZones: new Map([[input.message.id, input.message.sourceZones ?? []]]),
     authorizedMessageBodies: new Map([[input.message.id, input.message.body]]),
     trustedRecipientLabels: input.trustedRecipientLabels

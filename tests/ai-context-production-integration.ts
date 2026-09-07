@@ -240,7 +240,7 @@ try {
         );
         providerObservedCapturedRun = visibleRuns.rows.length === 1;
         return {status: 'completed', output_text: JSON.stringify({
-          schemaVersion: 2,
+          schemaVersion: 3,
           basisEvidenceRevision: 8,
           status: 'CANDIDATE',
           sourceMessageId: message1,
@@ -248,6 +248,7 @@ try {
           semanticUnits: [],
           sourceRefs: [{
             messageId: message1,
+            participantId: null,
             zone: 'AUTHORED_CURRENT',
             excerpt: changedBody,
             start: 0,

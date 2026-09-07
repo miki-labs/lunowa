@@ -12,7 +12,7 @@ import {
 import {buildDraftContext, buildInterpretationContext, type AuthorizedInterpretationContext, type AuthorizedReplyContext, type BuiltAIContext} from './context';
 import {AIProviderError, parseResponseJson, responseRequest, type ResponsesTransport} from './openai';
 import {deriveResponsibilityCommand} from '../responsibility/interpretation';
-import type {ResponsibilityEvidenceBasis, ResponsibilityInterpretationCandidate} from '../responsibility/types';
+import type {ResponsibilityEvidenceBasis, ResponsibilityInterpretationCandidate, ResponsibilityState} from '../responsibility/types';
 
 export type AIRunLane = 'interpretation' | 'draft';
 export type AIRunStatus = 'CAPTURED' | 'SUCCEEDED' | 'ABSTAINED' | 'STALE' | 'FAILED';
@@ -90,6 +90,7 @@ export type CapturedInterpretationContext = {
   context: AuthorizedInterpretationContext;
   built: BuiltAIContext;
   runId: string;
+  existingResponsibilities?: readonly ResponsibilityState[];
 };
 
 export type CapturedDraftContext = {
@@ -114,6 +115,8 @@ export type RuntimeDependencies = {
   runStore: AIRunStore;
   config: AIModelRuntimeConfig;
   contextSnapshot?: AIContextSnapshotStore;
+  /** Used by direct fixture callers; production snapshots carry the same state atomically. */
+  existingResponsibilities?: readonly ResponsibilityState[];
   currentEvidenceRevision: (input: {userId: string; connectedAccountId: string; conversationId: string}) => Promise<number> | number;
 };
 
@@ -226,6 +229,8 @@ export class ResponsibilityInterpretationRuntime {
         basisEvidenceRevision: context.evidenceRevision,
         allowedMessageIds: built.allowedMessageIds,
         allowedParticipantIds: built.allowedParticipantIds,
+        allowedParticipantEmails: built.allowedParticipantEmails,
+        messageParticipantEmails: built.messageParticipantEmails,
         allowedSourceZones: built.allowedSourceZones,
         authorizedMessageBodies: built.authorizedMessageBodies,
         expectedSourceMessageId: context.focalMessageId
@@ -249,7 +254,10 @@ export class ResponsibilityInterpretationRuntime {
         interpretationRunId: runId
       });
       if (!candidate) throw new AIContractError('interpretation candidate was not produced');
-      const derivation = deriveResponsibilityCommand(candidate, {evidenceBasis: interpretationEvidenceBasis(context)});
+      const derivation = deriveResponsibilityCommand(candidate, {
+        evidenceBasis: interpretationEvidenceBasis(context),
+        existingResponsibilities: captured.existingResponsibilities ?? this.deps.existingResponsibilities
+      });
       if (derivation.status === 'REJECTED') {
         await mark(this.deps, runId, context.user.id, 'FAILED');
         return {status: 'FAILED', runId, reason: derivation.reason};

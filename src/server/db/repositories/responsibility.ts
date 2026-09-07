@@ -245,6 +245,23 @@ async function loadState(tx: Parameters<Parameters<Database['transaction']>[0]>[
   return stateFromRow(row, legs, events, temporalFacts, fieldDecisions, domainEvents, provenanceRefs);
 }
 
+/**
+ * Provides the same scoped prior state needed by interpretation identity
+ * derivation without opening a second transaction or weakening tenant scope.
+ */
+export async function loadResponsibilityStatesInTransaction(
+  tx: ResponsibilityTransaction,
+  input: {userId: string; connectedAccountId: string; conversationId: string}
+): Promise<ResponsibilityState[]> {
+  const rows = await tx.select({id: responsibilities.id}).from(responsibilities).where(and(
+    eq(responsibilities.userId, input.userId),
+    eq(responsibilities.connectedAccountId, input.connectedAccountId),
+    eq(responsibilities.conversationId, input.conversationId)
+  ));
+  return (await Promise.all(rows.map((row) => loadState(tx, row.id, false))))
+    .filter((state): state is ResponsibilityState => Boolean(state));
+}
+
 function persistedStateIds(state: ResponsibilityState): ResponsibilityState {
   const legIds = new Map(state.obligationLegs.map((leg) => [leg.id, isUuid(leg.id) ? leg.id : stableUuid(`${state.id}:leg:${leg.id}`)]));
   const eventIds = new Map(state.expectedEvents.map((event) => [event.id, isUuid(event.id) ? event.id : stableUuid(`${state.id}:event:${event.id}`)]));

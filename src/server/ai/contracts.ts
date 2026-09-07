@@ -31,11 +31,12 @@ export const MODEL_SOURCE_ZONES = [
 ] as const;
 export type ModelSourceZone = (typeof MODEL_SOURCE_ZONES)[number];
 
-export const AI_INTERPRETATION_SCHEMA_VERSION = 2 as const;
+export const AI_INTERPRETATION_SCHEMA_VERSION = 3 as const;
 export const AI_DRAFT_SCHEMA_VERSION = 1 as const;
 
 export type ModelSourceRef = {
   messageId: string;
+  participantId?: string | null;
   zone: ModelSourceZone;
   excerpt?: string;
   start?: number;
@@ -222,11 +223,12 @@ const objectSchema = (properties: Record<string, JsonSchema>, required: readonly
 
 const sourceRefSchema = objectSchema({
   messageId: stringSchema(256),
+  participantId: nullable(stringSchema(128)),
   zone: enumSchema(MODEL_SOURCE_ZONES),
   excerpt: nullable(stringSchema(512)),
   start: nullable({type: 'integer', minimum: 0, maximum: 100_000}),
   end: nullable({type: 'integer', minimum: 0, maximum: 100_000})
-}, ['messageId', 'zone', 'excerpt', 'start', 'end']);
+}, ['messageId', 'participantId', 'zone', 'excerpt', 'start', 'end']);
 
 const provenanceFields = {sourceRefs: arraySchema(sourceRefSchema)};
 const sourceProvenanced = (properties: Record<string, JsonSchema>, required: readonly string[]): JsonSchema =>
@@ -315,7 +317,7 @@ const semanticUnitSchema = objectSchema({
 }, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs']);
 
 export const INTERPRETATION_RESPONSE_FORMAT: StructuredResponseFormat = {
-  type: 'json_schema', name: 'lunowa_responsibility_interpretation_v2', strict: true,
+  type: 'json_schema', name: 'lunowa_responsibility_interpretation_v3', strict: true,
   schema: objectSchema({
     schemaVersion: {type: 'integer', enum: [AI_INTERPRETATION_SCHEMA_VERSION]}, basisEvidenceRevision: {type: 'integer', minimum: 0}, status: enumSchema(['CANDIDATE', 'ABSTAINED']), sourceMessageId: stringSchema(256), abstentionReason: nullable(enumSchema(['AMBIGUOUS', 'MISSING_CONTEXT', 'UNSAFE_HIGH_RISK', 'UNINTERPRETABLE'])), semanticUnits: arraySchema(semanticUnitSchema), sourceRefs: arraySchema(sourceRefSchema)
   }, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'])
@@ -447,9 +449,10 @@ function sourceRefs(
   if (!Array.isArray(value) || value.length === 0 || value.length > 32) throw new AIContractError(`${label} must contain one to 32 source references`);
   return value.map((item, index) => {
     const source = record(item, `${label}[${index}]`);
-    exact(source, ['messageId', 'zone', 'excerpt', 'start', 'end'], `${label}[${index}]`);
+    exact(source, ['messageId', 'participantId', 'zone', 'excerpt', 'start', 'end'], `${label}[${index}]`);
     const messageId = stringValue(source.messageId, `${label}[${index}].messageId`, 256);
     if (!allowedMessageIds.has(messageId)) throw new AIContractError(`${label}[${index}] references an unauthorized message`);
+    const participantId = optionalString(source.participantId, `${label}[${index}].participantId`, 128);
     const zone = enumValue(source.zone, MODEL_SOURCE_ZONES, `${label}[${index}].zone`);
     const excerpt = optionalString(source.excerpt, `${label}[${index}].excerpt`, 512);
     const start = source.start === undefined || source.start === null ? undefined : boundedInteger(source.start, `${label}[${index}].start`, 0, 100_000);
@@ -469,15 +472,45 @@ function sourceRefs(
         : matchingZones.some((candidate) => body.slice(candidate.start, candidate.end).includes(excerpt));
       if (!excerptMatches) throw new AIContractError(`${label}[${index}] excerpt does not match the authorized source`);
     }
-    return {messageId, zone, ...(excerpt ? {excerpt} : {}), ...(start !== undefined ? {start} : {}), ...(end !== undefined ? {end} : {})};
+    return {messageId, ...(participantId ? {participantId} : {}), zone, ...(excerpt ? {excerpt} : {}), ...(start !== undefined ? {start} : {}), ...(end !== undefined ? {end} : {})};
   });
 }
 
-function mapSourceRefs(refs: readonly ModelSourceRef[]): ProvenanceInput[] {
+function assertParticipantIsCited(
+  participantId: string,
+  refs: readonly ModelSourceRef[],
+  label: string,
+  allowedParticipantEmails: ReadonlyMap<string, string>,
+  messageParticipantEmails: ReadonlyMap<string, ReadonlySet<string>>
+): void {
+  const email = allowedParticipantEmails.get(participantId);
+  if (!email) throw new AIContractError(`${label} names an unauthorized participant`);
+  if (!refs.some((ref) => ref.participantId === participantId && messageParticipantEmails.get(ref.messageId)?.has(email))) {
+    throw new AIContractError(`${label} participant identity is not associated with its cited message`);
+  }
+}
+
+function validateParticipantRefs(
+  refs: readonly ModelSourceRef[],
+  label: string,
+  allowedParticipantEmails: ReadonlyMap<string, string>,
+  messageParticipantEmails: ReadonlyMap<string, ReadonlySet<string>>
+): ModelSourceRef[] {
+  for (const [index, ref] of refs.entries()) {
+    if (!ref.participantId) continue;
+    const email = allowedParticipantEmails.get(ref.participantId);
+    if (!email || !messageParticipantEmails.get(ref.messageId)?.has(email)) {
+      throw new AIContractError(`${label}[${index}] participant is not associated with its message`);
+    }
+  }
+  return [...refs];
+}
+
+function mapSourceRefs(refs: readonly ModelSourceRef[], evidenceKind: ProvenanceInput['evidenceKind'] = 'COMMUNICATED_CLAIM'): ProvenanceInput[] {
   return refs.map((ref) => ({
-    evidenceKind: 'COMMUNICATED_CLAIM', messageId: ref.messageId,
+    evidenceKind, messageId: ref.messageId,
     ...(ref.excerpt ? {sourceExcerptShort: ref.excerpt} : {}),
-    sourceLocator: {messageId: ref.messageId, zone: ref.zone, ...(ref.start !== undefined ? {start: ref.start} : {}), ...(ref.end !== undefined ? {end: ref.end} : {})}
+    sourceLocator: {messageId: ref.messageId, zone: ref.zone, ...(ref.participantId ? {participantId: ref.participantId} : {}), ...(ref.start !== undefined ? {start: ref.start} : {}), ...(ref.end !== undefined ? {end: ref.end} : {})}
   }));
 }
 
@@ -512,6 +545,8 @@ function validateSemanticUnit(
   label: string,
   allowedMessageIds: ReadonlySet<string>,
   allowedParticipantIds: ReadonlySet<string>,
+  allowedParticipantEmails: ReadonlyMap<string, string>,
+  messageParticipantEmails: ReadonlyMap<string, ReadonlySet<string>>,
   allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>,
   authorizedMessageBodies: ReadonlyMap<string, string>
 ): ModelSemanticUnit {
@@ -522,9 +557,9 @@ function validateSemanticUnit(
   const operationalOutcome = optionalString(item.operationalOutcome, `${label}.operationalOutcome`, 2048);
   if (materiality === 'MATERIAL' && !operationalOutcome) throw new AIContractError(`${label}.operationalOutcome is required for material units`);
   const identityRelation = validateIdentity(item.identityRelation, `${label}.identityRelation`);
-  const refs = validateSourceProvenanced(item, label, allowedMessageIds, allowedSourceZones, authorizedMessageBodies);
+  const refs = validateParticipantRefs(validateSourceProvenanced(item, label, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), label, allowedParticipantEmails, messageParticipantEmails);
   const refsFor = (value: unknown, nestedLabel: string): ModelSourceRef[] =>
-    validateSourceProvenanced(value, nestedLabel, allowedMessageIds, allowedSourceZones, authorizedMessageBodies);
+    validateParticipantRefs(validateSourceProvenanced(value, nestedLabel, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), nestedLabel, allowedParticipantEmails, messageParticipantEmails);
   const list = <T>(key: string, mapper: (value: unknown, label: string) => T): T[] => {
     const values = item[key];
     if (!Array.isArray(values) || values.length > 64) throw new AIContractError(`${label}.${key} must be a bounded array`);
@@ -536,7 +571,9 @@ function validateSemanticUnit(
     const bearerCandidate = enumValue(leg.bearerCandidate, ['USER', 'PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const, `${nestedLabel}.bearerCandidate`);
     const participantId = optionalString(leg.participantId, `${nestedLabel}.participantId`, 128);
     if (bearerCandidate !== 'USER' && (!participantId || !allowedParticipantIds.has(participantId))) throw new AIContractError(`${nestedLabel} needs an authorized participantId`);
-    return {id: stringValue(leg.id, `${nestedLabel}.id`, 128), bearerCandidate, ...(participantId ? {participantId} : {}), actionCode: stringValue(leg.actionCode, `${nestedLabel}.actionCode`, 128), ...(optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048) ? {actionSummary: optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048)} : {}), ...(optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048) ? {objectSummary: optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048)} : {}), basisKind: stringValue(leg.basisKind, `${nestedLabel}.basisKind`, 128), blockedByCondition: booleanValue(leg.blockedByCondition, `${nestedLabel}.blockedByCondition`), sourceRefs: sourceRefs(leg.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)};
+    const refs = validateParticipantRefs(sourceRefs(leg.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), `${nestedLabel}.sourceRefs`, allowedParticipantEmails, messageParticipantEmails);
+    if (participantId) assertParticipantIsCited(participantId, refs, `${nestedLabel}.participantId`, allowedParticipantEmails, messageParticipantEmails);
+    return {id: stringValue(leg.id, `${nestedLabel}.id`, 128), bearerCandidate, ...(participantId ? {participantId} : {}), actionCode: stringValue(leg.actionCode, `${nestedLabel}.actionCode`, 128), ...(optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048) ? {actionSummary: optionalString(leg.actionSummary, `${nestedLabel}.actionSummary`, 2048)} : {}), ...(optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048) ? {objectSummary: optionalString(leg.objectSummary, `${nestedLabel}.objectSummary`, 2048)} : {}), basisKind: stringValue(leg.basisKind, `${nestedLabel}.basisKind`, 128), blockedByCondition: booleanValue(leg.blockedByCondition, `${nestedLabel}.blockedByCondition`), sourceRefs: refs};
   });
   const expectedEvents = list('expectedEvents', (value, nestedLabel) => {
     const event = record(value, nestedLabel);
@@ -544,7 +581,9 @@ function validateSemanticUnit(
     const actor = enumValue(event.actor, ['PARTICIPANT', 'OTHER_PARTY', 'EXTERNAL'] as const, `${nestedLabel}.actor`);
     const participantId = optionalString(event.participantId, `${nestedLabel}.participantId`, 128);
     if (actor !== 'EXTERNAL' && (!participantId || !allowedParticipantIds.has(participantId))) throw new AIContractError(`${nestedLabel} needs an authorized participantId`);
-    return {id: stringValue(event.id, `${nestedLabel}.id`, 128), actor, ...(participantId ? {participantId} : {}), eventCode: stringValue(event.eventCode, `${nestedLabel}.eventCode`, 128), ...(optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048) ? {eventSummary: optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048)} : {}), ...(optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128)} : {}), ...(optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128) ? {expectationStrength: optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128)} : {}), sourceRefs: validateSourceProvenanced(event, nestedLabel, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)};
+    const refs = validateParticipantRefs(sourceRefs(event.sourceRefs, `${nestedLabel}.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies), `${nestedLabel}.sourceRefs`, allowedParticipantEmails, messageParticipantEmails);
+    if (participantId) assertParticipantIsCited(participantId, refs, `${nestedLabel}.participantId`, allowedParticipantEmails, messageParticipantEmails);
+    return {id: stringValue(event.id, `${nestedLabel}.id`, 128), actor, ...(participantId ? {participantId} : {}), eventCode: stringValue(event.eventCode, `${nestedLabel}.eventCode`, 128), ...(optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048) ? {eventSummary: optionalString(event.eventSummary, `${nestedLabel}.eventSummary`, 2048)} : {}), ...(optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128) ? {basisKind: optionalString(event.basisKind, `${nestedLabel}.basisKind`, 128) } : {}), ...(optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128) ? {expectationStrength: optionalString(event.expectationStrength, `${nestedLabel}.expectationStrength`, 128)} : {}), sourceRefs: refs};
   });
   const temporalFacts = list('temporalFacts', (value, nestedLabel) => {
     const fact = record(value, nestedLabel);
@@ -580,12 +619,12 @@ function validateSemanticUnit(
   const uncertainties = list('uncertainties', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'fieldKey', 'reasonCode', 'material', 'reviewRequired', 'candidateRefs', 'sourceRefs'], nestedLabel); const refs = item.candidateRefs === undefined || item.candidateRefs === null ? undefined : (() => { if (!Array.isArray(item.candidateRefs)) throw new AIContractError(`${nestedLabel}.candidateRefs must be an array`); return item.candidateRefs.map((ref, index) => stringValue(ref, `${nestedLabel}.candidateRefs[${index}]`, 128)); })(); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), fieldKey: stringValue(item.fieldKey, `${nestedLabel}.fieldKey`, 128), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), material: booleanValue(item.material, `${nestedLabel}.material`), reviewRequired: booleanValue(item.reviewRequired, `${nestedLabel}.reviewRequired`), ...(refs ? {candidateRefs: refs} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
   const riskDetails = list('riskDetails', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'targetKind', 'targetId', 'riskClass', 'reasonCode', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), targetKind: stringValue(item.targetKind, `${nestedLabel}.targetKind`, 128), ...(optionalString(item.targetId, `${nestedLabel}.targetId`, 128) ? {targetId: optionalString(item.targetId, `${nestedLabel}.targetId`, 128)} : {}), riskClass: enumValue(item.riskClass, ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const, `${nestedLabel}.riskClass`), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), sourceRefs: refsFor(item, nestedLabel)}; });
   const corrections = list('corrections', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['fieldKey', 'value', 'semanticTime', 'relation', 'sourceRefs'], nestedLabel); return {fieldKey: enumValue(item.fieldKey, ['operationalOutcome', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'temporalFacts.SOURCE_DUE', 'temporalFacts.EXPECTED_EVENT_TIME', 'temporalFacts.USER_TARGET', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails'] as const, `${nestedLabel}.fieldKey`), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128) ? {semanticTime: optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128)} : {}), relation: enumValue(item.relation, ['CORRECTION', 'SUPERSEDES', 'CONFLICT'] as const, `${nestedLabel}.relation`), sourceRefs: refsFor(item, nestedLabel)}; });
-  const assignment = item.assignmentSemantics === undefined || item.assignmentSemantics === null ? undefined : (() => { const value = record(item.assignmentSemantics, `${label}.assignmentSemantics`); exact(value, ['id', 'shape', 'candidateParticipantIds', 'selectedParticipantId'], `${label}.assignmentSemantics`); if (!Array.isArray(value.candidateParticipantIds)) throw new AIContractError(`${label}.assignmentSemantics.candidateParticipantIds must be an array`); const ids = value.candidateParticipantIds.map((id, index) => stringValue(id, `${label}.assignmentSemantics.candidateParticipantIds[${index}]`, 128)); if (ids.some((id) => !allowedParticipantIds.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unauthorized participant`); const selected = optionalString(value.selectedParticipantId, `${label}.assignmentSemantics.selectedParticipantId`, 128); if (selected && !allowedParticipantIds.has(selected)) throw new AIContractError(`${label}.assignmentSemantics.selectedParticipantId is unauthorized`); return {id: stringValue(value.id, `${label}.assignmentSemantics.id`, 128), shape: enumValue(value.shape, ['ANY_OF', 'ALL_OF', 'UNSPECIFIED_GROUP'] as const, `${label}.assignmentSemantics.shape`), candidateParticipantIds: ids, ...(selected ? {selectedParticipantId: selected} : {})}; })();
-  const terminal = item.terminalSignal === undefined || item.terminalSignal === null ? undefined : (() => { const value = record(item.terminalSignal, `${label}.terminalSignal`); exact(value, ['kind', 'sourceRefs'], `${label}.terminalSignal`); return {kind: enumValue(value.kind, ['NONE', 'COMPLETED', 'DECLINED', 'CANCELLED', 'INVALIDATED'] as const, `${label}.terminalSignal.kind`), sourceRefs: sourceRefs(value.sourceRefs, `${label}.terminalSignal.sourceRefs`, allowedMessageIds, allowedSourceZones, authorizedMessageBodies)}; })();
+  const assignment = item.assignmentSemantics === undefined || item.assignmentSemantics === null ? undefined : (() => { const value = record(item.assignmentSemantics, `${label}.assignmentSemantics`); exact(value, ['id', 'shape', 'candidateParticipantIds', 'selectedParticipantId'], `${label}.assignmentSemantics`); if (!Array.isArray(value.candidateParticipantIds)) throw new AIContractError(`${label}.assignmentSemantics.candidateParticipantIds must be an array`); const ids = value.candidateParticipantIds.map((id, index) => stringValue(id, `${label}.assignmentSemantics.candidateParticipantIds[${index}]`, 128)); if (ids.some((id) => !allowedParticipantIds.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unauthorized participant`); ids.forEach((id) => assertParticipantIsCited(id, refs, `${label}.assignmentSemantics`, allowedParticipantEmails, messageParticipantEmails)); const selected = optionalString(value.selectedParticipantId, `${label}.assignmentSemantics.selectedParticipantId`, 128); if (selected && !allowedParticipantIds.has(selected)) throw new AIContractError(`${label}.assignmentSemantics.selectedParticipantId is unauthorized`); if (selected) assertParticipantIsCited(selected, refs, `${label}.assignmentSemantics.selectedParticipantId`, allowedParticipantEmails, messageParticipantEmails); return {id: stringValue(value.id, `${label}.assignmentSemantics.id`, 128), shape: enumValue(value.shape, ['ANY_OF', 'ALL_OF', 'UNSPECIFIED_GROUP'] as const, `${label}.assignmentSemantics.shape`), candidateParticipantIds: ids, ...(selected ? {selectedParticipantId: selected} : {})}; })();
+  const terminal = item.terminalSignal === undefined || item.terminalSignal === null ? undefined : (() => { const value = record(item.terminalSignal, `${label}.terminalSignal`); exact(value, ['kind', 'sourceRefs'], `${label}.terminalSignal`); return {kind: enumValue(value.kind, ['NONE', 'COMPLETED', 'DECLINED', 'CANCELLED', 'INVALIDATED'] as const, `${label}.terminalSignal.kind`), sourceRefs: refsFor({sourceRefs: value.sourceRefs}, `${label}.terminalSignal`)}; })();
   return {candidateUnitKey, materiality, ...(operationalOutcome ? {operationalOutcome} : {}), ...(identityRelation ? {identityRelation} : {}), obligationLegs, expectedEvents, temporalFacts, completionCriteria, constraints, pendingProposals: proposals, agreedFacts, uncertainties, riskDetails, ...(assignment ? {assignmentSemantics: assignment} : {}), corrections, ...(terminal ? {terminalSignal: terminal} : {}), sourceRefs: refs};
 }
 
-export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; expectedSourceMessageId?: string}): ModelInterpretationOutput {
+export function validateInterpretationOutput(value: unknown, input: {basisEvidenceRevision: number; allowedMessageIds: ReadonlySet<string>; allowedParticipantIds: ReadonlySet<string>; allowedParticipantEmails?: ReadonlyMap<string, string>; messageParticipantEmails?: ReadonlyMap<string, ReadonlySet<string>>; allowedSourceZones: ReadonlyMap<string, readonly AuthorizedSourceZone[]>; authorizedMessageBodies: ReadonlyMap<string, string>; expectedSourceMessageId?: string}): ModelInterpretationOutput {
   assertNoForbiddenKeys(value);
   const item = record(value, 'interpretation output');
   exact(item, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'], 'interpretation output');
@@ -599,10 +638,12 @@ export function validateInterpretationOutput(value: unknown, input: {basisEviden
   if (status === 'ABSTAINED' && !abstentionReason) throw new AIContractError('abstained interpretation needs a reason');
   if (status === 'CANDIDATE' && abstentionReason) throw new AIContractError('candidate interpretation cannot carry an abstention reason');
   if (!Array.isArray(item.semanticUnits) || item.semanticUnits.length > 32) throw new AIContractError('interpretation semanticUnits must be a bounded array');
-  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds, input.allowedSourceZones, input.authorizedMessageBodies));
+  const allowedParticipantEmails = input.allowedParticipantEmails ?? new Map<string, string>();
+  const messageParticipantEmails = input.messageParticipantEmails ?? new Map<string, ReadonlySet<string>>();
+  const semanticUnits = item.semanticUnits.map((unit, index) => validateSemanticUnit(unit, `interpretation output.semanticUnits[${index}]`, input.allowedMessageIds, input.allowedParticipantIds, allowedParticipantEmails, messageParticipantEmails, input.allowedSourceZones, input.authorizedMessageBodies));
   if (new Set(semanticUnits.map((unit) => unit.candidateUnitKey)).size !== semanticUnits.length) throw new AIContractError('interpretation semantic unit keys must be unique');
   if (status === 'ABSTAINED' && semanticUnits.length > 0) throw new AIContractError('abstained interpretation cannot include semantic units');
-  return {schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, basisEvidenceRevision: input.basisEvidenceRevision, status, sourceMessageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits, sourceRefs: sourceRefs(item.sourceRefs, 'interpretation output.sourceRefs', input.allowedMessageIds, input.allowedSourceZones, input.authorizedMessageBodies)};
+  return {schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, basisEvidenceRevision: input.basisEvidenceRevision, status, sourceMessageId, ...(abstentionReason ? {abstentionReason} : {}), semanticUnits, sourceRefs: validateParticipantRefs(sourceRefs(item.sourceRefs, 'interpretation output.sourceRefs', input.allowedMessageIds, input.allowedSourceZones, input.authorizedMessageBodies), 'interpretation output.sourceRefs', allowedParticipantEmails, messageParticipantEmails)};
 }
 
 export function validateDraftOutput(value: unknown, expectedRevision: number): ModelDraftOutput {
@@ -624,7 +665,12 @@ export function validateDraftOutput(value: unknown, expectedRevision: number): M
 
 function mapCandidateUnit(unit: ModelSemanticUnit): CandidateResponsibilitySemantics {
   const provenanced = <T extends {sourceRefs: ModelSourceRef[]}>(items: readonly T[] | undefined) => (items ?? []).map((item) => mapProvenanced(item));
-  const mapTerminal = (signal: ModelSemanticUnit['terminalSignal']): CandidateTerminalSignal | undefined => signal ? {kind: signal.kind, provenance: mapSourceRefs(signal.sourceRefs)} : undefined;
+  const unitEvidenceKind: ProvenanceInput['evidenceKind'] = unit.identityRelation?.kind === 'SAME_UNSATISFIED_OUTCOME'
+    ? 'COUNTERPART_FAILURE_REPORT'
+    : unit.identityRelation?.kind === 'REPLACES'
+      ? 'COUNTERPART_EXPLICIT_CLOSURE'
+      : 'COMMUNICATED_CLAIM';
+  const mapTerminal = (signal: ModelSemanticUnit['terminalSignal']): CandidateTerminalSignal | undefined => signal ? {kind: signal.kind, provenance: mapSourceRefs(signal.sourceRefs, signal.kind === 'COMPLETED' ? 'EXPLICIT_COMPLETION' : signal.kind === 'NONE' ? 'COMMUNICATED_CLAIM' : 'COUNTERPART_EXPLICIT_CLOSURE')} : undefined;
   const obligationLegs = unit.obligationLegs.map((leg) => {
     const {provenance, ...rest} = mapProvenanced(leg) as CandidateObligationLeg & {provenance: ProvenanceInput[]};
     return {...rest, provenance};
@@ -650,7 +696,7 @@ function mapCandidateUnit(unit: ModelSemanticUnit): CandidateResponsibilitySeman
     ...(unit.assignmentSemantics ? {assignmentSemantics: unit.assignmentSemantics} : {}),
     corrections: unit.corrections.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `field correction ${item.fieldKey}.value`)})) as CandidateFieldCorrection[],
     ...(unit.terminalSignal ? {terminalSignal: mapTerminal(unit.terminalSignal)} : {}),
-    provenance: mapSourceRefs(unit.sourceRefs)
+    provenance: mapSourceRefs(unit.sourceRefs, unitEvidenceKind)
   };
 }
 

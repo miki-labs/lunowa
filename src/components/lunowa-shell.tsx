@@ -560,7 +560,8 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
 
 function Home({fixture, attention, openMoment, openReview, openManaged}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openReview: (origin?: string) => void; openManaged: (origin?: string) => void}) {
   if (attention) {
-    if (attention.strictZero) return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>{attention.managedCount > 0 ? `会話の確認範囲は信頼でき、Lunowaが${attention.managedCount}件を見守っています。` : '現在、Lunowaが監視している件はありません。'}</p>{attention.managedCount > 0 && <button className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button>}</section></div>;
+    const managedOrigin = attention.managed[0] ? `managed-${attention.managed[0].id}` : undefined;
+    if (attention.strictZero) return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>{attention.managedCount > 0 ? `会話の確認範囲は信頼でき、Lunowaが${attention.managedCount}件を見守っています。` : '現在、Lunowaが監視している件はありません。'}</p>{attention.managedCount > 0 && <button className="quiet-button" type="button" onClick={() => openManaged(managedOrigin)}>管理中を見る</button>}</section></div>;
     return <div className="surface-content">
       {attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{attention.integrity.message}</p>}
       <section aria-labelledby="attention-heading"><div className="section-heading"><h2 id="attention-heading">今、確認が必要なこと</h2><span>{attention.needsYou.length + attention.review.length}件</span></div>
@@ -568,7 +569,7 @@ function Home({fixture, attention, openMoment, openReview, openManaged}: {fixtur
         {attention.review.map((item) => <LiveReviewButton key={item.id} item={item} onClick={openReview} />)}
       </section>
       {attention.integrity.status === 'healthy' && attention.managedCount > 0
-        ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>{attention.managedCount}</strong></h2><p>今、追加対応が必要なものはありません。</p><button id="managed-estimate" className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button></section>
+        ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>{attention.managedCount}</strong></h2><p>今、追加対応が必要なものはありません。</p><button id="managed-estimate" className="quiet-button" type="button" onClick={() => openManaged(managedOrigin)}>管理中を見る</button></section>
         : attention.integrity.status === 'healthy'
           ? <p className="empty-state">現在、Lunowaが監視している件はありません。</p>
           : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}

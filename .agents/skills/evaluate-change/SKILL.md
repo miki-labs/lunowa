@@ -126,6 +126,8 @@ Use the repository's formal gate vocabulary when it exists. Otherwise use this c
 
 Do not force certainty when the evidence does not support it.
 
+When persisting a PASS/FAIL disposition to a GitHub PR, include `<!-- independent-acceptance-disposition:v1 -->` and bind the decision to the exact reviewed head SHA. The marker exists for durable metrics/recovery parsing; it does not make the review authoritative by itself.
+
 ## 9. Output
 
 Return concisely:

@@ -277,6 +277,10 @@ When an agent fails, ask what was actually missing:
 
 Fix the recurring system cause at the cheapest durable layer.
 
+### Measure accepted delivery, not candidate activity
+
+Use `python scripts/direct_agent_control.py throughput` (host shortcut: `lw throughput`) when comparing workflow changes. Track first-pass exact-head acceptance, correction runs, implementation-start-to-merge latency, and model/token usage per accepted Issue. Treat missing historical evidence as missing; publication, green CI, or merge without an observable exact-head PASS must not be promoted into acceptance evidence. Compare several comparable Issues before changing the harness again.
+
 ## Do not overgeneralize high-autonomy case studies
 
 Organizations that allow highly autonomous agent execution generally rely on repository-specific investment in tests, guardrails, observability, deterministic tools, containment, and recovery.

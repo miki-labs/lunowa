@@ -17,6 +17,8 @@ Status: Issue #74 bounded implementation evidence. This manifest routes AI-layer
 
 The holdout contains independent families for claim-vs-observation, high-risk authority, cross-account isolation, genuine ambiguity, AI degradation, prompt injection, successful No Responsibility, high-risk draft assistance, and context-boundary draft behavior. Development examples are not reported as holdout evidence.
 
+The executable gate is `tests/ai-runtime.test.ts`: it binds every ID in `G70_EVAL_CASES` to a matching lane/family/split fixture, validates interpretation and draft outputs through the bounded runtime, and applies the layer-owned oracle for each case. `assertExecutableFixtureCoverage` fails when a declared case is missing; runtime provider failure and draft manual fallback are checked separately for PG-22/PG-29. This remains candidate-layer evidence only and does not claim reducer, scheduler, provider, or Send correctness.
+
 ## Runtime boundary
 
 The runtime records only the `AIInterpretationRun` manifest and status through the existing G30 substrate. A model result is rejected or degraded when it is malformed, unavailable, abstained, or based on stale evidence. A successful interpretation returns an untrusted candidate plus a deterministic derivation; it does not apply a privileged domain effect. A successful draft returns editable text plus a manual-fallback guarantee; it does not alter trusted route fields or send.

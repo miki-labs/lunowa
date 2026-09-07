@@ -17,6 +17,7 @@ import {
   SourceConversationDetail
 } from './source-ui';
 import type {SourceConversationReadModel, SourcePageReadModel} from './source-types';
+import type {CommunicationParticipant, DraftSaveState, ReplyContextReadModel, ReplyMode} from '@/lib/communication-types';
 
 export * from './lunowa-shell-model';
 
@@ -66,6 +67,19 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const [fixtureId, setFixtureId] = useState<ShellFixture['id']>('normal');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftVersion, setDraftVersion] = useState<number | null>(null);
+  const [draftSaveState, setDraftSaveState] = useState<DraftSaveState>('idle');
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [replyMode, setReplyMode] = useState<ReplyMode>('REPLY');
+  const [replyContext, setReplyContext] = useState<ReplyContextReadModel | null>(null);
+  const [draftRecipients, setDraftRecipients] = useState<{to: CommunicationParticipant[]; cc: CommunicationParticipant[]} | null>(null);
+  const [replyContextKey, setReplyContextKey] = useState('');
+  const [replyContextError, setReplyContextError] = useState('');
+  const [sendOperationStatus, setSendOperationStatus] = useState<SendLifecycle>('draft');
+  const draftGeneration = useRef(0);
+  const draftEditRevision = useRef(0);
+  const draftSaveInFlightGeneration = useRef<number | null>(null);
   const [localCommonMutations, setLocalCommonMutations] = useState<Record<Exclude<CommonMutationTarget, null>, MutationState>>({
     'stop-tracking': 'idle',
     'review-answer': 'idle'
@@ -102,8 +116,19 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   };
   const sendState = sendOverride ?? fixture.send;
   const changeFixture = (id: ShellFixture['id']) => {
+    draftGeneration.current += 1;
+    draftEditRevision.current += 1;
     setLocalCommonMutations({'stop-tracking': 'idle', 'review-answer': 'idle'});
     setSendOverride(null);
+    setReplyContext(null);
+    setReplyContextKey('');
+    setReplyContextError('');
+    setDraftRecipients(null);
+    setDraftId(null);
+    setDraftVersion(null);
+    setDraftSaveState('idle');
+    setDraftDirty(false);
+    setSendOperationStatus('draft');
     setFixtureId(id);
   };
 
@@ -116,6 +141,20 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   };
 
   const openConversation = (origin: string, conversationId = origin) => {
+    if (replyContext?.conversationId !== conversationId) {
+      draftGeneration.current += 1;
+      draftEditRevision.current += 1;
+      setReplyContext(null);
+      setReplyContextKey('');
+      setReplyContextError('');
+      setDraft('');
+      setDraftId(null);
+      setDraftVersion(null);
+      setDraftRecipients(null);
+      setDraftSaveState('idle');
+      setDraftDirty(false);
+      setSendOperationStatus('draft');
+    }
     setSelectedConversationId(conversationId);
     setSourceConversation(null);
     setSourceConversationError('');
@@ -302,6 +341,98 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   }, [appUser?.id, detail, selectedConversationId]);
 
   useEffect(() => {
+    if (!appUser?.id || (detail !== 'moment' && detail !== 'conversation')) return;
+    const attentionItem = attentionModel
+      ? [...attentionModel.needsYou, ...attentionModel.managed, ...attentionModel.later, ...attentionModel.review, ...attentionModel.done, ...(attentionModel.delegationCandidates ?? [])]
+        .find((item) => detailOrigin === item.id || detailOrigin === `attention-${item.id}` || detailOrigin === `managed-${item.id}` || detailOrigin === `review-${item.id}` || detailOrigin === `delegation-${item.id}`)
+      : null;
+    const conversationId = detail === 'moment' ? attentionItem?.conversationId : sourceConversation?.id ?? replyContext?.conversationId;
+    const accountId = detail === 'moment' ? attentionItem?.connectedAccountId : sourceConversation?.account.id ?? replyContext?.connectedAccount.id;
+    if (!conversationId || !accountId) return;
+    const key = `${conversationId}:${accountId}:${replyMode}`;
+    if (replyContextKey === key && replyContext) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({connectedAccountId: accountId, conversationId, mode: replyMode});
+    if (detail === 'conversation' && sourceConversation?.messages.at(-1)?.id) query.set('inReplyToMessageId', sourceConversation.messages.at(-1)!.id);
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/drafts/context?${query.toString()}`, {credentials: 'same-origin', signal: controller.signal})
+      .then(async (response) => {
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as {error?: string} | null)?.error ?? 'REPLY_CONTEXT_FAILED');
+        const result: unknown = await response.json();
+        if (!result || typeof result !== 'object' || !Array.isArray((result as {recipients?: unknown}).recipients) || !Array.isArray((result as {cc?: unknown}).cc) || !(result as {sender?: unknown}).sender) throw new Error('REPLY_CONTEXT_INVALID');
+        return result as ReplyContextReadModel;
+      })
+      .then((result) => {
+        draftGeneration.current += 1;
+        const sameConversation = replyContext?.conversationId === result.conversationId;
+        setReplyContext(result);
+        setReplyContextKey(key);
+        setReplyContextError('');
+        setDraft(result.draft?.body ?? (sameConversation ? draft : ''));
+        setDraftId(result.draft?.id ?? null);
+        setDraftVersion(result.draft?.version ?? null);
+        setDraftRecipients(result.draft ? {to: result.draft.recipients, cc: result.draft.cc} : null);
+        setDraftSaveState(result.draft ? 'saved' : 'idle');
+        setDraftDirty(false);
+        setSendOperationStatus('draft');
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setReplyContextError(error instanceof Error ? error.message : 'REPLY_CONTEXT_FAILED');
+      });
+    return () => controller.abort();
+  }, [appUser?.id, attentionModel, detail, detailOrigin, draft, replyContext, replyContextKey, replyMode, sourceConversation]);
+
+  useEffect(() => {
+    if (!appUser?.id || !replyContext || !draftDirty) return;
+    const userId = appUser.id;
+    const generation = draftGeneration.current;
+    const editRevision = draftEditRevision.current;
+    const timer = window.setTimeout(() => {
+      if (draftSaveInFlightGeneration.current === generation) return;
+      draftSaveInFlightGeneration.current = generation;
+      setDraftSaveState('saving');
+      void fetch(`/api/bff/users/${encodeURIComponent(userId)}/drafts`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          draftId,
+          expectedVersion: draftVersion,
+          connectedAccountId: replyContext.connectedAccount.id,
+          conversationId: replyContext.conversationId,
+          inReplyToMessageId: replyContext.inReplyToMessageId,
+          mode: replyContext.mode,
+          body: draft,
+          recipients: draftRecipients?.to,
+          cc: draftRecipients?.cc
+        })
+      })
+        .then(async (response) => {
+          const result = await response.json().catch(() => null) as {id?: string; version?: number; error?: string} | null;
+          if (!response.ok || !result?.id || !result.version) throw new Error(result?.error ?? 'DRAFT_SAVE_FAILED');
+          return result;
+        })
+        .then((result) => {
+          if (generation !== draftGeneration.current) return;
+          setDraftId(result.id!);
+          setDraftVersion(result.version!);
+          if (editRevision === draftEditRevision.current) {
+            setDraftSaveState('saved');
+            setDraftDirty(false);
+          } else {
+            setDraftSaveState('idle');
+          }
+        })
+        .catch((error: unknown) => {
+          if (generation === draftGeneration.current) setDraftSaveState(error instanceof Error && error.message === 'DRAFT_VERSION_CONFLICT' ? 'conflict' : 'failed');
+        })
+        .finally(() => {
+          if (draftSaveInFlightGeneration.current === generation) draftSaveInFlightGeneration.current = null;
+        });
+    }, 240);
+    return () => window.clearTimeout(timer);
+  }, [appUser?.id, draft, draftDirty, draftId, draftRecipients, draftVersion, replyContext]);
+
+  useEffect(() => {
     if (!appUser?.id) return;
     const userId = appUser.id;
     const controller = new AbortController();
@@ -407,6 +538,41 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
 
   const getAttentionMutation = (action: AttentionAction) => selectedAttention && attentionMutation.key === attentionMutationKey(action, selectedAttention) ? attentionMutation.state : 'idle';
 
+  const requestImmediateSend = async () => {
+    if (!appUser?.id || !draftId) {
+      setStatus('下書きの保存を確認してから送信してください');
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setSendOperationStatus('draft');
+      setStatus('現在オフラインです。送信されていません。下書きは保持されています。オンラインに戻ってから明示的に送信してください');
+      return;
+    }
+    if (!replyContext?.connectedAccount.sendAuthorized) {
+      setSendOperationStatus('draft');
+      setStatus('Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください');
+      return;
+    }
+    setSendOperationStatus('request_pending');
+    setStatus('送信をリクエストしています');
+    try {
+      const response = await fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/send-operations`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({draftId})
+      });
+      const result = await response.json().catch(() => null) as {accepted?: boolean; operation?: {status?: string}} | null;
+      if (!response.ok || result?.accepted !== true || result.operation?.status !== 'PENDING') throw new Error('SEND_REQUEST_FAILED');
+      setSendOperationStatus('request_pending');
+    } catch {
+      setSendOperationStatus('provider_failed');
+      setStatus('送信リクエストを保存できませんでした');
+    }
+  };
+
+  const effectiveSendState = replyContext ? sendOperationStatus : sendState;
+
   return (
     <main className={detail ? 'app-shell has-detail' : 'app-shell'} data-testid="lunowa-shell">
       <a className="skip-link" href="#surface-heading">本文へ移動</a>
@@ -497,11 +663,39 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             detail={detail}
             headingRef={detailHeading}
             draft={draft}
-            onDraft={setDraft}
+            onDraft={(value) => {
+              setDraft(value);
+              draftEditRevision.current += 1;
+              setDraftSaveState('idle');
+              setDraftDirty(true);
+            }}
             commonMutations={commonMutations}
-            sendState={sendState}
+            sendState={effectiveSendState}
             fixture={fixture}
             attentionItem={selectedAttention}
+            replyContext={replyContext}
+            replyContextError={replyContextError}
+            replyMode={replyMode}
+            onReplyMode={(mode) => {
+              setReplyMode(mode);
+              draftGeneration.current += 1;
+              draftEditRevision.current += 1;
+              setReplyContextKey('');
+              setDraftId(null);
+              setDraftVersion(null);
+              setDraftRecipients(null);
+              setDraftSaveState('idle');
+              setDraftDirty(false);
+              setSendOperationStatus('draft');
+            }}
+            draftSaveState={draftSaveState}
+            draftRecipients={draftRecipients}
+            onRecipients={(recipients) => {
+              setDraftRecipients(recipients);
+              draftEditRevision.current += 1;
+              setDraftSaveState('idle');
+              setDraftDirty(true);
+            }}
             sourceConversation={sourceConversation}
             sourceConversationLoading={sourceConversationLoading || Boolean(appUser?.id && detail === 'conversation' && selectedConversationId && !sourceConversation && !sourceConversationError)}
             sourceConversationError={sourceConversationError}
@@ -514,7 +708,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
               window.setTimeout(() => document.getElementById(detailOrigin)?.focus(), 0);
             }}
             onCommonMutation={announceMutation}
-            onSend={() => {
+            onSend={replyContext ? () => void requestImmediateSend() : () => {
               setSendOverride('request_pending');
               setStatus('送信をリクエストしています');
             }}
@@ -711,7 +905,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError}:
   </div>;
 }
 
-function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sendState, fixture, attentionItem, sourceConversation, sourceConversationLoading, sourceConversationError, sourceUserId, getAttentionMutation, onAttentionAction, onBack, onCommonMutation, onSend, onOpenSource}: {
+function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sendState, fixture, attentionItem, replyContext, replyContextError, replyMode, onReplyMode, draftSaveState, draftRecipients, onRecipients, sourceConversation, sourceConversationLoading, sourceConversationError, sourceUserId, getAttentionMutation, onAttentionAction, onBack, onCommonMutation, onSend, onOpenSource}: {
   detail: Detail;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   draft: string;
@@ -720,6 +914,13 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
   sendState: SendLifecycle;
   fixture: ShellFixture;
   attentionItem: AttentionItemReadModel | null;
+  replyContext: ReplyContextReadModel | null;
+  replyContextError: string;
+  replyMode: ReplyMode;
+  onReplyMode: (mode: ReplyMode) => void;
+  draftSaveState: DraftSaveState;
+  draftRecipients: {to: CommunicationParticipant[]; cc: CommunicationParticipant[]} | null;
+  onRecipients: (recipients: {to: CommunicationParticipant[]; cc: CommunicationParticipant[]}) => void;
   sourceConversation: SourceConversationReadModel | null;
   sourceConversationLoading: boolean;
   sourceConversationError: string;
@@ -735,20 +936,36 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
     ? sourceUserId ? sourceConversation?.subject ?? 'Sourceの会話' : sourceItem.subject
     : detail === 'review-detail' ? attentionItem?.reviewQuestion ?? '契約更新の条件を確認してください' : detail === 'delegation' ? attentionItem?.operationalOutcome ?? '任せる候補を確認してください' : detail === 'managed-detail' ? attentionItem?.operationalOutcome ?? '来期の見積書を見守っています' : attentionItem?.operationalOutcome ?? attentionItemStatic.action;
   return <div className="detail-content"><button className="back-button" type="button" onClick={onBack}>‹ 一覧に戻る</button><h2 ref={headingRef} tabIndex={-1}>{title}</h2>
-    {detail === 'moment' && <MomentBody item={attentionItem} onSource={onOpenSource} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />}
+    {detail === 'moment' && <MomentBody item={attentionItem} onSource={onOpenSource} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} replyContext={replyContext} replyContextError={replyContextError} replyMode={replyMode} onReplyMode={onReplyMode} draftSaveState={draftSaveState} draftRecipients={draftRecipients} onRecipients={onRecipients} liveContextRequired={Boolean(sourceUserId)} />}
     {detail === 'managed-detail' && <ManagedDetail item={attentionItem} live={Boolean(sourceUserId)} mutation={attentionItem ? getAttentionMutation('STOP_TRACKING') : commonMutations['stop-tracking']} returnMutation={attentionItem ? getAttentionMutation('RETURN_ATTENTION') : 'idle'} onMutation={onCommonMutation} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
     {detail === 'review-detail' && <ReviewDetail item={attentionItem} live={Boolean(sourceUserId)} mutation={attentionItem ? attentionItem.subjectKind === 'ADMISSION_REVIEW' ? getAttentionMutation('RESOLVE_ADMISSION_REVIEW') : getAttentionMutation('CORRECT_OPERATIONAL_OUTCOME') : commonMutations['review-answer']} onMutation={onCommonMutation} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
     {detail === 'delegation' && <DelegationDetail item={attentionItem} mutation={getAttentionMutation('DELEGATE')} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
     {detail === 'conversation' && (sourceUserId
-      ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError} />
-      : <Conversation draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} />)}
+      ? <><SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError} />{sourceConversation && <Composer draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} replyContext={replyContext?.conversationId === sourceConversation.id ? replyContext : null} replyContextError={replyContextError} replyMode={replyMode} onReplyMode={onReplyMode} draftSaveState={draftSaveState} draftRecipients={draftRecipients} onRecipients={onRecipients} liveContextRequired />}</>
+      : <Conversation draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} replyContext={replyContext} replyContextError={replyContextError} replyMode={replyMode} onReplyMode={onReplyMode} draftSaveState={draftSaveState} draftRecipients={draftRecipients} onRecipients={onRecipients} liveContextRequired={false} />)}
   </div>;
 }
 
-function MomentBody({item, onSource, draft, onDraft, sendState, fixture, onSend}: {item: AttentionItemReadModel | null; onSource: (conversationId?: string) => void; draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void}) {
+type ComposerProps = {
+  draft: string;
+  onDraft: (value: string) => void;
+  sendState: SendLifecycle;
+  fixture: ShellFixture;
+  onSend: () => void;
+  replyContext: ReplyContextReadModel | null;
+  replyContextError: string;
+  replyMode: ReplyMode;
+  onReplyMode: (mode: ReplyMode) => void;
+  draftSaveState: DraftSaveState;
+  draftRecipients: {to: CommunicationParticipant[]; cc: CommunicationParticipant[]} | null;
+  onRecipients: (recipients: {to: CommunicationParticipant[]; cc: CommunicationParticipant[]}) => void;
+  liveContextRequired: boolean;
+};
+
+function MomentBody({item, onSource, ...composer}: {item: AttentionItemReadModel | null; onSource: (conversationId?: string) => void} & ComposerProps) {
   const action = item?.primaryAction ?? '内容を確認してください';
   const outcome = item?.operationalOutcome ?? '見積書の条件について、確認を終える';
-  return <><p className="detail-lead">{item ? `現在の対応: ${action}` : attentionItemStatic.whyNow}</p><section className="trust-block"><h3>いま行うこと</h3><p>{item ? `${outcome}。` : '見積書を確認して、必要な点を返信してください。'}</p><button className="primary-button" type="button" onClick={() => document.getElementById('reply-body')?.focus()}>返信を書く</button></section><section><h3>変わったこと</h3><p>{item ? `このResponsibilityは「${item.projection.primaryReason}」として現在の状態に投影されています。` : '佐藤さんから、打ち合わせ前の確認依頼が届きました。'}</p></section><section><h3>残っていること</h3><p>{item ? outcome : '見積書の条件について、あなたからの確認を待っています。'}</p></section><button className="source-link" type="button" onClick={() => onSource(item?.conversationId)}>元の会話を確認する</button><Composer draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} /></>;
+  return <><p className="detail-lead">{item ? `現在の対応: ${action}` : attentionItemStatic.whyNow}</p><section className="trust-block"><h3>いま行うこと</h3><p>{item ? `${outcome}。` : '見積書を確認して、必要な点を返信してください。'}</p><button className="primary-button" type="button" onClick={() => document.getElementById('reply-body')?.focus()}>返信を書く</button></section><section><h3>変わったこと</h3><p>{item ? `このResponsibilityは「${item.projection.primaryReason}」として現在の状態に投影されています。` : '佐藤さんから、打ち合わせ前の確認依頼が届きました。'}</p></section><section><h3>残っていること</h3><p>{item ? outcome : '見積書の条件について、あなたからの確認を待っています。'}</p></section><button className="source-link" type="button" onClick={() => onSource(item?.conversationId)}>元の会話を確認する</button><Composer {...composer} /></>;
 }
 
 function ManagedDetail({item, live, mutation, returnMutation, onMutation, onAttentionAction, onSource}: {item: AttentionItemReadModel | null; live: boolean; mutation: MutationState; returnMutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void; onAttentionAction: (action: AttentionAction, value?: string) => void; onSource: (conversationId?: string) => void}) {
@@ -766,19 +983,31 @@ function DelegationDetail({item, mutation, onAttentionAction, onSource}: {item: 
   return <><p className="detail-lead">この件を任せると、Lunowaが「{item?.operationalOutcome ?? '選んだ対応'}」を見守ります。</p><section><h3>見守る約束</h3><p>期待する出来事: {item?.awaitedEvent ?? '相手の返信または次の出来事'}</p><p>戻す条件: {item?.returnCondition ?? '条件を確認して再表示します'}</p></section><section><h3>元の会話</h3><p>{item?.conversationId ?? sourceItem.subject}</p></section>{item && <button className="source-link" type="button" onClick={() => onSource(item.conversationId)}>元の会話を確認する</button>}<button className="primary-button" disabled={mutation === 'pending' || !item} type="button" onClick={() => item && onAttentionAction('DELEGATE')}>{mutation === 'pending' ? 'この件を任せています' : 'この件を任せる'}</button>{mutation === 'pending' && <p className="inline-status" role="status">保存を確認するまで、この候補は監視中には表示しません。</p>}{mutation === 'confirmed' && <p className="inline-status" role="status">任せる操作を保存しました。現在の状態を更新しています。</p>}{mutation === 'failed' && <p className="inline-status" role="status">任せる操作を保存できませんでした。この候補はまだ監視されていません。</p>}</>;
 }
 
-function Conversation({draft, onDraft, sendState, fixture, onSend}: {draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void}) {
-  return <><div className="message-card"><p className="metadata">佐藤ひろ子 · 10:24</p><p>添付の見積書をご確認いただけますか。明日の打ち合わせで確認できれば助かります。</p></div><p className="metadata">この会話は Source の原文です。要約や判断を必須にはしません。</p><Composer draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} /></>;
+function Conversation(composer: ComposerProps) {
+  return <><div className="message-card"><p className="metadata">佐藤ひろ子 · 10:24</p><p>添付の見積書をご確認いただけますか。明日の打ち合わせで確認できれば助かります。</p></div><p className="metadata">この会話は Source の原文です。要約や判断を必須にはしません。</p><Composer {...composer} /></>;
 }
 
-function Composer({draft, onDraft, sendState, fixture, onSend, toLabel = '佐藤ひろ子', fromLabel = 'work@example.jp'}: {draft: string; onDraft: (value: string) => void; sendState: SendLifecycle; fixture: ShellFixture; onSend: () => void; toLabel?: string; fromLabel?: string}) {
-  const unavailable = fixture.sourceRead === 'temporarily_unavailable';
+function Composer({draft, onDraft, sendState, fixture, onSend, replyContext, replyContextError, replyMode, onReplyMode, draftSaveState, draftRecipients, onRecipients, liveContextRequired}: ComposerProps) {
+  if (liveContextRequired && !replyContext) {
+    return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3>{replyContextError ? <p className="inline-status" role="alert">返信の宛先を確認できないため、送信できません。</p> : <p className="inline-status" role="status">返信の送信元と宛先を確認しています。</p>}</section>;
+  }
+  const unavailable = !liveContextRequired && fixture.sourceRead === 'temporarily_unavailable';
   const awaitingResult = sendState === 'request_pending' || sendState === 'provider_ambiguous' || sendState === 'provider_confirmed_reconciling';
+  const toRecipients = draftRecipients?.to ?? replyContext?.recipients ?? [];
+  const ccRecipients = draftRecipients?.cc ?? replyContext?.cc ?? [];
+  const toLabel = toRecipients.map(({displayName, email}) => displayName ? `${displayName} <${email}>` : email).join(', ') || '佐藤ひろ子';
+  const toValue = toRecipients.map(({email}) => email).join(', ');
+  const ccValue = ccRecipients.map(({email}) => email).join(', ');
+  const fromLabel = replyContext ? `${replyContext.sender.displayName ?? ''} <${replyContext.sender.email}>`.trim() : 'work@example.jp';
+  const parseRecipients = (value: string): CommunicationParticipant[] => value.split(',').map((email) => email.trim()).filter(Boolean).map((email) => ({email, displayName: null}));
   const feedback = sendState === 'request_pending' ? '送信をリクエストしています。確認されるまで、状態は変わりません。'
     : sendState === 'provider_failed' ? '送信できませんでした。下書きは保持されています。内容を確認して再試行できます。'
       : sendState === 'provider_ambiguous' ? '送信結果を確認しています。重複送信を避けるため、再試行はできません。'
         : sendState === 'provider_confirmed_reconciling' ? '送信を確認しました。状態を更新しています。'
           : null;
-  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3><p className="metadata">宛先: {toLabel} · From: {fromLabel}</p><label htmlFor="reply-body">本文<textarea id="reply-body" value={draft} onChange={(event) => onDraft(event.target.value)} placeholder="返信を入力" rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={!draft || awaitingResult || unavailable} type="button" onClick={onSend}>{sendState === 'request_pending' ? '送信をリクエストしています' : sendState === 'provider_ambiguous' ? '送信結果を確認しています' : sendState === 'provider_confirmed_reconciling' ? '状態を更新しています' : sendState === 'provider_failed' ? '再試行する' : '送信する'}</button><p className="metadata">Enterだけでは送信されません。</p></section>;
+  const sendPermissionMissing = Boolean(replyContext && !replyContext.connectedAccount.sendAuthorized);
+  const sendDisabled = !draft || awaitingResult || unavailable || sendPermissionMissing || Boolean(replyContextError) || Boolean(replyContext && draftSaveState !== 'saved');
+  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3>{replyContext && <label htmlFor="reply-mode">種類<select id="reply-mode" value={replyMode} disabled={awaitingResult} onChange={(event) => onReplyMode(event.target.value as ReplyMode)}><option value="REPLY">返信</option><option value="REPLY_ALL">全員に返信</option></select></label>}{replyContext ? <><label htmlFor="reply-to">宛先<input id="reply-to" value={toValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: parseRecipients(event.target.value), cc: ccRecipients})} /></label><label htmlFor="reply-cc">Cc<input id="reply-cc" value={ccValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: toRecipients, cc: parseRecipients(event.target.value)})} /></label><p className="metadata">宛先の表示名: {toLabel} · From: {fromLabel}</p></> : <p className="metadata">宛先: {toLabel} · From: {fromLabel}</p>}{replyContextError && <p className="inline-status" role="alert">返信の宛先を確認できないため、送信できません。</p>}{sendPermissionMissing && <p className="inline-status" role="status">Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください。読み取りと監視は継続できます。</p>}<label htmlFor="reply-body">本文<textarea id="reply-body" value={draft} disabled={awaitingResult} onChange={(event) => onDraft(event.target.value)} placeholder="返信を入力" rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{replyContext && draftSaveState === 'saving' && <p className="inline-status" role="status">下書きを保存しています。</p>}{replyContext && draftSaveState === 'conflict' && <p className="inline-status" role="alert">別の編集が保存されたため、下書きを上書きしていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={sendDisabled} type="button" onClick={onSend}>{sendState === 'request_pending' ? '送信をリクエストしています' : sendState === 'provider_ambiguous' ? '送信結果を確認しています' : sendState === 'provider_confirmed_reconciling' ? '状態を更新しています' : sendState === 'provider_failed' ? '再試行する' : '送信する'}</button><p className="metadata">Enterだけでは送信されません。</p></section>;
 }
 
 function IntegrityBanner() {

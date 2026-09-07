@@ -7,7 +7,8 @@ export default defineConfig({
     './src/server/db/schema/evidence.ts',
     './src/server/db/schema/responsibility.ts',
     './src/server/db/schema/temporal.ts',
-    './src/server/db/schema/gmail.ts'
+    './src/server/db/schema/gmail.ts',
+    './src/server/db/schema/communication.ts'
   ],
   out: './drizzle/migrations'
 });

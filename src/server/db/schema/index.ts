@@ -27,3 +27,4 @@ export {
   gmailWatchStates
 } from './gmail';
 export {temporalContracts, temporalResurfacingEvents, temporalTriggers} from './temporal';
+export {drafts, sendOperations} from './communication';

@@ -66,6 +66,10 @@ const attentionReadModel = {
     responsibilityId: 'responsibility-1',
     admissionReviewId: null,
     conversationId: 'source-conversation-1',
+    connectedAccountId: 'source-account-1',
+    acceptedEvidenceRevision: 1,
+    aggregateVersion: 1,
+    liveTrackingState: 'TRACKING_ACTIVE',
     surface: 'NEEDS_YOU',
     projection: {bucket: 'MY_TURN', subjectKind: 'RESPONSIBILITY', primaryReason: 'open-user-obligation:REPLY'},
     operationalOutcome: '見積書の確認を終える',
@@ -121,6 +125,20 @@ const sourceDetail = {
   }]
 };
 
+const replyContextFor = (mode: 'REPLY' | 'REPLY_ALL', sendAuthorized = true) => ({
+  connectedAccount: {id: 'source-account-1', emailAddress: 'browser@example.invalid', displayName: 'Browser mailbox', connectionState: 'CONNECTED', sendAuthorized},
+  conversationId: 'source-conversation-1', providerThreadId: 'source-thread-1', inReplyToMessageId: 'source-message-1', inReplyToProviderMessageId: 'provider-message-1',
+  evidenceRevision: 1, mode, sender: {email: 'browser@example.invalid', displayName: 'Browser mailbox'},
+  recipients: mode === 'REPLY_ALL'
+    ? [{email: 'sender@example.com', displayName: '佐藤ひろ子'}, {email: 'other@example.com', displayName: 'Other'}]
+    : [{email: 'sender@example.com', displayName: '佐藤ひろ子'}],
+  cc: mode === 'REPLY_ALL' ? [{email: 'copy@example.com', displayName: 'Copy'}] : [],
+  bcc: [], subject: 'Re: 来期の見積書について',
+  draft: {id: `browser-draft-${mode.toLowerCase()}`, version: 1, body: '確認しました。', recipients: mode === 'REPLY_ALL'
+    ? [{email: 'sender@example.com', displayName: '佐藤ひろ子'}, {email: 'other@example.com', displayName: 'Other'}]
+    : [{email: 'sender@example.com', displayName: '佐藤ひろ子'}], cc: mode === 'REPLY_ALL' ? [{email: 'copy@example.com', displayName: 'Copy'}] : []}
+});
+
 test.beforeEach(async ({page}) => {
   await page.route('**/api/auth/get-session**', (route) => route.fulfill({json: appSession}));
   await page.route('**/api/bff/users/**/attention', (route) => route.fulfill({json: attentionReadModel}));
@@ -129,6 +147,16 @@ test.beforeEach(async ({page}) => {
     const pathname = new URL(route.request().url()).pathname;
     await route.fulfill({json: pathname.endsWith('/source-conversation-1') ? sourceDetail : sourcePage});
   });
+  await page.route('**/api/bff/users/**/drafts/context**', async (route) => {
+    const mode = new URL(route.request().url()).searchParams.get('mode') === 'REPLY_ALL' ? 'REPLY_ALL' : 'REPLY';
+    await route.fulfill({json: replyContextFor(mode)});
+  });
+  await page.route('**/api/bff/users/**/drafts', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({json: {id: body.draftId ?? 'browser-draft-reply', version: Number(body.expectedVersion ?? 0) + 1, body: body.body}});
+  });
+  await page.route('**/api/bff/users/**/send-operations', (route) => route.fulfill({json: {accepted: true, operation: {id: 'browser-operation-1', status: 'PENDING'}}}));
 });
 
 test('renders the shell and navigates a Needs You item to its Moment', async ({page}) => {
@@ -192,16 +220,74 @@ test('keeps trusted delegation and LATER actions on the authenticated Product pa
   expect(actionBodies[1]?.action).toBe('RETURN_ATTENTION');
 });
 
-test('keeps the real Source Conversation read-only and exposes a usable compact navigation drawer', async ({page}) => {
+test('keeps Source truth readable and adds the trusted contextual reply entry on the real Source Conversation', async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
   await page.goto('/ja');
   await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '会話').click();
   await page.getByRole('button', {name: /佐藤ひろ子/}).click();
   await expect(page.getByLabel('詳細').getByText('添付の見積書をご確認いただけますか。')).toBeVisible();
-  await expect(page.getByRole('button', {name: '送信する'})).toHaveCount(0);
+  await expect(page.getByLabel('宛先')).toHaveValue('sender@example.com');
+  await expect(page.getByText(/From: Browser mailbox <browser@example.invalid>/)).toBeVisible();
+  await expect(page.getByRole('button', {name: '送信する'})).toBeEnabled();
   await page.getByRole('button', {name: /一覧に戻る/}).click();
   await expect(page.getByRole('button', {name: /佐藤ひろ子/})).toBeVisible();
+});
+
+test('uses trusted Moment reply context and keeps Send as pending application truth', async ({page}) => {
+  const sendBodies: Record<string, unknown>[] = [];
+  await page.unroute('**/api/bff/users/**/send-operations');
+  await page.route('**/api/bff/users/**/send-operations', async (route) => {
+    sendBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({json: {accepted: true, operation: {id: 'browser-operation-1', status: 'PENDING'}}});
+  });
+
+  await page.goto('/ja');
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByLabel('宛先')).toHaveValue('sender@example.com');
+  await expect(page.getByText(/From: Browser mailbox <browser@example.invalid>/)).toBeVisible();
+  await page.getByLabel('本文').press('Enter');
+  expect(sendBodies).toHaveLength(0);
+  await page.getByRole('button', {name: '送信する'}).click();
+  await expect(page.getByText(/送信をリクエストしています。確認されるまで、状態は変わりません/)).toBeVisible();
+  expect(sendBodies).toEqual([{draftId: 'browser-draft-reply'}]);
+  await expect(page.getByRole('button', {name: '送信をリクエストしています'})).toBeDisabled();
+  await expect(page.getByLabel('本文')).toBeDisabled();
+  await expect(page.getByLabel('宛先')).toBeDisabled();
+});
+
+test('blocks browser-offline Send without creating a SendOperation', async ({page, context}) => {
+  let sendRequests = 0;
+  await page.unroute('**/api/bff/users/**/send-operations');
+  await page.route('**/api/bff/users/**/send-operations', async (route) => {
+    sendRequests += 1;
+    await route.fulfill({json: {accepted: true, operation: {id: 'unexpected', status: 'PENDING'}}});
+  });
+  await page.goto('/ja');
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByRole('button', {name: '送信する'})).toBeEnabled();
+  await context.setOffline(true);
+  await page.getByRole('button', {name: '送信する'}).click();
+  await expect(page.getByText(/現在オフラインです。送信されていません/)).toBeVisible();
+  expect(sendRequests).toBe(0);
+  await expect(page.getByLabel('本文')).toHaveValue('確認しました。');
+  await context.setOffline(false);
+});
+
+test('keeps manual composer available but disables Send when mail_send permission is absent', async ({page}) => {
+  await page.unroute('**/api/bff/users/**/drafts/context**');
+  await page.route('**/api/bff/users/**/drafts/context**', async (route) => {
+    const mode = new URL(route.request().url()).searchParams.get('mode') === 'REPLY_ALL' ? 'REPLY_ALL' : 'REPLY';
+    await route.fulfill({json: replyContextFor(mode, false)});
+  });
+  await page.goto('/ja');
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByLabel('本文')).toHaveValue('確認しました。');
+  await expect(page.getByText(/Gmailの送信権限がありません/)).toBeVisible();
+  await expect(page.getByRole('button', {name: '送信する'})).toBeDisabled();
 });
 
 test('keeps each responsive stage in content-fit order and rail labels discoverable', async ({page}) => {

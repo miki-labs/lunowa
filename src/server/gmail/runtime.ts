@@ -5,6 +5,7 @@ import {GmailCredentialCipher} from './crypto';
 import {GoogleGmailClient} from './provider-client';
 import {GmailPushIngress, GooglePubSubJwtVerifier} from './pubsub';
 import {GmailSyncService} from './sync';
+import {GmailSendService} from './send';
 
 export function createGmailRuntime() {
   const environment = getGmailEnvironment();
@@ -16,6 +17,7 @@ export function createGmailRuntime() {
     authorization: new GmailAuthorizationService(environment, cipher, provider),
     credentials,
     sync: new GmailSyncService(environment.pubsubTopic, provider, credentials),
+    send: new GmailSendService(provider, credentials),
     push: new GmailPushIngress(
       new GooglePubSubJwtVerifier(environment.pubsubAudience, environment.pubsubServiceAccount)
     ),

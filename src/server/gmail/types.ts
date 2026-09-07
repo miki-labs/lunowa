@@ -1,6 +1,7 @@
 import type {NormalizedProviderMessage} from '@/server/evidence/normalized';
 
 export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+export const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
 
 export type GmailTokenSet = {
   accessToken: string;
@@ -51,7 +52,10 @@ export type GmailHistoryPage = {
 export type GmailMessageListPage = {
   messages?: {id: string; threadId?: string}[];
   nextPageToken?: string;
+  resultSizeEstimate?: number;
 };
+
+export type GmailSendRequest = {raw: string; threadId?: string};
 
 export type GmailWatch = {historyId: string; expiration: string};
 
@@ -62,6 +66,8 @@ export interface GmailProviderClient {
   getProfile(accessToken: string): Promise<GmailProfile>;
   watch(accessToken: string, topicName: string): Promise<GmailWatch>;
   listMessages(accessToken: string, pageToken?: string): Promise<GmailMessageListPage>;
+  sendMessage(accessToken: string, input: GmailSendRequest): Promise<GmailMessage>;
+  listMessagesByRfc822MessageId(accessToken: string, messageId: string): Promise<GmailMessageListPage>;
   getMessage(accessToken: string, messageId: string): Promise<GmailMessage>;
   listHistory(accessToken: string, startHistoryId: string, pageToken?: string): Promise<GmailHistoryPage>;
   getAttachment(accessToken: string, messageId: string, attachmentId: string): Promise<{data: string; size?: number}>;

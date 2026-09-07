@@ -7,7 +7,7 @@ import {GMAIL_OAUTH_SCOPES} from './config';
 import {GmailCredentialCipher, pkceChallenge, randomUrlToken, sha256} from './crypto';
 import {isSafeMailboxAddress} from './normalize';
 import type {GmailProviderClient, GmailTokenSet} from './types';
-import {GmailProviderError, GMAIL_READONLY_SCOPE} from './types';
+import {GmailProviderError, GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE} from './types';
 
 const OAUTH_STATE_TTL_MS = 10 * 60_000;
 
@@ -26,7 +26,12 @@ function safeReturnPath(candidate: string | undefined): string {
 
 function grantedCapabilities(scopes: readonly string[]): readonly string[] {
   if (!scopes.includes(GMAIL_READONLY_SCOPE)) return [];
-  return ['mail_read', 'incremental_sync', 'attachment_fetch'];
+  return [
+    'mail_read',
+    'incremental_sync',
+    'attachment_fetch',
+    ...(scopes.includes(GMAIL_SEND_SCOPE) ? ['mail_send'] : [])
+  ];
 }
 
 export class GmailAuthorizationService {
@@ -122,7 +127,7 @@ export class GmailCredentialService {
     private readonly repository: CredentialRepository = new GmailRepository()
   ) {}
 
-  async getAccessToken(userId: string, connectedAccountId: string): Promise<string> {
+  async getAccessToken(userId: string, connectedAccountId: string, requiredScope?: string): Promise<string> {
     const row = await this.repository.getOwnedCredential(userId, connectedAccountId);
     if (!row) throw new GmailProviderError(403, 'ACCOUNT_NOT_OWNED');
     if (row.invalidatedAt || row.connectionState !== 'CONNECTED') {
@@ -130,6 +135,12 @@ export class GmailCredentialService {
     }
     if (row.keyVersion !== this.environment.credentialKeyVersion) {
       throw new GmailProviderError(503, 'CREDENTIAL_KEY_VERSION_UNAVAILABLE');
+    }
+    if (requiredScope && !row.grantedScopes.includes(requiredScope)) {
+      throw new GmailProviderError(403, 'GMAIL_SCOPE_NOT_GRANTED');
+    }
+    if (requiredScope === GMAIL_SEND_SCOPE && !row.grantedCapabilities.includes('mail_send')) {
+      throw new GmailProviderError(403, 'GMAIL_SEND_CAPABILITY_NOT_GRANTED');
     }
     const context = `gmail-token:${userId}:${connectedAccountId}`;
     const token = this.cipher.decrypt<GmailTokenSet>(row.encryptedPayload, context);

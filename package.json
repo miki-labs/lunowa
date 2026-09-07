@@ -26,6 +26,8 @@
     "test:responsibility-reducer-production": "node --import tsx tests/responsibility-reducer-production-integration.ts",
     "test:temporal-production": "node --import tsx tests/temporal-production-integration.ts",
     "test:gmail-provider": "vitest run tests/gmail-provider.test.ts",
+    "test:gmail-send": "vitest run tests/gmail-send.test.ts",
+    "test:gmail-send-production": "node --import tsx tests/gmail-send-production-integration.ts",
     "test:gmail-production": "node --import tsx tests/gmail-provider-integration.ts",
     "test:source-production": "node --import tsx tests/source-integration.ts",
     "test:communication-production": "node --import tsx tests/communication-production-integration.ts",

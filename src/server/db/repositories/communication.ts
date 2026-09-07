@@ -3,12 +3,15 @@ import {and, asc, desc, eq, inArray} from 'drizzle-orm';
 import {getDatabase} from '../index';
 import {connectedAccounts, conversations, messageParticipants, messages, participantIdentities} from '../schema/evidence';
 import {drafts, sendOperations} from '../schema/communication';
+import {responsibilities} from '../schema/responsibility';
 import {buildReplyRecipients, normalizeDraftBody, type ReplyMode, type ReplyParticipant} from '../../communication/reply';
 import type {ReplyContextReadModel as SharedReplyContextReadModel} from '@/lib/communication-types';
 
 type Database = ReturnType<typeof getDatabase>;
 type StoredParticipant = {email: string; displayName: string | null};
 const ACTIVE_SEND_STATUSES = ['PENDING', 'DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED'] as const;
+export const SEND_OPERATION_STATUSES = ['PENDING', 'DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED', 'RECONCILED', 'FAILED'] as const;
+export type SendOperationStatus = (typeof SEND_OPERATION_STATUSES)[number];
 
 export class DraftConflictError extends Error {
   public constructor(public readonly currentVersion: number) {
@@ -44,11 +47,12 @@ export type DraftReadModel = {
 
 export type SendOperationReadModel = {
   id: string;
+  userId: string;
   draftId: string;
   connectedAccountId: string;
   idempotencyKey: string;
   kind: 'IMMEDIATE';
-  status: 'PENDING' | 'DISPATCHING' | 'AMBIGUOUS' | 'PROVIDER_ACCEPTED' | 'RECONCILED' | 'FAILED';
+  status: SendOperationStatus;
   draftSnapshot: Record<string, unknown>;
   attemptCount: number;
   providerResultId: string | null;
@@ -356,6 +360,7 @@ export class CommunicationRepository {
   private readSendOperation(row: typeof sendOperations.$inferSelect): SendOperationReadModel {
     return {
       id: row.id,
+      userId: row.userId,
       draftId: row.draftId,
       connectedAccountId: row.connectedAccountId,
       idempotencyKey: row.idempotencyKey,
@@ -371,7 +376,74 @@ export class CommunicationRepository {
     };
   }
 
-  public async requestImmediateSend(input: {userId: string; draftId: string}): Promise<SendOperationReadModel> {
+  public async getSendOperation(input: {userId: string; sendOperationId: string}): Promise<SendOperationReadModel | null> {
+    const [row] = await this.db.select().from(sendOperations).where(and(
+      eq(sendOperations.id, input.sendOperationId),
+      eq(sendOperations.userId, input.userId)
+    )).limit(1);
+    return row ? this.readSendOperation(row) : null;
+  }
+
+  /** Claim is the only path that can authorize a provider effect. */
+  public async claimSendOperation(input: {userId: string; sendOperationId: string}): Promise<SendOperationReadModel & {claimed: boolean}> {
+    return this.db.transaction(async (tx) => {
+      const [current] = await tx.select().from(sendOperations).where(and(
+        eq(sendOperations.id, input.sendOperationId),
+        eq(sendOperations.userId, input.userId)
+      )).for('update');
+      if (!current) throw new CommunicationInputError('SEND_OPERATION_NOT_FOUND');
+      if (current.status !== 'PENDING') return {...this.readSendOperation(current), claimed: false};
+      const [claimed] = await tx.update(sendOperations).set({
+        status: 'DISPATCHING',
+        attemptCount: current.attemptCount + 1,
+        updatedAt: new Date()
+      }).where(and(
+        eq(sendOperations.id, current.id),
+        eq(sendOperations.userId, input.userId),
+        eq(sendOperations.status, 'PENDING')
+      )).returning();
+      if (!claimed) throw new Error('SEND_OPERATION_CLAIM_FAILED');
+      return {...this.readSendOperation(claimed), claimed: true};
+    });
+  }
+
+  public async transitionSendOperation(input: {
+    userId: string;
+    sendOperationId: string;
+    expectedStatuses: readonly SendOperationStatus[];
+    status: SendOperationStatus;
+    providerResultId?: string | null;
+    providerMessageId?: string | null;
+    lastErrorCode?: string | null;
+  }): Promise<SendOperationReadModel> {
+    return this.db.transaction(async (tx) => {
+      const [current] = await tx.select().from(sendOperations).where(and(
+        eq(sendOperations.id, input.sendOperationId),
+        eq(sendOperations.userId, input.userId)
+      )).for('update');
+      if (!current) throw new CommunicationInputError('SEND_OPERATION_NOT_FOUND');
+      if (!input.expectedStatuses.includes(current.status as SendOperationStatus)) return this.readSendOperation(current);
+      const values = {
+        status: input.status,
+        updatedAt: new Date(),
+        ...(input.providerResultId !== undefined ? {providerResultId: input.providerResultId} : {}),
+        ...(input.providerMessageId !== undefined ? {providerMessageId: input.providerMessageId} : {}),
+        ...(input.lastErrorCode !== undefined ? {lastErrorCode: input.lastErrorCode} : {})
+      };
+      const [updated] = await tx.update(sendOperations).set(values).where(and(
+        eq(sendOperations.id, current.id),
+        eq(sendOperations.userId, input.userId),
+        inArray(sendOperations.status, [...input.expectedStatuses])
+      )).returning();
+      return this.readSendOperation(updated ?? current);
+    });
+  }
+
+  public async requestImmediateSend(input: {
+    userId: string;
+    draftId: string;
+    responsibilityBinding?: {responsibilityId: string; aggregateVersion: number; evidenceRevision: number};
+  }): Promise<SendOperationReadModel> {
     return this.db.transaction(async (tx) => {
       const [draft] = await tx.select().from(drafts).where(and(eq(drafts.id, input.draftId), eq(drafts.userId, input.userId))).for('update');
       if (!draft) throw new CommunicationInputError('DRAFT_NOT_FOUND');
@@ -384,19 +456,41 @@ export class CommunicationRepository {
         inArray(sendOperations.status, [...ACTIVE_SEND_STATUSES])
       )).orderBy(desc(sendOperations.createdAt), desc(sendOperations.id)).limit(1);
       if (activeSend) return this.readSendOperation(activeSend);
-      const [account] = await tx.select({id: connectedAccounts.id, connectionState: connectedAccounts.connectionState, grantedCapabilities: connectedAccounts.grantedCapabilities})
+      const [account] = await tx.select({
+        id: connectedAccounts.id,
+        emailAddress: connectedAccounts.emailAddress,
+        displayName: connectedAccounts.displayName,
+        connectionState: connectedAccounts.connectionState,
+        grantedCapabilities: connectedAccounts.grantedCapabilities
+      })
         .from(connectedAccounts)
         .where(and(eq(connectedAccounts.id, draft.connectedAccountId), eq(connectedAccounts.userId, input.userId))).limit(1);
       if (!account) throw new CommunicationInputError('ACCOUNT_NOT_OWNED');
       if (account.connectionState !== 'CONNECTED') throw new CommunicationInputError('ACCOUNT_NOT_CONNECTED');
       if (!account.grantedCapabilities.includes('mail_send')) throw new CommunicationInputError('ACCOUNT_SEND_NOT_AUTHORIZED');
+      if (input.responsibilityBinding) {
+        const [binding] = await tx.select({
+          id: responsibilities.id,
+          aggregateVersion: responsibilities.aggregateVersion,
+          acceptedEvidenceRevision: responsibilities.acceptedEvidenceRevision
+        }).from(responsibilities).where(and(
+          eq(responsibilities.id, input.responsibilityBinding.responsibilityId),
+          eq(responsibilities.userId, input.userId),
+          eq(responsibilities.connectedAccountId, draft.connectedAccountId),
+          eq(responsibilities.conversationId, draft.conversationId),
+          eq(responsibilities.aggregateVersion, input.responsibilityBinding.aggregateVersion),
+          eq(responsibilities.acceptedEvidenceRevision, input.responsibilityBinding.evidenceRevision)
+        )).limit(1);
+        if (!binding) throw new CommunicationInputError('RESPONSIBILITY_BINDING_STALE');
+      }
       const idempotencyKey = crypto.randomUUID();
       const now = new Date();
-      const snapshot = {
+      const snapshot: Record<string, unknown> = {
         draftId: draft.id,
         draftVersion: draft.version,
         userId: draft.userId,
         connectedAccountId: draft.connectedAccountId,
+        sender: {email: account.emailAddress, displayName: account.displayName},
         conversationId: draft.conversationId,
         inReplyToMessageId: draft.inReplyToMessageId,
         mode: draft.mode,
@@ -408,6 +502,9 @@ export class CommunicationRepository {
         body: draft.body,
         replyContext: draft.replyContext
       } satisfies Record<string, unknown>;
+      if (input.responsibilityBinding) {
+        snapshot.responsibilityBinding = {...input.responsibilityBinding};
+      }
       const [row] = await tx.insert(sendOperations).values({
         userId: input.userId,
         draftId: draft.id,

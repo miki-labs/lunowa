@@ -223,6 +223,7 @@ export class GmailRepository {
     invalidatedAt: Date | null;
     connectionState: string;
     emailAddress: string;
+    grantedCapabilities: readonly string[];
   } | null> {
     const [row] = await this.db
       .select({
@@ -232,7 +233,8 @@ export class GmailRepository {
         grantedScopes: gmailProviderCredentials.grantedScopes,
         invalidatedAt: gmailProviderCredentials.invalidatedAt,
         connectionState: connectedAccounts.connectionState,
-        emailAddress: connectedAccounts.emailAddress
+        emailAddress: connectedAccounts.emailAddress,
+        grantedCapabilities: connectedAccounts.grantedCapabilities
       })
       .from(gmailProviderCredentials)
       .innerJoin(

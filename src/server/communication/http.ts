@@ -44,6 +44,22 @@ export function optionalRecipients(value: unknown): {email: string}[] | undefine
   return value.map((candidate) => ({email: (candidate as {email: string}).email}));
 }
 
+export function optionalResponsibilityBinding(value: unknown): {responsibilityId: string; aggregateVersion: number; evidenceRevision: number} | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new CommunicationInputError('RESPONSIBILITY_BINDING_INVALID');
+  const candidate = value as {responsibilityId?: unknown; aggregateVersion?: unknown; evidenceRevision?: unknown};
+  if (typeof candidate.responsibilityId !== 'string' || !candidate.responsibilityId.trim() ||
+      !Number.isInteger(candidate.aggregateVersion) || Number(candidate.aggregateVersion) < 1 ||
+      !Number.isInteger(candidate.evidenceRevision) || Number(candidate.evidenceRevision) < 0) {
+    throw new CommunicationInputError('RESPONSIBILITY_BINDING_INVALID');
+  }
+  return {
+    responsibilityId: candidate.responsibilityId.trim(),
+    aggregateVersion: candidate.aggregateVersion as number,
+    evidenceRevision: candidate.evidenceRevision as number
+  };
+}
+
 
 export async function parseCommunicationRequest(request: Request): Promise<Record<string, unknown>> {
   try {

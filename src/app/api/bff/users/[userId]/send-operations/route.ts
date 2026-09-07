@@ -1,6 +1,6 @@
 import {getOwnedAppSession} from '@/server/auth/session';
 import {CommunicationRepository} from '@/server/db/repositories/communication';
-import {communicationErrorResponse, parseCommunicationRequest, requiredString} from '@/server/communication/http';
+import {communicationErrorResponse, optionalResponsibilityBinding, parseCommunicationRequest, requiredString} from '@/server/communication/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,8 @@ export async function POST(request: Request, context: RouteContext) {
     const body = await parseCommunicationRequest(request);
     const operation = await new CommunicationRepository().requestImmediateSend({
       userId,
-      draftId: requiredString(body, 'draftId')
+      draftId: requiredString(body, 'draftId'),
+      responsibilityBinding: optionalResponsibilityBinding(body.responsibilityBinding)
     });
     return Response.json({accepted: true, operation}, {headers: {'Cache-Control': 'no-store'}});
   } catch (error) {

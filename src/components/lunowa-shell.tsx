@@ -966,6 +966,11 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError}:
       <h2 id="mailbox-heading">接続と監視</h2>
       <p>メールボックスの接続は、アプリへのサインインとは別の状態です。</p>
       <dl><div><dt>メールボックス</dt><dd>未接続（fixture）</dd></div><div><dt>会話を読む権限</dt><dd>{fixture.sourceRead}</dd></div></dl>
+      {appUser?.id && <form action={`/api/bff/users/${encodeURIComponent(appUser.id)}/gmail/authorize`} method="get">
+        <input name="returnTo" type="hidden" value="/ja" />
+        <button className="primary-button" type="submit">Gmailを接続 / 再接続</button>
+      </form>}
+      {appUser?.id && <p className="metadata">Googleの同意画面へ移動します。メールボックス接続はアプリのログインとは別です。</p>}
     </section>
   </div>;
 }

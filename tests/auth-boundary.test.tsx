@@ -52,5 +52,19 @@ describe('UI-17 settings account actions', () => {
     expect(screen.getByRole('button', {name: 'この端末からログアウト'})).toBeInTheDocument();
     expect(screen.getByText(/ログアウトしても、メール連携は解除されず/)).toBeInTheDocument();
     expect(screen.getByText('未接続（fixture）')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Gmailを接続 / 再接続'})).not.toBeInTheDocument();
+  });
+
+  it('exposes the owned Gmail authorize route for an authenticated app user', () => {
+    render(<LunowaShell appUser={{id: 'user/1', name: 'User', email: 'user@example.invalid'}} onSignOut={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', {name: '設定を表示'}));
+
+    const connect = screen.getByRole('button', {name: 'Gmailを接続 / 再接続'});
+    const form = connect.closest('form');
+    expect(form).not.toBeNull();
+    expect(form).toHaveAttribute('action', '/api/bff/users/user%2F1/gmail/authorize');
+    expect(form).toHaveAttribute('method', 'get');
+    expect(form?.querySelector('input[name="returnTo"]')).toHaveAttribute('value', '/ja');
+    expect(screen.getByText(/Googleの同意画面へ移動します/)).toBeInTheDocument();
   });
 });

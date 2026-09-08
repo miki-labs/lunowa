@@ -90,6 +90,9 @@ Reuse existing authorities/tasks rather than duplicating them:
 - Product mechanism/validation work remains under its existing Product Issues and accepted dependencies.
 - `miki-labs/lunowa-site` **Issue #8** owns the minimal secure early-access boundary.
 - `miki-labs/lunowa-site` **Issue #9** owns release/preview acceptance for the marketing site.
+- `miki-labs/lunowa-site` **Issue #22** is planning inventory for attributable acquisition -> protected early-access/beta handoff.
+- Product **Issue #146** is planning inventory for private-beta activation/retention/variable-cost instrumentation.
+- Product **Issue #147** is planning inventory for value-exposed pricing/WTP validation before billing.
 - `docs/monetization-engineering.md` applies when Lunowa actually introduces paid state, entitlement, usage limits or economically dangerous variable-cost behavior.
 
 Issue existence is planning inventory, not automatic execution authority. Live task/dependency state must still be checked.

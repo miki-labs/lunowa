@@ -52,6 +52,7 @@ Execution guidance: `docs/coding-agent-harness.md`, `docs/implementation-workflo
 | Question | Authority |
 | --- | --- |
 | Product direction and v1 behavior | `docs/product/PRODUCT.md`, `PRODUCT-CONTENT.md`, `GOLDEN-SCENARIO-BANK.md` |
+| Commercial evidence / acquisition / pricing / retention / unit economics | `docs/product/COMMERCIAL-LOOP.md` |
 | Product / UX | `docs/design/DESIGN.md`, `INTERACTIONS.md`, `RESPONSIVE.md`, `V1-UI-IMPLEMENTATION-CONTRACT.md` |
 | Responsibility semantics | `docs/product/responsibility/`, especially its README, decisions, scenarios, transitions, oracles, and accepted schema/freeze evidence |
 | Architecture / data / module contracts | `docs/product/ARCHITECTURE.md`, `DATA-MODEL.md`, `CONTRACTS.md`, `TECH-STACK.md` |

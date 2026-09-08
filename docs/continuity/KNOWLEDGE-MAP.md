@@ -26,6 +26,7 @@
 | 実際のruntime behavior | code / schema / migrations / tests / deployed evidence | intended canonical behavior | mismatchはreconcile。summaryで隠さない |
 | 人間向け現在地 | `docs/continuity/CURRENT.md` | canonical + live GitHub | mutable summary。常にcanonical/live sourceに負ける |
 | Product Discovery | current Product Discovery Issue | Product authorities + protected/public evidence | implementation progressでは代替不可 |
+| acquisition / activation / retention / pricing / WTP / revenue / unit economics | `docs/product/COMMERCIAL-LOOP.md` | `docs/product/PRODUCT.md`, `docs/monetization-engineering.md`, `miki-labs/lunowa-site` live Issues | commercial stageを飛ばさず、HYPOTHESIS / UNKNOWNをevidenceなしで昇格しない |
 | durable rationale | `docs/decisions/` の該当ADR | current canonical docs/history | supersessionがmaterialなら記録 |
 | external/provider current fact | authoritative primary source | dated local evidence | freshnessがmaterialならlive recheck |
 | reusable engineering baseline | upstream Blueprint + `BLUEPRINT-ADOPTION.md` | local docs | Lunowa Product/domain authorityが優先 |

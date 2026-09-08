@@ -39,7 +39,7 @@ const sourceRef = sourceRefFor(messageBody);
 
 function interpretationOutput(overrides: Partial<ModelInterpretationOutput> = {}, ref = sourceRef): ModelInterpretationOutput {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     basisEvidenceRevision: 1,
     status: 'CANDIDATE',
     sourceMessageId: messageId,
@@ -48,7 +48,7 @@ function interpretationOutput(overrides: Partial<ModelInterpretationOutput> = {}
       materiality: 'MATERIAL',
       operationalOutcome: 'send the revised document',
       obligationLegs: [{id: 'leg-1', bearerCandidate: 'USER', actionCode: 'SEND_REVISED_DOCUMENT', blockedByCondition: false, sourceRefs: [ref]}],
-      expectedEvents: [], temporalFacts: [{id: 'due-1', temporalKind: 'SOURCE_DUE', valueKind: 'DATE', resolvedDate: '2026-08-25', precisionCode: 'DATE', conflictCandidate: false, sourceRefs: [ref]}],
+      expectedEvents: [], temporalFacts: [{id: 'due-1', temporalKind: 'SOURCE_DUE', originalExpression: '明日までに', conflictCandidate: false, sourceRefs: [ref]}],
       completionCriteria: [], constraints: [], pendingProposals: [], agreedFacts: [], uncertainties: [], riskDetails: [], corrections: [], sourceRefs: [ref]
     }],
     sourceRefs: [ref],
@@ -101,7 +101,7 @@ function interpretationFixtureOutput(caseId: string, body = messageBody): ModelI
     case 'T0-014':
       return withUnit({constraints: [{id: 'constraint-1', code: 'DO_NOT_PROCEED', summary: 'wait for the counterpart to resume', sourceRefs: [ref]}]});
     case 'T0-029':
-      return withUnit({identityRelation: {kind: 'SAME_UNSATISFIED_OUTCOME', priorOperationalOutcome: 'deliver usable signed contract'}});
+      return withUnit({identityRelation: {kind: 'SAME_UNSATISFIED_OUTCOME', priorResponsibilityId: '00000000-0000-4000-8000-000000000099'}});
     case 'T0-034':
       return withUnit({
         communicatedClaims: [{id: 'claim-1', kind: 'ATTACHMENT_DELIVERED', sourceRefs: [ref]}],
@@ -110,7 +110,7 @@ function interpretationFixtureOutput(caseId: string, body = messageBody): ModelI
       });
     case 'T0-037':
     case 'PG-50':
-      return withUnit({riskDetails: [{id: 'risk-1', targetKind: 'source', riskClass: 'HIGH', reasonCode: 'PROMPT_INJECTION', sourceRefs: [ref]}]});
+      return withUnit({temporalFacts: [], riskDetails: [{id: 'risk-1', targetKind: 'source', riskClass: 'HIGH', reasonCode: 'PROMPT_INJECTION', sourceRefs: [ref]}]});
     case 'T0-039':
       return withUnit({identityRelation: {kind: 'NEW'}});
     case 'T0-040':
@@ -168,7 +168,15 @@ describe('G70 bounded AI runtime', () => {
     expect(result.status).toBe('CANDIDATE');
     if (result.status !== 'CANDIDATE') return;
     expect(result.derivation.status).toBe('DERIVED');
-    if (result.derivation.status === 'DERIVED') expect(result.derivation.command.admission.decision).toBe('TRACK');
+    const temporal = result.candidate.semantics[0]?.temporalFacts?.[0];
+    expect(temporal).toMatchObject({originalExpression: '明日までに', valueKind: 'UNRESOLVED', precisionCode: 'UNRESOLVED'});
+    expect(temporal).not.toHaveProperty('resolvedDate');
+    expect(temporal).not.toHaveProperty('resolvedAt');
+    expect(temporal).not.toHaveProperty('referenceTimezone');
+    if (result.derivation.status === 'DERIVED') {
+      expect(result.derivation.command.admission.decision).toBe('TRACK');
+      expect(result.derivation.command.effects?.[0]?.patch?.temporalFacts?.[0]).toMatchObject({valueKind: 'UNRESOLVED', precisionCode: 'UNRESOLVED'});
+    }
     expect(store.runs.get(result.runId)?.status).toBe('SUCCEEDED');
     expect(store.runs.get(result.runId)?.contextManifest).toMatchObject({dataControlMode: 'UNVERIFIED', storageRequest: 'store:false'});
     expect(transport.requests[0]?.store).toBe(false);
@@ -408,5 +416,22 @@ describe('G70 bounded AI runtime', () => {
     expect(() => validateInterpretationOutput({...interpretationOutput(), sourceRefs: [{...sourceRef, messageId: 'other-message'}]}, validationInput)).toThrow(AIContractError);
     expect(() => validateInterpretationOutput({...interpretationOutput(), sender: 'attacker'}, validationInput)).toThrow('outside the model authority');
     expect(() => validateInterpretationOutput({...interpretationOutput(), sourceRefs: [{...sourceRef, zone: 'QUOTED_HISTORY'}]}, validationInput)).toThrow('unauthorized source zone');
+    expect(() => validateInterpretationOutput({
+      ...interpretationOutput(),
+      semanticUnits: [{...interpretationOutput().semanticUnits[0]!, temporalFacts: [{
+        id: 'due-bad', temporalKind: 'SOURCE_DUE', originalExpression: '明日までに', conflictCandidate: false,
+        resolvedDate: '2099-01-01', sourceRefs: [sourceRef]
+      }]}]
+    }, validationInput)).toThrow(/unsupported field resolvedDate/);
+    expect(() => validateInterpretationOutput({
+      ...interpretationOutput(),
+      semanticUnits: [{...interpretationOutput().semanticUnits[0]!, temporalFacts: [{
+        id: 'target-bad', temporalKind: 'USER_TARGET', originalExpression: '明日までに', conflictCandidate: false, sourceRefs: [sourceRef]
+      }]}]
+    }, validationInput)).toThrow();
+    expect(() => validateInterpretationOutput({
+      ...interpretationOutput(),
+      semanticUnits: [{...interpretationOutput().semanticUnits[0]!, identityRelation: {kind: 'CONTINUES', priorResponsibilityId: 'prior-1', priorOperationalOutcome: 'model supplied'}}]
+    }, {...validationInput, authorizedPriorResponsibilities: new Map([['prior-1', {operationalOutcome: 'trusted outcome', resolutionStatus: 'OPEN' as const, aggregateVersion: 1}]])})).toThrow(/unsupported field priorOperationalOutcome/);
   });
 });

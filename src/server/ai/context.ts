@@ -1,6 +1,6 @@
 import type {JsonObject} from '../evidence/normalized';
 import type {ResponsibilityState} from '../responsibility/types';
-import {MODEL_SOURCE_ZONES, type ModelSourceZone} from './contracts';
+import {AI_INTERPRETATION_SCHEMA_VERSION, MODEL_SOURCE_ZONES, type ModelSourceZone} from './contracts';
 
 export type AuthorizedAISourceZone = {
   zone: ModelSourceZone;
@@ -220,7 +220,7 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
   const authorizedMessageBodies = new Map(input.messages.map((message) => [message.id, message.body] as const));
   const payload = {
     lane: 'responsibility_interpretation',
-    schemaVersion: 1,
+    schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION,
     basisEvidenceRevision: input.evidenceRevision,
     sourceEventKey: input.sourceEventKey,
     focalMessageId: input.focalMessageId,
@@ -235,7 +235,7 @@ export function buildInterpretationContext(input: AuthorizedInterpretationContex
       {role: 'user', content: [{type: 'input_text', text: `<untrusted_source>${safeJson(payload)}</untrusted_source>`}]}
     ],
     manifest: {
-      lane: 'interpretation', schemaVersion: 1, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
+      lane: 'interpretation', schemaVersion: AI_INTERPRETATION_SCHEMA_VERSION, userId: input.user.id, connectedAccountId: input.connectedAccount.id,
       conversationId: input.conversationId, messageIds: [...ids], basisEvidenceRevision: input.evidenceRevision,
       focalMessageId: input.focalMessageId,
       fieldsIncluded: ['message.id', 'message.direction', 'message.sender.participantId', 'message.sender.email', 'message.recipients.participantId', 'message.recipients.email', 'message.cc.participantId', 'message.cc.email', 'message.subject', 'message.body', 'message.sentAt', 'message.sourceZones', 'focalMessageId', 'authorizedParticipants', 'authorizedPriorResponsibilities']

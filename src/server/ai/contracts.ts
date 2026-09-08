@@ -31,7 +31,7 @@ export const MODEL_SOURCE_ZONES = [
 ] as const;
 export type ModelSourceZone = (typeof MODEL_SOURCE_ZONES)[number];
 
-export const AI_INTERPRETATION_SCHEMA_VERSION = 1 as const;
+export const AI_INTERPRETATION_SCHEMA_VERSION = 2 as const;
 export const AI_DRAFT_SCHEMA_VERSION = 1 as const;
 
 export type ModelSourceRef = {
@@ -45,7 +45,7 @@ export type ModelSourceRef = {
 export type ModelIdentityRelation = {
   kind: 'NEW' | 'CONTINUES' | 'REPLACES' | 'SAME_UNSATISFIED_OUTCOME' | 'NEW_EPISODE';
   priorResponsibilityId?: string;
-  /** Compatibility-only value; production validation derives this from the scoped ID. */
+  /** Trusted-derived after validation; never accepted from model JSON. */
   priorOperationalOutcome?: string;
 };
 
@@ -74,20 +74,12 @@ export type ModelExpectedEvent = ModelProvenanced<{
 
 export type ModelTemporalFact = ModelProvenanced<{
   id: string;
-  temporalKind: 'SOURCE_DUE' | 'EXPECTED_EVENT_TIME' | 'USER_TARGET';
+  temporalKind: 'SOURCE_DUE' | 'EXPECTED_EVENT_TIME';
   obligationLegId?: string;
   expectedEventId?: string;
-  originalExpression?: string;
-  valueKind: 'DATE' | 'INSTANT' | 'UNRESOLVED';
-  resolvedDate?: string;
-  resolvedAt?: string;
-  precisionCode: string;
-  referenceTimezone?: string;
-  anchorKind?: string;
-  anchorReference?: string;
-  anchorOffsetSeconds?: number;
+  /** Raw communicated expression only. Resolution belongs to trusted Temporal authority. */
+  originalExpression: string;
   conflictCandidate?: boolean;
-  authorityStatus?: string;
 }>;
 
 export type ModelCompletionCriterion = ModelProvenanced<{
@@ -272,21 +264,12 @@ const expectedEventSchema = sourceProvenanced({
 
 const temporalFactSchema = sourceProvenanced({
   id: stringSchema(128),
-  temporalKind: enumSchema(['SOURCE_DUE', 'EXPECTED_EVENT_TIME', 'USER_TARGET']),
+  temporalKind: enumSchema(['SOURCE_DUE', 'EXPECTED_EVENT_TIME']),
   obligationLegId: nullable(stringSchema(128)),
   expectedEventId: nullable(stringSchema(128)),
-  originalExpression: nullable(stringSchema(512)),
-  valueKind: enumSchema(['DATE', 'INSTANT', 'UNRESOLVED']),
-  resolvedDate: nullable(stringSchema(32)),
-  resolvedAt: nullable(stringSchema(64)),
-  precisionCode: stringSchema(64),
-  referenceTimezone: nullable(stringSchema(128)),
-  anchorKind: nullable(stringSchema(128)),
-  anchorReference: nullable(stringSchema(256)),
-  anchorOffsetSeconds: nullable({type: 'integer', minimum: -31_536_000, maximum: 31_536_000}),
-  conflictCandidate: {type: 'boolean'},
-  authorityStatus: nullable(stringSchema(128))
-}, ['id', 'temporalKind', 'obligationLegId', 'expectedEventId', 'originalExpression', 'valueKind', 'resolvedDate', 'resolvedAt', 'precisionCode', 'referenceTimezone', 'anchorKind', 'anchorReference', 'anchorOffsetSeconds', 'conflictCandidate', 'authorityStatus']);
+  originalExpression: stringSchema(512),
+  conflictCandidate: {type: 'boolean'}
+}, ['id', 'temporalKind', 'obligationLegId', 'expectedEventId', 'originalExpression', 'conflictCandidate']);
 
 const completionSchema = sourceProvenanced({
   id: stringSchema(128), code: stringSchema(128), summary: nullable(stringSchema(2048))
@@ -326,7 +309,7 @@ const semanticUnitSchema = objectSchema({
 }, ['candidateUnitKey', 'materiality', 'operationalOutcome', 'identityRelation', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails', 'communicatedClaims', 'assignmentSemantics', 'corrections', 'terminalSignal', 'sourceRefs']);
 
 export const INTERPRETATION_RESPONSE_FORMAT: StructuredResponseFormat = {
-  type: 'json_schema', name: 'lunowa_responsibility_interpretation_v1', strict: true,
+  type: 'json_schema', name: 'lunowa_responsibility_interpretation_v2', strict: true,
   schema: objectSchema({
     schemaVersion: {type: 'integer', enum: [AI_INTERPRETATION_SCHEMA_VERSION]}, basisEvidenceRevision: {type: 'integer', minimum: 0}, status: enumSchema(['CANDIDATE', 'ABSTAINED']), sourceMessageId: stringSchema(256), abstentionReason: nullable(enumSchema(['AMBIGUOUS', 'MISSING_CONTEXT', 'UNSAFE_HIGH_RISK', 'UNINTERPRETABLE'])), semanticUnits: arraySchema(semanticUnitSchema), sourceRefs: arraySchema(sourceRefSchema)
   }, ['schemaVersion', 'basisEvidenceRevision', 'status', 'sourceMessageId', 'abstentionReason', 'semanticUnits', 'sourceRefs'])
@@ -500,20 +483,17 @@ function validateIdentity(
 ): ModelIdentityRelation | undefined {
   if (value === undefined || value === null) return undefined;
   const item = record(value, label);
-  exact(item, ['kind', 'priorResponsibilityId', 'priorOperationalOutcome'], label);
+  exact(item, ['kind', 'priorResponsibilityId'], label);
   const kind = enumValue(item.kind, ['NEW', 'CONTINUES', 'REPLACES', 'SAME_UNSATISFIED_OUTCOME', 'NEW_EPISODE'] as const, `${label}.kind`);
   const priorResponsibilityId = optionalString(item.priorResponsibilityId, `${label}.priorResponsibilityId`, 128);
-  const priorOperationalOutcome = optionalString(item.priorOperationalOutcome, `${label}.priorOperationalOutcome`, 2048);
-  if (kind !== 'NEW' && kind !== 'NEW_EPISODE') {
-    if (priorResponsibilityId) {
-      const prior = authorizedPriorResponsibilities?.get(priorResponsibilityId);
-      if (!prior) throw new AIContractError(`${label}.priorResponsibilityId is not authorized for this user/account/conversation`);
-      return {kind, priorResponsibilityId, priorOperationalOutcome: prior.operationalOutcome};
-    }
-    if (authorizedPriorResponsibilities) throw new AIContractError(`${label} must select an authorized priorResponsibilityId`);
-    if (!priorOperationalOutcome) throw new AIContractError(`${label} needs priorResponsibilityId`);
+  if (kind === 'NEW' || kind === 'NEW_EPISODE') {
+    if (priorResponsibilityId) throw new AIContractError(`${label}.priorResponsibilityId is invalid for ${kind}`);
+    return {kind};
   }
-  return {kind, ...(priorResponsibilityId ? {priorResponsibilityId} : {}), ...(priorOperationalOutcome ? {priorOperationalOutcome} : {})};
+  if (!priorResponsibilityId) throw new AIContractError(`${label} must select an authorized priorResponsibilityId`);
+  const prior = authorizedPriorResponsibilities?.get(priorResponsibilityId);
+  if (!prior) throw new AIContractError(`${label}.priorResponsibilityId is not authorized for this user/account/conversation`);
+  return {kind, priorResponsibilityId, priorOperationalOutcome: prior.operationalOutcome};
 }
 
 function validateSourceProvenanced(
@@ -583,29 +563,23 @@ function validateSemanticUnit(
   });
   const temporalFacts = list('temporalFacts', (value, nestedLabel) => {
     const fact = record(value, nestedLabel);
-    exact(fact, ['id', 'temporalKind', 'obligationLegId', 'expectedEventId', 'originalExpression', 'valueKind', 'resolvedDate', 'resolvedAt', 'precisionCode', 'referenceTimezone', 'anchorKind', 'anchorReference', 'anchorOffsetSeconds', 'conflictCandidate', 'authorityStatus', 'sourceRefs'], nestedLabel);
-    const valueKind = enumValue(fact.valueKind, ['DATE', 'INSTANT', 'UNRESOLVED'] as const, `${nestedLabel}.valueKind`);
-    const resolvedDate = optionalString(fact.resolvedDate, `${nestedLabel}.resolvedDate`, 32);
-    const resolvedAt = optionalString(fact.resolvedAt, `${nestedLabel}.resolvedAt`, 64);
-    if (valueKind === 'DATE' && resolvedDate && !/^\d{4}-\d{2}-\d{2}$/.test(resolvedDate)) throw new AIContractError(`${nestedLabel}.resolvedDate must retain date precision`);
-    if (valueKind === 'INSTANT' && resolvedAt && Number.isNaN(Date.parse(resolvedAt))) throw new AIContractError(`${nestedLabel}.resolvedAt must be an ISO instant`);
-    if (valueKind === 'UNRESOLVED' && (resolvedDate || resolvedAt)) throw new AIContractError(`${nestedLabel} unresolved time cannot carry a resolved value`);
-    const temporalKind = enumValue(fact.temporalKind, ['SOURCE_DUE', 'EXPECTED_EVENT_TIME', 'USER_TARGET'] as const, `${nestedLabel}.temporalKind`);
+    exact(fact, ['id', 'temporalKind', 'obligationLegId', 'expectedEventId', 'originalExpression', 'conflictCandidate', 'sourceRefs'], nestedLabel);
+    const temporalKind = enumValue(fact.temporalKind, ['SOURCE_DUE', 'EXPECTED_EVENT_TIME'] as const, `${nestedLabel}.temporalKind`);
     const obligationLegId = optionalString(fact.obligationLegId, `${nestedLabel}.obligationLegId`, 128);
     const expectedEventId = optionalString(fact.expectedEventId, `${nestedLabel}.expectedEventId`, 128);
+    const originalExpression = stringValue(fact.originalExpression, `${nestedLabel}.originalExpression`, 512);
+    const refs = refsFor(fact, nestedLabel);
+    const grounded = refs.some((ref) =>
+      (ref.excerpt?.includes(originalExpression) ?? false) ||
+      (authorizedMessageBodies.get(ref.messageId)?.includes(originalExpression) ?? false)
+    );
+    if (!grounded) throw new AIContractError(`${nestedLabel}.originalExpression is not grounded in the authorized source`);
     return {
       id: stringValue(fact.id, `${nestedLabel}.id`, 128), temporalKind,
       ...(obligationLegId ? {obligationLegId} : {}), ...(expectedEventId ? {expectedEventId} : {}),
-      ...(optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512) ? {originalExpression: optionalString(fact.originalExpression, `${nestedLabel}.originalExpression`, 512)} : {}),
-      valueKind, ...(resolvedDate ? {resolvedDate} : {}), ...(resolvedAt ? {resolvedAt} : {}),
-      precisionCode: stringValue(fact.precisionCode, `${nestedLabel}.precisionCode`, 64),
-      ...(optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128) ? {referenceTimezone: optionalString(fact.referenceTimezone, `${nestedLabel}.referenceTimezone`, 128)} : {}),
-      ...(optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128) ? {anchorKind: optionalString(fact.anchorKind, `${nestedLabel}.anchorKind`, 128)} : {}),
-      ...(optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256) ? {anchorReference: optionalString(fact.anchorReference, `${nestedLabel}.anchorReference`, 256)} : {}),
-      ...(fact.anchorOffsetSeconds === undefined || fact.anchorOffsetSeconds === null ? {} : {anchorOffsetSeconds: boundedInteger(fact.anchorOffsetSeconds, `${nestedLabel}.anchorOffsetSeconds`, -31_536_000, 31_536_000)}),
+      originalExpression,
       conflictCandidate: booleanValue(fact.conflictCandidate, `${nestedLabel}.conflictCandidate`),
-      ...(optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128) ? {authorityStatus: optionalString(fact.authorityStatus, `${nestedLabel}.authorityStatus`, 128)} : {}),
-      sourceRefs: refsFor(fact, nestedLabel)
+      sourceRefs: refs
     };
   });
   const completionCriteria = list('completionCriteria', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'code', 'summary', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), code: stringValue(item.code, `${nestedLabel}.code`, 128), ...(optionalString(item.summary, `${nestedLabel}.summary`, 2048) ? {summary: optionalString(item.summary, `${nestedLabel}.summary`, 2048)} : {}), sourceRefs: refsFor(item, nestedLabel)}; });
@@ -637,17 +611,6 @@ function validateSemanticUnit(
       ...(terminal ? [terminal.sourceRefs] : [])
     ];
     if (currentZoneRequired.some((refs) => !refs.some((ref) => ref.zone === 'AUTHORED_CURRENT'))) throw new AIContractError(`${label} material authority cannot be derived solely from quoted or forwarded source zones`);
-    for (const fact of temporalFacts) {
-      const materialValue = fact.resolvedDate ?? fact.resolvedAt;
-      if (!materialValue) continue;
-      const grounded = fact.sourceRefs.some((ref) =>
-        (ref.excerpt?.includes(materialValue) ?? false) ||
-        (fact.originalExpression ? (ref.excerpt?.includes(fact.originalExpression) ?? false) : false) ||
-        (authorizedMessageBodies.get(ref.messageId)?.includes(materialValue) ?? false) ||
-        (fact.originalExpression ? (authorizedMessageBodies.get(ref.messageId)?.includes(fact.originalExpression) ?? false) : false)
-      );
-      if (!grounded) throw new AIContractError(`${label}.temporalFacts[${fact.id}] contains an ungrounded normalized value; resolve relative time through trusted Temporal semantics`);
-    }
   }
   const legIds = new Set(obligationLegs.map((leg) => leg.id));
   const eventIds = new Set(expectedEvents.map((event) => event.id));
@@ -726,7 +689,7 @@ function mapCandidateUnit(unit: ModelSemanticUnit): CandidateResponsibilitySeman
     ...(unit.identityRelation ? {identityRelation: unit.identityRelation} : {}),
     obligationLegs,
     expectedEvents,
-    temporalFacts: provenanced(unit.temporalFacts) as CandidateTemporalFact[],
+    temporalFacts: unit.temporalFacts.map((item) => ({...mapProvenanced(item), valueKind: 'UNRESOLVED' as const, precisionCode: 'UNRESOLVED'})) as CandidateTemporalFact[],
     completionCriteria: provenanced(unit.completionCriteria) as CandidateCompletionCriterion[],
     constraints: provenanced(unit.constraints) as CandidateConstraint[],
     pendingProposals: unit.pendingProposals.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `pending proposal ${item.id}.value`)})) as CandidatePendingProposal[],

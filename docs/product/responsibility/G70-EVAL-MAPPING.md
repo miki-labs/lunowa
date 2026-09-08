@@ -21,6 +21,10 @@ Status: Issue #142 post-merge hardening evidence for the G70 component accepted 
 
 `tests/ai-runtime.test.ts` separately covers schema, source/participant authority, degradation, No Responsibility, prompt-injection and draft boundaries without pretending those checks are complete canonical scenario execution.
 
+## Temporal authority boundary
+
+Interpretation Structured Output schema v2 deliberately carries only the communicated temporal kind (`SOURCE_DUE` / `EXPECTED_EVENT_TIME`), its raw `originalExpression`, and bounded semantic links. It does not expose `resolvedDate`, `resolvedAt`, timezone, anchor, or `USER_TARGET` fields to the model. Model temporal candidates cross G70 as `UNRESOLVED`; accepted date/time resolution remains exclusively owned by the trusted G32/Temporal boundary. A model response containing resolved temporal authority is rejected as an unsupported field.
+
 ## Claim versus provider observation
 
 The model may emit only bounded communicated claims (`ATTACHMENT_DELIVERED` or `DELIVERY_FAILURE_REPORTED`). Gmail normalization/provider observations are never included in the model prompt. `src/server/ai/provider-evidence.ts` derives deterministic attachment observations from normalized evidence, and the production Responsibility repository independently reconstructs and validates the same observation key before accepting `PROVIDER_NON_DELIVERY`. `MIME_STRUCTURE_TRUNCATED`, partial normalization, and unsupported body evidence cannot become trusted absence.

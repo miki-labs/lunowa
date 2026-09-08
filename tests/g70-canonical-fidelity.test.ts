@@ -193,7 +193,7 @@ function refFor(context: AuthorizedInterpretationContext) {
 function outputFor(caseId: string, context: AuthorizedInterpretationContext): ModelInterpretationOutput {
   const ref = refFor(context);
   const base = {
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     basisEvidenceRevision: 1,
     status: 'CANDIDATE' as const,
     sourceMessageId: context.focalMessageId,
@@ -214,7 +214,7 @@ function outputFor(caseId: string, context: AuthorizedInterpretationContext): Mo
       return material({
         operationalOutcome: 'send the requested revised document to the counterpart',
         obligationLegs: [{id: 'leg-send', bearerCandidate: 'USER', actionCode: 'SEND_REVISED_DOCUMENT', blockedByCondition: false, sourceRefs: [ref]}],
-        temporalFacts: [{id: 'due', temporalKind: 'SOURCE_DUE', valueKind: 'DATE', originalExpression: '明日まで', resolvedDate: '2026-08-25', precisionCode: 'DATE', conflictCandidate: false, sourceRefs: [ref]}]
+        temporalFacts: [{id: 'due', temporalKind: 'SOURCE_DUE', originalExpression: '明日まで', conflictCandidate: false, sourceRefs: [ref]}]
       });
     case 'T0-002':
       return material({

@@ -1,7 +1,8 @@
 # Gmail provider operations
 
-G20 activates one Gmail read-only Source lane. Gmail authorization remains
-separate from the Better Auth application session and does not grant Send or
+G20 establishes the Gmail read-only Source lane; G51 extends the same mailbox
+authorization boundary with explicit Gmail Send capability. Gmail authorization
+remains separate from the Better Auth application session and never grants
 Responsibility mutation authority.
 
 ## Runtime configuration
@@ -17,9 +18,12 @@ The Google OAuth client redirect URI is:
 /api/providers/gmail/oauth/callback
 ```
 
-Grant only `https://www.googleapis.com/auth/gmail.readonly`. The flow requests
-offline access because watch renewal and reconciliation run without an active
-browser session. Reconnect uses the same authorization path.
+Current v1 requests exactly `https://www.googleapis.com/auth/gmail.readonly`
+and `https://www.googleapis.com/auth/gmail.send`. Read authority remains required
+for Source/monitoring; Send is a separate `mail_send` capability and is checked
+again immediately before dispatch. The flow requests offline access because watch
+renewal and reconciliation run without an active browser session. Reconnect uses
+the same authorization path. No broader Gmail scope is requested.
 
 ## Pub/Sub and scheduling
 

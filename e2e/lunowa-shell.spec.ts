@@ -234,12 +234,12 @@ test('keeps Source truth readable and adds the trusted contextual reply entry on
   await expect(page.getByRole('button', {name: /佐藤ひろ子/})).toBeVisible();
 });
 
-test('uses trusted Moment reply context and keeps Send as pending application truth', async ({page}) => {
+test('uses trusted Moment reply context and binds explicit Send to the active Responsibility', async ({page}) => {
   const sendBodies: Record<string, unknown>[] = [];
   await page.unroute('**/api/bff/users/**/send-operations');
   await page.route('**/api/bff/users/**/send-operations', async (route) => {
     sendBodies.push(route.request().postDataJSON() as Record<string, unknown>);
-    await route.fulfill({json: {accepted: true, operation: {id: 'browser-operation-1', status: 'PENDING'}}});
+    await route.fulfill({json: {accepted: true, operation: {id: 'browser-operation-1', status: 'RECONCILED'}}});
   });
 
   await page.goto('/ja');
@@ -250,9 +250,16 @@ test('uses trusted Moment reply context and keeps Send as pending application tr
   await page.getByLabel('本文').press('Enter');
   expect(sendBodies).toHaveLength(0);
   await page.getByRole('button', {name: '送信する'}).click();
-  await expect(page.getByText(/送信をリクエストしています。確認されるまで、状態は変わりません/)).toBeVisible();
-  expect(sendBodies).toEqual([{draftId: 'browser-draft-reply'}]);
-  await expect(page.getByRole('button', {name: '送信をリクエストしています'})).toBeDisabled();
+  await expect(page.getByRole('button', {name: '送信済み'})).toBeDisabled();
+  expect(sendBodies).toEqual([{
+    draftId: 'browser-draft-reply',
+    responsibilityBinding: {
+      responsibilityId: 'responsibility-1',
+      aggregateVersion: 1,
+      evidenceRevision: 1
+    }
+  }]);
+  await expect(page.getByText(/現在の状態へ反映済み/)).toBeVisible();
   await expect(page.getByLabel('本文')).toBeDisabled();
   await expect(page.getByLabel('宛先')).toBeDisabled();
 });

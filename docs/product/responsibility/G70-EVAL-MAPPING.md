@@ -1,24 +1,46 @@
 # G70 AI evaluation mapping
 
-Status: Issue #74 bounded implementation evidence. This manifest routes AI-layer checks to the accepted Responsibility and Product oracles; it does not replace those authorities and does not claim to prove reducer, Temporal, provider, authorization, or Send behavior.
+Status: Issue #142 post-merge hardening evidence for the G70 component accepted through PR #136. This document routes checks to canonical Product/Responsibility authority; it is not a second semantic oracle.
 
-## Oracle-first layers
+## Verification layers
 
-| Layer | Evidence / oracle | Mechanical check owned here | Not claimed here |
+| Layer | Evidence | Owned check | Explicit non-claim |
 | --- | --- | --- | --- |
-| Context | authorized normalized message context | tenant/account/message scope, trusted source-zone spans, minimum draft context, untrusted-source framing, bounded payload, no raw-body run manifest | provider authorization or database query correctness |
-| Structured interpretation | `T0-001/002`, `T0-009..044`, `PG-22/23/50/60` | version/revision/source IDs, source-zone/span/excerpt resolution, semantic shape, explicit ambiguity/abstention, no trusted authority fields | semantic accuracy beyond the executable candidate checks |
-| Candidate boundary | ADR 0007; `src/server/responsibility/interpretation.ts` | candidate can derive only through existing trusted admission/reducer boundary; provider observations are not model evidence | accepted Responsibility persistence/reducer correctness |
-| Draft assistance | `PG-29`, `PG-42`, `PG-45`, `PG-52` | editable body only, currentness, no sender/recipient/send fields, manual fallback remains available | G50 draft persistence or G51 provider Send |
-| Data control | current execution-time OpenAI evidence | `store:false` is explicit in every request; no raw prompt/output logging; model/config, declared data-control mode, and run manifest are versioned | organization/project retention mode or ZDR eligibility, which require deployment evidence |
-| Eval discipline | family-stratified development/holdout manifest | holdout families do not overlap development families | generalization or production quality from fixtures alone |
+| Context | authorized normalized message snapshot | tenant/account/message scope, participant binding, current/quoted/forwarded zones, minimum draft payload | provider authorization itself |
+| Canonical interpretation fixtures | detailed Tier-0 YAML oracles | exact focal event, direction/order, participants, existing Responsibility state, provider-evidence condition | reducer/Temporal/provider/Send correctness |
+| Candidate boundary | ADR 0007 + Responsibility interpretation boundary | model emits language-level semantics only; prior identity is scoped; trusted provider observations stay outside the prompt | accepted state authority |
+| Production provider boundary | PostgreSQL 18.6 G70 integration | complete normalized attachment absence can become trusted contradiction; partial/truncated evidence remains UNKNOWN; repository revalidates provider observation identity | real Gmail mailbox behavior |
+| Draft assistance | PG-29/42/45/52 boundary tests | editable body only, no routing/Send authority, manual fallback | G50 persistence or G51 Send |
+| Live selected-model acceptance | `scripts/g70-live-model-acceptance.ts` | repeated synthetic high-value trials bound to exact model/config/prompt/schema/data-control identity | ordinary deterministic CI or production-mail approval |
 
-## Held-out families
+## Canonical fidelity
 
-The holdout contains independent families for claim-vs-observation, high-risk authority, cross-account isolation, genuine ambiguity, AI degradation, prompt injection, successful No Responsibility, high-risk draft assistance, and context-boundary draft behavior. Development examples are not reported as holdout evidence.
+`tests/g70-canonical-fidelity.test.ts` reads the owning canonical YAML blocks and executes only the selected message-owned scenarios `T0-001`, `T0-002`, `T0-014`, `T0-029`, `T0-034`, and `T0-040`. It mechanically compares focal event, message direction/order, participants, accepted prior-state envelope, provider attachment condition, and focal body where serialized. Deliberate mutations must fail.
 
-The executable gate is `tests/ai-runtime.test.ts`: it binds every ID in `G70_EVAL_CASES` to a matching lane/family/split fixture, validates interpretation and draft outputs through the bounded runtime, and applies the layer-owned oracle for each case. `assertExecutableFixtureCoverage` fails when a declared case is missing; runtime provider failure and draft manual fallback are checked separately for PG-22/PG-29. This remains candidate-layer evidence only and does not claim reducer, scheduler, provider, or Send correctness.
+`T0-026` is a canonical `USER_COMMAND: SET_PERSONAL_TARGET` case and is deliberately rejected as an AI email-interpretation fixture. Routing metadata in `G70_EVAL_CASES` does not imply executable or live-model coverage by itself.
 
-## Runtime boundary
+`tests/ai-runtime.test.ts` separately covers schema, source/participant authority, degradation, No Responsibility, prompt-injection and draft boundaries without pretending those checks are complete canonical scenario execution.
 
-The runtime records only the `AIInterpretationRun` manifest and status through the existing G30 substrate. A model result is rejected or degraded when it is malformed, unavailable, abstained, or based on stale evidence. A successful interpretation returns an untrusted candidate plus a deterministic derivation; it does not apply a privileged domain effect. A successful draft returns editable text plus a manual-fallback guarantee; it does not alter trusted route fields or send.
+## Temporal authority boundary
+
+Interpretation Structured Output schema v2 deliberately carries only the communicated temporal kind (`SOURCE_DUE` / `EXPECTED_EVENT_TIME`), its raw `originalExpression`, and bounded semantic links. It does not expose `resolvedDate`, `resolvedAt`, timezone, anchor, or `USER_TARGET` fields to the model. Model temporal candidates cross G70 as `UNRESOLVED`; accepted date/time resolution remains exclusively owned by the trusted G32/Temporal boundary. A model response containing resolved temporal authority is rejected as an unsupported field.
+
+## Claim versus provider observation
+
+Continuation/reopen identity is exact and scoped at both the model validator and production reduction boundary: non-new relations must select a current authorized `priorResponsibilityId`; operational-outcome text similarity is never identity authority.
+
+The model may emit only bounded communicated claims (`ATTACHMENT_DELIVERED` or `DELIVERY_FAILURE_REPORTED`). Gmail normalization/provider observations are never included in the model prompt. `src/server/ai/provider-evidence.ts` derives deterministic attachment observations from normalized evidence, and the production Responsibility repository independently reconstructs and validates the same observation key before accepting `PROVIDER_NON_DELIVERY`. `MIME_STRUCTURE_TRUNCATED`, partial normalization, and unsupported body evidence cannot become trusted absence.
+
+## Live model gate
+
+Run explicitly, never from ordinary `pnpm verify`:
+
+```text
+OPENAI_API_KEY=... OPENAI_MODEL=... AI_MODEL_CONFIG_VERSION=... \
+OPENAI_DATA_CONTROL_MODE=STANDARD_API_RETENTION G70_LIVE_TRIALS=3 \
+node --import tsx scripts/g70-live-model-acceptance.ts
+```
+
+`OPENAI_DATA_CONTROL_MODE` must be `STANDARD_API_RETENTION` or separately verified `ZDR_VERIFIED`. The gate uses synthetic fixtures only, sends `store:false`, persists no raw prompt/output, hashes exact prompt/schema identities, and applies a `pass^k` rule: every selected trial must pass. Default is three trials; two through ten are allowed.
+
+OpenAI API/data-control behavior was revalidated on 2026-09-08: Structured Outputs remains the preferred schema-adherent Responses path; `store:false` avoids foreground Responses application-state storage, while Zero Data Retention remains a separately approved organization/project control and must not be inferred from request flags alone.

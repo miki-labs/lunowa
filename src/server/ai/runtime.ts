@@ -11,6 +11,7 @@ import {
 } from './contracts';
 import {buildDraftContext, buildInterpretationContext, type AuthorizedInterpretationContext, type AuthorizedReplyContext, type BuiltAIContext} from './context';
 import {AIProviderError, parseResponseJson, responseRequest, type ResponsesTransport} from './openai';
+import {trustedProviderEvidenceForCandidate} from './provider-evidence';
 import {deriveResponsibilityCommand} from '../responsibility/interpretation';
 import type {ResponsibilityEvidenceBasis, ResponsibilityInterpretationCandidate} from '../responsibility/types';
 
@@ -150,7 +151,8 @@ async function captureRun(deps: RuntimeDependencies, context: BuiltAIContext, co
     contextManifest: {
       ...context.manifest,
       dataControlMode: config.dataControlMode,
-      storageRequest: 'store:false'
+      storageRequest: 'store:false',
+      ...(context.providerObservations.length > 0 ? {providerObservationKeys: context.providerObservations.map((observation) => observation.observationKey)} : {})
     }
   });
   return captured.id;
@@ -201,10 +203,11 @@ async function mark(deps: RuntimeDependencies, runId: string, userId: string, st
 }
 
 function interpretationEvidenceBasis(context: AuthorizedInterpretationContext): ResponsibilityEvidenceBasis {
+  const references: ResponsibilityEvidenceBasis['references'][number][] = context.messages.map((message) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: message.id}));
   return {
     evidenceRevision: context.evidenceRevision,
     sourceEventKey: context.sourceEventKey,
-    references: context.messages.map((message) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: message.id}))
+    references
   };
 }
 
@@ -224,10 +227,14 @@ export class ResponsibilityInterpretationRuntime {
       }));
       const modelOutput = validateInterpretationOutput(parseResponseJson(raw), {
         basisEvidenceRevision: context.evidenceRevision,
+        focalMessageId: context.focalMessageId,
         allowedMessageIds: built.allowedMessageIds,
         allowedParticipantIds: built.allowedParticipantIds,
         allowedSourceZones: built.allowedSourceZones,
-        authorizedMessageBodies: built.authorizedMessageBodies
+        authorizedMessageBodies: built.authorizedMessageBodies,
+        authorizedParticipants: built.authorizedParticipants,
+        authorizedPriorResponsibilities: built.authorizedPriorResponsibilities,
+        enforceMaterialGrounding: built.enforceBoundParticipantIdentity
       });
       const current = await currentRevision(this.deps, {userId: context.user.id, connectedAccountId: context.connectedAccount.id, conversationId: context.conversationId});
       if (current !== modelOutput.basisEvidenceRevision) {
@@ -248,7 +255,14 @@ export class ResponsibilityInterpretationRuntime {
         interpretationRunId: runId
       });
       if (!candidate) throw new AIContractError('interpretation candidate was not produced');
-      const derivation = deriveResponsibilityCommand(candidate, {evidenceBasis: interpretationEvidenceBasis(context)});
+      const providerEvidence = trustedProviderEvidenceForCandidate(candidate, built.providerObservations);
+      const baseEvidenceBasis = interpretationEvidenceBasis(context);
+      const evidenceBasis: ResponsibilityEvidenceBasis = {...baseEvidenceBasis, references: [...baseEvidenceBasis.references, ...providerEvidence]};
+      const derivation = deriveResponsibilityCommand(candidate, {
+        evidenceBasis,
+        existingResponsibilities: built.existingResponsibilities,
+        trustedEvidence: providerEvidence
+      });
       if (derivation.status === 'REJECTED') {
         await mark(this.deps, runId, context.user.id, 'FAILED');
         return {status: 'FAILED', runId, reason: derivation.reason};

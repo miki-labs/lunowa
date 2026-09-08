@@ -128,7 +128,7 @@ describe('deterministic Responsibility admission and reducer', () => {
       semantics: [{
         candidateUnitKey: 'clarification', materiality: 'MATERIAL',
         operationalOutcome: initial.operationalOutcome,
-        identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: initial.operationalOutcome},
+        identityRelation: {kind: 'CONTINUES', priorResponsibilityId: initial.id},
         constraints: [{id: 'pdf', code: 'FORMAT_PDF', provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1', sourceLocator: {zone: 'AUTHORED_CURRENT'}}]}],
         provenance: [{evidenceKind: 'COMMUNICATED_CLAIM', messageId: 'message-1', sourceLocator: {zone: 'AUTHORED_CURRENT'}}]
       }]

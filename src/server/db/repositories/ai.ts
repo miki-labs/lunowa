@@ -4,10 +4,12 @@ import {getDatabase} from '../index';
 import {
   connectedAccounts,
   conversations,
+  attachments,
   messageParticipants,
   messages,
   participantIdentities
 } from '../schema/evidence';
+import {responsibilities} from '../schema/responsibility';
 import {user} from '../schema/auth';
 import {aiInterpretationRuns} from '../schema/responsibility';
 import {
@@ -29,6 +31,8 @@ import type {
   DraftContextRequest,
   InterpretationContextRequest
 } from '../../ai/runtime';
+import {loadResponsibilityState} from './responsibility';
+import {normalizedAttachmentObservation} from '../../ai/provider-evidence';
 
 type Database = ReturnType<typeof getDatabase>;
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -107,6 +111,7 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
     conversation: {id: string; semanticEvidenceRevision: number};
     messageRows: Array<typeof messages.$inferSelect>;
     participantRows: Array<{messageId: string; role: string; participantId: string; email: string; displayName: string | null}>;
+    attachmentRows: Array<{messageId: string; id: string; providerAttachmentId: string | null}>;
   }> {
     const [accountRow] = await tx.select({
       id: connectedAccounts.id,
@@ -173,16 +178,28 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
       }
     }
 
+    const attachmentRows = await tx.select({messageId: attachments.messageId, id: attachments.id, providerAttachmentId: attachments.providerAttachmentId})
+      .from(attachments).where(and(
+        eq(attachments.userId, input.userId),
+        eq(attachments.connectedAccountId, input.connectedAccountId),
+        inArray(attachments.messageId, messageIds)
+      ));
     return {
       account: {id: accountRow.id, provider: accountRow.provider, emailAddress: accountRow.emailAddress},
       owner: {id: accountRow.ownerId, email: accountRow.ownerEmail},
       conversation,
       messageRows,
-      participantRows
+      participantRows,
+      attachmentRows
     };
   }
 
-  private toMessages(scope: Awaited<ReturnType<AIInterpretationRunRepository['readScope']>>): {messages: SnapshotMessage[]; participantIds: string[]} {
+  private toMessages(scope: Awaited<ReturnType<AIInterpretationRunRepository['readScope']>>): {
+    messages: SnapshotMessage[];
+    participantIds: string[];
+    participants: NonNullable<AuthorizedInterpretationContext['participants']>;
+    providerObservations: NonNullable<AuthorizedInterpretationContext['providerObservations']>;
+  } {
     const participantsByMessage = new Map<string, Array<{role: string; participantId: string; email: string; displayName: string | null}>>();
     for (const participant of scope.participantRows) {
       const list = participantsByMessage.get(participant.messageId) ?? [];
@@ -190,32 +207,52 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
       participantsByMessage.set(participant.messageId, list);
     }
     const participantIds = new Set<string>();
+    const participants: Array<NonNullable<AuthorizedInterpretationContext['participants']>[number]> = [];
     const result = scope.messageRows.map((row) => {
       const sender = scope.participantRows.find((participant) => participant.messageId === row.id && participant.role === 'SENDER');
       if (!sender || !row.textBody?.trim()) throw new Error('AI interpretation requires an authorized sender and text body');
       participantIds.add(sender.participantId);
+      participants.push({id: sender.participantId, email: sender.email, messageIds: [row.id], roles: ['SENDER'], isConnectedAccount: sender.email.trim().toLowerCase() === scope.account.emailAddress.trim().toLowerCase()});
       const related = participantsByMessage.get(row.id) ?? [];
       const recipients = related.filter((participant) => participant.role === 'TO').map((participant) => {
         participantIds.add(participant.participantId);
+        participants.push({id: participant.participantId, email: participant.email, messageIds: [row.id], roles: ['TO'], isConnectedAccount: participant.email.trim().toLowerCase() === scope.account.emailAddress.trim().toLowerCase()});
         return {email: participant.email, displayName: participant.displayName ?? undefined};
       });
       const cc = related.filter((participant) => participant.role === 'CC').map((participant) => {
         participantIds.add(participant.participantId);
+        participants.push({id: participant.participantId, email: participant.email, messageIds: [row.id], roles: ['CC'], isConnectedAccount: participant.email.trim().toLowerCase() === scope.account.emailAddress.trim().toLowerCase()});
         return {email: participant.email, displayName: participant.displayName ?? undefined};
       });
       if (recipients.length === 0) throw new Error('AI interpretation requires authorized recipients');
       return {
         id: row.id,
         direction: row.direction as 'INBOUND' | 'OUTBOUND',
-        sender: {email: sender.email, displayName: sender.displayName ?? undefined},
-        recipients,
-        cc,
+        sender: {email: sender.email, displayName: sender.displayName ?? undefined, participantId: sender.participantId},
+        recipients: recipients.map((recipient, index) => ({...recipient, participantId: related.filter((participant) => participant.role === 'TO')[index]?.participantId})),
+        cc: cc.map((recipient, index) => ({...recipient, participantId: related.filter((participant) => participant.role === 'CC')[index]?.participantId})),
         subject: row.subject,
         body: row.textBody,
         sentAt: row.occurredAt.toISOString()
       } satisfies SnapshotMessage;
     });
-    return {messages: result, participantIds: [...participantIds]};
+    const mergedParticipants = new Map<string, NonNullable<AuthorizedInterpretationContext['participants']>[number]>();
+    for (const participant of participants) {
+      const existing = mergedParticipants.get(participant.id);
+      if (!existing) mergedParticipants.set(participant.id, {...participant});
+      else mergedParticipants.set(participant.id, {
+        ...existing,
+        messageIds: [...new Set([...existing.messageIds, ...participant.messageIds])],
+        roles: [...new Set([...existing.roles, ...participant.roles])]
+      });
+    }
+    const providerObservations = scope.messageRows.map((row) => normalizedAttachmentObservation({
+      messageId: row.id,
+      evidenceRevision: scope.conversation.semanticEvidenceRevision,
+      rawProviderMetadata: row.rawProviderMetadata,
+      attachmentCount: (scope.attachmentRows ?? []).filter((attachment) => attachment.messageId === row.id).length
+    }));
+    return {messages: result, participantIds: [...participantIds], participants: [...mergedParticipants.values()], providerObservations};
   }
 
   public async captureInterpretation(input: InterpretationContextRequest, config: AIRunCaptureConfig): Promise<CapturedInterpretationContext> {
@@ -232,6 +269,15 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
       const scope = await this.readScope(tx, input);
       const normalized = this.toMessages(scope);
       if (!normalized.messages.some((message) => message.id === input.focalMessageId)) throw new Error('AI focal message is outside the authorized snapshot');
+      const responsibilityRows = await tx.select({id: responsibilities.id}).from(responsibilities).where(and(
+        eq(responsibilities.userId, input.userId),
+        eq(responsibilities.connectedAccountId, input.connectedAccountId),
+        eq(responsibilities.conversationId, input.conversationId)
+      ));
+      const existingResponsibilities = (await Promise.all(responsibilityRows
+        .filter((row): row is {id: string} => typeof row.id === 'string')
+        .map((row) => loadResponsibilityState(tx, row.id, false))))
+        .filter((state): state is NonNullable<typeof state> => Boolean(state));
       const sourceZones = await this.trustedSourceZoneResolver({
         userId: input.userId,
         connectedAccountId: input.connectedAccountId,
@@ -247,7 +293,10 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         evidenceRevision: scope.conversation.semanticEvidenceRevision,
         focalMessageId: input.focalMessageId,
         messages: messagesWithZones,
-        participantIds: normalized.participantIds
+        participantIds: normalized.participantIds,
+        participants: normalized.participants,
+        existingResponsibilities,
+        providerObservations: normalized.providerObservations
       };
       const built = buildInterpretationContext(context);
       const run = await this.captureInTransaction(tx, {

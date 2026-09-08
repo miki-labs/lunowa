@@ -61,11 +61,9 @@ function clone<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
 }
 
-function normalizedOutcome(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('und');
-}
 
 function referenceKey(item: ProvenanceInput): string | undefined {
+  if (item.providerObservationKey?.trim()) return `provider:${item.providerObservationKey.trim()}`;
   if (item.messageId?.trim()) return `message:${item.messageId.trim()}`;
   if (item.interpretationRunId?.trim()) return `interpretation:${item.interpretationRunId.trim()}`;
   return undefined;
@@ -101,7 +99,8 @@ function unitProvenance(unit: CandidateResponsibilitySemantics): ProvenanceInput
     ...(unit.pendingProposals?.flatMap((item) => item.provenance) ?? []),
     ...(unit.agreedFacts?.flatMap((item) => item.provenance) ?? []),
     ...(unit.uncertainties?.flatMap((item) => item.provenance) ?? []),
-    ...(unit.riskDetails?.flatMap((item) => item.provenance) ?? [])
+    ...(unit.riskDetails?.flatMap((item) => item.provenance) ?? []),
+    ...(unit.communicatedClaims?.flatMap((item) => item.provenance) ?? [])
   ];
 }
 
@@ -112,7 +111,7 @@ function allProvenance(candidate: ResponsibilityInterpretationCandidate): Proven
   return result;
 }
 
-function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate, basis: ResponsibilityEvidenceBasis): string | undefined {
+function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate, basis: ResponsibilityEvidenceBasis, trustedEvidence: readonly ProvenanceInput[] = []): string | undefined {
   const injected = forbiddenAuthorityPath(candidate);
   if (injected) return `interpretation candidate cannot supply trusted authority field ${injected}`;
   if (!candidate.userId || !candidate.connectedAccountId || !candidate.conversationId) return 'tenant scope is required';
@@ -141,7 +140,7 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
       !event.eventCode?.trim() ||
       (event.actor !== 'EXTERNAL' && !UUID.test(event.participantId ?? ''))
     )) return `semantic unit ${unit.candidateUnitKey} has an invalid expected-event candidate`;
-    const childArrays = [unit.obligationLegs, unit.expectedEvents, unit.temporalFacts, unit.completionCriteria, unit.constraints, unit.pendingProposals, unit.agreedFacts, unit.uncertainties, unit.riskDetails];
+    const childArrays = [unit.obligationLegs, unit.expectedEvents, unit.temporalFacts, unit.completionCriteria, unit.constraints, unit.pendingProposals, unit.agreedFacts, unit.uncertainties, unit.riskDetails, unit.communicatedClaims];
     if (childArrays.some((items) => items?.some((item) => item.provenance.length === 0))) return `semantic unit ${unit.candidateUnitKey} has an ungrounded child semantic`;
     if (unit.materiality === 'MATERIAL' && unit.provenance.length === 0) return `material unit ${unit.candidateUnitKey} needs source provenance`;
     if (unit.materiality === 'MATERIAL') {
@@ -152,16 +151,20 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
         return 'quoted, forwarded, boilerplate, or metadata context cannot supply current-turn communicative authority';
       }
     }
-    if (unit.identityRelation && unit.identityRelation.kind !== 'NEW' && unit.identityRelation.kind !== 'NEW_EPISODE' && !unit.identityRelation.priorOperationalOutcome?.trim()) {
-      return `identity relation ${unit.identityRelation?.kind} needs a prior operational outcome, not a Responsibility identifier`;
+    if (unit.identityRelation && unit.identityRelation.kind !== 'NEW' && unit.identityRelation.kind !== 'NEW_EPISODE' && !unit.identityRelation.priorResponsibilityId?.trim()) {
+      return `identity relation ${unit.identityRelation.kind} needs an exact priorResponsibilityId`;
+    }
+    if (unit.identityRelation && (unit.identityRelation.kind === 'NEW' || unit.identityRelation.kind === 'NEW_EPISODE') && unit.identityRelation.priorResponsibilityId) {
+      return `identity relation ${unit.identityRelation.kind} cannot select a prior Responsibility`;
     }
   }
 
   const basisKeys = new Set(basis.references.map(referenceKey).filter((key): key is string => Boolean(key)));
   const provenance = allProvenance(candidate);
   if (provenance.length === 0 || basisKeys.size === 0) return 'candidate needs authorized source provenance';
+  const trustedKeys = new Set(trustedEvidence.map((item) => `${item.evidenceKind}|${item.providerObservationKey ?? ''}|${item.messageId ?? ''}`));
   for (const item of provenance) {
-    if (MODEL_FORBIDDEN_EVIDENCE.has(item.evidenceKind)) return `interpretation candidate cannot assert trusted evidence kind ${item.evidenceKind}`;
+    if (MODEL_FORBIDDEN_EVIDENCE.has(item.evidenceKind) && !trustedKeys.has(`${item.evidenceKind}|${item.providerObservationKey ?? ''}|${item.messageId ?? ''}`)) return `interpretation candidate cannot assert trusted evidence kind ${item.evidenceKind}`;
     const key = referenceKey(item);
     if (!key || !basisKeys.has(key)) return 'candidate provenance is not contained in the current authorized evidence basis';
   }
@@ -170,26 +173,28 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
 }
 
 function admissionFor(candidate: ResponsibilityInterpretationCandidate): {decision: AdmissionDecision; reasonCodes: string[]} {
-  if (candidate.admissionUncertainties?.some((item) => item.material && item.reviewRequired) || candidate.semantics.some((unit) => unit.materiality === 'UNCERTAIN')) {
+  const hasNonProviderMaterialUncertainty = candidate.admissionUncertainties?.some((item) => item.material && item.reviewRequired && item.reasonCode !== 'PROVIDER_CONTRADICTION') || candidate.semantics.some((unit) => unit.materiality === 'UNCERTAIN');
+  const hasMaterialUnit = candidate.semantics.some((unit) => unit.materiality === 'MATERIAL');
+  if (hasNonProviderMaterialUncertainty) {
     return {decision: 'NEEDS_REVIEW', reasonCodes: ['RESPONSIBILITY_ADMISSION_UNCERTAIN']};
   }
-  if (candidate.semantics.some((unit) => unit.materiality === 'MATERIAL')) {
+  if (hasMaterialUnit) {
     return {decision: 'TRACK', reasonCodes: ['MATERIAL_OPEN_LOOP_DERIVED']};
   }
   return {decision: 'DO_NOT_TRACK', reasonCodes: ['NO_MATERIAL_OPEN_LOOP_DERIVED']};
 }
 
 function findPrior(unit: CandidateResponsibilitySemantics, candidate: ResponsibilityInterpretationCandidate, states: readonly ResponsibilityState[]): ResponsibilityState {
-  const priorOutcome = unit.identityRelation?.priorOperationalOutcome;
-  if (!priorOutcome) throw new Error('continuation needs a prior operational outcome');
-  const matches = states.filter((state) =>
+  const priorId = unit.identityRelation?.priorResponsibilityId;
+  if (!priorId) throw new Error('continuation needs an exact priorResponsibilityId');
+  const exact = states.find((state) =>
+    state.id === priorId &&
     state.userId === candidate.userId &&
     state.connectedAccountId === candidate.connectedAccountId &&
-    state.conversationId === candidate.conversationId &&
-    normalizedOutcome(state.operationalOutcome) === normalizedOutcome(priorOutcome)
+    state.conversationId === candidate.conversationId
   );
-  if (matches.length !== 1) throw new Error(`identity relation for ${unit.candidateUnitKey} must match exactly one scoped Responsibility`);
-  return matches[0] as ResponsibilityState;
+  if (!exact) throw new Error(`identity relation for ${unit.candidateUnitKey} selected an unauthorized or unknown Responsibility`);
+  return exact;
 }
 
 function patchFor(unit: CandidateResponsibilitySemantics): ResponsibilityPatch {
@@ -235,39 +240,66 @@ function resolutionReason(unit: CandidateResponsibilitySemantics): ResolutionRea
 /** Convert language-level semantics to trusted effects without accepting any model-supplied final authority. */
 export function deriveResponsibilityCommand(
   candidate: ResponsibilityInterpretationCandidate,
-  input: {evidenceBasis: ResponsibilityEvidenceBasis; existingResponsibilities?: readonly ResponsibilityState[]}
+  input: {evidenceBasis: ResponsibilityEvidenceBasis; existingResponsibilities?: readonly ResponsibilityState[]; trustedEvidence?: readonly ProvenanceInput[]}
 ): InterpretationDerivationResult {
-  const admission = admissionFor(candidate);
-  const shapeError = validateCandidateShape(candidate, input.evidenceBasis);
+  const trustedEvidence = input.trustedEvidence ?? [];
+  const enriched = trustedEvidence.length === 0 ? candidate : clone(candidate);
+  if (trustedEvidence.length > 0) {
+    const usedTrustedKeys = new Set<string>();
+    for (const unit of enriched.semantics) {
+      const attachmentClaims = unit.communicatedClaims?.filter((claim) => claim.kind === 'ATTACHMENT_DELIVERED') ?? [];
+      const claimEvidence = attachmentClaims.flatMap((claim) => claim.provenance);
+      const claimMessageIds = new Set(claimEvidence.map((item) => item.messageId).filter((value): value is string => Boolean(value)));
+      const relevantTrustedEvidence = trustedEvidence.filter((item) => item.messageId && claimMessageIds.has(item.messageId));
+      if (relevantTrustedEvidence.length === 0) continue;
+      for (const item of relevantTrustedEvidence) if (item.providerObservationKey) usedTrustedKeys.add(item.providerObservationKey);
+      unit.uncertainties = [
+        ...(unit.uncertainties ?? []),
+        {
+          id: `provider-contradiction:${unit.candidateUnitKey}`,
+          fieldKey: 'completion',
+          reasonCode: 'PROVIDER_CONTRADICTION',
+          material: true,
+          reviewRequired: true,
+          provenance: [...claimEvidence, ...relevantTrustedEvidence]
+        }
+      ];
+      unit.provenance = [...unit.provenance, ...relevantTrustedEvidence];
+    }
+    const usedTrustedEvidence = trustedEvidence.filter((item) => item.providerObservationKey && usedTrustedKeys.has(item.providerObservationKey));
+    enriched.provenance = [...enriched.provenance, ...usedTrustedEvidence];
+  }
+  const admission = admissionFor(enriched);
+  const shapeError = validateCandidateShape(enriched, input.evidenceBasis, trustedEvidence);
   if (shapeError) return {status: 'REJECTED', admission: admission.decision, reason: shapeError};
 
   const command: TrustedResponsibilityCommand = {
-    userId: candidate.userId,
-    connectedAccountId: candidate.connectedAccountId,
-    conversationId: candidate.conversationId,
-    sourceEventKey: candidate.sourceEventKey,
-    candidateKey: candidate.candidateKey,
-    evidenceRevision: candidate.evidenceRevision,
+    userId: enriched.userId,
+    connectedAccountId: enriched.connectedAccountId,
+    conversationId: enriched.conversationId,
+    sourceEventKey: enriched.sourceEventKey,
+    candidateKey: enriched.candidateKey,
+    evidenceRevision: enriched.evidenceRevision,
     commandSource: 'INTERPRETATION_BOUNDARY',
     admission: {
       decision: admission.decision,
       reasonCodes: admission.reasonCodes,
       candidateSummary: {
-        semanticUnitKeys: candidate.semantics.map((unit) => unit.candidateUnitKey),
-        uncertaintyIds: candidate.admissionUncertainties?.map((item) => item.id) ?? []
+        semanticUnitKeys: enriched.semantics.map((unit) => unit.candidateUnitKey),
+        uncertaintyIds: enriched.admissionUncertainties?.map((item) => item.id) ?? []
       }
     },
-    provenance: clone(candidate.provenance),
-    ...(candidate.interpretationRunId ? {interpretationRunId: candidate.interpretationRunId} : {}),
-    ...(candidate.sourceMessageId ? {sourceMessageId: candidate.sourceMessageId} : {}),
-    ...(candidate.semanticTime ? {semanticTime: candidate.semanticTime} : {}),
+    provenance: clone(enriched.provenance),
+    ...(enriched.interpretationRunId ? {interpretationRunId: enriched.interpretationRunId} : {}),
+    ...(enriched.sourceMessageId ? {sourceMessageId: enriched.sourceMessageId} : {}),
+    ...(enriched.semanticTime ? {semanticTime: enriched.semanticTime} : {}),
     effects: []
   };
 
   if (admission.decision !== 'TRACK') return {status: 'DERIVED', command};
 
   try {
-    for (const unit of candidate.semantics.filter((item) => item.materiality === 'MATERIAL')) {
+    for (const unit of enriched.semantics.filter((item) => item.materiality === 'MATERIAL')) {
       const relation = unit.identityRelation?.kind ?? 'NEW';
       const patch = patchFor(unit);
       const effectKey = unit.candidateUnitKey;
@@ -275,11 +307,13 @@ export function deriveResponsibilityCommand(
         command.effects?.push({operation: 'CREATE', effectKey, patch, provenance: clone(unit.provenance)});
         continue;
       }
-      const prior = findPrior(unit, candidate, input.existingResponsibilities ?? []);
-      if (relation !== 'REPLACES' && normalizedOutcome(unit.operationalOutcome as string) !== normalizedOutcome(prior.operationalOutcome)) {
-        throw new Error('continuation cannot rewrite operational identity; use explicit replacement or a field correction');
+      const prior = findPrior(unit, enriched, input.existingResponsibilities ?? []);
+      if (relation !== 'REPLACES') {
+        // The selected accepted Responsibility owns operational identity. The
+        // model cannot smuggle a rewritten prior outcome through a continuation.
+        unit.operationalOutcome = prior.operationalOutcome;
+        delete patch.operationalOutcome;
       }
-      if (relation !== 'REPLACES') delete patch.operationalOutcome;
       if (relation === 'REPLACES') {
         const supersessionKinds = unit.provenance.map((item) => item.evidenceKind) as EvidenceKind[];
         if (!supersessionKinds.some((kind) => STRONG_COMMUNICATED_COMPLETION.has(kind))) throw new Error('replacement relation requires grounded explicit supersession/cancellation communication');
@@ -293,7 +327,7 @@ export function deriveResponsibilityCommand(
       }
       if (relation === 'SAME_UNSATISFIED_OUTCOME') {
         if (prior.resolutionStatus !== 'RESOLVED') throw new Error('SAME_UNSATISFIED_OUTCOME requires a resolved prior Responsibility');
-        if (!unit.provenance.some((item) => item.evidenceKind === 'COUNTERPART_FAILURE_REPORT')) throw new Error('reopen relation requires a grounded counterpart failure report');
+        if (!unit.communicatedClaims?.some((claim) => claim.kind === 'DELIVERY_FAILURE_REPORTED')) throw new Error('reopen relation requires a grounded counterpart failure report');
         command.effects?.push({
           operation: 'REOPEN', responsibilityRef: prior.id, effectKey,
           expectedAggregateVersion: prior.aggregateVersion,

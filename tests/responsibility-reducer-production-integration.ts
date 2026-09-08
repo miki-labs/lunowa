@@ -296,6 +296,21 @@ try {
   });
   const trackedInterpretationState = stateFrom(trackedInterpretation);
   assert(trackedInterpretationState.obligationLegs[0]?.actionCode === 'REVIEW_CURRENT_STATUS', 'trusted derivation did not persist structured candidate semantics.');
+  const outcomeOnlyIdentity = {
+    ...noResponsibilityInterpretation,
+    sourceEventKey: 'g31-outcome-only-identity',
+    candidateKey: 'g31-outcome-only-identity',
+    provenance: [materialSource],
+    semantics: [{
+      candidateUnitKey: 'outcome-only-identity',
+      materiality: 'MATERIAL' as const,
+      operationalOutcome: trackedInterpretationState.operationalOutcome,
+      identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: trackedInterpretationState.operationalOutcome},
+      provenance: [materialSource]
+    }]
+  } as unknown as ResponsibilityInterpretationCandidate;
+  const outcomeOnlyRejected = await repository.reduceCandidate(outcomeOnlyIdentity);
+  assert(outcomeOnlyRejected.status === 'REJECTED', 'operational-outcome similarity bypassed exact prior Responsibility identity in production reduction.');
   const injectedInterpretation = {...noResponsibilityInterpretation, sourceEventKey: 'g31-injected', candidateKey: 'g31-injected'} as ResponsibilityInterpretationCandidate & Record<string, unknown>;
   injectedInterpretation.effects = [{operation: 'INVALIDATE', responsibilityRef: firstState.id}];
   const injectionRejected = await repository.reduceCandidate(injectedInterpretation);

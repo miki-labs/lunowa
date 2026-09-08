@@ -808,7 +808,7 @@ function runCommitmentForceOracle(
     candidateUnitKey: id,
     materiality: 'MATERIAL',
     operationalOutcome: outcome,
-    identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: outcome},
+    identityRelation: {kind: 'CONTINUES', priorResponsibilityId: initial.id},
     expectedEvents: [{
       id: initialEvent.id,
       actor: 'OTHER_PARTY',
@@ -858,7 +858,7 @@ function runCapabilityOracle(): void {
     candidateUnitKey: 'T0-008',
     materiality: 'MATERIAL',
     operationalOutcome: outcome,
-    identityRelation: {kind: 'CONTINUES', priorOperationalOutcome: outcome},
+    identityRelation: {kind: 'CONTINUES', priorResponsibilityId: initial.id},
     expectedEvents: [{
       id: initialEvent.id,
       actor: 'OTHER_PARTY',

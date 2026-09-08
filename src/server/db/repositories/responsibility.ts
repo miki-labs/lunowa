@@ -17,7 +17,6 @@ import {
 } from '../schema/responsibility';
 import type {ResponsibilitySemanticDetailsV1} from '../schema/responsibility';
 import {normalizedAttachmentObservation, trustedProviderEvidenceForCandidate} from '../../ai/provider-evidence';
-import {buildSendRfcMessageId} from '../../communication/send-identity';
 import {
   admitTrustedResponsibilityCommand,
   deriveResponsibilityCommand,
@@ -442,6 +441,12 @@ function storedGmailDeliveryStatus(value: unknown): StoredGmailDeliveryStatus | 
     : undefined;
 }
 
+function storedRfcMessageId(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const messageId = (value as {rfcMessageId?: unknown}).rfcMessageId;
+  return typeof messageId === 'string' && /^<[^<>\s]+>$/.test(messageId) ? messageId : undefined;
+}
+
 /** Resolve an already-derived command against durable application/provider facts. */
 async function evidenceBasisForCandidate(
   tx: Parameters<Parameters<Database['transaction']>[0]>[0],
@@ -548,14 +553,14 @@ async function evidenceBasisForCandidate(
           )).limit(1);
         const snapshot = sendOperation?.draftSnapshot as {conversationId?: unknown} | undefined;
         if (!sendOperation?.providerMessageId || snapshot?.conversationId !== candidate.conversationId) return undefined;
-        const [sentSource] = await tx.select({id: messages.id}).from(messages).where(and(
+        const [sentSource] = await tx.select({id: messages.id, rawProviderMetadata: messages.rawProviderMetadata}).from(messages).where(and(
           eq(messages.userId, candidate.userId),
           eq(messages.connectedAccountId, candidate.connectedAccountId),
           eq(messages.conversationId, candidate.conversationId),
           eq(messages.direction, 'OUTBOUND'),
           eq(messages.providerMessageId, sendOperation.providerMessageId)
         )).limit(1);
-        if (!sentSource || buildSendRfcMessageId(sendOperationId) !== dsn.originalMessageId) return undefined;
+        if (!sentSource || storedRfcMessageId(sentSource.rawProviderMetadata) !== dsn.originalMessageId) return undefined;
         references.push({
           evidenceKind: 'PROVIDER_NON_DELIVERY',
           messageId: row.id,

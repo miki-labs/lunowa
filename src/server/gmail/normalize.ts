@@ -288,6 +288,7 @@ export async function normalizeGmailMessage(input: {
   const recipients = addresses(message.payload, 'To', issues);
   const cc = addresses(message.payload, 'Cc', issues);
   const bcc = addresses(message.payload, 'Bcc', issues);
+  const rfcMessageId = cleanMetadata(safeHeader(message.payload, 'Message-ID', issues) ?? '', MAX_HEADER_CHARS) || null;
   const boundedIssues = [...new Set(issues)].slice(0, MAX_NORMALIZATION_ISSUES);
 
   return {
@@ -317,6 +318,7 @@ export async function normalizeGmailMessage(input: {
     mailboxStateSnapshot: {labelIds: labels},
     rawProviderMetadata: {
       gmailHistoryId: message.historyId ?? null,
+      rfcMessageId,
       ...(deliveryStatus ? {deliveryStatus} : {}),
       snippet: message.snippet ? cleanMetadata(message.snippet, 4096) : null,
       normalization: {

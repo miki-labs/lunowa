@@ -22,7 +22,7 @@ import type {
   GmailWatch
 } from '@/server/gmail/types';
 import {GmailProviderError, GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE} from '@/server/gmail/types';
-import {runGmailReconciliation} from '@/server/gmail/worker';
+import {runGmailReconciliation, runGmailSendReconciliation} from '@/server/gmail/worker';
 
 const environment: GmailEnvironment = {
   clientId: 'client-id',
@@ -304,7 +304,23 @@ describe('G20 deployed runtime bindings', () => {
     const worker = readFileSync(resolve(process.cwd(), 'src/worker.ts'), 'utf8');
     expect(wrangler).toContain('"main": "src/worker.ts"');
     expect(wrangler).toContain('"crons": ["*/10 * * * *"]');
-    expect(worker).toContain('context.waitUntil(runGmailReconciliation())');
+    expect(worker).toContain('runGmailReconciliation()');
+    expect(worker).toContain('runGmailSendReconciliation()');
+  });
+
+  it('reconciles only already-attempted SendOperations through the scheduled repair path', async () => {
+    const dispatch = vi.fn(async () => ({status: 'RECONCILED'}));
+    const listReconcilableSendOperations = vi.fn(async () => [
+      {id: 'send-1', userId: 'user-a', status: 'DISPATCHING'},
+      {id: 'send-2', userId: 'user-b', status: 'PROVIDER_ACCEPTED'}
+    ]);
+    await expect(runGmailSendReconciliation(
+      {send: {dispatch} as never},
+      {listReconcilableSendOperations} as never
+    )).resolves.toEqual({processed: 2, failed: 0});
+    expect(listReconcilableSendOperations).toHaveBeenCalledWith(20);
+    expect(dispatch).toHaveBeenNthCalledWith(1, {userId: 'user-a', sendOperationId: 'send-1'});
+    expect(dispatch).toHaveBeenNthCalledWith(2, {userId: 'user-b', sendOperationId: 'send-2'});
   });
 
   it('declares the complete authenticated Gmail Pub/Sub IAM chain', () => {

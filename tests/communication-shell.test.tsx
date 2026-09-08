@@ -84,6 +84,37 @@ describe('G50 live composer safety', () => {
     expect(screen.getByDisplayValue('確認しました。')).toBeTruthy();
   });
 
+
+  it('binds the selected Responsibility and follows ambiguous Send reconciliation to a truthful reconciled state', async () => {
+    let sendPosts = 0;
+    const sendBodies: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json(attention);
+      if (url.includes('/drafts/context?')) return json(replyContext(true));
+      if (url.includes('/source/conversations')) return json(source);
+      if (url.endsWith('/send-operations') && init?.method === 'POST') {
+        sendPosts += 1;
+        sendBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({accepted: true, operation: {id: 'operation-1', status: sendPosts === 1 ? 'AMBIGUOUS' : 'RECONCILED'}});
+      }
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    await openComposer();
+
+    fireEvent.click(screen.getByRole('button', {name: '送信する'}));
+    await waitFor(() => expect(sendPosts).toBe(2), {timeout: 2500});
+    expect(sendBodies[0]).toMatchObject({
+      draftId: 'draft-1',
+      responsibilityBinding: {responsibilityId: 'responsibility-1', aggregateVersion: 1, evidenceRevision: 2}
+    });
+    expect(sendBodies[1]).toEqual(sendBodies[0]);
+    await waitFor(() => expect(screen.getByRole('button', {name: '送信済み'})).toBeDisabled());
+    expect(screen.getByText(/現在の状態へ反映済み/)).toBeTruthy();
+  });
+
   it('serializes autosave so a newer edit waits for the prior version result', async () => {
     let releaseFirst: (response: Response) => void = () => undefined;
     const firstSave = new Promise<Response>((resolve) => { releaseFirst = resolve; });

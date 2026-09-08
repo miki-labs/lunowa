@@ -553,21 +553,86 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
       setStatus('Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください');
       return;
     }
+    const responsibilityBinding = selectedAttention?.subjectKind === 'RESPONSIBILITY' &&
+      selectedAttention.responsibilityId && selectedAttention.conversationId === replyContext.conversationId &&
+      selectedAttention.aggregateVersion !== undefined && selectedAttention.acceptedEvidenceRevision !== undefined
+      ? {
+          responsibilityId: selectedAttention.responsibilityId,
+          aggregateVersion: selectedAttention.aggregateVersion,
+          evidenceRevision: selectedAttention.acceptedEvidenceRevision
+        }
+      : undefined;
+    const requestBody = JSON.stringify({draftId, ...(responsibilityBinding ? {responsibilityBinding} : {})});
     setSendOperationStatus('request_pending');
     setStatus('送信をリクエストしています');
-    try {
-      const response = await fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/send-operations`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({draftId})
-      });
+
+    // Repeating this same explicit request is safe: the server reuses any
+    // non-failed SendOperation for the immutable draft version. For ambiguous
+    // or provider-accepted states, dispatch performs reconciliation only and
+    // never issues another Gmail send.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      let response: Response;
+      try {
+        response = await fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/send-operations`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json'},
+          body: requestBody
+        });
+      } catch {
+        if (attempt < 4) {
+          await new Promise((resolve) => window.setTimeout(resolve, 300));
+          continue;
+        }
+        setSendOperationStatus('provider_ambiguous');
+        setStatus('送信結果を確認できません。重複送信を避けるため、再試行せず確認を続けます');
+        return;
+      }
       const result = await response.json().catch(() => null) as {accepted?: boolean; operation?: {status?: string}} | null;
-      if (!response.ok || result?.accepted !== true || result.operation?.status !== 'PENDING') throw new Error('SEND_REQUEST_FAILED');
-      setSendOperationStatus('request_pending');
-    } catch {
-      setSendOperationStatus('provider_failed');
-      setStatus('送信リクエストを保存できませんでした');
+      if (!response.ok || result?.accepted !== true || !result.operation?.status) {
+        if (response.status >= 400 && response.status < 500) {
+          setSendOperationStatus('provider_failed');
+          setStatus('送信リクエストは受け付けられませんでした。下書きは保持されています');
+          return;
+        }
+        if (attempt < 4) {
+          await new Promise((resolve) => window.setTimeout(resolve, 300));
+          continue;
+        }
+        setSendOperationStatus('provider_ambiguous');
+        setStatus('送信結果を確認できません。重複送信を避けるため、再試行せず確認を続けます');
+        return;
+      }
+
+      switch (result.operation.status) {
+        case 'FAILED':
+          setSendOperationStatus('provider_failed');
+          setStatus('送信できませんでした。下書きは保持されています');
+          return;
+        case 'RECONCILED':
+          setSendOperationStatus('provider_reconciled');
+          setStatus('送信を確認しました。現在の状態を反映しました');
+          setAttentionReload((current) => current + 1);
+          return;
+        case 'PROVIDER_ACCEPTED':
+          setSendOperationStatus('provider_confirmed_reconciling');
+          setStatus('送信を確認しました。状態を更新しています');
+          break;
+        case 'AMBIGUOUS':
+        case 'DISPATCHING':
+          setSendOperationStatus('provider_ambiguous');
+          setStatus('送信結果を確認しています。重複送信を避けるため、再送しません');
+          break;
+        case 'PENDING':
+          setSendOperationStatus('request_pending');
+          setStatus('送信をリクエストしています');
+          break;
+        default:
+          setSendOperationStatus('provider_ambiguous');
+          setStatus('送信結果を確認できません。重複送信を避けるため、確認を続けます');
+          return;
+      }
+      if (attempt < 4) await new Promise((resolve) => window.setTimeout(resolve, 300));
     }
   };
 
@@ -992,7 +1057,7 @@ function Composer({draft, onDraft, sendState, fixture, onSend, replyContext, rep
     return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3>{replyContextError ? <p className="inline-status" role="alert">返信の宛先を確認できないため、送信できません。</p> : <p className="inline-status" role="status">返信の送信元と宛先を確認しています。</p>}</section>;
   }
   const unavailable = !liveContextRequired && fixture.sourceRead === 'temporarily_unavailable';
-  const awaitingResult = sendState === 'request_pending' || sendState === 'provider_ambiguous' || sendState === 'provider_confirmed_reconciling';
+  const awaitingResult = sendState === 'request_pending' || sendState === 'provider_ambiguous' || sendState === 'provider_confirmed_reconciling' || sendState === 'provider_reconciled';
   const toRecipients = draftRecipients?.to ?? replyContext?.recipients ?? [];
   const ccRecipients = draftRecipients?.cc ?? replyContext?.cc ?? [];
   const toLabel = toRecipients.map(({displayName, email}) => displayName ? `${displayName} <${email}>` : email).join(', ') || '佐藤ひろ子';
@@ -1004,10 +1069,11 @@ function Composer({draft, onDraft, sendState, fixture, onSend, replyContext, rep
     : sendState === 'provider_failed' ? '送信できませんでした。下書きは保持されています。内容を確認して再試行できます。'
       : sendState === 'provider_ambiguous' ? '送信結果を確認しています。重複送信を避けるため、再試行はできません。'
         : sendState === 'provider_confirmed_reconciling' ? '送信を確認しました。状態を更新しています。'
+        : sendState === 'provider_reconciled' ? '送信を確認しました。現在の状態へ反映済みです。'
           : null;
   const sendPermissionMissing = Boolean(replyContext && !replyContext.connectedAccount.sendAuthorized);
   const sendDisabled = !draft || awaitingResult || unavailable || sendPermissionMissing || Boolean(replyContextError) || Boolean(replyContext && draftSaveState !== 'saved');
-  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3>{replyContext && <label htmlFor="reply-mode">種類<select id="reply-mode" value={replyMode} disabled={awaitingResult} onChange={(event) => onReplyMode(event.target.value as ReplyMode)}><option value="REPLY">返信</option><option value="REPLY_ALL">全員に返信</option></select></label>}{replyContext ? <><label htmlFor="reply-to">宛先<input id="reply-to" value={toValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: parseRecipients(event.target.value), cc: ccRecipients})} /></label><label htmlFor="reply-cc">Cc<input id="reply-cc" value={ccValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: toRecipients, cc: parseRecipients(event.target.value)})} /></label><p className="metadata">宛先の表示名: {toLabel} · From: {fromLabel}</p></> : <p className="metadata">宛先: {toLabel} · From: {fromLabel}</p>}{replyContextError && <p className="inline-status" role="alert">返信の宛先を確認できないため、送信できません。</p>}{sendPermissionMissing && <p className="inline-status" role="status">Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください。読み取りと監視は継続できます。</p>}<label htmlFor="reply-body">本文<textarea id="reply-body" value={draft} disabled={awaitingResult} onChange={(event) => onDraft(event.target.value)} placeholder="返信を入力" rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{replyContext && draftSaveState === 'saving' && <p className="inline-status" role="status">下書きを保存しています。</p>}{replyContext && draftSaveState === 'conflict' && <p className="inline-status" role="alert">別の編集が保存されたため、下書きを上書きしていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={sendDisabled} type="button" onClick={onSend}>{sendState === 'request_pending' ? '送信をリクエストしています' : sendState === 'provider_ambiguous' ? '送信結果を確認しています' : sendState === 'provider_confirmed_reconciling' ? '状態を更新しています' : sendState === 'provider_failed' ? '再試行する' : '送信する'}</button><p className="metadata">Enterだけでは送信されません。</p></section>;
+  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3>{replyContext && <label htmlFor="reply-mode">種類<select id="reply-mode" value={replyMode} disabled={awaitingResult} onChange={(event) => onReplyMode(event.target.value as ReplyMode)}><option value="REPLY">返信</option><option value="REPLY_ALL">全員に返信</option></select></label>}{replyContext ? <><label htmlFor="reply-to">宛先<input id="reply-to" value={toValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: parseRecipients(event.target.value), cc: ccRecipients})} /></label><label htmlFor="reply-cc">Cc<input id="reply-cc" value={ccValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: toRecipients, cc: parseRecipients(event.target.value)})} /></label><p className="metadata">宛先の表示名: {toLabel} · From: {fromLabel}</p></> : <p className="metadata">宛先: {toLabel} · From: {fromLabel}</p>}{replyContextError && <p className="inline-status" role="alert">返信の宛先を確認できないため、送信できません。</p>}{sendPermissionMissing && <p className="inline-status" role="status">Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください。読み取りと監視は継続できます。</p>}<label htmlFor="reply-body">本文<textarea id="reply-body" value={draft} disabled={awaitingResult} onChange={(event) => onDraft(event.target.value)} placeholder="返信を入力" rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{replyContext && draftSaveState === 'saving' && <p className="inline-status" role="status">下書きを保存しています。</p>}{replyContext && draftSaveState === 'conflict' && <p className="inline-status" role="alert">別の編集が保存されたため、下書きを上書きしていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={sendDisabled} type="button" onClick={onSend}>{sendState === 'request_pending' ? '送信をリクエストしています' : sendState === 'provider_ambiguous' ? '送信結果を確認しています' : sendState === 'provider_confirmed_reconciling' ? '状態を更新しています' : sendState === 'provider_reconciled' ? '送信済み' : sendState === 'provider_failed' ? '再試行する' : '送信する'}</button><p className="metadata">Enterだけでは送信されません。</p></section>;
 }
 
 function IntegrityBanner() {

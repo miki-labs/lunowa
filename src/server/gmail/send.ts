@@ -13,6 +13,10 @@ import {GmailProviderError, GMAIL_SEND_SCOPE} from './types';
 import type {ProvenanceInput, ResponsibilityState, TrustedResponsibilityCommand} from '@/server/responsibility';
 
 const RECONCILABLE_STATUSES = ['DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED'] as const;
+const RFC_MAX_LINE_LENGTH = 998;
+const PREFERRED_HEADER_LINE_LENGTH = 78;
+const ENCODED_WORD_BYTE_LIMIT = 42;
+const BASE64_BODY_LINE_LENGTH = 76;
 
 export type SendSnapshot = {
   draftId: string;
@@ -53,26 +57,86 @@ function assertHeaderSafe(value: string, name: string): string {
   return value;
 }
 
-function encodeHeader(value: string): string {
-  const safe = assertHeaderSafe(value, 'value');
-  return /[^\x20-\x7e]/.test(safe)
-    ? `=?UTF-8?B?${Buffer.from(safe, 'utf8').toString('base64')}?=`
-    : safe;
+function utf8Chunks(value: string, maxBytes: number): string[] {
+  const chunks: string[] = [];
+  let current = '';
+  for (const character of value) {
+    const next = `${current}${character}`;
+    if (current && Buffer.byteLength(next, 'utf8') > maxBytes) {
+      chunks.push(current);
+      current = character;
+    } else {
+      current = next;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
 }
 
-function mailbox(value: {email: string; displayName: string | null}): string {
+function encodedWords(value: string, name: string): string[] {
+  const safe = assertHeaderSafe(value, name);
+  return utf8Chunks(safe, ENCODED_WORD_BYTE_LIMIT).map((chunk) =>
+    `=?UTF-8?B?${Buffer.from(chunk, 'utf8').toString('base64')}?=`
+  );
+}
+
+function foldHeader(name: string, tokens: readonly string[]): string[] {
+  if (tokens.length === 0) throw new Error(`MIME_HEADER_EMPTY:${name}`);
+  const prefix = `${name}: `;
+  const lines: string[] = [];
+  let line = prefix;
+  for (const token of tokens) {
+    assertHeaderSafe(token, name);
+    const separator = line === prefix ? '' : ' ';
+    if (line !== prefix && line.length + separator.length + token.length > PREFERRED_HEADER_LINE_LENGTH) {
+      lines.push(line);
+      line = ` ${token}`;
+    } else {
+      line += `${separator}${token}`;
+    }
+    if (line.length > RFC_MAX_LINE_LENGTH) throw new Error(`MIME_LINE_TOO_LONG:${name}`);
+  }
+  lines.push(line);
+  return lines;
+}
+
+function subjectTokens(value: string): string[] {
+  const safe = assertHeaderSafe(value, 'subject');
+  if (/^[\x20-\x7e]+$/.test(safe) && safe.length <= 60) return [safe];
+  return encodedWords(safe, 'subject');
+}
+
+function mailboxTokens(value: {email: string; displayName: string | null}, comma: boolean): string[] {
   const email = assertHeaderSafe(value.email.trim().toLowerCase(), 'address');
   if (!/^[^@\s<>]+@[^@\s<>]+$/.test(email)) throw new Error('MIME_ADDRESS_INVALID');
-  if (!value.displayName) return `<${email}>`;
-  const displayName = assertHeaderSafe(value.displayName, 'display-name');
-  return /[^\x20-\x7e]/.test(displayName)
-    ? `${encodeHeader(displayName)} <${email}>`
-    : `"${displayName.replace(/[\\\"]/g, '\\$&')}" <${email}>`;
+  const address = `<${email}>${comma ? ',' : ''}`;
+  if (!value.displayName) return [address];
+  return [...encodedWords(value.displayName, 'display-name'), address];
 }
 
-function mailboxes(values: readonly {email: string; displayName: string | null}[]): string {
+function mailboxHeader(name: string, values: readonly {email: string; displayName: string | null}[]): string[] {
   if (values.length === 0) throw new Error('MIME_RECIPIENTS_EMPTY');
-  return values.map(mailbox).join(', ');
+  return foldHeader(name, values.flatMap((value, index) => mailboxTokens(value, index < values.length - 1)));
+}
+
+function rfc5322Date(value: Date): string {
+  if (!Number.isFinite(value.getTime())) throw new Error('MIME_DATE_INVALID');
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${days[value.getUTCDay()]}, ${pad(value.getUTCDate())} ${months[value.getUTCMonth()]} ${value.getUTCFullYear()} ${pad(value.getUTCHours())}:${pad(value.getUTCMinutes())}:${pad(value.getUTCSeconds())} +0000`;
+}
+
+function base64Body(value: string): string {
+  const normalized = value.replace(/\r\n|\r|\n/g, '\r\n');
+  const encoded = Buffer.from(normalized, 'utf8').toString('base64');
+  return encoded.match(new RegExp(`.{1,${BASE64_BODY_LINE_LENGTH}}`, 'g'))?.join('\r\n') ?? '';
+}
+
+function assertMessageLineLengths(raw: string): void {
+  for (const line of raw.split('\r\n')) {
+    if (line.length > RFC_MAX_LINE_LENGTH) throw new Error('MIME_LINE_TOO_LONG');
+  }
 }
 
 function messageIdForSendOperation(sendOperationId: string): string {
@@ -105,6 +169,7 @@ export function buildGmailTextMime(input: {
   sendOperationId: string;
   snapshot: SendSnapshot;
   originalMessage: GmailMessage;
+  date?: Date;
 }): {raw: string; threadId: string; messageId: string} {
   const {snapshot, originalMessage} = input;
   if (snapshot.bodyFormat !== 'TEXT') throw new Error('MIME_BODY_FORMAT_UNSUPPORTED');
@@ -124,21 +189,24 @@ export function buildGmailTextMime(input: {
   ])];
   const messageId = messageIdForSendOperation(input.sendOperationId);
   const lines = [
-    `From: ${mailbox(snapshot.sender)}`,
-    `To: ${mailboxes(snapshot.recipients)}`,
-    ...(snapshot.cc.length > 0 ? [`Cc: ${mailboxes(snapshot.cc)}`] : []),
-    ...(snapshot.bcc.length > 0 ? [`Bcc: ${mailboxes(snapshot.bcc)}`] : []),
-    `Subject: ${encodeHeader(snapshot.subject)}`,
-    `Message-ID: ${messageId}`,
-    `In-Reply-To: ${originalMessageId}`,
-    `References: ${references.join(' ')}`,
+    ...foldHeader('Date', [rfc5322Date(input.date ?? new Date())]),
+    ...mailboxHeader('From', [snapshot.sender]),
+    ...mailboxHeader('To', snapshot.recipients),
+    ...(snapshot.cc.length > 0 ? mailboxHeader('Cc', snapshot.cc) : []),
+    ...(snapshot.bcc.length > 0 ? mailboxHeader('Bcc', snapshot.bcc) : []),
+    ...foldHeader('Subject', subjectTokens(snapshot.subject)),
+    ...foldHeader('Message-ID', [messageId]),
+    ...foldHeader('In-Reply-To', [originalMessageId]),
+    ...foldHeader('References', references),
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: 8bit',
+    'Content-Transfer-Encoding: base64',
     '',
-    snapshot.body.replace(/\r\n|\r|\n/g, '\r\n')
+    base64Body(snapshot.body)
   ];
-  const raw = Buffer.from(lines.join('\r\n'), 'utf8').toString('base64url');
+  const decoded = lines.join('\r\n');
+  assertMessageLineLengths(decoded);
+  const raw = Buffer.from(decoded, 'utf8').toString('base64url');
   return {raw, threadId: originalMessage.threadId, messageId};
 }
 
@@ -242,7 +310,7 @@ export class GmailSendService {
     try {
       accessToken = await this.credentials.getAccessToken(input.userId, operation.connectedAccountId, GMAIL_SEND_SCOPE);
       originalMessage = await this.provider.getMessage(accessToken, contextString(snapshot, 'inReplyToProviderMessageId'));
-      mime = buildGmailTextMime({sendOperationId: operation.id, snapshot, originalMessage});
+      mime = buildGmailTextMime({sendOperationId: operation.id, snapshot, originalMessage, date: new Date(operation.createdAt)});
     } catch (error) {
       if (error instanceof GmailProviderError && error.status === 401 && this.credentials.markReconnectRequired) {
         await this.credentials.markReconnectRequired(input.userId, operation.connectedAccountId).catch(() => undefined);
@@ -292,6 +360,9 @@ export class GmailSendService {
         status: operation.status, lastErrorCode: error instanceof Error ? error.message.slice(0, 128) : 'RECONCILIATION_AUTH_FAILED'
       });
     }
+    if (operation.status === 'PROVIDER_ACCEPTED' && operation.providerMessageId) {
+      return this.reconcileAccepted(input, operation, token, operation.providerMessageId);
+    }
     const stableId = messageIdForSendOperation(operation.id);
     let page;
     try {
@@ -321,7 +392,16 @@ export class GmailSendService {
         status: 'AMBIGUOUS', lastErrorCode: matches.length > 1 ? 'MULTIPLE_RECONCILIATION_MATCHES' : 'SEND_ACCEPTANCE_UNKNOWN'
       });
     }
-    return this.reconcileAccepted(input, operation, token, matches[0]!.id, matches[0]);
+    const accepted = await this.operations.transitionSendOperation({
+      userId: input.userId,
+      sendOperationId: operation.id,
+      expectedStatuses: [operation.status],
+      status: 'PROVIDER_ACCEPTED',
+      providerResultId: matches[0]!.id,
+      providerMessageId: matches[0]!.id,
+      lastErrorCode: null
+    });
+    return this.reconcileAccepted(input, accepted, token, matches[0]!.id, matches[0]);
   }
 
   private async reconcileAccepted(
@@ -331,35 +411,50 @@ export class GmailSendService {
     providerMessageId: string,
     knownMessage?: GmailMessage
   ): Promise<SendOperationReadModel> {
-    const snapshot = snapshotOf(operation);
-    const message = knownMessage ?? await this.provider.getMessage(accessToken, providerMessageId);
-    const normalized = await normalizeGmailMessage({
-      userId: input.userId,
-      connectedAccountId: operation.connectedAccountId,
-      accountEmail: snapshot.sender.email,
-      message,
-      loadBodyPart: (attachmentId) => this.provider.getAttachment(accessToken, message.id, attachmentId)
-    });
-    const source = await this.evidence.upsertNormalizedMessage(normalized);
-    const binding = bindingOf(snapshot);
-    if (binding) {
-      const target = await this.responsibilities.getResponsibility({
+    try {
+      const snapshot = snapshotOf(operation);
+      const message = knownMessage ?? await this.provider.getMessage(accessToken, providerMessageId);
+      const normalized = await normalizeGmailMessage({
         userId: input.userId,
         connectedAccountId: operation.connectedAccountId,
-        responsibilityId: binding.responsibilityId
+        accountEmail: snapshot.sender.email,
+        message,
+        loadBodyPart: (attachmentId) => this.provider.getAttachment(accessToken, message.id, attachmentId)
       });
-      if (target && target.state.aggregateVersion === binding.aggregateVersion &&
-          target.state.acceptedEvidenceRevision === binding.evidenceRevision &&
-          target.state.conversationId === snapshot.conversationId) {
-        const command = buildTrustedReconciledSendCommand({operation, snapshot, responsibility: target.state, messageId: source.messageId, evidenceRevision: source.evidenceRevision});
-        if (command) await this.responsibilities.applyTrustedCommand(command);
+      const source = await this.evidence.upsertNormalizedMessage(normalized);
+      const binding = bindingOf(snapshot);
+      if (binding) {
+        const target = await this.responsibilities.getResponsibility({
+          userId: input.userId,
+          connectedAccountId: operation.connectedAccountId,
+          responsibilityId: binding.responsibilityId
+        });
+        if (target && target.state.aggregateVersion === binding.aggregateVersion &&
+            target.state.acceptedEvidenceRevision === binding.evidenceRevision &&
+            target.state.conversationId === snapshot.conversationId) {
+          const command = buildTrustedReconciledSendCommand({operation, snapshot, responsibility: target.state, messageId: source.messageId, evidenceRevision: source.evidenceRevision});
+          if (command) await this.responsibilities.applyTrustedCommand(command);
+        }
       }
+      return this.operations.transitionSendOperation({
+        userId: input.userId, sendOperationId: operation.id,
+        expectedStatuses: ['PROVIDER_ACCEPTED'],
+        status: 'RECONCILED', providerResultId: operation.providerResultId ?? providerMessageId,
+        providerMessageId, lastErrorCode: null
+      });
+    } catch (error) {
+      // Provider acceptance is a stronger durable fact than Source/domain
+      // reconciliation. A later indexing/DB/reducer failure must never turn a
+      // known accepted send back into an unknown/ambiguous provider outcome.
+      return this.operations.transitionSendOperation({
+        userId: input.userId,
+        sendOperationId: operation.id,
+        expectedStatuses: ['PROVIDER_ACCEPTED'],
+        status: 'PROVIDER_ACCEPTED',
+        providerResultId: operation.providerResultId ?? providerMessageId,
+        providerMessageId,
+        lastErrorCode: error instanceof Error ? `RECONCILIATION:${error.message}`.slice(0, 128) : 'RECONCILIATION_FAILED'
+      });
     }
-    return this.operations.transitionSendOperation({
-      userId: input.userId, sendOperationId: operation.id,
-      expectedStatuses: ['PROVIDER_ACCEPTED', 'DISPATCHING', 'AMBIGUOUS'],
-      status: 'RECONCILED', providerResultId: operation.providerResultId ?? providerMessageId,
-      providerMessageId, lastErrorCode: null
-    });
   }
 }

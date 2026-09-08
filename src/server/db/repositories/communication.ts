@@ -1,4 +1,4 @@
-import {and, asc, desc, eq, inArray} from 'drizzle-orm';
+import {and, asc, desc, eq, inArray, sql} from 'drizzle-orm';
 
 import {getDatabase} from '../index';
 import {connectedAccounts, conversations, messageParticipants, messages, participantIdentities} from '../schema/evidence';
@@ -10,6 +10,8 @@ import type {ReplyContextReadModel as SharedReplyContextReadModel} from '@/lib/c
 type Database = ReturnType<typeof getDatabase>;
 type StoredParticipant = {email: string; displayName: string | null};
 const ACTIVE_SEND_STATUSES = ['PENDING', 'DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED'] as const;
+const NON_RETRYABLE_SNAPSHOT_STATUSES = [...ACTIVE_SEND_STATUSES, 'RECONCILED'] as const;
+export const SEND_RECONCILIATION_STATUSES = ['DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED'] as const;
 export const SEND_OPERATION_STATUSES = ['PENDING', 'DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED', 'RECONCILED', 'FAILED'] as const;
 export type SendOperationStatus = (typeof SEND_OPERATION_STATUSES)[number];
 
@@ -384,6 +386,14 @@ export class CommunicationRepository {
     return row ? this.readSendOperation(row) : null;
   }
 
+  public async listReconcilableSendOperations(limit = 20): Promise<SendOperationReadModel[]> {
+    const boundedLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
+    const rows = await this.db.select().from(sendOperations).where(
+      inArray(sendOperations.status, [...SEND_RECONCILIATION_STATUSES])
+    ).orderBy(asc(sendOperations.updatedAt), asc(sendOperations.id)).limit(boundedLimit);
+    return rows.map((row) => this.readSendOperation(row));
+  }
+
   /** Claim is the only path that can authorize a provider effect. */
   public async claimSendOperation(input: {userId: string; sendOperationId: string}): Promise<SendOperationReadModel & {claimed: boolean}> {
     return this.db.transaction(async (tx) => {
@@ -450,6 +460,16 @@ export class CommunicationRepository {
       if (draft.status !== 'ACTIVE') throw new CommunicationInputError('DRAFT_NOT_ACTIVE');
       if (!draft.body.trim()) throw new CommunicationInputError('DRAFT_BODY_REQUIRED');
       if (!draft.conversationId || !draft.inReplyToMessageId) throw new CommunicationInputError('DRAFT_CONTEXT_REQUIRED');
+      // A lost HTTP response or page reload must converge on the already-attempted
+      // immutable draft snapshot. Only a definite provider failure permits a new
+      // explicit attempt for the same draft version.
+      const [sameSnapshot] = await tx.select().from(sendOperations).where(and(
+        eq(sendOperations.userId, input.userId),
+        eq(sendOperations.draftId, draft.id),
+        inArray(sendOperations.status, [...NON_RETRYABLE_SNAPSHOT_STATUSES]),
+        sql`${sendOperations.draftSnapshot}->>'draftVersion' = ${String(draft.version)}`
+      )).orderBy(desc(sendOperations.createdAt), desc(sendOperations.id)).limit(1);
+      if (sameSnapshot) return this.readSendOperation(sameSnapshot);
       const [activeSend] = await tx.select().from(sendOperations).where(and(
         eq(sendOperations.userId, input.userId),
         eq(sendOperations.draftId, draft.id),

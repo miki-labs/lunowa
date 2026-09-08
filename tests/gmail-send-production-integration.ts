@@ -12,6 +12,7 @@ import * as schema from '../src/server/db/schema';
 import {normalizeGmailMessage} from '../src/server/gmail/normalize';
 import {GmailSendService, buildGmailMessageId} from '../src/server/gmail/send';
 import type {GmailMessage, GmailProviderClient} from '../src/server/gmail/types';
+import type {TrustedResponsibilityCommand} from '../src/server/responsibility';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -49,12 +50,36 @@ try {
   const source = await evidence.upsertNormalizedMessage(await normalizeGmailMessage({
     userId, connectedAccountId: accountId, accountEmail: 'owner@example.com', message: original
   }));
+  const responsibilityRepository = new ResponsibilityRepository(db);
+  const initialCommand: TrustedResponsibilityCommand = {
+    commandSource: 'TRUSTED_SYSTEM',
+    userId,
+    connectedAccountId: accountId,
+    conversationId: source.conversationId,
+    sourceEventKey: 'g51-initial-responsibility',
+    candidateKey: 'g51-initial-responsibility',
+    applicationKey: 'g51-initial-responsibility',
+    evidenceRevision: source.evidenceRevision,
+    admission: {decision: 'TRACK', reasonCodes: ['MATERIAL_OPEN_LOOP']},
+    operationalOutcome: 'reply to the request',
+    obligationLegs: [{
+      id: randomUUID(), bearer: 'USER', actionCode: 'REPLY_TO_REQUEST', status: 'OPEN', actionability: 'ACTIONABLE', basisKind: 'COMMUNICATED_REQUEST',
+      provenance: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: source.messageId}]
+    }],
+    provenance: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: source.messageId}]
+  };
+  const initialResult = await responsibilityRepository.applyTrustedCommand(initialCommand);
+  assert(initialResult.status === 'APPLIED' && initialResult.effects[0]?.state, 'G51 Responsibility fixture was not admitted');
+  const initialResponsibility = initialResult.effects[0]!.state!;
+
   const communication = new CommunicationRepository(db);
   const draft = await communication.saveDraft({
     userId, connectedAccountId: accountId, conversationId: source.conversationId,
     inReplyToMessageId: source.messageId, mode: 'REPLY', body: 'Confirmed.'
   });
-  const operation = await communication.requestImmediateSend({userId, draftId: draft.id});
+  const responsibilityBinding = {responsibilityId: initialResponsibility.id, aggregateVersion: initialResponsibility.aggregateVersion, evidenceRevision: initialResponsibility.acceptedEvidenceRevision};
+  const operation = await communication.requestImmediateSend({userId, draftId: draft.id, responsibilityBinding});
+  assert((await communication.listReconcilableSendOperations()).every((item) => item.id !== operation.id), 'PENDING SendOperation must never be cron-reconcilable');
   let sentMessageId = '';
   const sent = () => message(sentMessageId, buildGmailMessageId(operation.id), ['SENT']);
   let sendCalls = 0;
@@ -81,13 +106,20 @@ try {
     credentials as never,
     communication,
     evidence,
-    new ResponsibilityRepository(db)
+    responsibilityRepository
   );
   const reconciled = await service.dispatch({userId, sendOperationId: operation.id});
   assert(reconciled.status === 'RECONCILED', 'G51 provider acceptance did not reconcile the SendOperation');
   assert(sendCalls === 1, 'G51 dispatch did not perform exactly one provider send');
   const replay = await service.dispatch({userId, sendOperationId: operation.id});
   assert(replay.status === 'RECONCILED' && sendCalls === 1, 'G51 duplicate dispatch sent again');
+  const repeatedRequest = await communication.requestImmediateSend({userId, draftId: draft.id, responsibilityBinding});
+  assert(repeatedRequest.id === operation.id, 'lost-response/page-reload request did not converge on the reconciled immutable draft snapshot');
+  const repeatedDispatch = await service.dispatch({userId, sendOperationId: repeatedRequest.id});
+  assert(repeatedDispatch.status === 'RECONCILED' && sendCalls === 1, 'replayed explicit request duplicated the provider send');
+
+  const resultingResponsibility = await responsibilityRepository.getResponsibility({userId, connectedAccountId: accountId, responsibilityId: initialResponsibility.id});
+  assert(resultingResponsibility?.state.resolutionStatus === 'RESOLVED', 'reconciled sent Source did not apply the bound Responsibility consequence');
 
   const persisted = await db.select({status: schema.sendOperations.status, attempts: schema.sendOperations.attemptCount})
     .from(schema.sendOperations);

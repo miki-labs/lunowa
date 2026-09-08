@@ -63,6 +63,17 @@ describe('G50 contextual communication routes', () => {
     expect(mocks.repository.saveDraft.mock.calls[0]?.[0]).not.toHaveProperty('recipients');
   });
 
+  it('treats null expectedVersion from an unsaved browser draft as an initial create', async () => {
+    const response = await saveDraft(request('http://localhost/api/bff/users/user-1/drafts', {
+      draftId: null, expectedVersion: null, connectedAccountId: 'account-1', conversationId: 'conversation-1',
+      inReplyToMessageId: 'message-1', mode: 'REPLY', body: '初回保存'
+    }), {params: Promise.resolve({userId: 'user-1'})});
+    expect(response.status).toBe(200);
+    expect(mocks.repository.saveDraft).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1', draftId: undefined, expectedVersion: undefined, body: '初回保存'
+    }));
+  });
+
   it('rejects malformed JSON at the communication boundary instead of surfacing a server error', async () => {
     const response = await requestSend(new Request('http://localhost/api/bff/users/user-1/send-operations', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{not-json'

@@ -29,7 +29,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     await getOwnedAppSession(request.headers, userId);
     const body = await parseCommunicationRequest(request);
-    const expectedVersion = body.expectedVersion === undefined ? undefined : Number(body.expectedVersion);
+    const expectedVersion = body.expectedVersion == null ? undefined : Number(body.expectedVersion);
     if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) throw new CommunicationInputError('EXPECTED_VERSION_INVALID');
     const recipients = optionalRecipients(body.recipients);
     const cc = optionalRecipients(body.cc);

@@ -66,6 +66,7 @@ function normalizedOutcome(value: string): string {
 }
 
 function referenceKey(item: ProvenanceInput): string | undefined {
+  if (item.providerObservationKey?.trim()) return `provider:${item.providerObservationKey.trim()}`;
   if (item.messageId?.trim()) return `message:${item.messageId.trim()}`;
   if (item.interpretationRunId?.trim()) return `interpretation:${item.interpretationRunId.trim()}`;
   return undefined;
@@ -255,11 +256,14 @@ export function deriveResponsibilityCommand(
   const trustedEvidence = input.trustedEvidence ?? [];
   const enriched = trustedEvidence.length === 0 ? candidate : clone(candidate);
   if (trustedEvidence.length > 0) {
+    const usedTrustedKeys = new Set<string>();
     for (const unit of enriched.semantics) {
-      const attachmentClaims = unit.communicatedClaims?.filter((claim) => /ATTACH|DELIVER.*DOCUMENT|DOCUMENT.*DELIVER/i.test(claim.kind)) ?? [];
-      const hasAttachmentClaim = attachmentClaims.length > 0;
-      if (!hasAttachmentClaim) continue;
+      const attachmentClaims = unit.communicatedClaims?.filter((claim) => claim.kind === 'ATTACHMENT_DELIVERED') ?? [];
       const claimEvidence = attachmentClaims.flatMap((claim) => claim.provenance);
+      const claimMessageIds = new Set(claimEvidence.map((item) => item.messageId).filter((value): value is string => Boolean(value)));
+      const relevantTrustedEvidence = trustedEvidence.filter((item) => item.messageId && claimMessageIds.has(item.messageId));
+      if (relevantTrustedEvidence.length === 0) continue;
+      for (const item of relevantTrustedEvidence) if (item.providerObservationKey) usedTrustedKeys.add(item.providerObservationKey);
       unit.uncertainties = [
         ...(unit.uncertainties ?? []),
         {
@@ -268,12 +272,13 @@ export function deriveResponsibilityCommand(
           reasonCode: 'PROVIDER_CONTRADICTION',
           material: true,
           reviewRequired: true,
-          provenance: [...claimEvidence, ...trustedEvidence]
+          provenance: [...claimEvidence, ...relevantTrustedEvidence]
         }
       ];
-      unit.provenance = [...unit.provenance, ...trustedEvidence];
+      unit.provenance = [...unit.provenance, ...relevantTrustedEvidence];
     }
-    enriched.provenance = [...enriched.provenance, ...trustedEvidence];
+    const usedTrustedEvidence = trustedEvidence.filter((item) => item.providerObservationKey && usedTrustedKeys.has(item.providerObservationKey));
+    enriched.provenance = [...enriched.provenance, ...usedTrustedEvidence];
   }
   const admission = admissionFor(enriched);
   const shapeError = validateCandidateShape(enriched, input.evidenceBasis, trustedEvidence);
@@ -333,7 +338,7 @@ export function deriveResponsibilityCommand(
       }
       if (relation === 'SAME_UNSATISFIED_OUTCOME') {
         if (prior.resolutionStatus !== 'RESOLVED') throw new Error('SAME_UNSATISFIED_OUTCOME requires a resolved prior Responsibility');
-        if (!unit.provenance.some((item) => item.evidenceKind === 'COUNTERPART_FAILURE_REPORT')) throw new Error('reopen relation requires a grounded counterpart failure report');
+        if (!unit.communicatedClaims?.some((claim) => claim.kind === 'DELIVERY_FAILURE_REPORTED')) throw new Error('reopen relation requires a grounded counterpart failure report');
         command.effects?.push({
           operation: 'REOPEN', responsibilityRef: prior.id, effectKey,
           expectedAggregateVersion: prior.aggregateVersion,

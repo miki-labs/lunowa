@@ -303,8 +303,7 @@ export type CandidateIdentityRelation = {
 
 export type CandidateCommunicatedClaim = {
   id: string;
-  kind: string;
-  value: unknown;
+  kind: 'ATTACHMENT_DELIVERED' | 'DELIVERY_FAILURE_REPORTED';
   provenance: ProvenanceInput[];
 };
 

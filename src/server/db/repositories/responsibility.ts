@@ -15,6 +15,7 @@ import {
   responsibilityTemporalFacts
 } from '../schema/responsibility';
 import type {ResponsibilitySemanticDetailsV1} from '../schema/responsibility';
+import {normalizedAttachmentObservation, trustedProviderEvidenceForCandidate} from '../../ai/provider-evidence';
 import {
   admitTrustedResponsibilityCommand,
   deriveResponsibilityCommand,
@@ -401,36 +402,50 @@ function isAuthorizedDirectEvidence(provenance: ProvenanceInput): boolean {
  * evidence. A sourceEventKey is intentionally not sufficient: it is a
  * caller/idempotency label, not a provider observation.
  */
+async function normalizedAttachmentObservationsForRows(
+  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+  input: {
+    userId: string;
+    connectedAccountId: string;
+    evidenceRevision: number;
+    rows: readonly {id: string; rawProviderMetadata: unknown}[];
+  }
+) {
+  const ids = input.rows.map((row) => row.id);
+  const attachmentRows = ids.length === 0 ? [] : await tx.select({messageId: attachments.messageId})
+    .from(attachments).where(and(
+      eq(attachments.userId, input.userId),
+      eq(attachments.connectedAccountId, input.connectedAccountId),
+      inArray(attachments.messageId, ids)
+    ));
+  const counts = new Map<string, number>();
+  for (const row of attachmentRows) counts.set(row.messageId, (counts.get(row.messageId) ?? 0) + 1);
+  return input.rows.map((row) => normalizedAttachmentObservation({
+    messageId: row.id,
+    evidenceRevision: input.evidenceRevision,
+    rawProviderMetadata: row.rawProviderMetadata,
+    attachmentCount: counts.get(row.id) ?? 0
+  }));
+}
+
+/** Resolve an already-derived command against durable application/provider facts. */
 async function evidenceBasisForCandidate(
   tx: Parameters<Parameters<Database['transaction']>[0]>[0],
   candidate: TrustedResponsibilityCommand
 ): Promise<ResponsibilityEvidenceBasis | undefined> {
   if (!commandChildrenAreGrounded(candidate) || !commandAuthorityIsConsistent(candidate)) return undefined;
   const provenance = candidateProvenance(candidate);
-  const messageIds = [...new Set(
-    provenance
-      .map((item) => item.messageId)
-      .filter((value): value is string => Boolean(value))
-  )];
+  const messageIds = [...new Set(provenance.map((item) => item.messageId).filter((value): value is string => Boolean(value)))];
   const directReferences = provenance.filter((item) => isAuthorizedDirectEvidence(item) && (
     ((item.evidenceKind === 'USER_ASSERTION' || item.evidenceKind === 'USER_OFF_CHANNEL_ASSERTION') && candidate.commandSource === 'TRUSTED_USER') ||
     (item.evidenceKind === 'EXTERNAL_AUTHORITATIVE_FACT' && candidate.commandSource === 'TRUSTED_SYSTEM')
   ));
-  const providerReferences = provenance.filter((item) =>
-    candidate.commandSource === 'TRUSTED_SYSTEM' &&
-    (item.evidenceKind === 'PROVIDER_NON_DELIVERY' || item.evidenceKind === 'EXTERNAL_AUTHORITATIVE_FACT') &&
-    Boolean(item.providerObservationKey) &&
-    item.sourceLocator?.authorized === true &&
-    Boolean(explicitAuthorityReference(item))
-  );
-  const references: ProvenanceInput[] = [...directReferences, ...providerReferences];
+  const references: ProvenanceInput[] = [...directReferences];
 
   if (messageIds.length > 0) {
     if (messageIds.some((id) => !isUuid(id))) return undefined;
-    const rows = await tx
-      .select({id: messages.id, direction: messages.direction})
-      .from(messages)
-      .where(and(
+    const rows = await tx.select({id: messages.id, direction: messages.direction, rawProviderMetadata: messages.rawProviderMetadata})
+      .from(messages).where(and(
         eq(messages.userId, candidate.userId),
         eq(messages.connectedAccountId, candidate.connectedAccountId),
         eq(messages.conversationId, candidate.conversationId),
@@ -439,23 +454,50 @@ async function evidenceBasisForCandidate(
     if (rows.length !== messageIds.length) return undefined;
     const rowsById = new Map(rows.map((row) => [row.id, row]));
     if (provenance.some((item) => item.evidenceKind === 'PROVIDER_RECONCILED_SEND' && item.messageId && rowsById.get(item.messageId)?.direction !== 'OUTBOUND')) return undefined;
-    if (provenance.some((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY' && !item.providerObservationKey)) return undefined;
     references.push(...rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id})));
-  } else if (directReferences.length === 0 && providerReferences.length === 0) {
+
+    const providerClaims = provenance.filter((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY');
+    if (providerClaims.length > 0) {
+      const observations = await normalizedAttachmentObservationsForRows(tx, {
+        userId: candidate.userId,
+        connectedAccountId: candidate.connectedAccountId,
+        evidenceRevision: candidate.evidenceRevision,
+        rows
+      });
+      for (const item of providerClaims) {
+        if (!item.messageId || !item.providerObservationKey) return undefined;
+        const observation = observations.find((candidateObservation) =>
+          candidateObservation.messageId === item.messageId &&
+          candidateObservation.observationKey === item.providerObservationKey &&
+          candidateObservation.kind === 'ATTACHMENT_PRESENCE' &&
+          candidateObservation.status === 'ABSENT' &&
+          candidateObservation.completeness === 'COMPLETE'
+        );
+        if (!observation) return undefined;
+        references.push({
+          evidenceKind: 'PROVIDER_NON_DELIVERY',
+          messageId: observation.messageId,
+          providerObservationKey: observation.observationKey,
+          sourceLocator: {zone: 'STRUCTURED_METADATA', authorized: true, authorityReference: observation.observationKey}
+        });
+      }
+    }
+  } else if (directReferences.length === 0) {
     return undefined;
   }
 
-  return {
-    evidenceRevision: candidate.evidenceRevision,
-    sourceEventKey: candidate.sourceEventKey,
-    references
-  };
+  return {evidenceRevision: candidate.evidenceRevision, sourceEventKey: candidate.sourceEventKey, references};
 }
+
+type InterpretationEvidence = {
+  basis: ResponsibilityEvidenceBasis;
+  trustedEvidence: ProvenanceInput[];
+};
 
 async function evidenceBasisForInterpretation(
   tx: Parameters<Parameters<Database['transaction']>[0]>[0],
   candidate: ResponsibilityInterpretationCandidate
-): Promise<ResponsibilityEvidenceBasis | undefined> {
+): Promise<InterpretationEvidence | undefined> {
   const provenance = interpretationProvenance(candidate);
   const messageIds = [...new Set(provenance.map((item) => item.messageId).filter((value): value is string => Boolean(value)))];
   if (messageIds.length === 0 || messageIds.some((id) => !isUuid(id))) return undefined;
@@ -463,7 +505,8 @@ async function evidenceBasisForInterpretation(
     id: messages.id,
     subject: messages.subject,
     textBody: messages.textBody,
-    direction: messages.direction
+    direction: messages.direction,
+    rawProviderMetadata: messages.rawProviderMetadata
   }).from(messages).where(and(
     eq(messages.userId, candidate.userId),
     eq(messages.connectedAccountId, candidate.connectedAccountId),
@@ -509,10 +552,23 @@ async function evidenceBasisForInterpretation(
     ));
     if (!run || (candidate.sourceMessageId && run.messageId !== candidate.sourceMessageId)) return undefined;
   }
-  return {
+  const observations = await normalizedAttachmentObservationsForRows(tx, {
+    userId: candidate.userId,
+    connectedAccountId: candidate.connectedAccountId,
     evidenceRevision: candidate.evidenceRevision,
-    sourceEventKey: candidate.sourceEventKey,
-    references: rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id}))
+    rows
+  });
+  const trustedEvidence = trustedProviderEvidenceForCandidate(candidate, observations);
+  return {
+    basis: {
+      evidenceRevision: candidate.evidenceRevision,
+      sourceEventKey: candidate.sourceEventKey,
+      references: [
+        ...rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id})),
+        ...trustedEvidence
+      ]
+    },
+    trustedEvidence
   };
 }
 
@@ -627,8 +683,8 @@ export class ResponsibilityRepository {
           responsibilities: []
         }};
       }
-      const evidenceBasis = await evidenceBasisForInterpretation(tx, candidate);
-      if (!evidenceBasis) return {kind: 'result' as const, result: {
+      const interpretationEvidence = await evidenceBasisForInterpretation(tx, candidate);
+      if (!interpretationEvidence) return {kind: 'result' as const, result: {
         status: 'REJECTED' as const, admission: provisionalAdmission,
         reason: 'candidate provenance does not resolve in the authorized conversation evidence', effects: [] as [], responsibilities: []
       }};
@@ -638,7 +694,11 @@ export class ResponsibilityRepository {
         eq(responsibilities.conversationId, candidate.conversationId)
       ));
       const states = (await Promise.all(rows.map((row) => loadResponsibilityState(tx, row.id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
-      const derived = deriveResponsibilityCommand(candidate, {evidenceBasis, existingResponsibilities: states});
+      const derived = deriveResponsibilityCommand(candidate, {
+        evidenceBasis: interpretationEvidence.basis,
+        existingResponsibilities: states,
+        trustedEvidence: interpretationEvidence.trustedEvidence
+      });
       if (derived.status === 'REJECTED') return {kind: 'result' as const, result: {
         status: 'REJECTED' as const, admission: derived.admission, reason: derived.reason, effects: [] as [], responsibilities: []
       }};

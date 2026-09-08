@@ -62,8 +62,8 @@ function authorityReference(provenance: ProvenanceInput): string | undefined {
 }
 
 function evidenceReferenceKey(provenance: ProvenanceInput): string | undefined {
-  if (provenance.messageId?.trim()) return `message:${provenance.messageId.trim()}`;
   if (provenance.providerObservationKey?.trim()) return `provider:${provenance.providerObservationKey.trim()}`;
+  if (provenance.messageId?.trim()) return `message:${provenance.messageId.trim()}`;
   const reference = authorityReference(provenance);
   return reference ? `authority:${reference}` : undefined;
 }

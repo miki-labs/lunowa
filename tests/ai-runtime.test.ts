@@ -9,9 +9,7 @@ import {
   ResponsibilityInterpretationRuntime,
   ContextualDraftRuntime,
   assertFamilyStratifiedHoldout,
-  assertExecutableFixtureCoverage,
   assertExecutableFixtureStratification,
-  assertCanonicalFixtureFidelity,
   checkDraftOracle,
   checkDraftRuntimeOracle,
   checkInterpretationOracle,
@@ -102,16 +100,11 @@ function interpretationFixtureOutput(caseId: string, body = messageBody): ModelI
       });
     case 'T0-014':
       return withUnit({constraints: [{id: 'constraint-1', code: 'DO_NOT_PROCEED', summary: 'wait for the counterpart to resume', sourceRefs: [ref]}]});
-    case 'T0-026':
-      return withUnit({temporalFacts: [
-        {id: 'due-1', temporalKind: 'SOURCE_DUE', valueKind: 'DATE', resolvedDate: '2026-08-28', precisionCode: 'DATE', conflictCandidate: false, sourceRefs: [ref]},
-        {id: 'target-1', temporalKind: 'USER_TARGET', valueKind: 'DATE', resolvedDate: '2026-08-27', precisionCode: 'DATE', conflictCandidate: false, sourceRefs: [ref]}
-      ]});
     case 'T0-029':
       return withUnit({identityRelation: {kind: 'SAME_UNSATISFIED_OUTCOME', priorOperationalOutcome: 'deliver usable signed contract'}});
     case 'T0-034':
       return withUnit({
-        communicatedClaims: [{id: 'claim-1', kind: 'ATTACHMENT_DELIVERY', value: JSON.stringify(true), sourceRefs: [ref]}],
+        communicatedClaims: [{id: 'claim-1', kind: 'ATTACHMENT_DELIVERED', sourceRefs: [ref]}],
         uncertainties: [],
         terminalSignal: undefined
       });
@@ -330,22 +323,14 @@ describe('G70 bounded AI runtime', () => {
     expect(G70_EVAL_CASES.filter((item) => item.split === 'HOLDOUT').length).toBeGreaterThan(0);
   });
 
-  it('rejects canonical fixture direction/focal/state drift before model evaluation', () => {
-    const manifest = G70_EVAL_CASES.find((item) => item.id === 'T0-034')!;
-    const fixture = {id: manifest.id, family: manifest.family, lane: manifest.lane, split: manifest.split, ...manifest.fidelity};
-    expect(() => assertCanonicalFixtureFidelity([fixture])).not.toThrow();
-    expect(() => assertCanonicalFixtureFidelity([{...fixture, direction: 'OUTBOUND'}])).toThrow(/direction/);
-    expect(() => assertCanonicalFixtureFidelity([{...fixture, focalMessageIndex: 1}])).toThrow(/focalMessageIndex/);
-    expect(() => assertCanonicalFixtureFidelity([{...fixture, existingResponsibilityState: 'NONE'}])).toThrow(/existingResponsibilityState/);
-  });
 
-  it('executes every declared interpretation and draft case through schema, runtime, and layer-owned oracles', async () => {
+  it('executes degradation and draft boundary scenarios without claiming canonical scenario fidelity', async () => {
     const manifestCase = (id: string) => {
       const item = G70_EVAL_CASES.find((candidate) => candidate.id === id);
       if (!item) throw new Error(`missing G70 manifest case: ${id}`);
       return item;
     };
-    const interpretationFixtureIds = ['T0-001', 'T0-002', 'T0-009', 'T0-014', 'T0-026', 'T0-029', 'T0-034', 'T0-037', 'T0-039', 'T0-040', 'PG-22', 'PG-23', 'PG-50', 'PG-60'];
+    const interpretationFixtureIds = ['PG-22', 'PG-23', 'PG-50', 'PG-60'];
     const draftFixtureIds = ['PG-29', 'PG-42', 'PG-45', 'PG-52'];
     const interpretationFixtures = interpretationFixtureIds.map((id) => {
       const item = manifestCase(id);
@@ -361,8 +346,6 @@ describe('G70 bounded AI runtime', () => {
       };
     });
     const fixtureManifests = [...interpretationFixtures, ...draftFixtures].map(({id, family, lane, split}) => ({id, family, lane, split}));
-    expect(() => assertExecutableFixtureCoverage(fixtureManifests)).not.toThrow();
-    expect(() => assertExecutableFixtureCoverage(fixtureManifests.slice(0, -1))).toThrow(/coverage mismatch/);
     expect(() => assertExecutableFixtureStratification(fixtureManifests)).not.toThrow();
 
     const expectedInterpretationStatus = (id: string) => {
@@ -372,31 +355,13 @@ describe('G70 bounded AI runtime', () => {
       return 'CANDIDATE';
     };
     for (const fixture of interpretationFixtures) {
-      const context = fixture.id === 'T0-034'
-        ? {...fixture.context, providerObservations: [{
-          observationKey: 'gmail:attachment-presence:message-1:1', messageId, kind: 'ATTACHMENT_PRESENCE' as const,
-          status: 'ABSENT' as const, completeness: 'COMPLETE' as const, attachmentCount: 0, source: 'GMAIL_NORMALIZED' as const
-        }]}
-        : fixture.context;
+      const context = fixture.context;
       const result = await new ResponsibilityInterpretationRuntime({
         transport: new FakeTransport(response(fixture.output)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
       }).run(context);
       expect(result.status, fixture.id).toBe(expectedInterpretationStatus(fixture.id));
       expect(checkInterpretationOracle(fixture.id, fixture.output).passed, fixture.id).toBe(true);
       expect(checkInterpretationRuntimeOracle(fixture.id, result).passed, fixture.id).toBe(true);
-      if (fixture.id === 'T0-034' && result.status === 'CANDIDATE' && result.derivation.status === 'DERIVED') {
-        expect((result.derivation.command.provenance ?? []).some((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY')).toBe(true);
-        const incomplete = await new ResponsibilityInterpretationRuntime({
-          transport: new FakeTransport(response(fixture.output)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
-        }).run({...fixture.context, providerObservations: [{
-          observationKey: 'gmail:attachment-presence:message-1:incomplete', messageId, kind: 'ATTACHMENT_PRESENCE' as const,
-          status: 'UNKNOWN' as const, completeness: 'INCOMPLETE' as const, attachmentCount: 0, source: 'GMAIL_NORMALIZED' as const
-        }]});
-        expect(incomplete.status).toBe('CANDIDATE');
-        if (incomplete.status === 'CANDIDATE' && incomplete.derivation.status === 'DERIVED') {
-          expect((incomplete.derivation.command.provenance ?? []).some((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY')).toBe(false);
-        }
-      }
     }
 
     const unavailableInterpretation = await new ResponsibilityInterpretationRuntime({

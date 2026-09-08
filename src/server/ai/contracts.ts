@@ -149,8 +149,7 @@ export type ModelFieldCorrection = ModelProvenanced<{
 
 export type ModelCommunicatedClaim = ModelProvenanced<{
   id: string;
-  kind: string;
-  value: ModelJSONValue;
+  kind: 'ATTACHMENT_DELIVERED' | 'DELIVERY_FAILURE_REPORTED';
 }>;
 
 export type ModelSemanticUnit = {
@@ -309,8 +308,8 @@ const riskSchema = sourceProvenanced({
   id: stringSchema(128), targetKind: stringSchema(128), targetId: nullable(stringSchema(128)), riskClass: enumSchema(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']), reasonCode: stringSchema(128)
 }, ['id', 'targetKind', 'targetId', 'riskClass', 'reasonCode']);
 const communicatedClaimSchema = sourceProvenanced({
-  id: stringSchema(128), kind: stringSchema(128), value: jsonValueSchema
-}, ['id', 'kind', 'value']);
+  id: stringSchema(128), kind: enumSchema(['ATTACHMENT_DELIVERED', 'DELIVERY_FAILURE_REPORTED'])
+}, ['id', 'kind']);
 const correctionSchema = sourceProvenanced({
   fieldKey: stringSchema(128), value: jsonValueSchema, semanticTime: nullable(stringSchema(128)), relation: enumSchema(['CORRECTION', 'SUPERSEDES', 'CONFLICT'])
 }, ['fieldKey', 'value', 'semanticTime', 'relation']);
@@ -617,8 +616,8 @@ function validateSemanticUnit(
   const riskDetails = list('riskDetails', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['id', 'targetKind', 'targetId', 'riskClass', 'reasonCode', 'sourceRefs'], nestedLabel); return {id: stringValue(item.id, `${nestedLabel}.id`, 128), targetKind: stringValue(item.targetKind, `${nestedLabel}.targetKind`, 128), ...(optionalString(item.targetId, `${nestedLabel}.targetId`, 128) ? {targetId: optionalString(item.targetId, `${nestedLabel}.targetId`, 128)} : {}), riskClass: enumValue(item.riskClass, ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const, `${nestedLabel}.riskClass`), reasonCode: stringValue(item.reasonCode, `${nestedLabel}.reasonCode`, 128), sourceRefs: refsFor(item, nestedLabel)}; });
   const communicatedClaims = item.communicatedClaims === undefined ? [] : list('communicatedClaims', (value, nestedLabel) => {
     const claim = record(value, nestedLabel);
-    exact(claim, ['id', 'kind', 'value', 'sourceRefs'], nestedLabel);
-    return {id: stringValue(claim.id, `${nestedLabel}.id`, 128), kind: stringValue(claim.kind, `${nestedLabel}.kind`, 128), value: encodedJsonValue(claim.value, `${nestedLabel}.value`), sourceRefs: refsFor(claim, nestedLabel)};
+    exact(claim, ['id', 'kind', 'sourceRefs'], nestedLabel);
+    return {id: stringValue(claim.id, `${nestedLabel}.id`, 128), kind: enumValue(claim.kind, ['ATTACHMENT_DELIVERED', 'DELIVERY_FAILURE_REPORTED'] as const, `${nestedLabel}.kind`), sourceRefs: refsFor(claim, nestedLabel)};
   });
   const corrections = list('corrections', (value, nestedLabel) => { const item = record(value, nestedLabel); exact(item, ['fieldKey', 'value', 'semanticTime', 'relation', 'sourceRefs'], nestedLabel); return {fieldKey: enumValue(item.fieldKey, ['operationalOutcome', 'obligationLegs', 'expectedEvents', 'temporalFacts', 'temporalFacts.SOURCE_DUE', 'temporalFacts.EXPECTED_EVENT_TIME', 'temporalFacts.USER_TARGET', 'completionCriteria', 'constraints', 'pendingProposals', 'agreedFacts', 'uncertainties', 'riskDetails'] as const, `${nestedLabel}.fieldKey`), value: encodedJsonValue(item.value, `${nestedLabel}.value`), ...(optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128) ? {semanticTime: optionalString(item.semanticTime, `${nestedLabel}.semanticTime`, 128)} : {}), relation: enumValue(item.relation, ['CORRECTION', 'SUPERSEDES', 'CONFLICT'] as const, `${nestedLabel}.relation`), sourceRefs: refsFor(item, nestedLabel)}; });
   const assignment = item.assignmentSemantics === undefined || item.assignmentSemantics === null ? undefined : (() => { const value = record(item.assignmentSemantics, `${label}.assignmentSemantics`); exact(value, ['id', 'shape', 'candidateParticipantIds', 'selectedParticipantId'], `${label}.assignmentSemantics`); if (!Array.isArray(value.candidateParticipantIds)) throw new AIContractError(`${label}.assignmentSemantics.candidateParticipantIds must be an array`); const ids = value.candidateParticipantIds.map((id, index) => stringValue(id, `${label}.assignmentSemantics.candidateParticipantIds[${index}]`, 128)); if (ids.some((id) => !allowedParticipantIds.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unauthorized participant`); if (authorizedParticipants && authorizedParticipants.size > 0 && ids.some((id) => !authorizedParticipants.has(id))) throw new AIContractError(`${label}.assignmentSemantics contains an unbound participant`); const selected = optionalString(value.selectedParticipantId, `${label}.assignmentSemantics.selectedParticipantId`, 128); if (selected && !allowedParticipantIds.has(selected)) throw new AIContractError(`${label}.assignmentSemantics.selectedParticipantId is unauthorized`); if (selected && authorizedParticipants && authorizedParticipants.size > 0 && authorizedParticipants.get(selected)?.isConnectedAccount) throw new AIContractError(`${label}.assignmentSemantics cannot silently select the connected user's identity`); return {id: stringValue(value.id, `${label}.assignmentSemantics.id`, 128), shape: enumValue(value.shape, ['ANY_OF', 'ALL_OF', 'UNSPECIFIED_GROUP'] as const, `${label}.assignmentSemantics.shape`), candidateParticipantIds: ids, ...(selected ? {selectedParticipantId: selected} : {})}; })();
@@ -734,7 +733,7 @@ function mapCandidateUnit(unit: ModelSemanticUnit): CandidateResponsibilitySeman
     agreedFacts: unit.agreedFacts.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `agreed fact ${item.id}.value`)})) as CandidateAgreedFact[],
     uncertainties: provenanced(unit.uncertainties) as Uncertainty[],
     riskDetails: provenanced(unit.riskDetails) as RiskDetail[],
-    ...(unit.communicatedClaims ? {communicatedClaims: unit.communicatedClaims.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `communicated claim ${item.id}.value`)}))} : {}),
+    ...(unit.communicatedClaims ? {communicatedClaims: unit.communicatedClaims.map((item) => mapProvenanced(item))} : {}),
     ...(unit.assignmentSemantics ? {assignmentSemantics: unit.assignmentSemantics} : {}),
     corrections: unit.corrections.map((item) => ({...mapProvenanced(item), value: decodedJsonValue(item.value, `field correction ${item.fieldKey}.value`)})) as CandidateFieldCorrection[],
     ...(unit.terminalSignal ? {terminalSignal: mapTerminal(unit.terminalSignal)} : {}),

@@ -9,10 +9,11 @@ import {
   validateDraftOutput,
   validateInterpretationOutput
 } from './contracts';
-import {buildDraftContext, buildInterpretationContext, type AuthorizedInterpretationContext, type AuthorizedReplyContext, type BuiltAIContext, type TrustedProviderObservation} from './context';
+import {buildDraftContext, buildInterpretationContext, type AuthorizedInterpretationContext, type AuthorizedReplyContext, type BuiltAIContext} from './context';
 import {AIProviderError, parseResponseJson, responseRequest, type ResponsesTransport} from './openai';
+import {trustedProviderEvidenceForCandidate} from './provider-evidence';
 import {deriveResponsibilityCommand} from '../responsibility/interpretation';
-import type {ProvenanceInput, ResponsibilityEvidenceBasis, ResponsibilityInterpretationCandidate} from '../responsibility/types';
+import type {ResponsibilityEvidenceBasis, ResponsibilityInterpretationCandidate} from '../responsibility/types';
 
 export type AIRunLane = 'interpretation' | 'draft';
 export type AIRunStatus = 'CAPTURED' | 'SUCCEEDED' | 'ABSTAINED' | 'STALE' | 'FAILED';
@@ -210,29 +211,6 @@ function interpretationEvidenceBasis(context: AuthorizedInterpretationContext): 
   };
 }
 
-function trustedProviderEvidence(
-  output: {semanticUnits: Array<{communicatedClaims?: Array<{kind: string; sourceRefs: Array<{messageId: string}>}>}>},
-  observations: readonly TrustedProviderObservation[]
-): ResponsibilityEvidenceBasis['references'] {
-  const result: ProvenanceInput[] = [];
-  for (const unit of output.semanticUnits) {
-    for (const claim of unit.communicatedClaims ?? []) {
-      if (!/ATTACH|DELIVER.*DOCUMENT|DOCUMENT.*DELIVER/i.test(claim.kind)) continue;
-      for (const ref of claim.sourceRefs) {
-        const observation = observations.find((candidate) => candidate.messageId === ref.messageId && candidate.kind === 'ATTACHMENT_PRESENCE');
-        if (!observation || observation.status !== 'ABSENT' || observation.completeness !== 'COMPLETE') continue;
-        result.push({
-          evidenceKind: 'PROVIDER_NON_DELIVERY',
-          messageId: observation.messageId,
-          providerObservationKey: observation.observationKey,
-          sourceLocator: {zone: 'STRUCTURED_METADATA', authorized: true, authorityReference: observation.observationKey, observationKind: observation.kind, attachmentCount: observation.attachmentCount}
-        });
-      }
-    }
-  }
-  return result;
-}
-
 export class ResponsibilityInterpretationRuntime {
   public constructor(private readonly deps: RuntimeDependencies) {}
 
@@ -277,7 +255,7 @@ export class ResponsibilityInterpretationRuntime {
         interpretationRunId: runId
       });
       if (!candidate) throw new AIContractError('interpretation candidate was not produced');
-      const providerEvidence = trustedProviderEvidence(modelOutput, built.providerObservations);
+      const providerEvidence = trustedProviderEvidenceForCandidate(candidate, built.providerObservations);
       const baseEvidenceBasis = interpretationEvidenceBasis(context);
       const evidenceBasis: ResponsibilityEvidenceBasis = {...baseEvidenceBasis, references: [...baseEvidenceBasis.references, ...providerEvidence]};
       const derivation = deriveResponsibilityCommand(candidate, {

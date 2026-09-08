@@ -6,7 +6,9 @@ import {migrate} from 'drizzle-orm/node-postgres/migrator';
 import {Pool} from 'pg';
 
 import {AIInterpretationRunRepository} from '../src/server/db/repositories/ai';
+import {ResponsibilityRepository} from '../src/server/db/repositories/responsibility';
 import {ResponsibilityInterpretationRuntime} from '../src/server/ai/runtime';
+import type {ResponsibilityInterpretationCandidate} from '../src/server/responsibility/types';
 import * as schema from '../src/server/db/schema';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -272,6 +274,63 @@ try {
   assert(providerObservedCapturedRun, 'provider observed no unique pre-call captured AIInterpretationRun for revision 8');
   assert(runtimeResult.status === 'NO_RESPONSIBILITY', `runtime production-context result was ${JSON.stringify(runtimeResult)}`);
 
+  const attachmentClaimBody = '修正版を添付しました。';
+  await pool.query(
+    `UPDATE messages
+        SET text_body = $1,
+            raw_provider_metadata = $2::jsonb
+      WHERE id = $3 AND connected_account_id = $4`,
+    [attachmentClaimBody, JSON.stringify({normalization: {status: 'COMPLETE', bodyState: 'AVAILABLE', unsupported: []}}), message1, account1]
+  );
+  await pool.query(
+    'UPDATE conversations SET semantic_evidence_revision = 9 WHERE id = $1 AND connected_account_id = $2',
+    [conversation1, account1]
+  );
+  const claimProvenance = {
+    evidenceKind: 'COMMUNICATED_CLAIM',
+    messageId: message1,
+    sourceExcerptShort: attachmentClaimBody,
+    sourceLocator: {messageId: message1, zone: 'AUTHORED_CURRENT'}
+  } as const;
+  const attachmentClaimCandidate = (revision: number, suffix: string): ResponsibilityInterpretationCandidate => ({
+    userId: user1,
+    connectedAccountId: account1,
+    conversationId: conversation1,
+    sourceEventKey: `g70-provider-boundary-${suffix}`,
+    candidateKey: `g70-provider-boundary-${suffix}`,
+    evidenceRevision: revision,
+    sourceMessageId: message1,
+    semantics: [{
+      candidateUnitKey: `attachment-claim-${suffix}`,
+      materiality: 'MATERIAL',
+      operationalOutcome: `receive the revised contract ${suffix}`,
+      communicatedClaims: [{id: `claim-${suffix}`, kind: 'ATTACHMENT_DELIVERED', provenance: [claimProvenance]}],
+      provenance: [claimProvenance]
+    }],
+    provenance: [claimProvenance]
+  });
+  const responsibilityRepository = new ResponsibilityRepository(db);
+  const completeAbsence = await responsibilityRepository.reduceCandidate(attachmentClaimCandidate(9, 'complete'));
+  assert(completeAbsence.status === 'APPLIED', `complete provider absence did not cross production reduction: ${JSON.stringify(completeAbsence)}`);
+  const completeState = completeAbsence.effects[0]?.state;
+  assert(completeState?.details.uncertainties.some((item) => item.reasonCode === 'PROVIDER_CONTRADICTION'), 'complete provider absence lost the deterministic claim/observation contradiction');
+  assert(completeState?.provenance.some((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY' && Boolean(item.providerObservationKey)), 'trusted provider evidence did not survive production reduction provenance');
+
+  await pool.query(
+    `UPDATE messages
+        SET raw_provider_metadata = $1::jsonb
+      WHERE id = $2 AND connected_account_id = $3`,
+    [JSON.stringify({normalization: {status: 'PARTIAL', bodyState: 'AVAILABLE', unsupported: ['MIME_STRUCTURE_TRUNCATED']}}), message1, account1]
+  );
+  await pool.query(
+    'UPDATE conversations SET semantic_evidence_revision = 10 WHERE id = $1 AND connected_account_id = $2',
+    [conversation1, account1]
+  );
+  const incompleteAbsence = await responsibilityRepository.reduceCandidate(attachmentClaimCandidate(10, 'incomplete'));
+  assert(incompleteAbsence.status === 'APPLIED', `incomplete provider evidence unexpectedly rejected the language candidate: ${JSON.stringify(incompleteAbsence)}`);
+  const incompleteState = incompleteAbsence.effects[0]?.state;
+  assert(!incompleteState?.details.uncertainties.some((item) => item.reasonCode === 'PROVIDER_CONTRADICTION'), 'partial/truncated provider evidence became false trusted non-delivery');
+
   console.log(JSON.stringify({
     kind: 'g70-ai-context-production-result-v1',
     postgres: version.rows[0]?.version,
@@ -283,7 +342,9 @@ try {
       'DB-owned body and participant context capture',
       'AIInterpretationRun revision/message/focal manifest persistence',
       'PostgreSQL repeatable-read concurrent revision/body consistency',
-      'post-capture currentness observes the new revision'
+      'post-capture currentness observes the new revision',
+      'complete provider absence survives production reduction as trusted contradiction',
+      'partial/truncated attachment evidence remains unknown rather than false non-delivery'
     ],
     status: 'PASS'
   }, null, 2));

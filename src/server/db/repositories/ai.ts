@@ -32,6 +32,7 @@ import type {
   InterpretationContextRequest
 } from '../../ai/runtime';
 import {loadResponsibilityState} from './responsibility';
+import {normalizedAttachmentObservation} from '../../ai/provider-evidence';
 
 type Database = ReturnType<typeof getDatabase>;
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -245,20 +246,12 @@ export class AIInterpretationRunRepository implements AIRunStore, AIContextSnaps
         roles: [...new Set([...existing.roles, ...participant.roles])]
       });
     }
-    const providerObservations = scope.messageRows.map((row) => {
-      const normalization = (row.rawProviderMetadata as {normalization?: {status?: unknown; unsupported?: unknown[]}} | null)?.normalization;
-      const complete = normalization?.status === 'COMPLETE' && !(normalization.unsupported ?? []).some((issue) => issue === 'MIME_STRUCTURE_TRUNCATED' || issue === 'BODY_ENCODING_UNSUPPORTED');
-      const attachmentCount = (scope.attachmentRows ?? []).filter((attachment) => attachment.messageId === row.id).length;
-      return {
-        observationKey: `gmail:attachment-presence:${row.id}:${scope.conversation.semanticEvidenceRevision}`,
-        messageId: row.id,
-        kind: 'ATTACHMENT_PRESENCE' as const,
-        status: attachmentCount > 0 ? 'PRESENT' as const : complete ? 'ABSENT' as const : 'UNKNOWN' as const,
-        completeness: complete ? 'COMPLETE' as const : 'INCOMPLETE' as const,
-        attachmentCount,
-        source: 'GMAIL_NORMALIZED' as const
-      };
-    });
+    const providerObservations = scope.messageRows.map((row) => normalizedAttachmentObservation({
+      messageId: row.id,
+      evidenceRevision: scope.conversation.semanticEvidenceRevision,
+      rawProviderMetadata: row.rawProviderMetadata,
+      attachmentCount: (scope.attachmentRows ?? []).filter((attachment) => attachment.messageId === row.id).length
+    }));
     return {messages: result, participantIds: [...participantIds], participants: [...mergedParticipants.values()], providerObservations};
   }
 

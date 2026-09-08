@@ -297,7 +297,15 @@ export type ResponsibilityEffectInput = {
  */
 export type CandidateIdentityRelation = {
   kind: 'NEW' | 'CONTINUES' | 'REPLACES' | 'SAME_UNSATISFIED_OUTCOME' | 'NEW_EPISODE';
+  priorResponsibilityId?: string;
   priorOperationalOutcome?: string;
+};
+
+export type CandidateCommunicatedClaim = {
+  id: string;
+  kind: string;
+  value: unknown;
+  provenance: ProvenanceInput[];
 };
 
 export type CandidateTerminalSignal = {
@@ -339,6 +347,7 @@ export type CandidateResponsibilitySemantics = {
   agreedFacts?: CandidateAgreedFact[];
   uncertainties?: Uncertainty[];
   riskDetails?: RiskDetail[];
+  communicatedClaims?: CandidateCommunicatedClaim[];
   assignmentSemantics?: ResponsibilityDetails['assignmentSemantics'];
   corrections?: CandidateFieldCorrection[];
   terminalSignal?: CandidateTerminalSignal;

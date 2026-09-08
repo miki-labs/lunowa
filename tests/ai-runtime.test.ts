@@ -11,6 +11,7 @@ import {
   assertFamilyStratifiedHoldout,
   assertExecutableFixtureCoverage,
   assertExecutableFixtureStratification,
+  assertCanonicalFixtureFidelity,
   checkDraftOracle,
   checkDraftRuntimeOracle,
   checkInterpretationOracle,
@@ -110,7 +111,8 @@ function interpretationFixtureOutput(caseId: string, body = messageBody): ModelI
       return withUnit({identityRelation: {kind: 'SAME_UNSATISFIED_OUTCOME', priorOperationalOutcome: 'deliver usable signed contract'}});
     case 'T0-034':
       return withUnit({
-        uncertainties: [{id: 'uncertainty-1', fieldKey: 'completion', reasonCode: 'PROVIDER_CONTRADICTION', material: true, reviewRequired: true, sourceRefs: [ref]}],
+        communicatedClaims: [{id: 'claim-1', kind: 'ATTACHMENT_DELIVERY', value: JSON.stringify(true), sourceRefs: [ref]}],
+        uncertainties: [],
         terminalSignal: undefined
       });
     case 'T0-037':
@@ -328,6 +330,15 @@ describe('G70 bounded AI runtime', () => {
     expect(G70_EVAL_CASES.filter((item) => item.split === 'HOLDOUT').length).toBeGreaterThan(0);
   });
 
+  it('rejects canonical fixture direction/focal/state drift before model evaluation', () => {
+    const manifest = G70_EVAL_CASES.find((item) => item.id === 'T0-034')!;
+    const fixture = {id: manifest.id, family: manifest.family, lane: manifest.lane, split: manifest.split, ...manifest.fidelity};
+    expect(() => assertCanonicalFixtureFidelity([fixture])).not.toThrow();
+    expect(() => assertCanonicalFixtureFidelity([{...fixture, direction: 'OUTBOUND'}])).toThrow(/direction/);
+    expect(() => assertCanonicalFixtureFidelity([{...fixture, focalMessageIndex: 1}])).toThrow(/focalMessageIndex/);
+    expect(() => assertCanonicalFixtureFidelity([{...fixture, existingResponsibilityState: 'NONE'}])).toThrow(/existingResponsibilityState/);
+  });
+
   it('executes every declared interpretation and draft case through schema, runtime, and layer-owned oracles', async () => {
     const manifestCase = (id: string) => {
       const item = G70_EVAL_CASES.find((candidate) => candidate.id === id);
@@ -361,12 +372,31 @@ describe('G70 bounded AI runtime', () => {
       return 'CANDIDATE';
     };
     for (const fixture of interpretationFixtures) {
+      const context = fixture.id === 'T0-034'
+        ? {...fixture.context, providerObservations: [{
+          observationKey: 'gmail:attachment-presence:message-1:1', messageId, kind: 'ATTACHMENT_PRESENCE' as const,
+          status: 'ABSENT' as const, completeness: 'COMPLETE' as const, attachmentCount: 0, source: 'GMAIL_NORMALIZED' as const
+        }]}
+        : fixture.context;
       const result = await new ResponsibilityInterpretationRuntime({
         transport: new FakeTransport(response(fixture.output)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
-      }).run(fixture.context);
+      }).run(context);
       expect(result.status, fixture.id).toBe(expectedInterpretationStatus(fixture.id));
       expect(checkInterpretationOracle(fixture.id, fixture.output).passed, fixture.id).toBe(true);
       expect(checkInterpretationRuntimeOracle(fixture.id, result).passed, fixture.id).toBe(true);
+      if (fixture.id === 'T0-034' && result.status === 'CANDIDATE' && result.derivation.status === 'DERIVED') {
+        expect((result.derivation.command.provenance ?? []).some((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY')).toBe(true);
+        const incomplete = await new ResponsibilityInterpretationRuntime({
+          transport: new FakeTransport(response(fixture.output)), runStore: new InMemoryAIRunStore(), config, currentEvidenceRevision
+        }).run({...fixture.context, providerObservations: [{
+          observationKey: 'gmail:attachment-presence:message-1:incomplete', messageId, kind: 'ATTACHMENT_PRESENCE' as const,
+          status: 'UNKNOWN' as const, completeness: 'INCOMPLETE' as const, attachmentCount: 0, source: 'GMAIL_NORMALIZED' as const
+        }]});
+        expect(incomplete.status).toBe('CANDIDATE');
+        if (incomplete.status === 'CANDIDATE' && incomplete.derivation.status === 'DERIVED') {
+          expect((incomplete.derivation.command.provenance ?? []).some((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY')).toBe(false);
+        }
+      }
     }
 
     const unavailableInterpretation = await new ResponsibilityInterpretationRuntime({

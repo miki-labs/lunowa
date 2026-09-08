@@ -229,7 +229,7 @@ function stateFromRow(
   };
 }
 
-async function loadState(tx: Parameters<Parameters<Database['transaction']>[0]>[0], responsibilityId: string, lock = true): Promise<ResponsibilityState | undefined> {
+export async function loadResponsibilityState(tx: Parameters<Parameters<Database['transaction']>[0]>[0], responsibilityId: string, lock = true): Promise<ResponsibilityState | undefined> {
   const query = tx.select().from(responsibilities).where(eq(responsibilities.id, responsibilityId));
   const rows = lock ? await query.for('update') : await query;
   const row = rows[0];
@@ -376,7 +376,8 @@ function interpretationProvenance(candidate: ResponsibilityInterpretationCandida
       ...(unit.pendingProposals?.flatMap((item) => item.provenance) ?? []),
       ...(unit.agreedFacts?.flatMap((item) => item.provenance) ?? []),
       ...(unit.uncertainties?.flatMap((item) => item.provenance) ?? []),
-      ...(unit.riskDetails?.flatMap((item) => item.provenance) ?? [])
+      ...(unit.riskDetails?.flatMap((item) => item.provenance) ?? []),
+      ...(unit.communicatedClaims?.flatMap((item) => item.provenance) ?? [])
     ]),
     ...(candidate.admissionUncertainties?.flatMap((item) => item.provenance) ?? [])
   ];
@@ -524,7 +525,7 @@ export class ResponsibilityRepository {
     responsibilityId: string;
   }): Promise<{state: ResponsibilityState; projection: ReturnType<typeof projectResponsibility>} | null> {
     return this.db.transaction(async (tx) => {
-      const state = await loadState(tx, input.responsibilityId, false);
+      const state = await loadResponsibilityState(tx, input.responsibilityId, false);
       if (!state || state.userId !== input.userId || state.connectedAccountId !== input.connectedAccountId) return null;
       return {state, projection: projectResponsibility(state)};
     });
@@ -534,7 +535,7 @@ export class ResponsibilityRepository {
     tx: ResponsibilityTransaction,
     input: {userId: string; connectedAccountId: string; responsibilityId: string}
   ): Promise<{state: ResponsibilityState; projection: ReturnType<typeof projectResponsibility>; semanticEvidenceRevision: number} | null> {
-    const unlocked = await loadState(tx, input.responsibilityId, false);
+    const unlocked = await loadResponsibilityState(tx, input.responsibilityId, false);
     if (!unlocked || unlocked.userId !== input.userId || unlocked.connectedAccountId !== input.connectedAccountId) return null;
     const [conversation] = await tx.select({
       id: conversations.id,
@@ -545,7 +546,7 @@ export class ResponsibilityRepository {
       eq(conversations.connectedAccountId, input.connectedAccountId)
     )).for('update');
     if (!conversation) return null;
-    const state = await loadState(tx, input.responsibilityId, true);
+    const state = await loadResponsibilityState(tx, input.responsibilityId, true);
     if (!state || state.userId !== input.userId || state.connectedAccountId !== input.connectedAccountId) return null;
     return {
       state,
@@ -564,7 +565,7 @@ export class ResponsibilityRepository {
       if (input.connectedAccountId) predicates.push(eq(responsibilities.connectedAccountId, input.connectedAccountId));
       if (input.conversationId) predicates.push(eq(responsibilities.conversationId, input.conversationId));
       const rows = await tx.select({id: responsibilities.id}).from(responsibilities).where(and(...predicates));
-      const states = (await Promise.all(rows.map((row) => loadState(tx, row.id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
+      const states = (await Promise.all(rows.map((row) => loadResponsibilityState(tx, row.id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
       return states.map((state) => ({state, projection: projectResponsibility(state)}));
     });
   }
@@ -636,7 +637,7 @@ export class ResponsibilityRepository {
         eq(responsibilities.connectedAccountId, candidate.connectedAccountId),
         eq(responsibilities.conversationId, candidate.conversationId)
       ));
-      const states = (await Promise.all(rows.map((row) => loadState(tx, row.id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
+      const states = (await Promise.all(rows.map((row) => loadResponsibilityState(tx, row.id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
       const derived = deriveResponsibilityCommand(candidate, {evidenceBasis, existingResponsibilities: states});
       if (derived.status === 'REJECTED') return {kind: 'result' as const, result: {
         status: 'REJECTED' as const, admission: derived.admission, reason: derived.reason, effects: [] as [], responsibilities: []
@@ -729,7 +730,7 @@ export class ResponsibilityRepository {
         const ids = priorEvents
           .map((event) => (event.changeSummary as {responsibilityId?: string}).responsibilityId)
           .filter((id): id is string => Boolean(id));
-        const states = (await Promise.all([...new Set(ids)].map((id) => loadState(tx, id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
+        const states = (await Promise.all([...new Set(ids)].map((id) => loadResponsibilityState(tx, id, false)))).filter((state): state is ResponsibilityState => Boolean(state));
         if (states.length !== new Set(ids).size || states.some((state) =>
           state.userId !== candidate.userId ||
           state.connectedAccountId !== candidate.connectedAccountId ||
@@ -846,7 +847,7 @@ export class ResponsibilityRepository {
       const targetIds = candidateEffects
         .map((effect) => effect.operation === 'CREATE' ? undefined : effect.responsibilityRef)
         .filter((id): id is string => Boolean(id));
-      const existingStates = (await Promise.all([...new Set(targetIds)].map((id) => loadState(tx, id)))).filter((state): state is ResponsibilityState => Boolean(state));
+      const existingStates = (await Promise.all([...new Set(targetIds)].map((id) => loadResponsibilityState(tx, id)))).filter((state): state is ResponsibilityState => Boolean(state));
       const pureResult = reduceResponsibility(candidate, {
         currentEvidenceRevision: conversation.semanticEvidenceRevision,
         evidenceBasis,

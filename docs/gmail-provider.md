@@ -135,8 +135,10 @@ limits and that a successful HTTP response alone is not proof that the message
 was successfully sent. Gmail quota tiering also changed in 2026. G51 therefore
 does not encode stale fixed quota numbers and deliberately does **not** apply a
 generic blind retry policy to a possibly accepted Send. A transport/server
-ambiguity remains `AMBIGUOUS` until stable Message-ID/provider reconciliation
-proves the outcome.
+ambiguity remains `AMBIGUOUS`; Lunowa never blind-retries a potentially accepted Send.
+When Gmail returned a provider `Message.id`, reconciliation uses that immutable provider identity.
+If the transport outcome is unknown and no provider id is available, recovery stays fail-closed
+until an operator/provider observation establishes the exact message identity.
 
 Primary references checked on 2026-09-08:
 
@@ -162,8 +164,8 @@ harness before provider credentials are constructed. A local durable effect mark
 atomically written before `messages.send` and is scoped to the exact candidate/lane,
 so changing the run ID cannot admit a second provider attempt on that controller
 host. After any ambiguous outcome, only `RECONCILE_ONLY` is permitted; it must use
-the run ID bound by the durable claim, searches the stable RFC822 Message-ID, and
-never calls `messages.send`.
+the run ID bound by the durable claim plus an independently established Gmail provider
+`Message.id`, and never calls `messages.send`.
 
 The prepared source must be an inbound message in a dedicated harmless test
 thread. Provider `From` / `To` / `Cc` headers are parsed as RFC mailbox lists rather
@@ -174,9 +176,9 @@ target. Reply must target the exact observed sender. Reply All must retain that
 sender and exercise at least one additional observed recipient. Bcc is never
 accepted by this harness.
 
-A lane passes only after Gmail is read back and confirms the expected thread,
-stable Message-ID, In-Reply-To, References chain, Subject, exact To/Cc mailbox
-sets, and no Bcc target. Evidence output contains the exact candidate SHA and external evidence
+A lane passes only after Gmail is read back by provider `Message.id` and confirms the
+expected thread, a valid final provider RFC Message-ID, In-Reply-To, References chain,
+Subject, exact To/Cc mailbox sets, and no Bcc target. Evidence output contains the exact candidate SHA and external evidence
 reference but hashes provider/thread identities and emits no credentials,
 recipient addresses, mailbox content, or raw MIME. Both Reply and Reply All
 must PASS against the same exact candidate before G51 may claim its real Gmail

@@ -8,6 +8,7 @@ import type {SendOperationReadModel} from '@/server/db/repositories/communicatio
 import type {ResponsibilityState} from '@/server/responsibility';
 
 const originalMessageId = '<original@example.com>';
+const providerFinalMessageId = '<provider-final@mail.gmail.com>';
 
 function gmailMessage(id: string, messageId: string, overrides: Partial<GmailMessage> = {}): GmailMessage {
   return {
@@ -79,7 +80,7 @@ function providerFor(input: {
   send?: () => Promise<GmailMessage>;
 } = {}): GmailProviderClient {
   const original = input.original ?? gmailMessage('original-provider-1', originalMessageId, {labelIds: ['INBOX']});
-  const sent = input.sent ?? gmailMessage('sent-1', buildGmailMessageId('operation-1'));
+  const sent = input.sent ?? gmailMessage('sent-1', providerFinalMessageId);
   return {
     exchangeCode: vi.fn(), refresh: vi.fn(), revoke: vi.fn(),
     getProfile: vi.fn(), watch: vi.fn(), listMessages: vi.fn(), listHistory: vi.fn(), getAttachment: vi.fn(async () => ({data: ''})),
@@ -238,15 +239,15 @@ describe('G51 Gmail send boundary', () => {
     expect(responsibilityStore.applyTrustedCommand).toHaveBeenCalledTimes(1);
   });
 
-  it('reconciles exactly one RFC822 Message-ID match and guards multiple matches', async () => {
-    const oneStore = store(operation('AMBIGUOUS'));
-    const one = new GmailSendService(providerFor({search: ['sent-1']}), credentials as never, oneStore as never, evidence as never, responsibilities as never);
-    expect((await one.dispatch({userId: 'user-1', sendOperationId: 'operation-1'})).status).toBe('RECONCILED');
-
-    vi.clearAllMocks();
-    const manyStore = store(operation('AMBIGUOUS'));
-    const many = new GmailSendService(providerFor({search: ['sent-1', 'sent-2']}), credentials as never, manyStore as never, evidence as never, responsibilities as never);
-    expect((await many.dispatch({userId: 'user-1', sendOperationId: 'operation-1'})).status).toBe('AMBIGUOUS');
+  it('keeps an unknown provider outcome ambiguous without guessing identity or resending', async () => {
+    const operationStore = store(operation('AMBIGUOUS'));
+    const provider = providerFor({search: ['sent-1']});
+    const service = new GmailSendService(provider, credentials as never, operationStore as never, evidence as never, responsibilities as never);
+    const result = await service.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
+    expect(result.status).toBe('AMBIGUOUS');
+    expect(result.lastErrorCode).toBe('SEND_ACCEPTANCE_UNKNOWN');
+    expect(provider.sendMessage).not.toHaveBeenCalled();
+    expect(provider.listMessagesByRfc822MessageId).not.toHaveBeenCalled();
     expect(evidence.upsertNormalizedMessage).not.toHaveBeenCalled();
   });
 
@@ -275,9 +276,15 @@ describe('G51 Gmail send boundary', () => {
     expect(t04?.effects?.[0]?.patch?.obligationLegs?.find((item) => item.id === 'approval')?.status).toBe('OPEN');
   });
 
-  it('keeps provider acceptance but refuses Source reconciliation for the wrong Gmail thread or Message-ID', async () => {
+  it('accepts a provider-generated Message-ID but refuses the wrong Gmail thread or a missing final Message-ID', async () => {
+    const rewrittenStore = store(operation());
+    const rewrittenProvider = providerFor({sent: gmailMessage('sent-1', '<gmail-rewritten@mail.gmail.com>')});
+    const rewrittenService = new GmailSendService(rewrittenProvider, credentials as never, rewrittenStore as never, evidence as never, responsibilities as never);
+    expect((await rewrittenService.dispatch({userId: 'user-1', sendOperationId: 'operation-1'})).status).toBe('RECONCILED');
+
+    vi.clearAllMocks();
     const wrongThreadStore = store(operation());
-    const wrongThread = gmailMessage('sent-1', buildGmailMessageId('operation-1'), {threadId: 'wrong-thread'});
+    const wrongThread = gmailMessage('sent-1', providerFinalMessageId, {threadId: 'wrong-thread'});
     const wrongThreadProvider = providerFor({sent: wrongThread});
     const wrongThreadService = new GmailSendService(wrongThreadProvider, credentials as never, wrongThreadStore as never, evidence as never, responsibilities as never);
     const threadResult = await wrongThreadService.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
@@ -285,18 +292,19 @@ describe('G51 Gmail send boundary', () => {
     expect(threadResult.lastErrorCode).toContain('RECONCILED_THREAD_MISMATCH');
 
     vi.clearAllMocks();
-    const wrongMessageStore = store(operation());
-    const wrongMessage = gmailMessage('sent-1', '<different@example.com>');
-    const wrongMessageProvider = providerFor({sent: wrongMessage});
-    const wrongMessageService = new GmailSendService(wrongMessageProvider, credentials as never, wrongMessageStore as never, evidence as never, responsibilities as never);
-    const messageResult = await wrongMessageService.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
+    const missingIdStore = store(operation());
+    const missingId = gmailMessage('sent-1', providerFinalMessageId);
+    missingId.payload!.headers = missingId.payload!.headers!.filter((item) => item.name !== 'Message-ID');
+    const missingIdProvider = providerFor({sent: missingId});
+    const missingIdService = new GmailSendService(missingIdProvider, credentials as never, missingIdStore as never, evidence as never, responsibilities as never);
+    const messageResult = await missingIdService.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
     expect(messageResult.status).toBe('PROVIDER_ACCEPTED');
-    expect(messageResult.lastErrorCode).toContain('RECONCILED_MESSAGE_ID_MISMATCH');
+    expect(messageResult.lastErrorCode).toContain('RECONCILED_MESSAGE_ID_MISSING');
     expect(evidence.upsertNormalizedMessage).not.toHaveBeenCalled();
   });
 
   it('recognizes only structured failed DSNs with a returned original Message-ID', async () => {
-    const original = buildGmailMessageId('operation-1');
+    const original = providerFinalMessageId;
     const failed = await extractGmailFailedDeliveryStatus(failedDsnMessage(original));
     expect(failed).toEqual({
       action: 'FAILED',
@@ -342,10 +350,10 @@ describe('G51 Gmail send boundary', () => {
       aggregateVersion: 8,
       obligationLegs: [{...originalLeg, status: 'CLOSED' as const, closureReason: 'SATISFIED' as const, closedAt: '2030-01-01T00:01:00.000Z', provenance: [closeEvidence]}]
     } satisfies ResponsibilityState;
-    const deliveryStatus = await extractGmailFailedDeliveryStatus(failedDsnMessage(buildGmailMessageId(send.id)));
+    const deliveryStatus = await extractGmailFailedDeliveryStatus(failedDsnMessage(providerFinalMessageId));
     expect(deliveryStatus).toBeDefined();
 
-    const provider = providerFor({search: ['sent-1']});
+    const provider = providerFor({search: ['sent-1'], sent: gmailMessage('sent-1', providerFinalMessageId)});
     const operationStore = store(send);
     const responsibilityStore = {
       getResponsibility: vi.fn(async () => ({state: resolved, projection: {}, semanticEvidenceRevision: 9})),

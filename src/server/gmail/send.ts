@@ -290,10 +290,11 @@ export function buildTrustedReconciledSendCommand(input: {
   };
 }
 
-function sentMessageMatchesOperation(snapshot: SendSnapshot, operationId: string, message: GmailMessage): void {
+function sentMessageMatchesOperation(snapshot: SendSnapshot, message: GmailMessage): void {
   const expectedThreadId = contextString(snapshot, 'providerThreadId');
   if (message.threadId !== expectedThreadId) throw new Error('RECONCILED_THREAD_MISMATCH');
-  if (header(message, 'Message-ID') !== messageIdForSendOperation(operationId)) throw new Error('RECONCILED_MESSAGE_ID_MISMATCH');
+  const finalMessageId = header(message, 'Message-ID');
+  if (!finalMessageId || messageIds(finalMessageId).length !== 1) throw new Error('RECONCILED_MESSAGE_ID_MISSING');
   const sentSubject = header(message, 'Subject');
   if (!sentSubject || !compatibleSubject(snapshot.subject, sentSubject)) throw new Error('RECONCILED_SUBJECT_MISMATCH');
   if (!(message.labelIds ?? []).includes('SENT')) throw new Error('RECONCILED_SENT_LABEL_MISSING');
@@ -430,9 +431,9 @@ export class GmailSendService {
     const operation = await this.operations.getSendOperationByProviderMessageId({
       userId: input.userId, connectedAccountId: input.connectedAccountId, providerMessageId: sentMessage.id
     });
-    if (!operation || messageIdForSendOperation(operation.id) !== input.deliveryStatus.originalMessageId) return false;
+    if (!operation) return false;
     const snapshot = snapshotOf(operation);
-    sentMessageMatchesOperation(snapshot, operation.id, sentMessage);
+    sentMessageMatchesOperation(snapshot, sentMessage);
     const binding = bindingOf(snapshot);
     if (!binding) return false;
     const target = await this.responsibilities.getResponsibility({
@@ -462,45 +463,14 @@ export class GmailSendService {
     if (operation.status === 'PROVIDER_ACCEPTED' && operation.providerMessageId) {
       return this.reconcileAccepted(input, operation, token, operation.providerMessageId);
     }
-    const stableId = messageIdForSendOperation(operation.id);
-    let page;
-    try {
-      page = await this.provider.listMessagesByRfc822MessageId(token, stableId);
-    } catch (error) {
-      return this.operations.transitionSendOperation({
-        userId: input.userId, sendOperationId: operation.id, expectedStatuses: [operation.status],
-        status: operation.status, lastErrorCode: providerErrorCode(error)
-      });
-    }
-    const ids = [...new Set((page.messages ?? []).map((item) => item.id).filter(Boolean))];
-    const matches: GmailMessage[] = [];
-    try {
-      for (const id of ids) {
-        const message = await this.provider.getMessage(token, id);
-        if (header(message, 'Message-ID') === stableId) matches.push(message);
-      }
-    } catch (error) {
-      return this.operations.transitionSendOperation({
-        userId: input.userId, sendOperationId: operation.id, expectedStatuses: [operation.status],
-        status: 'AMBIGUOUS', lastErrorCode: providerErrorCode(error)
-      });
-    }
-    if (matches.length !== 1) {
-      return this.operations.transitionSendOperation({
-        userId: input.userId, sendOperationId: operation.id, expectedStatuses: [operation.status],
-        status: 'AMBIGUOUS', lastErrorCode: matches.length > 1 ? 'MULTIPLE_RECONCILIATION_MATCHES' : 'SEND_ACCEPTANCE_UNKNOWN'
-      });
-    }
-    const accepted = await this.operations.transitionSendOperation({
-      userId: input.userId,
-      sendOperationId: operation.id,
-      expectedStatuses: [operation.status],
-      status: 'PROVIDER_ACCEPTED',
-      providerResultId: matches[0]!.id,
-      providerMessageId: matches[0]!.id,
-      lastErrorCode: null
+    // If dispatch may have reached Gmail but no provider Message.id was returned,
+    // fail closed. Gmail may replace caller-supplied RFC Message-ID, so guessing
+    // provider acceptance from that header is not a safe idempotency oracle.
+    // Never blind-retry; G60 owns the user-facing recovery path for this state.
+    return this.operations.transitionSendOperation({
+      userId: input.userId, sendOperationId: operation.id, expectedStatuses: [operation.status],
+      status: 'AMBIGUOUS', lastErrorCode: 'SEND_ACCEPTANCE_UNKNOWN'
     });
-    return this.reconcileAccepted(input, accepted, token, matches[0]!.id, matches[0]);
   }
 
   private async reconcileAccepted(
@@ -514,7 +484,7 @@ export class GmailSendService {
       const snapshot = snapshotOf(operation);
       const message = knownMessage ?? await this.provider.getMessage(accessToken, providerMessageId);
       if (message.id !== providerMessageId) throw new Error('RECONCILED_PROVIDER_ID_MISMATCH');
-      sentMessageMatchesOperation(snapshot, operation.id, message);
+      sentMessageMatchesOperation(snapshot, message);
       const normalized = await normalizeGmailMessage({
         userId: input.userId,
         connectedAccountId: operation.connectedAccountId,

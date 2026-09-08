@@ -144,15 +144,11 @@ const snapshot: SendSnapshot = {
 const built = buildGmailTextMime({sendOperationId: operationKey, snapshot, originalMessage: source});
 assert(built.threadId === targetThreadId, `${lane} MIME did not preserve the prepared Gmail thread`);
 
-const existing = await client.listMessagesByRfc822MessageId(refreshed.accessToken, built.messageId);
-const ids = [...new Set((existing.messages ?? []).map((item) => item.id).filter(Boolean))];
-assert(ids.length <= 1, `${lane} stable Message-ID matched multiple Gmail messages`);
 let providerMessageId: string;
 let sentThisRun = false;
-if (ids.length === 1) {
-  providerMessageId = ids[0]!;
+if (executionMode === 'RECONCILE_ONLY') {
+  providerMessageId = required('G51_REAL_PROVIDER_MESSAGE_ID');
 } else {
-  assert(executionMode === 'SEND_ONCE', `${lane} stable Message-ID is not visible yet; RECONCILE_ONLY performed no send`);
   await claimProviderEffect(stateBase, {candidateSha, runId, lane});
   try {
     const accepted = await client.sendMessage(refreshed.accessToken, {raw: built.raw, threadId: built.threadId});
@@ -161,12 +157,12 @@ if (ids.length === 1) {
     sentThisRun = true;
   } catch (error) {
     const code = error instanceof GmailProviderError ? error.code : 'provider_transport_or_acceptance_unknown';
-    throw new Error(`AMBIGUOUS_PROVIDER_EFFECT:${code}; do not rerun SEND_ONCE for this exact candidate/lane; use RECONCILE_ONLY with the admitted run ID`);
+    throw new Error(`AMBIGUOUS_PROVIDER_EFFECT:${code}; do not rerun SEND_ONCE for this exact candidate/lane; reconcile only after independently confirming the provider Message.id`);
   }
 }
 const reconciled = await client.getMessage(refreshed.accessToken, providerMessageId);
 assert(reconciled.threadId === targetThreadId, `${lane} Gmail message did not land in the intended thread`);
-assert(header(reconciled, 'Message-ID') === built.messageId, `${lane} reconciled Message-ID does not match the stable request identity`);
+assert(/^<[^<>\s]+>$/.test(header(reconciled, 'Message-ID')), `${lane} Gmail message is missing a valid final RFC Message-ID`);
 const originalRfcMessageId = header(source, 'Message-ID');
 assert(header(reconciled, 'In-Reply-To') === originalRfcMessageId, `${lane} Gmail message lost the intended In-Reply-To identity`);
 assert(header(reconciled, 'References').includes(originalRfcMessageId), `${lane} Gmail message lost the intended References chain`);

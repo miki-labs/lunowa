@@ -54,7 +54,7 @@ describe('G51 real Gmail acceptance controls', () => {
     await expect(claimProviderEffect(root, {candidateSha, runId: 'run-b', lane: 'REPLY_ALL'})).resolves.toBeUndefined();
   });
 
-  it('keeps stable provider Message-ID operation identity run-specific inside the lane quarantine', () => {
+  it('keeps operation identity run-specific inside the lane quarantine', () => {
     expect(realSendOperationKey(candidateSha, 'run-a', 'REPLY')).not.toBe(realSendOperationKey(candidateSha, 'run-b', 'REPLY'));
   });
 });

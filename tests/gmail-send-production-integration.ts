@@ -11,7 +11,7 @@ import {ResponsibilityRepository} from '../src/server/db/repositories/responsibi
 import * as schema from '../src/server/db/schema';
 import {extractGmailFailedDeliveryStatus} from '../src/server/gmail/delivery-status';
 import {normalizeGmailMessage} from '../src/server/gmail/normalize';
-import {GmailSendService, buildGmailMessageId} from '../src/server/gmail/send';
+import {GmailSendService} from '../src/server/gmail/send';
 import type {GmailMessage, GmailProviderClient} from '../src/server/gmail/types';
 import type {TrustedResponsibilityCommand} from '../src/server/responsibility';
 
@@ -99,7 +99,8 @@ try {
   const operation = await communication.requestImmediateSend({userId, draftId: draft.id, responsibilityBinding});
   assert((await communication.listReconcilableSendOperations()).every((item) => item.id !== operation.id), 'PENDING SendOperation must never be cron-reconcilable');
   let sentMessageId = '';
-  const sent = () => message(sentMessageId, buildGmailMessageId(operation.id), ['SENT']);
+  const providerFinalMessageId = '<g51-provider-final@mail.gmail.com>';
+  const sent = () => message(sentMessageId, providerFinalMessageId, ['SENT']);
   let sendCalls = 0;
   const provider: GmailProviderClient = {
     exchangeCode: async () => { throw new Error('not used'); },
@@ -116,7 +117,7 @@ try {
       sentMessageId = 'g51-sent';
       return {id: sentMessageId, threadId: 'g51-thread'};
     },
-    listMessagesByRfc822MessageId: async (_token, messageId) => messageId === buildGmailMessageId(operation.id)
+    listMessagesByRfc822MessageId: async (_token, messageId) => messageId === providerFinalMessageId
       ? ({messages: [{id: sentMessageId, threadId: 'g51-thread'}]})
       : ({messages: []})
   };
@@ -141,7 +142,7 @@ try {
   const resultingResponsibility = await responsibilityRepository.getResponsibility({userId, connectedAccountId: accountId, responsibilityId: initialResponsibility.id});
   assert(resultingResponsibility?.state.resolutionStatus === 'RESOLVED', 'reconciled sent Source did not apply the bound Responsibility consequence');
 
-  const dsnMessage = failedDsnMessage(buildGmailMessageId(operation.id));
+  const dsnMessage = failedDsnMessage(providerFinalMessageId);
   const deliveryStatus = await extractGmailFailedDeliveryStatus(dsnMessage);
   assert(deliveryStatus, 'structured failed DSN fixture was not recognized');
   const dsnSource = await evidence.upsertNormalizedMessage(await normalizeGmailMessage({

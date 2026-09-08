@@ -386,6 +386,16 @@ export class CommunicationRepository {
     return row ? this.readSendOperation(row) : null;
   }
 
+  public async getSendOperationByProviderMessageId(input: {userId: string; connectedAccountId: string; providerMessageId: string}): Promise<SendOperationReadModel | null> {
+    const rows = await this.db.select().from(sendOperations).where(and(
+      eq(sendOperations.userId, input.userId),
+      eq(sendOperations.connectedAccountId, input.connectedAccountId),
+      eq(sendOperations.providerMessageId, input.providerMessageId),
+      inArray(sendOperations.status, ['PROVIDER_ACCEPTED', 'RECONCILED'])
+    )).orderBy(desc(sendOperations.createdAt), desc(sendOperations.id)).limit(2);
+    return rows.length === 1 ? this.readSendOperation(rows[0]!) : null;
+  }
+
   public async listReconcilableSendOperations(limit = 20): Promise<SendOperationReadModel[]> {
     const boundedLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
     const rows = await this.db.select().from(sendOperations).where(

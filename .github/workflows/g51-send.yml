@@ -9,6 +9,7 @@ on:
       - 'src/server/db/**'
       - 'src/server/evidence/**'
       - 'src/server/gmail/**'
+      - 'src/server/communication/send-identity.ts'
       - 'src/app/api/internal/gmail/send/**'
       - 'tests/gmail-send*.ts'
       - 'package.json'

@@ -12,12 +12,13 @@ export function createGmailRuntime() {
   const cipher = new GmailCredentialCipher(environment.credentialKey);
   const provider = new GoogleGmailClient(environment);
   const credentials = new GmailCredentialService(environment, cipher, provider);
+  const send = new GmailSendService(provider, credentials);
   return {
     environment,
     authorization: new GmailAuthorizationService(environment, cipher, provider),
     credentials,
-    sync: new GmailSyncService(environment.pubsubTopic, provider, credentials),
-    send: new GmailSendService(provider, credentials),
+    sync: new GmailSyncService(environment.pubsubTopic, provider, credentials, undefined, undefined, send),
+    send,
     push: new GmailPushIngress(
       new GooglePubSubJwtVerifier(environment.pubsubAudience, environment.pubsubServiceAccount)
     ),

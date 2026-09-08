@@ -1,6 +1,7 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {buildGmailMessageId, buildGmailTextMime, buildTrustedReconciledSendCommand, GmailSendService} from '@/server/gmail/send';
+import {buildGmailMessageId, buildGmailTextMime, buildTrustedProviderNonDeliveryCommand, buildTrustedReconciledSendCommand, GmailSendService} from '@/server/gmail/send';
+import {extractGmailFailedDeliveryStatus} from '@/server/gmail/delivery-status';
 import {GmailProviderError} from '@/server/gmail/types';
 import type {GmailMessage, GmailProviderClient} from '@/server/gmail/types';
 import type {SendOperationReadModel} from '@/server/db/repositories/communication';
@@ -29,6 +30,27 @@ function gmailMessage(id: string, messageId: string, overrides: Partial<GmailMes
   };
 }
 
+function failedDsnMessage(originalRfcMessageId: string): GmailMessage {
+  return {
+    id: 'dsn-1', threadId: 'dsn-thread-1', labelIds: ['INBOX'], internalDate: '1893456001000',
+    payload: {
+      mimeType: 'multipart/report',
+      headers: [
+        {name: 'From', value: 'Mail Delivery Subsystem <mailer-daemon@example.net>'},
+        {name: 'To', value: 'owner@example.com'},
+        {name: 'Subject', value: 'Delivery Status Notification (Failure)'},
+        {name: 'Message-ID', value: '<dsn-1@example.net>'},
+        {name: 'Content-Type', value: 'multipart/report; report-type=delivery-status; boundary=dsn'}
+      ],
+      parts: [
+        {mimeType: 'text/plain', body: {data: Buffer.from('Delivery failed.').toString('base64url')}},
+        {mimeType: 'message/delivery-status', body: {data: Buffer.from('Reporting-MTA: dns; mx.example.net\r\n\r\nFinal-Recipient: rfc822; person@example.com\r\nAction: failed\r\nStatus: 5.1.1\r\n').toString('base64url')}},
+        {mimeType: 'text/rfc822-headers', body: {data: Buffer.from(`Message-ID: ${originalRfcMessageId}\r\nSubject: Re: Request\r\n`).toString('base64url')}}
+      ]
+    }
+  };
+}
+
 function snapshot(): Record<string, unknown> {
   return {
     draftId: 'draft-1', draftVersion: 1, userId: 'user-1', connectedAccountId: 'account-1',
@@ -44,8 +66,8 @@ function operation(status: SendOperationReadModel['status'] = 'PENDING'): SendOp
   return {
     id: 'operation-1', userId: 'user-1', draftId: 'draft-1', connectedAccountId: 'account-1', idempotencyKey: 'key-1', kind: 'IMMEDIATE',
     status, draftSnapshot: snapshot(), attemptCount: status === 'PENDING' ? 0 : 1,
-    providerResultId: status === 'PROVIDER_ACCEPTED' ? 'sent-1' : null,
-    providerMessageId: status === 'PROVIDER_ACCEPTED' ? 'sent-1' : null,
+    providerResultId: ['PROVIDER_ACCEPTED', 'RECONCILED'].includes(status) ? 'sent-1' : null,
+    providerMessageId: ['PROVIDER_ACCEPTED', 'RECONCILED'].includes(status) ? 'sent-1' : null,
     lastErrorCode: null, createdAt: '2030-01-01T00:00:00.000Z', updatedAt: '2030-01-01T00:00:00.000Z'
   };
 }
@@ -71,6 +93,7 @@ function store(initial: SendOperationReadModel) {
   let current = initial;
   return {
     getSendOperation: vi.fn(async () => current),
+    getSendOperationByProviderMessageId: vi.fn(async (input: {providerMessageId: string}) => current.providerMessageId === input.providerMessageId ? current : null),
     claimSendOperation: vi.fn(async () => {
       if (current.status === 'PENDING') {
         current = {...current, status: 'DISPATCHING', attemptCount: current.attemptCount + 1};
@@ -149,12 +172,15 @@ describe('G51 Gmail send boundary', () => {
 
   it('claims once, sends once, and reconciles the sent Source', async () => {
     const operationStore = store(operation());
-    const service = new GmailSendService(providerFor(), credentials as never, operationStore as never, evidence as never, responsibilities as never);
+    const provider = providerFor();
+    const service = new GmailSendService(provider, credentials as never, operationStore as never, evidence as never, responsibilities as never);
     const result = await service.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
     expect(result.status).toBe('RECONCILED');
     expect(operationStore.claimSendOperation).toHaveBeenCalledTimes(1);
     expect(operationStore.transitionSendOperation).toHaveBeenCalledWith(expect.objectContaining({status: 'PROVIDER_ACCEPTED'}));
     expect(evidence.upsertNormalizedMessage).toHaveBeenCalledTimes(1);
+    expect(provider.sendMessage).toHaveBeenCalledWith('token', {raw: expect.any(String), threadId: 'thread-1'});
+    expect(Object.keys(vi.mocked(provider.sendMessage).mock.calls[0]![1] as object).sort()).toEqual(['raw', 'threadId']);
   });
 
   it('never sends when restarting from DISPATCHING and keeps zero-match acceptance ambiguous', async () => {
@@ -190,7 +216,7 @@ describe('G51 Gmail send boundary', () => {
   });
 
   it('keeps provider acceptance durable when a current bound Responsibility re-evaluation is rejected', async () => {
-    const state = responsibility([leg('user-send', 'USER', 'SEND_REVISED_DOCUMENT')]);
+    const state = responsibility([leg('user-send', 'USER', 'REPLY_TO_REQUEST')]);
     const bound = {
       ...operation(),
       draftSnapshot: {
@@ -201,7 +227,7 @@ describe('G51 Gmail send boundary', () => {
     const operationStore = store(bound);
     const provider = providerFor();
     const responsibilityStore = {
-      getResponsibility: vi.fn(async () => ({state})),
+      getResponsibility: vi.fn(async () => ({state, semanticEvidenceRevision: 8})),
       applyTrustedCommand: vi.fn(async () => ({status: 'REJECTED', admission: 'TRACK', reason: 'trusted evidence mismatch', effects: [], responsibilities: [state]}))
     };
     const service = new GmailSendService(provider, credentials as never, operationStore as never, evidence as never, responsibilityStore as never);
@@ -224,13 +250,20 @@ describe('G51 Gmail send boundary', () => {
     expect(evidence.upsertNormalizedMessage).not.toHaveBeenCalled();
   });
 
-  it('closes only the user send leg: T03 resolves fully covered work, T04 returns to WAITING', () => {
-    const t03 = buildTrustedReconciledSendCommand({
+  it('closes only communication legs and never treats artifact-specific SEND as fulfilled by provider acceptance alone', () => {
+    const reply = buildTrustedReconciledSendCommand({
       operation: operation('PROVIDER_ACCEPTED'), snapshot: snapshot() as never,
-      responsibility: responsibility([leg('user-send', 'USER', 'SEND_REVISED_DOCUMENT')]),
+      responsibility: responsibility([leg('user-send', 'USER', 'REPLY_TO_REQUEST')]),
       messageId: 'db-sent-1', evidenceRevision: 8
     });
-    expect(t03?.effects?.[0]?.operation).toBe('RESOLVE');
+    expect(reply?.effects?.[0]?.operation).toBe('RESOLVE');
+
+    const artifact = buildTrustedReconciledSendCommand({
+      operation: operation('PROVIDER_ACCEPTED'), snapshot: snapshot() as never,
+      responsibility: responsibility([leg('artifact-send', 'USER', 'SEND_REVISED_DOCUMENT')]),
+      messageId: 'db-sent-1', evidenceRevision: 8
+    });
+    expect(artifact).toBeUndefined();
 
     const t04 = buildTrustedReconciledSendCommand({
       operation: operation('PROVIDER_ACCEPTED'), snapshot: snapshot() as never,
@@ -241,4 +274,98 @@ describe('G51 Gmail send boundary', () => {
     expect(t04?.effects?.[0]?.responsibilityRef).toBe('responsibility-1');
     expect(t04?.effects?.[0]?.patch?.obligationLegs?.find((item) => item.id === 'approval')?.status).toBe('OPEN');
   });
+
+  it('keeps provider acceptance but refuses Source reconciliation for the wrong Gmail thread or Message-ID', async () => {
+    const wrongThreadStore = store(operation());
+    const wrongThread = gmailMessage('sent-1', buildGmailMessageId('operation-1'), {threadId: 'wrong-thread'});
+    const wrongThreadProvider = providerFor({sent: wrongThread});
+    const wrongThreadService = new GmailSendService(wrongThreadProvider, credentials as never, wrongThreadStore as never, evidence as never, responsibilities as never);
+    const threadResult = await wrongThreadService.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
+    expect(threadResult.status).toBe('PROVIDER_ACCEPTED');
+    expect(threadResult.lastErrorCode).toContain('RECONCILED_THREAD_MISMATCH');
+
+    vi.clearAllMocks();
+    const wrongMessageStore = store(operation());
+    const wrongMessage = gmailMessage('sent-1', '<different@example.com>');
+    const wrongMessageProvider = providerFor({sent: wrongMessage});
+    const wrongMessageService = new GmailSendService(wrongMessageProvider, credentials as never, wrongMessageStore as never, evidence as never, responsibilities as never);
+    const messageResult = await wrongMessageService.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
+    expect(messageResult.status).toBe('PROVIDER_ACCEPTED');
+    expect(messageResult.lastErrorCode).toContain('RECONCILED_MESSAGE_ID_MISMATCH');
+    expect(evidence.upsertNormalizedMessage).not.toHaveBeenCalled();
+  });
+
+  it('recognizes only structured failed DSNs with a returned original Message-ID', async () => {
+    const original = buildGmailMessageId('operation-1');
+    const failed = await extractGmailFailedDeliveryStatus(failedDsnMessage(original));
+    expect(failed).toEqual({
+      action: 'FAILED',
+      originalMessageId: original,
+      observationKey: expect.stringMatching(/^gmail:dsn-failed:[0-9a-f]{64}$/)
+    });
+
+    const delayed = failedDsnMessage(original);
+    const statusPart = delayed.payload?.parts?.find((part) => part.mimeType === 'message/delivery-status');
+    if (statusPart?.body?.data) statusPart.body.data = Buffer.from('Final-Recipient: rfc822; person@example.com\r\nAction: delayed\r\nStatus: 4.2.0\r\n').toString('base64url');
+    expect(await extractGmailFailedDeliveryStatus(delayed)).toBeUndefined();
+
+    const unstructured = gmailMessage('fake-bounce', '<fake@example.com>', {labelIds: ['INBOX']});
+    expect(await extractGmailFailedDeliveryStatus(unstructured)).toBeUndefined();
+
+    const blocked = failedDsnMessage(original);
+    const blockedStatusPart = blocked.payload?.parts?.find((part) => part.mimeType === 'message/delivery-status');
+    if (blockedStatusPart) blockedStatusPart.body = {attachmentId: 'dsn-status', size: 100};
+    expect(await extractGmailFailedDeliveryStatus(blocked, async () => {
+      throw new GmailProviderError(404, 'DSN_PART_UNAVAILABLE');
+    })).toBeUndefined();
+  });
+
+  it('reopens only the exact leg previously closed by the correlated SendOperation after trusted non-delivery', async () => {
+    const send = operation('RECONCILED');
+    send.draftSnapshot = {
+      ...snapshot(),
+      responsibilityBinding: {responsibilityId: 'responsibility-1', aggregateVersion: 7, evidenceRevision: 4}
+    };
+    const closeEvidence = {
+      evidenceKind: 'PROVIDER_RECONCILED_SEND',
+      messageId: 'db-sent-1',
+      providerObservationKey: 'sent-1',
+      sourceLocator: {authorized: true, provider: 'gmail', sendOperationId: send.id}
+    };
+    const originalLeg = leg('reply-leg', 'USER', 'REPLY_TO_REQUEST');
+    const resolved = {
+      ...responsibility([]),
+      resolutionStatus: 'RESOLVED' as const,
+      resolutionReason: 'SATISFIED' as const,
+      resolvedAt: '2030-01-01T00:01:00.000Z',
+      acceptedEvidenceRevision: 8,
+      aggregateVersion: 8,
+      obligationLegs: [{...originalLeg, status: 'CLOSED' as const, closureReason: 'SATISFIED' as const, closedAt: '2030-01-01T00:01:00.000Z', provenance: [closeEvidence]}]
+    } satisfies ResponsibilityState;
+    const deliveryStatus = await extractGmailFailedDeliveryStatus(failedDsnMessage(buildGmailMessageId(send.id)));
+    expect(deliveryStatus).toBeDefined();
+
+    const provider = providerFor({search: ['sent-1']});
+    const operationStore = store(send);
+    const responsibilityStore = {
+      getResponsibility: vi.fn(async () => ({state: resolved, projection: {}, semanticEvidenceRevision: 9})),
+      applyTrustedCommand: vi.fn(async (command: ReturnType<typeof buildTrustedProviderNonDeliveryCommand>) => ({
+        status: 'APPLIED', admission: 'TRACK', reason: 'applied', effects: command?.effects ?? [], responsibilities: []
+      }))
+    };
+    const service = new GmailSendService(provider, credentials as never, operationStore as never, evidence as never, responsibilityStore as never);
+    expect(await service.observeProviderNonDelivery({
+      userId: 'user-1', connectedAccountId: 'account-1', accessToken: 'token', sourceMessageId: '00000000-0000-4000-8000-000000000001', deliveryStatus: deliveryStatus!
+    })).toBe(true);
+    const command = responsibilityStore.applyTrustedCommand.mock.calls[0]![0]!;
+    expect(command.evidenceRevision).toBe(9);
+    expect(command.effects?.[0]?.operation).toBe('REOPEN');
+    expect(command.effects?.[0]?.patch?.obligationLegs?.find((item) => item.id === 'reply-leg')?.status).toBe('OPEN');
+    expect(command.provenance?.[0]).toEqual(expect.objectContaining({
+      evidenceKind: 'PROVIDER_NON_DELIVERY',
+      providerObservationKey: deliveryStatus!.observationKey,
+      sourceLocator: expect.objectContaining({kind: 'DSN_FAILED', sendOperationId: send.id})
+    }));
+  });
+
 });

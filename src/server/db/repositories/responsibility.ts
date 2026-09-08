@@ -17,6 +17,7 @@ import {
 } from '../schema/responsibility';
 import type {ResponsibilitySemanticDetailsV1} from '../schema/responsibility';
 import {normalizedAttachmentObservation, trustedProviderEvidenceForCandidate} from '../../ai/provider-evidence';
+import {buildSendRfcMessageId} from '../../communication/send-identity';
 import {
   admitTrustedResponsibilityCommand,
   deriveResponsibilityCommand,
@@ -429,6 +430,18 @@ async function normalizedAttachmentObservationsForRows(
   }));
 }
 
+type StoredGmailDeliveryStatus = {action: 'FAILED'; originalMessageId: string; observationKey: string};
+
+function storedGmailDeliveryStatus(value: unknown): StoredGmailDeliveryStatus | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const metadata = value as {deliveryStatus?: unknown};
+  if (!metadata.deliveryStatus || typeof metadata.deliveryStatus !== 'object' || Array.isArray(metadata.deliveryStatus)) return undefined;
+  const status = metadata.deliveryStatus as Record<string, unknown>;
+  return status.action === 'FAILED' && typeof status.originalMessageId === 'string' && typeof status.observationKey === 'string'
+    ? {action: 'FAILED', originalMessageId: status.originalMessageId, observationKey: status.observationKey}
+    : undefined;
+}
+
 /** Resolve an already-derived command against durable application/provider facts. */
 async function evidenceBasisForCandidate(
   tx: Parameters<Parameters<Database['transaction']>[0]>[0],
@@ -445,20 +458,29 @@ async function evidenceBasisForCandidate(
 
   if (messageIds.length > 0) {
     if (messageIds.some((id) => !isUuid(id))) return undefined;
-    const rows = await tx.select({id: messages.id, direction: messages.direction, providerMessageId: messages.providerMessageId, rawProviderMetadata: messages.rawProviderMetadata})
-      .from(messages).where(and(
-        eq(messages.userId, candidate.userId),
-        eq(messages.connectedAccountId, candidate.connectedAccountId),
-        eq(messages.conversationId, candidate.conversationId),
-        inArray(messages.id, messageIds)
-      ));
+    const rows = await tx.select({
+      id: messages.id,
+      conversationId: messages.conversationId,
+      direction: messages.direction,
+      providerMessageId: messages.providerMessageId,
+      rawProviderMetadata: messages.rawProviderMetadata
+    }).from(messages).where(and(
+      eq(messages.userId, candidate.userId),
+      eq(messages.connectedAccountId, candidate.connectedAccountId),
+      inArray(messages.id, messageIds)
+    ));
     if (rows.length !== messageIds.length) return undefined;
     const rowsById = new Map(rows.map((row) => [row.id, row]));
+    const crossThreadDsnIds = new Set(provenance
+      .filter((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY' && item.sourceLocator?.kind === 'DSN_FAILED')
+      .map((item) => item.messageId)
+      .filter((id): id is string => Boolean(id)));
+    if (rows.some((row) => row.conversationId !== candidate.conversationId && !crossThreadDsnIds.has(row.id))) return undefined;
     const reconciledSendClaims = provenance.filter((item) => item.evidenceKind === 'PROVIDER_RECONCILED_SEND');
     for (const item of reconciledSendClaims) {
       if (!item.messageId || !item.providerObservationKey) return undefined;
       const row = rowsById.get(item.messageId);
-      if (!row || row.direction !== 'OUTBOUND' || row.providerMessageId !== item.providerObservationKey) return undefined;
+      if (!row || row.conversationId !== candidate.conversationId || row.direction !== 'OUTBOUND' || row.providerMessageId !== item.providerObservationKey) return undefined;
       const sendOperationId = item.sourceLocator?.sendOperationId;
       if (typeof sendOperationId !== 'string' || !isUuid(sendOperationId)) return undefined;
       const [sendOperation] = await tx.select({
@@ -481,18 +503,21 @@ async function evidenceBasisForCandidate(
         sourceLocator: {authorized: true, provider: 'gmail', sendOperationId: sendOperation.id}
       });
     }
-    references.push(...rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id})));
+    references.push(...rows.filter((row) => row.conversationId === candidate.conversationId).map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id})));
 
     const providerClaims = provenance.filter((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY');
     if (providerClaims.length > 0) {
+      const sameConversationRows = rows.filter((row) => row.conversationId === candidate.conversationId);
       const observations = await normalizedAttachmentObservationsForRows(tx, {
         userId: candidate.userId,
         connectedAccountId: candidate.connectedAccountId,
         evidenceRevision: candidate.evidenceRevision,
-        rows
+        rows: sameConversationRows
       });
       for (const item of providerClaims) {
         if (!item.messageId || !item.providerObservationKey) return undefined;
+        const row = rowsById.get(item.messageId);
+        if (!row) return undefined;
         const observation = observations.find((candidateObservation) =>
           candidateObservation.messageId === item.messageId &&
           candidateObservation.observationKey === item.providerObservationKey &&
@@ -500,12 +525,42 @@ async function evidenceBasisForCandidate(
           candidateObservation.status === 'ABSENT' &&
           candidateObservation.completeness === 'COMPLETE'
         );
-        if (!observation) return undefined;
+        if (observation) {
+          references.push({
+            evidenceKind: 'PROVIDER_NON_DELIVERY',
+            messageId: observation.messageId,
+            providerObservationKey: observation.observationKey,
+            sourceLocator: {zone: 'STRUCTURED_METADATA', authorized: true, authorityReference: observation.observationKey}
+          });
+          continue;
+        }
+
+        const dsn = storedGmailDeliveryStatus(row.rawProviderMetadata);
+        const sendOperationId = item.sourceLocator?.sendOperationId;
+        if (!dsn || dsn.observationKey !== item.providerObservationKey || item.sourceLocator?.kind !== 'DSN_FAILED' ||
+            typeof sendOperationId !== 'string' || !isUuid(sendOperationId)) return undefined;
+        const [sendOperation] = await tx.select({providerMessageId: sendOperations.providerMessageId, draftSnapshot: sendOperations.draftSnapshot})
+          .from(sendOperations).where(and(
+            eq(sendOperations.id, sendOperationId),
+            eq(sendOperations.userId, candidate.userId),
+            eq(sendOperations.connectedAccountId, candidate.connectedAccountId),
+            inArray(sendOperations.status, ['PROVIDER_ACCEPTED', 'RECONCILED'])
+          )).limit(1);
+        const snapshot = sendOperation?.draftSnapshot as {conversationId?: unknown} | undefined;
+        if (!sendOperation?.providerMessageId || snapshot?.conversationId !== candidate.conversationId) return undefined;
+        const [sentSource] = await tx.select({id: messages.id}).from(messages).where(and(
+          eq(messages.userId, candidate.userId),
+          eq(messages.connectedAccountId, candidate.connectedAccountId),
+          eq(messages.conversationId, candidate.conversationId),
+          eq(messages.direction, 'OUTBOUND'),
+          eq(messages.providerMessageId, sendOperation.providerMessageId)
+        )).limit(1);
+        if (!sentSource || buildSendRfcMessageId(sendOperationId) !== dsn.originalMessageId) return undefined;
         references.push({
           evidenceKind: 'PROVIDER_NON_DELIVERY',
-          messageId: observation.messageId,
-          providerObservationKey: observation.observationKey,
-          sourceLocator: {zone: 'STRUCTURED_METADATA', authorized: true, authorityReference: observation.observationKey}
+          messageId: row.id,
+          providerObservationKey: dsn.observationKey,
+          sourceLocator: {zone: 'STRUCTURED_METADATA', authorized: true, provider: 'gmail', kind: 'DSN_FAILED', sendOperationId}
         });
       }
     }
@@ -606,11 +661,17 @@ export class ResponsibilityRepository {
     userId: string;
     connectedAccountId: string;
     responsibilityId: string;
-  }): Promise<{state: ResponsibilityState; projection: ReturnType<typeof projectResponsibility>} | null> {
+  }): Promise<{state: ResponsibilityState; projection: ReturnType<typeof projectResponsibility>; semanticEvidenceRevision: number} | null> {
     return this.db.transaction(async (tx) => {
       const state = await loadResponsibilityState(tx, input.responsibilityId, false);
       if (!state || state.userId !== input.userId || state.connectedAccountId !== input.connectedAccountId) return null;
-      return {state, projection: projectResponsibility(state)};
+      const [conversation] = await tx.select({semanticEvidenceRevision: conversations.semanticEvidenceRevision}).from(conversations).where(and(
+        eq(conversations.id, state.conversationId),
+        eq(conversations.userId, input.userId),
+        eq(conversations.connectedAccountId, input.connectedAccountId)
+      )).limit(1);
+      if (!conversation) return null;
+      return {state, projection: projectResponsibility(state), semanticEvidenceRevision: conversation.semanticEvidenceRevision};
     });
   }
 

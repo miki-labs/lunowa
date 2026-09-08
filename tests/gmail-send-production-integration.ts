@@ -9,6 +9,7 @@ import {CommunicationRepository} from '../src/server/db/repositories/communicati
 import {EvidenceRepository} from '../src/server/db/repositories/evidence';
 import {ResponsibilityRepository} from '../src/server/db/repositories/responsibility';
 import * as schema from '../src/server/db/schema';
+import {extractGmailFailedDeliveryStatus} from '../src/server/gmail/delivery-status';
 import {normalizeGmailMessage} from '../src/server/gmail/normalize';
 import {GmailSendService, buildGmailMessageId} from '../src/server/gmail/send';
 import type {GmailMessage, GmailProviderClient} from '../src/server/gmail/types';
@@ -33,6 +34,23 @@ function message(id: string, messageId: string, labels: string[]): GmailMessage 
       {name: 'Message-ID', value: messageId},
       {name: 'References', value: '<g51-original@example.com>'}
     ], body: {data: Buffer.from(`body-${id}`).toString('base64url')}}
+  };
+}
+
+function failedDsnMessage(originalMessageId: string): GmailMessage {
+  return {
+    id: 'g51-dsn', threadId: 'g51-dsn-thread', labelIds: ['INBOX'], internalDate: '1893456001000',
+    payload: {mimeType: 'multipart/report', headers: [
+      {name: 'From', value: 'Mail Delivery Subsystem <mailer-daemon@example.net>'},
+      {name: 'To', value: 'owner@example.com'},
+      {name: 'Subject', value: 'Delivery Status Notification (Failure)'},
+      {name: 'Message-ID', value: '<g51-dsn@example.net>'},
+      {name: 'Content-Type', value: 'multipart/report; report-type=delivery-status; boundary=g51-dsn'}
+    ], parts: [
+      {mimeType: 'text/plain', body: {data: Buffer.from('Delivery failed.').toString('base64url')}},
+      {mimeType: 'message/delivery-status', body: {data: Buffer.from('Final-Recipient: rfc822; person@example.com\r\nAction: failed\r\nStatus: 5.1.1\r\n').toString('base64url')}},
+      {mimeType: 'text/rfc822-headers', body: {data: Buffer.from(`Message-ID: ${originalMessageId}\r\nSubject: Re: G51 request\r\n`).toString('base64url')}}
+    ]}
   };
 }
 
@@ -98,7 +116,9 @@ try {
       sentMessageId = 'g51-sent';
       return {id: sentMessageId, threadId: 'g51-thread'};
     },
-    listMessagesByRfc822MessageId: async () => ({messages: []})
+    listMessagesByRfc822MessageId: async (_token, messageId) => messageId === buildGmailMessageId(operation.id)
+      ? ({messages: [{id: sentMessageId, threadId: 'g51-thread'}]})
+      : ({messages: []})
   };
   const credentials = {getAccessToken: async () => 'g51-test-token'};
   const service = new GmailSendService(
@@ -120,6 +140,45 @@ try {
 
   const resultingResponsibility = await responsibilityRepository.getResponsibility({userId, connectedAccountId: accountId, responsibilityId: initialResponsibility.id});
   assert(resultingResponsibility?.state.resolutionStatus === 'RESOLVED', 'reconciled sent Source did not apply the bound Responsibility consequence');
+
+  const dsnMessage = failedDsnMessage(buildGmailMessageId(operation.id));
+  const deliveryStatus = await extractGmailFailedDeliveryStatus(dsnMessage);
+  assert(deliveryStatus, 'structured failed DSN fixture was not recognized');
+  const dsnSource = await evidence.upsertNormalizedMessage(await normalizeGmailMessage({
+    userId, connectedAccountId: accountId, accountEmail: 'owner@example.com', message: dsnMessage
+  }));
+  const targetBeforeBounce = await responsibilityRepository.getResponsibility({
+    userId, connectedAccountId: accountId, responsibilityId: initialResponsibility.id
+  });
+  assert(targetBeforeBounce, 'resolved Responsibility disappeared before non-delivery proof');
+  const crossThreadGeneric: TrustedResponsibilityCommand = {
+    commandSource: 'TRUSTED_SYSTEM', userId, connectedAccountId: accountId,
+    conversationId: targetBeforeBounce.state.conversationId,
+    sourceEventKey: 'g51-cross-thread-generic', candidateKey: 'g51-cross-thread-generic',
+    applicationKey: 'g51-cross-thread-generic', evidenceRevision: targetBeforeBounce.semanticEvidenceRevision,
+    admission: {decision: 'TRACK', reasonCodes: ['MATERIAL_OPEN_LOOP']},
+    provenance: [{evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: dsnSource.messageId}],
+    effects: [{operation: 'NO_OP', responsibilityRef: targetBeforeBounce.state.id, effectKey: 'g51-cross-thread-generic'}]
+  };
+  const crossThreadRejected = await responsibilityRepository.applyTrustedCommand(crossThreadGeneric);
+  assert(crossThreadRejected.status === 'REJECTED', 'generic cross-thread Source bypassed conversation evidence authorization');
+  const reopened = await service.observeProviderNonDelivery({
+    userId, connectedAccountId: accountId, accessToken: 'g51-test-token',
+    sourceMessageId: dsnSource.messageId, deliveryStatus
+  });
+  assert(reopened, 'trusted DSN did not re-enter Responsibility reduction');
+  const afterBounce = await responsibilityRepository.getResponsibility({
+    userId, connectedAccountId: accountId, responsibilityId: initialResponsibility.id
+  });
+  assert(afterBounce?.state.resolutionStatus === 'OPEN', 'trusted non-delivery did not REOPEN the previously reconciled Responsibility');
+  assert(afterBounce.state.obligationLegs.some((leg) => leg.actionCode === 'REPLY_TO_REQUEST' && leg.status === 'OPEN'),
+    'trusted non-delivery did not restore the exact communication leg');
+  assert(afterBounce.state.resolutionHistory.length >= 1, 'REOPEN erased prior resolution history');
+  const replayedBounce = await service.observeProviderNonDelivery({
+    userId, connectedAccountId: accountId, accessToken: 'g51-test-token',
+    sourceMessageId: dsnSource.messageId, deliveryStatus
+  });
+  assert(replayedBounce === false, 'replayed DSN applied a second non-delivery mutation');
 
   const persisted = await db.select({status: schema.sendOperations.status, attempts: schema.sendOperations.attemptCount})
     .from(schema.sendOperations);

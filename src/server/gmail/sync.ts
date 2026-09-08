@@ -5,6 +5,7 @@ import {GmailRepository, type ClaimedGmailSignal} from '@/server/db/repositories
 
 import {GmailCredentialService} from './authorization';
 import {normalizeGmailMessage} from './normalize';
+import type {GmailSendService} from './send';
 import type {GmailEvidenceWriter, GmailHistory, GmailProviderClient} from './types';
 import {GmailProviderError} from './types';
 
@@ -53,7 +54,8 @@ export class GmailSyncService {
     private readonly provider: GmailProviderClient,
     private readonly credentials: GmailCredentialService,
     private readonly repository: SyncRepository = new GmailRepository(),
-    private readonly evidence: GmailEvidenceWriter = new EvidenceRepository()
+    private readonly evidence: GmailEvidenceWriter = new EvidenceRepository(),
+    private readonly nonDelivery?: Pick<GmailSendService, 'observeProviderNonDelivery'>
   ) {}
 
   private async ingestMessage(context: {
@@ -70,7 +72,14 @@ export class GmailSyncService {
         loadBodyPart: (attachmentId) =>
           this.provider.getAttachment(accessToken, message.id, attachmentId)
       });
-      await this.evidence.upsertNormalizedMessage(normalized);
+      const source = await this.evidence.upsertNormalizedMessage(normalized);
+      const deliveryStatus = normalized.rawProviderMetadata.deliveryStatus;
+      if (deliveryStatus && this.nonDelivery) {
+        await this.nonDelivery.observeProviderNonDelivery({
+          userId: context.userId, connectedAccountId: context.connectedAccountId, accessToken,
+          sourceMessageId: source.messageId, deliveryStatus
+        });
+      }
     } catch (error) {
       if (error instanceof GmailProviderError && error.status === 404) {
         await this.evidence.markNormalizedMessageAbsent({

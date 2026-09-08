@@ -74,7 +74,7 @@ export interface GmailProviderClient {
 }
 
 export interface GmailEvidenceWriter {
-  upsertNormalizedMessage(input: NormalizedProviderMessage): Promise<unknown>;
+  upsertNormalizedMessage(input: NormalizedProviderMessage): Promise<{messageId: string; conversationId: string; evidenceRevision: number; changed: boolean}>;
   listProviderMessageIds(input: {userId: string; connectedAccountId: string}): Promise<readonly string[]>;
   markNormalizedMessageAbsent(input: {userId: string; connectedAccountId: string; providerMessageId: string}): Promise<boolean>;
 }

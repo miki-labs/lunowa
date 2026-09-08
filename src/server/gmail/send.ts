@@ -1,12 +1,12 @@
-import {createHash} from 'node:crypto';
-
 import type {CommunicationRepository, SendOperationReadModel} from '@/server/db/repositories/communication';
+import {buildSendRfcMessageId} from '@/server/communication/send-identity';
 import {CommunicationRepository as DefaultCommunicationRepository} from '@/server/db/repositories/communication';
 import type {EvidenceRepository} from '@/server/db/repositories/evidence';
 import {EvidenceRepository as DefaultEvidenceRepository} from '@/server/db/repositories/evidence';
 import type {ResponsibilityRepository} from '@/server/db/repositories/responsibility';
 import {ResponsibilityRepository as DefaultResponsibilityRepository} from '@/server/db/repositories/responsibility';
 import {GmailCredentialService} from './authorization';
+import type {GmailFailedDeliveryStatus} from './delivery-status';
 import {normalizeGmailMessage} from './normalize';
 import type {GmailMessage, GmailProviderClient} from './types';
 import {GmailProviderError, GMAIL_SEND_SCOPE} from './types';
@@ -42,7 +42,7 @@ export type SendSnapshot = {
 };
 
 type OperationStore = Pick<CommunicationRepository,
-  'getSendOperation' | 'claimSendOperation' | 'transitionSendOperation'>;
+  'getSendOperation' | 'getSendOperationByProviderMessageId' | 'claimSendOperation' | 'transitionSendOperation'>;
 type EvidenceWriter = Pick<EvidenceRepository, 'upsertNormalizedMessage'>;
 type ResponsibilityWriter = Pick<ResponsibilityRepository, 'getResponsibility' | 'applyTrustedCommand'>;
 type CredentialReader = Pick<GmailCredentialService, 'getAccessToken'> &
@@ -140,8 +140,7 @@ function assertMessageLineLengths(raw: string): void {
 }
 
 function messageIdForSendOperation(sendOperationId: string): string {
-  const digest = createHash('sha256').update(`lunowa:gmail:send:${sendOperationId}`).digest('hex');
-  return `<lunowa-${digest}@lunowa.invalid>`;
+  return buildSendRfcMessageId(sendOperationId);
 }
 
 function messageIds(value: string | undefined): string[] {
@@ -237,7 +236,10 @@ function bindingOf(snapshot: SendSnapshot): SendSnapshot['responsibilityBinding'
 }
 
 function sendLeg(leg: ResponsibilityState['obligationLegs'][number]): boolean {
-  return leg.bearer === 'USER' && /^(?:SEND|REPLY|RESPOND|FOLLOW[_-]?UP)(?:$|[_-])/.test(leg.actionCode.trim().toUpperCase());
+  // Provider acceptance proves that a communication was sent. It does not by
+  // itself prove content/attachment-specific fulfillment such as SEND_DRAFT,
+  // SEND_FIGURES or SEND_REVISED_DOCUMENT.
+  return leg.bearer === 'USER' && /^(?:REPLY|RESPOND|FOLLOW[_-]?UP)(?:$|[_-])/.test(leg.actionCode.trim().toUpperCase());
 }
 
 export function buildTrustedReconciledSendCommand(input: {
@@ -288,6 +290,69 @@ export function buildTrustedReconciledSendCommand(input: {
   };
 }
 
+function sentMessageMatchesOperation(snapshot: SendSnapshot, operationId: string, message: GmailMessage): void {
+  const expectedThreadId = contextString(snapshot, 'providerThreadId');
+  if (message.threadId !== expectedThreadId) throw new Error('RECONCILED_THREAD_MISMATCH');
+  if (header(message, 'Message-ID') !== messageIdForSendOperation(operationId)) throw new Error('RECONCILED_MESSAGE_ID_MISMATCH');
+  const sentSubject = header(message, 'Subject');
+  if (!sentSubject || !compatibleSubject(snapshot.subject, sentSubject)) throw new Error('RECONCILED_SUBJECT_MISMATCH');
+  if (!(message.labelIds ?? []).includes('SENT')) throw new Error('RECONCILED_SENT_LABEL_MISSING');
+}
+
+function legWasClosedByOperation(leg: ResponsibilityState['obligationLegs'][number], operationId: string): boolean {
+  return leg.status === 'CLOSED' && leg.bearer === 'USER' && leg.provenance.some((item) =>
+    item.evidenceKind === 'PROVIDER_RECONCILED_SEND' && item.sourceLocator?.sendOperationId === operationId
+  );
+}
+
+export function buildTrustedProviderNonDeliveryCommand(input: {
+  operation: SendOperationReadModel;
+  responsibility: ResponsibilityState;
+  sourceMessageId: string;
+  providerObservationKey: string;
+  evidenceRevision: number;
+}): TrustedResponsibilityCommand | undefined {
+  const state = input.responsibility;
+  const closed = state.obligationLegs.filter((leg) => legWasClosedByOperation(leg, input.operation.id));
+  if (closed.length !== 1) return undefined;
+  const failedLeg = closed[0]!;
+  const provenance: ProvenanceInput = {
+    evidenceKind: 'PROVIDER_NON_DELIVERY',
+    messageId: input.sourceMessageId,
+    providerObservationKey: input.providerObservationKey,
+    sourceLocator: {zone: 'STRUCTURED_METADATA', authorized: true, provider: 'gmail', kind: 'DSN_FAILED', sendOperationId: input.operation.id}
+  };
+  const legs = state.obligationLegs.map((leg) => {
+    if (leg.id !== failedLeg.id) return leg;
+    const openLeg = {...leg, status: 'OPEN' as const, provenance: [...leg.provenance, provenance]};
+    delete openLeg.closureReason;
+    delete openLeg.closedAt;
+    return openLeg;
+  });
+  const reopensResolved = state.resolutionStatus === 'RESOLVED';
+  const effect = {
+    operation: reopensResolved ? 'REOPEN' as const : 'UPDATE' as const,
+    responsibilityRef: state.id,
+    expectedAggregateVersion: state.aggregateVersion,
+    effectKey: `provider-non-delivery:${input.operation.id}:${input.sourceMessageId}`,
+    patch: {obligationLegs: legs},
+    ...(reopensResolved ? {resolutionEvidence: {strength: 'SUFFICIENT' as const, kinds: ['PROVIDER_NON_DELIVERY' as const]}} : {}),
+    provenance: [provenance]
+  };
+  return {
+    userId: state.userId, connectedAccountId: state.connectedAccountId, conversationId: state.conversationId,
+    commandSource: 'TRUSTED_SYSTEM',
+    sourceEventKey: `provider-non-delivery:${input.sourceMessageId}`,
+    candidateKey: `provider-non-delivery:${input.sourceMessageId}`,
+    evidenceRevision: input.evidenceRevision,
+    admission: {decision: 'TRACK', reasonCodes: ['PROVIDER_NON_DELIVERY'], candidateSummary: {sendOperationId: input.operation.id}},
+    provenance: [provenance],
+    applicationKey: `provider-non-delivery:${input.operation.id}:${input.sourceMessageId}`,
+    correlationId: input.operation.id,
+    effects: [effect]
+  };
+}
+
 export class GmailSendService {
   constructor(
     private readonly provider: GmailProviderClient,
@@ -324,7 +389,7 @@ export class GmailSendService {
       });
     }
     try {
-      const response = await this.provider.sendMessage(accessToken, mime);
+      const response = await this.provider.sendMessage(accessToken, {raw: mime.raw, threadId: mime.threadId});
       if (!response.id || !response.threadId) throw new GmailProviderError(502, 'INVALID_SEND_RESPONSE');
       const accepted = await this.operations.transitionSendOperation({
         userId: input.userId,
@@ -348,6 +413,40 @@ export class GmailSendService {
         lastErrorCode: providerErrorCode(error)
       });
     }
+  }
+
+  async observeProviderNonDelivery(input: {
+    userId: string;
+    connectedAccountId: string;
+    accessToken: string;
+    sourceMessageId: string;
+    deliveryStatus: GmailFailedDeliveryStatus;
+  }): Promise<boolean> {
+    const page = await this.provider.listMessagesByRfc822MessageId(input.accessToken, input.deliveryStatus.originalMessageId);
+    const ids = [...new Set((page.messages ?? []).map((item) => item.id).filter(Boolean))];
+    if (ids.length !== 1) return false;
+    const sentMessage = await this.provider.getMessage(input.accessToken, ids[0]!);
+    if (header(sentMessage, 'Message-ID') !== input.deliveryStatus.originalMessageId || !(sentMessage.labelIds ?? []).includes('SENT')) return false;
+    const operation = await this.operations.getSendOperationByProviderMessageId({
+      userId: input.userId, connectedAccountId: input.connectedAccountId, providerMessageId: sentMessage.id
+    });
+    if (!operation || messageIdForSendOperation(operation.id) !== input.deliveryStatus.originalMessageId) return false;
+    const snapshot = snapshotOf(operation);
+    sentMessageMatchesOperation(snapshot, operation.id, sentMessage);
+    const binding = bindingOf(snapshot);
+    if (!binding) return false;
+    const target = await this.responsibilities.getResponsibility({
+      userId: input.userId, connectedAccountId: input.connectedAccountId, responsibilityId: binding.responsibilityId
+    });
+    if (!target || target.state.conversationId !== snapshot.conversationId) return false;
+    const command = buildTrustedProviderNonDeliveryCommand({
+      operation, responsibility: target.state, sourceMessageId: input.sourceMessageId,
+      providerObservationKey: input.deliveryStatus.observationKey, evidenceRevision: target.semanticEvidenceRevision
+    });
+    if (!command) return false;
+    const reduction = await this.responsibilities.applyTrustedCommand(command);
+    if (reduction.status !== 'APPLIED') throw new Error(`PROVIDER_NON_DELIVERY_REEVALUATION_${reduction.status}:${reduction.reason}`);
+    return true;
   }
 
   private async reconcile(input: {userId: string; sendOperationId: string}, operation: SendOperationReadModel): Promise<SendOperationReadModel> {
@@ -414,6 +513,8 @@ export class GmailSendService {
     try {
       const snapshot = snapshotOf(operation);
       const message = knownMessage ?? await this.provider.getMessage(accessToken, providerMessageId);
+      if (message.id !== providerMessageId) throw new Error('RECONCILED_PROVIDER_ID_MISMATCH');
+      sentMessageMatchesOperation(snapshot, operation.id, message);
       const normalized = await normalizeGmailMessage({
         userId: input.userId,
         connectedAccountId: operation.connectedAccountId,

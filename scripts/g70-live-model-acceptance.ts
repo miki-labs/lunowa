@@ -33,6 +33,7 @@ const transport = new OpenAISdkResponsesTransport();
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const participant = '00000000-0000-4000-8000-000000000010';
 const currentUserParticipant = '00000000-0000-4000-8000-000000000011';
+const managerParticipant = '00000000-0000-4000-8000-000000000012';
 
 function interpretationCase(id: string, body: string, input: Partial<AuthorizedInterpretationContext> = {}): AuthorizedInterpretationContext {
   const sender = {email: 'partner@example.com', participantId: participant};
@@ -59,13 +60,17 @@ const interpretationCases = [
   {id: 'T0-002', context: interpretationCase('T0-002', '修正版を明日送ります。')},
   {id: 'T0-034', context: interpretationCase('T0-034', '修正版を添付しました。')},
   {id: 'T0-040', context: interpretationCase('T0-040', '田中さんか佐藤さん、どちらか本日中に対応お願いします。', {
+    user: {id: 'live-eval-user', email: 'sato@example.com', locale: 'ja-JP', timezone: 'Asia/Tokyo'},
+    connectedAccount: {id: 'live-eval-account', provider: 'gmail', emailAddress: 'sato@example.com'},
+    participantIds: [managerParticipant, participant, currentUserParticipant],
     participants: [
+      {id: managerParticipant, email: 'manager@example.com', messageIds: ['m1'], roles: ['SENDER']},
       {id: participant, email: 'tanaka@example.com', messageIds: ['m1'], roles: ['TO']},
-      {id: currentUserParticipant, email: 'user@example.com', messageIds: ['m1'], roles: ['TO'], isConnectedAccount: true}
+      {id: currentUserParticipant, email: 'sato@example.com', messageIds: ['m1'], roles: ['TO'], isConnectedAccount: true}
     ],
     messages: [{
-      id: 'm1', direction: 'INBOUND', sender: {email: 'manager@example.com'},
-      recipients: [{email: 'tanaka@example.com', participantId: participant}, {email: 'user@example.com', participantId: currentUserParticipant}],
+      id: 'm1', direction: 'INBOUND', sender: {email: 'manager@example.com', participantId: managerParticipant},
+      recipients: [{email: 'tanaka@example.com', participantId: participant}, {email: 'sato@example.com', participantId: currentUserParticipant}],
       subject: '本日の対応', body: '田中さんか佐藤さん、どちらか本日中に対応お願いします。', sentAt: '2026-08-24T09:00:00+09:00',
       sourceZones: [{zone: 'AUTHORED_CURRENT', start: 0, end: '田中さんか佐藤さん、どちらか本日中に対応お願いします。'.length}]
     }]

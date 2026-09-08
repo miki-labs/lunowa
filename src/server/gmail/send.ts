@@ -433,7 +433,12 @@ export class GmailSendService {
             target.state.acceptedEvidenceRevision === binding.evidenceRevision &&
             target.state.conversationId === snapshot.conversationId) {
           const command = buildTrustedReconciledSendCommand({operation, snapshot, responsibility: target.state, messageId: source.messageId, evidenceRevision: source.evidenceRevision});
-          if (command) await this.responsibilities.applyTrustedCommand(command);
+          if (command) {
+            const reduction = await this.responsibilities.applyTrustedCommand(command);
+            if (reduction.status !== 'APPLIED') {
+              throw new Error(`RESPONSIBILITY_REEVALUATION_${reduction.status}:${reduction.reason}`);
+            }
+          }
         }
       }
       return this.operations.transitionSendOperation({

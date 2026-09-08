@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 
 import {getDatabase} from '../index';
 import {attachments, conversations, messages, participantIdentities} from '../schema/evidence';
+import {sendOperations} from '../schema/communication';
 import {
   aiInterpretationRuns,
   responsibilities,
@@ -444,7 +445,7 @@ async function evidenceBasisForCandidate(
 
   if (messageIds.length > 0) {
     if (messageIds.some((id) => !isUuid(id))) return undefined;
-    const rows = await tx.select({id: messages.id, direction: messages.direction, rawProviderMetadata: messages.rawProviderMetadata})
+    const rows = await tx.select({id: messages.id, direction: messages.direction, providerMessageId: messages.providerMessageId, rawProviderMetadata: messages.rawProviderMetadata})
       .from(messages).where(and(
         eq(messages.userId, candidate.userId),
         eq(messages.connectedAccountId, candidate.connectedAccountId),
@@ -453,7 +454,33 @@ async function evidenceBasisForCandidate(
       ));
     if (rows.length !== messageIds.length) return undefined;
     const rowsById = new Map(rows.map((row) => [row.id, row]));
-    if (provenance.some((item) => item.evidenceKind === 'PROVIDER_RECONCILED_SEND' && item.messageId && rowsById.get(item.messageId)?.direction !== 'OUTBOUND')) return undefined;
+    const reconciledSendClaims = provenance.filter((item) => item.evidenceKind === 'PROVIDER_RECONCILED_SEND');
+    for (const item of reconciledSendClaims) {
+      if (!item.messageId || !item.providerObservationKey) return undefined;
+      const row = rowsById.get(item.messageId);
+      if (!row || row.direction !== 'OUTBOUND' || row.providerMessageId !== item.providerObservationKey) return undefined;
+      const sendOperationId = item.sourceLocator?.sendOperationId;
+      if (typeof sendOperationId !== 'string' || !isUuid(sendOperationId)) return undefined;
+      const [sendOperation] = await tx.select({
+        id: sendOperations.id,
+        status: sendOperations.status,
+        providerMessageId: sendOperations.providerMessageId,
+        draftSnapshot: sendOperations.draftSnapshot
+      }).from(sendOperations).where(and(
+        eq(sendOperations.id, sendOperationId),
+        eq(sendOperations.userId, candidate.userId),
+        eq(sendOperations.connectedAccountId, candidate.connectedAccountId),
+        inArray(sendOperations.status, ['PROVIDER_ACCEPTED', 'RECONCILED'])
+      )).limit(1);
+      const snapshot = sendOperation?.draftSnapshot as {conversationId?: unknown} | undefined;
+      if (!sendOperation || sendOperation.providerMessageId !== row.providerMessageId || snapshot?.conversationId !== candidate.conversationId) return undefined;
+      references.push({
+        evidenceKind: 'PROVIDER_RECONCILED_SEND',
+        messageId: row.id,
+        providerObservationKey: row.providerMessageId,
+        sourceLocator: {authorized: true, provider: 'gmail', sendOperationId: sendOperation.id}
+      });
+    }
     references.push(...rows.map(({id}) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: id})));
 
     const providerClaims = provenance.filter((item) => item.evidenceKind === 'PROVIDER_NON_DELIVERY');

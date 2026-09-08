@@ -189,6 +189,29 @@ describe('G51 Gmail send boundary', () => {
     expect(provider.listMessagesByRfc822MessageId).not.toHaveBeenCalled();
   });
 
+  it('keeps provider acceptance durable when a current bound Responsibility re-evaluation is rejected', async () => {
+    const state = responsibility([leg('user-send', 'USER', 'SEND_REVISED_DOCUMENT')]);
+    const bound = {
+      ...operation(),
+      draftSnapshot: {
+        ...snapshot(),
+        responsibilityBinding: {responsibilityId: state.id, aggregateVersion: state.aggregateVersion, evidenceRevision: state.acceptedEvidenceRevision}
+      }
+    };
+    const operationStore = store(bound);
+    const provider = providerFor();
+    const responsibilityStore = {
+      getResponsibility: vi.fn(async () => ({state})),
+      applyTrustedCommand: vi.fn(async () => ({status: 'REJECTED', admission: 'TRACK', reason: 'trusted evidence mismatch', effects: [], responsibilities: [state]}))
+    };
+    const service = new GmailSendService(provider, credentials as never, operationStore as never, evidence as never, responsibilityStore as never);
+    const result = await service.dispatch({userId: 'user-1', sendOperationId: 'operation-1'});
+    expect(result.status).toBe('PROVIDER_ACCEPTED');
+    expect(result.lastErrorCode).toContain('RESPONSIBILITY_REEVALUATION_REJECTED');
+    expect(provider.sendMessage).toHaveBeenCalledTimes(1);
+    expect(responsibilityStore.applyTrustedCommand).toHaveBeenCalledTimes(1);
+  });
+
   it('reconciles exactly one RFC822 Message-ID match and guards multiple matches', async () => {
     const oneStore = store(operation('AMBIGUOUS'));
     const one = new GmailSendService(providerFor({search: ['sent-1']}), credentials as never, oneStore as never, evidence as never, responsibilities as never);

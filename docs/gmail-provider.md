@@ -153,22 +153,26 @@ that Gmail places a real Reply or Reply All in the intended provider thread.
 It requires `G51_REAL_LANE=REPLY` or `REPLY_ALL` and
 `G51_REAL_MODE=SEND_ONCE` or `RECONCILE_ONLY`. `SEND_ONCE` additionally requires
 `G51_ALLOW_REAL_SEND=YES`; without that exact value the process stops before a
-provider client is constructed. A local durable effect marker is atomically
-written before `messages.send`, so the same candidate/run/lane cannot be
-blindly sent again on that controller host. After any ambiguous outcome, only
-`RECONCILE_ONLY` is permitted; it searches the stable RFC822 Message-ID and
+provider client is constructed. The declared candidate SHA must match the clean checkout actually executing the
+harness before provider credentials are constructed. A local durable effect marker is
+atomically written before `messages.send` and is scoped to the exact candidate/lane,
+so changing the run ID cannot admit a second provider attempt on that controller
+host. After any ambiguous outcome, only `RECONCILE_ONLY` is permitted; it must use
+the run ID bound by the durable claim, searches the stable RFC822 Message-ID, and
 never calls `messages.send`.
 
 The prepared source must be an inbound message in a dedicated harmless test
-thread. Every target address must be both provider-observed in that source and
-present in the explicit `G51_REAL_ALLOWED_RECIPIENTS_JSON` allowlist; the
-connected account is never a target. Reply must target the observed sender.
-Reply All must retain that sender and exercise at least one additional observed
-recipient. Bcc is never accepted by this harness.
+thread. Provider `From` / `To` / `Cc` headers are parsed as RFC mailbox lists rather
+than matched as raw substrings. Every target address must be both exactly
+provider-observed in that source and present in the explicit
+`G51_REAL_ALLOWED_RECIPIENTS_JSON` allowlist; the connected account is never a
+target. Reply must target the exact observed sender. Reply All must retain that
+sender and exercise at least one additional observed recipient. Bcc is never
+accepted by this harness.
 
 A lane passes only after Gmail is read back and confirms the expected thread,
-stable Message-ID, In-Reply-To, References chain, Subject, and authorized target
-set. Evidence output contains the exact candidate SHA and external evidence
+stable Message-ID, In-Reply-To, References chain, Subject, exact To/Cc mailbox
+sets, and no Bcc target. Evidence output contains the exact candidate SHA and external evidence
 reference but hashes provider/thread identities and emits no credentials,
 recipient addresses, mailbox content, or raw MIME. Both Reply and Reply All
 must PASS against the same exact candidate before G51 may claim its real Gmail

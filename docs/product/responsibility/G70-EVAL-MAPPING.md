@@ -27,6 +27,8 @@ Interpretation Structured Output schema v2 deliberately carries only the communi
 
 ## Claim versus provider observation
 
+Continuation/reopen identity is exact and scoped at both the model validator and production reduction boundary: non-new relations must select a current authorized `priorResponsibilityId`; operational-outcome text similarity is never identity authority.
+
 The model may emit only bounded communicated claims (`ATTACHMENT_DELIVERED` or `DELIVERY_FAILURE_REPORTED`). Gmail normalization/provider observations are never included in the model prompt. `src/server/ai/provider-evidence.ts` derives deterministic attachment observations from normalized evidence, and the production Responsibility repository independently reconstructs and validates the same observation key before accepting `PROVIDER_NON_DELIVERY`. `MIME_STRUCTURE_TRUNCATED`, partial normalization, and unsupported body evidence cannot become trusted absence.
 
 ## Live model gate

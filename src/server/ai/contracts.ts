@@ -45,8 +45,6 @@ export type ModelSourceRef = {
 export type ModelIdentityRelation = {
   kind: 'NEW' | 'CONTINUES' | 'REPLACES' | 'SAME_UNSATISFIED_OUTCOME' | 'NEW_EPISODE';
   priorResponsibilityId?: string;
-  /** Trusted-derived after validation; never accepted from model JSON. */
-  priorOperationalOutcome?: string;
 };
 
 type ModelProvenanced<T extends object> = T & {sourceRefs: ModelSourceRef[]};
@@ -493,7 +491,7 @@ function validateIdentity(
   if (!priorResponsibilityId) throw new AIContractError(`${label} must select an authorized priorResponsibilityId`);
   const prior = authorizedPriorResponsibilities?.get(priorResponsibilityId);
   if (!prior) throw new AIContractError(`${label}.priorResponsibilityId is not authorized for this user/account/conversation`);
-  return {kind, priorResponsibilityId, priorOperationalOutcome: prior.operationalOutcome};
+  return {kind, priorResponsibilityId};
 }
 
 function validateSourceProvenanced(

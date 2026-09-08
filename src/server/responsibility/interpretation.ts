@@ -61,9 +61,6 @@ function clone<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
 }
 
-function normalizedOutcome(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('und');
-}
 
 function referenceKey(item: ProvenanceInput): string | undefined {
   if (item.providerObservationKey?.trim()) return `provider:${item.providerObservationKey.trim()}`;
@@ -154,8 +151,11 @@ function validateCandidateShape(candidate: ResponsibilityInterpretationCandidate
         return 'quoted, forwarded, boilerplate, or metadata context cannot supply current-turn communicative authority';
       }
     }
-    if (unit.identityRelation && unit.identityRelation.kind !== 'NEW' && unit.identityRelation.kind !== 'NEW_EPISODE' && !unit.identityRelation.priorOperationalOutcome?.trim()) {
-      return `identity relation ${unit.identityRelation?.kind} needs a prior operational outcome, not a Responsibility identifier`;
+    if (unit.identityRelation && unit.identityRelation.kind !== 'NEW' && unit.identityRelation.kind !== 'NEW_EPISODE' && !unit.identityRelation.priorResponsibilityId?.trim()) {
+      return `identity relation ${unit.identityRelation.kind} needs an exact priorResponsibilityId`;
+    }
+    if (unit.identityRelation && (unit.identityRelation.kind === 'NEW' || unit.identityRelation.kind === 'NEW_EPISODE') && unit.identityRelation.priorResponsibilityId) {
+      return `identity relation ${unit.identityRelation.kind} cannot select a prior Responsibility`;
     }
   }
 
@@ -186,26 +186,15 @@ function admissionFor(candidate: ResponsibilityInterpretationCandidate): {decisi
 
 function findPrior(unit: CandidateResponsibilitySemantics, candidate: ResponsibilityInterpretationCandidate, states: readonly ResponsibilityState[]): ResponsibilityState {
   const priorId = unit.identityRelation?.priorResponsibilityId;
-  if (priorId) {
-    const exact = states.find((state) =>
-      state.id === priorId &&
-      state.userId === candidate.userId &&
-      state.connectedAccountId === candidate.connectedAccountId &&
-      state.conversationId === candidate.conversationId
-    );
-    if (!exact) throw new Error(`identity relation for ${unit.candidateUnitKey} selected an unauthorized or unknown Responsibility`);
-    return exact;
-  }
-  const priorOutcome = unit.identityRelation?.priorOperationalOutcome;
-  if (!priorOutcome) throw new Error('continuation needs a prior operational outcome');
-  const matches = states.filter((state) =>
+  if (!priorId) throw new Error('continuation needs an exact priorResponsibilityId');
+  const exact = states.find((state) =>
+    state.id === priorId &&
     state.userId === candidate.userId &&
     state.connectedAccountId === candidate.connectedAccountId &&
-    state.conversationId === candidate.conversationId &&
-    normalizedOutcome(state.operationalOutcome) === normalizedOutcome(priorOutcome)
+    state.conversationId === candidate.conversationId
   );
-  if (matches.length !== 1) throw new Error(`identity relation for ${unit.candidateUnitKey} must match exactly one scoped Responsibility`);
-  return matches[0] as ResponsibilityState;
+  if (!exact) throw new Error(`identity relation for ${unit.candidateUnitKey} selected an unauthorized or unknown Responsibility`);
+  return exact;
 }
 
 function patchFor(unit: CandidateResponsibilitySemantics): ResponsibilityPatch {

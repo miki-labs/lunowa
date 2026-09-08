@@ -207,7 +207,7 @@ test('keeps trusted delegation and LATER actions on the authenticated Product pa
   await page.goto('/ja');
   await page.getByRole('button', {name: /契約条件を確認する/}).click();
   await page.getByRole('button', {name: 'この件を任せる'}).click();
-  await expect(page.getByText('任せる操作を保存しました。現在の状態を更新しています。')).toBeVisible();
+  await expect(page.getByText('保存を確認しました。現在の状態を更新しています', {exact: true})).toBeVisible();
   expect(actionBodies[0]?.action).toBe('DELEGATE');
 
   model = {...initialAttention, needsYou: [], managed: [], later: [later], review: [], done: [], delegationCandidates: [], strictZero: false, managedCount: 0, delegatedCount: 1};

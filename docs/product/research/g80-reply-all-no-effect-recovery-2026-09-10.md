@@ -21,3 +21,17 @@ Classification: **NO_PROVIDER_EFFECT_OBSERVED**. This is not provider acceptance
 ## Recovery rule
 
 A later real-provider proof may use only a new exact candidate SHA plus a new one-shot run identity. The historical claim above remains quarantined evidence. Any ambiguous successor outcome is reconcile-only and must never be blindly replayed.
+
+## Successor no-effect attempt
+
+A second one-shot admission was created for candidate `affaf5bd7417d421e0c2a94f53a16a81aaa6a70d`, run `g80-reply-all-affaf5bd-20260910-0100`, lane `REPLY_ALL`.
+
+The browser-side execution path did not produce an observable provider effect. Before any successor admission, independent read-only checks established:
+
+- the prepared draft still had zero `SendOperation` rows;
+- the recipient mailbox still had no matching message from `educ43602@gmail.com` for the prepared subject/thread;
+- the prepared draft remained `ACTIVE` and the connected Gmail account retained `mail_send`.
+
+Classification: **NO_PROVIDER_EFFECT_OBSERVED**.
+
+The `affaf5bd...` claim is therefore historical/quarantined evidence and must not be reused. Any further real-provider proof requires another exact candidate SHA and a new one-shot run identity.

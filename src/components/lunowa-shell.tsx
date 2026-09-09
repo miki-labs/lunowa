@@ -348,12 +348,12 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
       : null;
     const conversationId = detail === 'moment' ? attentionItem?.conversationId : sourceConversation?.id ?? replyContext?.conversationId;
     const accountId = detail === 'moment' ? attentionItem?.connectedAccountId : sourceConversation?.account.id ?? replyContext?.connectedAccount.id;
-    if (!conversationId || !accountId) return;
-    const key = `${conversationId}:${accountId}:${replyMode}`;
+    if (!conversationId || !accountId || (detail === 'conversation' && !sourceConversation)) return;
+    const latestInboundMessage = detail === 'conversation' ? [...sourceConversation!.messages].reverse().find((message) => message.direction === 'INBOUND') : undefined;
+    const key = `${conversationId}:${accountId}:${replyMode}:${latestInboundMessage?.id ?? ''}`;
     if (replyContextKey === key && replyContext) return;
     const controller = new AbortController();
     const query = new URLSearchParams({connectedAccountId: accountId, conversationId, mode: replyMode});
-    const latestInboundMessage = detail === 'conversation' ? [...(sourceConversation?.messages ?? [])].reverse().find((message) => message.direction === 'INBOUND') : undefined;
     if (latestInboundMessage) query.set('inReplyToMessageId', latestInboundMessage.id);
     void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/drafts/context?${query.toString()}`, {credentials: 'same-origin', signal: controller.signal})
       .then(async (response) => {

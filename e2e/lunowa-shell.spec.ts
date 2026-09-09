@@ -167,6 +167,7 @@ test('renders the shell and navigates a Needs You item to its Moment', async ({p
 
   await page.goto('/ja');
   await expect(page.getByTestId('lunowa-shell')).toBeVisible();
+  await expect(page.getByLabel('表示状態')).toHaveCount(0);
   await nav(page, '対応が必要').click();
   await page.getByRole('button', {name: /返信する/}).click();
   await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
@@ -232,6 +233,48 @@ test('keeps Source truth readable and adds the trusted contextual reply entry on
   await expect(page.getByRole('button', {name: '送信する'})).toBeEnabled();
   await page.getByRole('button', {name: /一覧に戻る/}).click();
   await expect(page.getByRole('button', {name: /佐藤ひろ子/})).toBeVisible();
+});
+
+test('shows truthful Source detail loading until the production-shaped conversation is ready', async ({page}) => {
+  await page.unroute('**/api/bff/users/**/source/conversations**');
+  let detailRequests = 0;
+  await page.route('**/api/bff/users/**/source/conversations**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith('/source-conversation-1')) {
+      detailRequests += 1;
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      await route.fulfill({json: sourceDetail});
+      return;
+    }
+    await route.fulfill({json: sourcePage});
+  });
+
+  await page.goto('/ja');
+  await nav(page, '会話').click();
+  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+  await expect(page.getByText('Sourceの会話を読み込んでいます。')).toBeVisible();
+  expect(detailRequests).toBe(1);
+  await expect(page.getByLabel('詳細').getByText('添付の見積書をご確認いただけますか。')).toBeVisible();
+  await expect(page.getByRole('button', {name: '送信する'})).toBeEnabled();
+  await expect(page.getByText('Sourceの会話を読み込んでいます。')).toHaveCount(0);
+});
+
+test('clears Source search loading when the user clears an in-flight query', async ({page}) => {
+  await page.unroute('**/api/bff/users/**/source/search**');
+  await page.route('**/api/bff/users/**/source/search**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (!route.request().isNavigationRequest()) await route.fulfill({json: sourcePage}).catch(() => undefined);
+  });
+
+  await page.goto('/ja');
+  await nav(page, '検索').click();
+  const search = page.getByLabel('メールを検索');
+  await search.fill('slow-query');
+  await expect(page.getByText('認可されたSourceを検索しています。')).toBeVisible();
+  await search.fill('');
+  await expect(page.getByText('検索語を入力すると、認可された会話の原文を検索します。')).toBeVisible();
+  await expect(page.getByText('認可されたSourceを検索しています。')).toHaveCount(0);
+  await expect(page.locator('#source-conversation-1')).toHaveCount(0);
 });
 
 test('uses trusted Moment reply context and binds explicit Send to the active Responsibility', async ({page}) => {

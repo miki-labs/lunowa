@@ -274,6 +274,53 @@ try {
   const bffSearchNextBody = await responseJson<{total: number; conversations: {id: string}[]; query: {text: string; accountId: string | null}}>(bffSearchNext);
   assert(bffSearchNext.status === 200 && bffSearchNextBody.total === 2 && bffSearchNextBody.query.text === 'Invoice' && bffSearchNextBody.query.accountId === sourceAccountId && bffSearchNextBody.conversations[0]?.id !== bffSearchFirstBody.conversations[0]?.id, 'BFF Source search continuation lost query/account context or repeated a page.');
 
+  for (const [index, occurredAt] of [['2', '2030-01-01T04:00:00.000Z'], ['3', '2030-01-01T05:00:00.000Z']] as const) {
+    await evidence.upsertNormalizedMessage({
+      userId: ownerId,
+      connectedAccountId: sourceAccountId,
+      conversation: {
+        id: combinedMatch.conversationId,
+        providerThreadId: `g21-thread-${combinedMatch.conversationId}`,
+        normalizedSubject: 'Invoice evidence'
+      },
+      providerMessageId: `g21-batched-detail-message-${index}`,
+      providerThreadId: `g21-thread-${combinedMatch.conversationId}`,
+      direction: 'INBOUND',
+      sender: {email: 'requested-sender@example.invalid', displayName: 'Requested Sender'},
+      recipients: [{email: ownerSignUp.response.user.email, displayName: 'G21 Source Owner'}],
+      cc: [{email: `copy-${index}@example.invalid`, displayName: `Copy ${index}`}],
+      subject: 'Invoice evidence',
+      textBody: `Additional detail message ${index}`,
+      occurredAt: new Date(occurredAt),
+      providerReceivedAt: new Date(occurredAt),
+      readState: 'READ',
+      sanitizedHtmlBody: `<p>additional safe body ${index}</p>`,
+      attachments: []
+    });
+  }
+  let detailQueryCount = 0;
+  const detailDb = drizzle(pool, {
+    schema: databaseSchema,
+    logger: {logQuery: () => { detailQueryCount += 1; }}
+  });
+  const batchedDetail = await new SourceRepository(detailDb).getConversation({
+    userId: ownerId,
+    connectedAccountId: sourceAccountId,
+    conversationId: combinedMatch.conversationId
+  });
+  assert(
+    batchedDetail?.messages.length === 3 && detailQueryCount <= 5,
+    `Source detail regressed to per-message database round trips (queries=${detailQueryCount}, messages=${batchedDetail?.messages.length ?? 0})`
+  );
+  assert(
+    batchedDetail.messages[0]?.sender.email === senderEmail &&
+      batchedDetail.messages[0]?.recipients[0]?.email === ownerSignUp.response.user.email &&
+      batchedDetail.messages[0]?.attachments[0]?.filename === 'evidence.pdf' &&
+      batchedDetail.messages[1]?.cc[0]?.email === 'copy-2@example.invalid' &&
+      batchedDetail.messages[2]?.cc[0]?.email === 'copy-3@example.invalid',
+    'batched Source detail changed sender/recipient/attachment projection semantics'
+  );
+
   const bffNoMatch = await getSourceSearch(
     routeRequest(`http://g21-source-auth.invalid/api/bff/users/${ownerId}/source/search?q=not-present&sender=nobody%40example.invalid&accountId=${sourceAccountId}`, ownerCookie),
     {params: Promise.resolve({userId: ownerId})}

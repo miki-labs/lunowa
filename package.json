@@ -26,6 +26,8 @@
     "test:responsibility-reducer-production": "node --import tsx tests/responsibility-reducer-production-integration.ts",
     "test:temporal-production": "node --import tsx tests/temporal-production-integration.ts",
     "test:gmail-provider": "vitest run tests/gmail-provider.test.ts",
+    "test:gmail-send": "vitest run tests/gmail-send.test.ts tests/g51-real-gmail-send-controls.test.ts",
+    "test:gmail-send-production": "node --import tsx tests/gmail-send-production-integration.ts",
     "test:gmail-production": "node --import tsx tests/gmail-provider-integration.ts",
     "test:source-production": "node --import tsx tests/source-integration.ts",
     "test:communication-production": "node --import tsx tests/communication-production-integration.ts",
@@ -37,7 +39,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test e2e/deployed-preview-smoke.spec.ts",
-    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare && pnpm check:cloudflare:deploy"
+    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare && pnpm check:cloudflare:deploy",
+    "accept:gmail-real-send": "node --import tsx scripts/g51-real-gmail-send-acceptance.ts"
   },
   "dependencies": {
     "@vinext/cloudflare": "1.0.0-beta.7",

@@ -1,4 +1,4 @@
-import {GMAIL_READONLY_SCOPE} from './types';
+import {GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE} from './types';
 
 export type GmailEnvironment = {
   clientId: string;
@@ -40,4 +40,4 @@ export function getGmailEnvironment(): GmailEnvironment {
   return result;
 }
 
-export const GMAIL_OAUTH_SCOPES = Object.freeze([GMAIL_READONLY_SCOPE]);
+export const GMAIL_OAUTH_SCOPES = Object.freeze([GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE]);

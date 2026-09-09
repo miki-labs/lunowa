@@ -4,6 +4,7 @@ import type {
   GmailMessageListPage,
   GmailProfile,
   GmailProviderClient,
+  GmailSendRequest,
   GmailTokenSet,
   GmailWatch
 } from './types';
@@ -167,6 +168,23 @@ export class GoogleGmailClient implements GmailProviderClient {
     url.searchParams.set('maxResults', '100');
     url.searchParams.set('includeSpamTrash', 'true');
     if (pageToken) url.searchParams.set('pageToken', pageToken);
+    return this.authorized(accessToken, url);
+  }
+
+  sendMessage(accessToken: string, input: GmailSendRequest): Promise<GmailMessage> {
+    const url = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
+    return this.authorized<GmailMessage>(accessToken, url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(input)
+    });
+  }
+
+  listMessagesByRfc822MessageId(accessToken: string, messageId: string): Promise<GmailMessageListPage> {
+    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
+    url.searchParams.set('q', `rfc822msgid:${messageId}`);
+    url.searchParams.set('maxResults', '100');
+    url.searchParams.set('includeSpamTrash', 'true');
     return this.authorized(accessToken, url);
   }
 

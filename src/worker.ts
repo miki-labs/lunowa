@@ -1,6 +1,6 @@
 import vinext from 'vinext/server/fetch-handler';
 
-import {runGmailReconciliation} from './server/gmail/worker';
+import {runGmailReconciliation, runGmailSendReconciliation} from './server/gmail/worker';
 
 type WorkerExecutionContext = {waitUntil(promise: Promise<unknown>): void};
 type VinextHandler = {
@@ -16,7 +16,7 @@ const worker = {
   scheduled(_controller: unknown, _environment: unknown, context: WorkerExecutionContext) {
     // The database queue owns retry/backoff and idempotency. The recurring
     // trigger independently repairs missed push and prior cron delivery.
-    context.waitUntil(runGmailReconciliation());
+    context.waitUntil(Promise.all([runGmailReconciliation(), runGmailSendReconciliation()]).then(() => undefined));
   }
 };
 

@@ -18,7 +18,7 @@ export type CapabilityAvailability =
   | 'unsupported';
 export type MutationState = 'idle' | 'pending' | 'confirmed' | 'failed';
 export type CommonMutationTarget = 'stop-tracking' | 'review-answer' | null;
-export type SendLifecycle = 'draft' | 'request_pending' | 'provider_failed' | 'provider_ambiguous' | 'provider_confirmed_reconciling';
+export type SendLifecycle = 'draft' | 'request_pending' | 'provider_failed' | 'provider_ambiguous' | 'provider_confirmed_reconciling' | 'provider_reconciled';
 
 export type ShellFixture = {
   id: 'normal' | 'zero' | 'not-delegated' | 'stopped' | 'loading' | 'partial' | 'degraded' | 'mutation-pending' | 'mutation-confirmed' | 'mutation-failed' | 'send-pending' | 'send-failed' | 'send-ambiguous' | 'send-reconciling' | 'session-expired';

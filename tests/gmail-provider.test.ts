@@ -21,8 +21,8 @@ import type {
   GmailTokenSet,
   GmailWatch
 } from '@/server/gmail/types';
-import {GmailProviderError, GMAIL_READONLY_SCOPE} from '@/server/gmail/types';
-import {runGmailReconciliation} from '@/server/gmail/worker';
+import {GmailProviderError, GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE} from '@/server/gmail/types';
+import {runGmailReconciliation, runGmailSendReconciliation} from '@/server/gmail/worker';
 
 const environment: GmailEnvironment = {
   clientId: 'client-id',
@@ -79,6 +79,8 @@ function provider(overrides: Partial<GmailProviderClient> = {}): GmailProviderCl
     getProfile: vi.fn(async () => ({emailAddress: 'owner@example.com', historyId: '100'})),
     watch: vi.fn(async () => ({historyId: '100', expiration: String(Date.now() + 7 * 86400_000)})),
     listMessages: vi.fn(async () => ({messages: []})),
+    sendMessage: vi.fn(async () => message('sent', {threadId: 'thread-sent'})),
+    listMessagesByRfc822MessageId: vi.fn(async () => ({messages: []})),
     getMessage: vi.fn(async (_token, id) => message(id)),
     listHistory: vi.fn(async () => ({historyId: '101'})),
     getAttachment: vi.fn(async () => ({data: Buffer.from('attachment').toString('base64url'), size: 10})),
@@ -110,6 +112,26 @@ describe('G20 Gmail provider client runtime boundary', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('uses the Gmail send endpoint and bounded RFC822 Message-ID search', async () => {
+    const requests: {url: string; init?: RequestInit}[] = [];
+    const client = new GoogleGmailClient({
+      clientId: 'client-id', clientSecret: 'client-secret',
+      redirectUri: 'https://app.example/api/providers/gmail/oauth/callback',
+      fetch: (async (url, init) => {
+        requests.push({url: String(url), init});
+        return new Response(JSON.stringify(url.toString().includes('/send')
+          ? {id: 'sent-1', threadId: 'thread-1'}
+          : {messages: [{id: 'sent-1', threadId: 'thread-1'}]}), {status: 200});
+      }) as typeof fetch
+    });
+    await client.sendMessage('access-token', {raw: 'encoded', threadId: 'thread-1'});
+    await client.listMessagesByRfc822MessageId('access-token', '<stable@example.com>');
+    expect(requests[0]?.url).toBe('https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
+    expect(requests[0]?.init?.method).toBe('POST');
+    expect(JSON.parse(String(requests[0]?.init?.body))).toEqual({raw: 'encoded', threadId: 'thread-1'});
+    expect(new URL(requests[1]!.url).searchParams.get('q')).toBe('rfc822msgid:<stable@example.com>');
   });
 });
 
@@ -177,7 +199,7 @@ describe('G20 Gmail credential and authorization boundary', () => {
       gmailRepository as never
     );
     const authorizationUrl = new URL(await service.createAuthorizationUrl('00000000-0000-4000-8000-000000000001', '//evil.example'));
-    expect(authorizationUrl.searchParams.get('scope')).toBe(GMAIL_READONLY_SCOPE);
+    expect(authorizationUrl.searchParams.get('scope')).toBe(`${GMAIL_READONLY_SCOPE} ${GMAIL_SEND_SCOPE}`);
     expect(authorizationUrl.searchParams.get('access_type')).toBe('offline');
     expect(authorizationUrl.searchParams.get('code_challenge_method')).toBe('S256');
     const state = authorizationUrl.searchParams.get('state')!;
@@ -282,7 +304,23 @@ describe('G20 deployed runtime bindings', () => {
     const worker = readFileSync(resolve(process.cwd(), 'src/worker.ts'), 'utf8');
     expect(wrangler).toContain('"main": "src/worker.ts"');
     expect(wrangler).toContain('"crons": ["*/10 * * * *"]');
-    expect(worker).toContain('context.waitUntil(runGmailReconciliation())');
+    expect(worker).toContain('runGmailReconciliation()');
+    expect(worker).toContain('runGmailSendReconciliation()');
+  });
+
+  it('reconciles only already-attempted SendOperations through the scheduled repair path', async () => {
+    const dispatch = vi.fn(async () => ({status: 'RECONCILED'}));
+    const listReconcilableSendOperations = vi.fn(async () => [
+      {id: 'send-1', userId: 'user-a', status: 'DISPATCHING'},
+      {id: 'send-2', userId: 'user-b', status: 'PROVIDER_ACCEPTED'}
+    ]);
+    await expect(runGmailSendReconciliation(
+      {send: {dispatch} as never},
+      {listReconcilableSendOperations} as never
+    )).resolves.toEqual({processed: 2, failed: 0});
+    expect(listReconcilableSendOperations).toHaveBeenCalledWith(20);
+    expect(dispatch).toHaveBeenNthCalledWith(1, {userId: 'user-a', sendOperationId: 'send-1'});
+    expect(dispatch).toHaveBeenNthCalledWith(2, {userId: 'user-b', sendOperationId: 'send-2'});
   });
 
   it('declares the complete authenticated Gmail Pub/Sub IAM chain', () => {

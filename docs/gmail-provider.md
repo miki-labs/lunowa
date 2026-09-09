@@ -1,7 +1,8 @@
 # Gmail provider operations
 
-G20 activates one Gmail read-only Source lane. Gmail authorization remains
-separate from the Better Auth application session and does not grant Send or
+G20 establishes the Gmail read-only Source lane; G51 extends the same mailbox
+authorization boundary with explicit Gmail Send capability. Gmail authorization
+remains separate from the Better Auth application session and never grants
 Responsibility mutation authority.
 
 ## Runtime configuration
@@ -17,9 +18,12 @@ The Google OAuth client redirect URI is:
 /api/providers/gmail/oauth/callback
 ```
 
-Grant only `https://www.googleapis.com/auth/gmail.readonly`. The flow requests
-offline access because watch renewal and reconciliation run without an active
-browser session. Reconnect uses the same authorization path.
+Current v1 requests exactly `https://www.googleapis.com/auth/gmail.readonly`
+and `https://www.googleapis.com/auth/gmail.send`. Read authority remains required
+for Source/monitoring; Send is a separate `mail_send` capability and is checked
+again immediately before dispatch. The flow requests offline access because watch
+renewal and reconciliation run without an active browser session. Reconnect uses
+the same authorization path. No broader Gmail scope is requested.
 
 ## Pub/Sub and scheduling
 
@@ -115,3 +119,68 @@ history interval, normalization, attachment fetch, and `users.watch`, and
 uploads only a sanitized exact-head JSON artifact. A missing, failing,
 different-head, mock-only, pre-provisioned-token-only, or uninspectable run is
 explicitly insufficient for Issue #65.
+## G51 vendor recheck — 2026-09-08
+
+Current Google Gmail API documentation was rechecked before G51 acceptance.
+`users.messages.send` remains the direct send method; the `Message.raw` payload is
+a base64URL-encoded RFC-formatted message. Adding a message to an existing
+thread still requires the requested `threadId`, RFC-compliant `References` and
+`In-Reply-To` headers, and a matching `Subject`. Lunowa requests only
+`https://www.googleapis.com/auth/gmail.send` for Send authority in addition to
+its separately owned read scope.
+
+Google's current Gmail error guide recommends exponential backoff for rate-limit
+and server errors, but also states that mail sending has separate per-user
+limits and that a successful HTTP response alone is not proof that the message
+was successfully sent. Gmail quota tiering also changed in 2026. G51 therefore
+does not encode stale fixed quota numbers and deliberately does **not** apply a
+generic blind retry policy to a possibly accepted Send. A transport/server
+ambiguity remains `AMBIGUOUS`; Lunowa never blind-retries a potentially accepted Send.
+When Gmail returned a provider `Message.id`, reconciliation uses that immutable provider identity.
+If the transport outcome is unknown and no provider id is available, recovery stays fail-closed
+until an operator/provider observation establishes the exact message identity.
+
+Primary references checked on 2026-09-08:
+
+- https://developers.google.com/workspace/gmail/api/guides/sending
+- https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/send
+- https://developers.google.com/workspace/gmail/api/auth/scopes
+- https://developers.google.com/workspace/gmail/api/guides/handle-errors
+- https://developers.google.com/workspace/release-notes
+
+## G51 real Gmail Send acceptance
+
+G51 provider acceptance is deliberately separate from ordinary `pnpm verify`.
+Deterministic PostgreSQL/UI tests prove the Lunowa request -> durable
+SendOperation -> Source -> Responsibility composition, but they cannot prove
+that Gmail places a real Reply or Reply All in the intended provider thread.
+
+`pnpm accept:gmail-real-send` exercises one explicit provider lane per process.
+It requires `G51_REAL_LANE=REPLY` or `REPLY_ALL` and
+`G51_REAL_MODE=SEND_ONCE` or `RECONCILE_ONLY`. `SEND_ONCE` additionally requires
+`G51_ALLOW_REAL_SEND=YES`; without that exact value the process stops before a
+provider client is constructed. The declared candidate SHA must match the clean checkout actually executing the
+harness before provider credentials are constructed. A local durable effect marker is
+atomically written before `messages.send` and is scoped to the exact candidate/lane,
+so changing the run ID cannot admit a second provider attempt on that controller
+host. After any ambiguous outcome, only `RECONCILE_ONLY` is permitted; it must use
+the run ID bound by the durable claim plus an independently established Gmail provider
+`Message.id`, and never calls `messages.send`.
+
+The prepared source must be an inbound message in a dedicated harmless test
+thread. Provider `From` / `To` / `Cc` headers are parsed as RFC mailbox lists rather
+than matched as raw substrings. Every target address must be both exactly
+provider-observed in that source and present in the explicit
+`G51_REAL_ALLOWED_RECIPIENTS_JSON` allowlist; the connected account is never a
+target. Reply must target the exact observed sender. Reply All must retain that
+sender and exercise at least one additional observed recipient. Bcc is never
+accepted by this harness.
+
+A lane passes only after Gmail is read back by provider `Message.id` and confirms the
+expected thread, a valid final provider RFC Message-ID, In-Reply-To, References chain,
+Subject, exact To/Cc mailbox sets, and no Bcc target. Evidence output contains the exact candidate SHA and external evidence
+reference but hashes provider/thread identities and emits no credentials,
+recipient addresses, mailbox content, or raw MIME. Both Reply and Reply All
+must PASS against the same exact candidate before G51 may claim its real Gmail
+threading acceptance. Real sends require an explicit trusted-operator approval;
+this harness is not part of unattended CI or cron execution.

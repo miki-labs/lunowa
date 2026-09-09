@@ -6,6 +6,7 @@ import sanitizeHtml from 'sanitize-html';
 
 import type {NormalizedAttachment, NormalizedParticipant} from '@/server/evidence/normalized';
 
+import {extractGmailFailedDeliveryStatus} from './delivery-status';
 import type {GmailMessage, GmailMessagePart} from './types';
 import {GmailProviderError} from './types';
 
@@ -276,6 +277,7 @@ export async function normalizeGmailMessage(input: {
   const issues: string[] = [];
   const walked = walkParts(message.payload);
   if (walked.truncated) issues.push('MIME_STRUCTURE_TRUNCATED');
+  const deliveryStatus = await extractGmailFailedDeliveryStatus(message, input.loadBodyPart);
   const sender = addresses(message.payload, 'From', issues, true)[0]!;
   const body = await bodyEvidence(walked.parts, input.loadBodyPart, issues);
   const providerThreadId = message.threadId;
@@ -286,6 +288,7 @@ export async function normalizeGmailMessage(input: {
   const recipients = addresses(message.payload, 'To', issues);
   const cc = addresses(message.payload, 'Cc', issues);
   const bcc = addresses(message.payload, 'Bcc', issues);
+  const rfcMessageId = cleanMetadata(safeHeader(message.payload, 'Message-ID', issues) ?? '', MAX_HEADER_CHARS) || null;
   const boundedIssues = [...new Set(issues)].slice(0, MAX_NORMALIZATION_ISSUES);
 
   return {
@@ -315,6 +318,8 @@ export async function normalizeGmailMessage(input: {
     mailboxStateSnapshot: {labelIds: labels},
     rawProviderMetadata: {
       gmailHistoryId: message.historyId ?? null,
+      rfcMessageId,
+      ...(deliveryStatus ? {deliveryStatus} : {}),
       snippet: message.snippet ? cleanMetadata(message.snippet, 4096) : null,
       normalization: {
         status: boundedIssues.length > 0 ? 'PARTIAL' : 'COMPLETE',

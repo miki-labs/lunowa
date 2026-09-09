@@ -30,6 +30,8 @@ function readinessNotice(readiness: SourceReadiness, dataThroughAt: string | nul
 }
 
 function accountReadiness(account: SourcePageReadModel['accounts'][number]): SourceReadiness {
+  if (account.monitoring?.status === 'disconnected' || account.sync.errorCode === 'INTENTIONAL_DISCONNECT') return 'partial';
+  if (account.monitoring?.status === 'degraded') return 'degraded';
   if (
     account.connectionState === 'ERROR' ||
     account.connectionState === 'RECONNECT_REQUIRED' ||

@@ -1,0 +1,57 @@
+name: G60 integrity and recovery
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/g60-integrity.yml'
+      - 'src/server/integrity/**'
+      - 'src/server/gmail/**'
+      - 'src/server/db/repositories/gmail.ts'
+      - 'src/server/db/repositories/responsibility.ts'
+      - 'src/server/db/repositories/source.ts'
+      - 'src/server/db/repositories/temporal.ts'
+      - 'src/server/db/schema/**'
+      - 'src/server/gmail/worker.ts'
+      - 'src/server/source/**'
+      - 'src/components/source-ui.tsx'
+      - 'src/components/lunowa-shell.tsx'
+      - 'src/lib/source-types.ts'
+      - 'src/worker.ts'
+      - 'tests/g60-integrity.test.ts'
+      - 'tests/source.test.tsx'
+      - 'tests/attention-read-model.test.ts'
+      - 'tests/attention-temporal.test.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  g60-integrity:
+    name: Deterministic integrity and recovery boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.20.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run G60 deterministic acceptance suite
+        run: pnpm test:g60-integrity

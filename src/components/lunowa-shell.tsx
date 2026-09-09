@@ -689,6 +689,16 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
           onSignOut={onSignOut}
           signingOut={signingOut}
           sessionActionError={sessionActionError}
+          onRefreshData={() => {
+            setSourceError('');
+            setSourceLoading(true);
+            setSourceReload((current) => current + 1);
+            setAttentionModel(null);
+            setAttentionOwnerId(null);
+            setAttentionLoading(true);
+            setAttentionError('');
+            setAttentionReload((current) => current + 1);
+          }}
           search={search}
           searchAccountId={searchAccountId}
           sourceModel={sourceModel}
@@ -803,7 +813,7 @@ function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; on
   );
 }
 
-function SurfaceContent({surface, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
+function SurfaceContent({surface, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
   surface: Surface;
   fixture: ShellFixture;
   attention: AttentionReadModel | null;
@@ -813,6 +823,7 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   onSignOut?: () => Promise<void>;
   signingOut: boolean;
   sessionActionError: string;
+  onRefreshData: () => void;
   search: string;
   onSearch: (value: string) => void;
   searchAccountId: string;
@@ -867,6 +878,10 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
           onSignOut={onSignOut}
           signingOut={signingOut}
           sessionActionError={sessionActionError}
+          sourceModel={sourceModel}
+          attention={attention}
+          onRefreshData={onRefreshData}
+          onOpenManaged={openManaged}
         />
       )}
     </>
@@ -947,13 +962,48 @@ function Search({search, onSearch, openConversation}: {search: string; onSearch:
   return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button id="search-result-estimate" className="list-row" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
 }
 
-function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError}: {
+function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, sourceModel, attention, onRefreshData, onOpenManaged}: {
   fixture: ShellFixture;
   appUser?: AppUserSummary;
   onSignOut?: () => Promise<void>;
   signingOut: boolean;
   sessionActionError: string;
+  sourceModel: SourcePageReadModel | null;
+  attention: AttentionReadModel | null;
+  onRefreshData: () => void;
+  onOpenManaged: (origin?: string) => void;
 }) {
+  const [disconnectTarget, setDisconnectTarget] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [disconnectError, setDisconnectError] = useState('');
+  const delegatedItems = (accountId: string): AttentionItemReadModel[] => attention
+    ? [...attention.needsYou, ...attention.managed, ...attention.later, ...attention.review]
+      .filter((item) => item.connectedAccountId === accountId && item.liveTrackingState === 'TRACKING_ACTIVE')
+    : [];
+  const delegatedCount = (accountId: string): number | null => attention ? delegatedItems(accountId).length : null;
+  const disconnect = async (accountId: string) => {
+    if (!appUser?.id) return;
+    if (disconnectTarget !== accountId) {
+      setDisconnectTarget(accountId);
+      setDisconnectError('');
+      return;
+    }
+    setDisconnecting(true);
+    setDisconnectError('');
+    try {
+      const response = await fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/gmail/accounts/${encodeURIComponent(accountId)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin'
+      });
+      if (!response.ok) throw new Error('DISCONNECT_FAILED');
+      setDisconnectTarget(null);
+      onRefreshData();
+    } catch {
+      setDisconnectError('メール連携を解除できませんでした。現在の接続状態は変わっていません。');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
   return <div className="surface-content">
     {appUser && <section className="settings-card" aria-labelledby="app-account-heading">
       <h2 id="app-account-heading">アプリのアカウント</h2>
@@ -966,12 +1016,37 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError}:
     <section className="settings-card" aria-labelledby="mailbox-heading">
       <h2 id="mailbox-heading">接続と監視</h2>
       <p>メールボックスの接続は、アプリへのサインインとは別の状態です。</p>
-      <dl><div><dt>メールボックス</dt><dd>未接続（fixture）</dd></div><div><dt>会話を読む権限</dt><dd>{fixture.sourceRead}</dd></div></dl>
+      {sourceModel?.accounts.length ? sourceModel.accounts.map((account) => {
+        const monitored = delegatedCount(account.id);
+        const capabilities = account.grantedCapabilities ?? [];
+        const disconnected = account.connectionState === 'DISCONNECTED';
+        const degraded = !disconnected && (account.monitoring?.status === 'degraded' || account.sync.status === 'ERROR' || account.sync.status === 'RECONCILIATION_REQUIRED');
+        return <article className="settings-account" key={account.id}>
+          <h3>{account.emailAddress}</h3>
+          <dl>
+            <div><dt>接続状態</dt><dd>{disconnected ? '意図的に解除済み' : degraded ? '再接続または再同期が必要です' : account.sync.status}</dd></div>
+            <div><dt>監視中</dt><dd>{monitored === null ? '確認中' : `${monitored}件`}</dd></div>
+            <div><dt>データ確認時点</dt><dd>{account.sync.dataThroughAt ? new Date(account.sync.dataThroughAt).toLocaleString('ja-JP') : '不明'}</dd></div>
+            <div><dt>権限</dt><dd>{capabilities.includes('mail_send') ? '読み取り・監視・送信' : '読み取り・監視（送信権限なし）'}</dd></div>
+          </dl>
+          {degraded && <p className="inline-status" role="alert">このアカウントの最新状態は信頼できません。{account.monitoring?.lastTrustworthyAt ? `最終確認: ${new Date(account.monitoring.lastTrustworthyAt).toLocaleString('ja-JP')}。` : '最終確認時点は不明です。'} 再接続後、未確認期間を同期してから監視を正常に戻します。</p>}
+          {account.connectionState !== 'CONNECTED' && !disconnected && <form action={`/api/bff/users/${encodeURIComponent(appUser?.id ?? '')}/gmail/authorize`} method="get"><input name="returnTo" type="hidden" value="/ja" /><button className="primary-button" type="submit">このメールボックスを再接続</button></form>}
+          {disconnected && <p className="metadata">解除により新しいメールの監視は停止しています。保存済みのSourceはプロバイダー側のメールとは別に保持されます。</p>}
+          {account.connectionState === 'CONNECTED' && <>
+            {disconnectTarget === account.id && <>
+              <p className="inline-status" role="alert">{monitored === null ? '監視中の項目を確認できていません。' : monitored > 0 ? `この解除で${monitored}件の監視が停止します。完了や対応不要にはなりません。` : 'このメールボックスの新しい監視を停止します。完了や対応不要にはなりません。'} もう一度押すと解除します。</p>
+              {monitored !== null && monitored > 0 && <button className="quiet-button" type="button" onClick={() => onOpenManaged(delegatedItems(account.id)[0]?.id)}>影響する監視中の項目を見る</button>}
+            </>}
+            <button className="danger-button" type="button" disabled={disconnecting} onClick={() => void disconnect(account.id)}>{disconnectTarget === account.id ? '解除を確定する' : 'メール連携を解除する'}</button>
+          </>}
+        </article>;
+      }) : <dl><div><dt>メールボックス</dt><dd>未接続（fixture）</dd></div><div><dt>会話を読む権限</dt><dd>{fixture.sourceRead}</dd></div></dl>}
       {appUser?.id && <form action={`/api/bff/users/${encodeURIComponent(appUser.id)}/gmail/authorize`} method="get">
         <input name="returnTo" type="hidden" value="/ja" />
         <button className="primary-button" type="submit">Gmailを接続 / 再接続</button>
       </form>}
       {appUser?.id && <p className="metadata">Googleの同意画面へ移動します。メールボックス接続はアプリのログインとは別です。</p>}
+      {disconnectError && <p className="inline-status" role="alert">{disconnectError}</p>}
     </section>
   </div>;
 }

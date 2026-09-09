@@ -1,5 +1,12 @@
 export type SourceReadiness = 'loading' | 'partial' | 'ready' | 'degraded' | 'unavailable';
 
+export type SourceAccountMonitoringIntegrity = {
+  status: 'healthy' | 'unknown' | 'degraded' | 'disconnected';
+  reasonCode: string | null;
+  lastTrustworthyAt: string | null;
+  recoveryAction: 'RECONNECT' | 'RECONCILE' | null;
+};
+
 export type SourceAccountReadModel = {
   id: string;
   provider: string;
@@ -7,6 +14,8 @@ export type SourceAccountReadModel = {
   emailAddress: string;
   displayName: string | null;
   connectionState: string;
+  grantedCapabilities?: readonly string[];
+  monitoring?: SourceAccountMonitoringIntegrity;
   sync: {
     status: string;
     lastSuccessAt: string | null;

@@ -492,6 +492,19 @@ export class TemporalRepository {
     return results;
   }
 
+  /** Returns bounded tenant work for a scheduler recovery sweep. */
+  public async listDueUserIds(now = new Date(), limit = 20): Promise<readonly string[]> {
+    const rows = await this.db.select({userId: temporalTriggers.userId})
+      .from(temporalTriggers)
+      .where(or(
+        and(or(eq(temporalTriggers.triggerStatus, 'SCHEDULED'), eq(temporalTriggers.triggerStatus, 'FAILED')), lte(temporalTriggers.availableAt, now)),
+        and(eq(temporalTriggers.triggerStatus, 'CLAIMED'), lte(temporalTriggers.claimedAt, new Date(now.getTime() - 5 * 60 * 1000)))
+      ))
+      .orderBy(asc(temporalTriggers.availableAt), asc(temporalTriggers.userId), asc(temporalTriggers.id))
+      .limit(Math.max(1, Math.min(limit, 100)));
+    return [...new Set(rows.map((row) => row.userId))];
+  }
+
   private async claimTrigger(id: string, userId: string, now: Date): Promise<{trigger: TemporalTrigger; contract: TemporalContract; owned: boolean} | null> {
     return this.db.transaction(async (tx) => {
       const [row] = await tx.select().from(temporalTriggers).where(and(eq(temporalTriggers.id, id), eq(temporalTriggers.userId, userId))).for('update');

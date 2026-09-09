@@ -8,6 +8,7 @@ import {responsibilities} from '../schema/responsibility';
 import {ResponsibilityRepository} from './responsibility';
 import {
   createDeferAttentionCommand,
+  createDisconnectTrackingCommand,
   createReturnAttentionCommand,
   createTemporalReconsiderationCommand,
   isTemporalTriggerEligible,
@@ -285,6 +286,52 @@ export class TemporalRepository {
         createdAt: now
       });
       return result.responsibilities[0];
+    });
+  }
+
+  public async stopTrackingForDisconnectedAccount(input: {
+    userId: string;
+    connectedAccountId: string;
+    requestKey: string;
+    now?: Date;
+  }): Promise<number> {
+    const now = input.now ?? new Date();
+    return this.db.transaction(async (tx) => {
+      const rows = await tx.select({id: responsibilities.id})
+        .from(responsibilities)
+        .where(and(
+          eq(responsibilities.userId, input.userId),
+          eq(responsibilities.connectedAccountId, input.connectedAccountId),
+          eq(responsibilities.resolutionStatus, 'OPEN'),
+          eq(responsibilities.liveTrackingState, 'TRACKING_ACTIVE')
+        ))
+        .orderBy(asc(responsibilities.id));
+      let stopped = 0;
+      for (const row of rows) {
+        const current = await this.responsibilityRepository.getResponsibilityInTransaction(tx, {
+          userId: input.userId,
+          connectedAccountId: input.connectedAccountId,
+          responsibilityId: row.id
+        });
+        if (!current || current.state.resolutionStatus !== 'OPEN' || current.state.liveTrackingState !== 'TRACKING_ACTIVE') continue;
+        const command = createDisconnectTrackingCommand({
+          state: current.state,
+          requestKey: `${input.requestKey}:${current.state.id}`,
+          evidenceRevision: current.semanticEvidenceRevision,
+          expectedAggregateVersion: current.state.aggregateVersion
+        });
+        const result = await this.responsibilityRepository.applyTrustedCommandInTransaction(tx, command);
+        if (result.status !== 'APPLIED' || !result.responsibilities[0]) {
+          throw new Error(result.status === 'APPLIED' ? 'account disconnect did not stop tracking' : result.reason);
+        }
+        await this.retireActiveContractsInTransaction(tx, {
+          userId: input.userId,
+          connectedAccountId: input.connectedAccountId,
+          responsibilityId: current.state.id
+        }, now, 'CANCELLED', 'CANCELLED');
+        stopped += 1;
+      }
+      return stopped;
     });
   }
 

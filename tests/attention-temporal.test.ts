@@ -5,6 +5,7 @@ import {
   TemporalRuntime,
   applyAttentionCommand,
   createDelegateResponsibilityCommand,
+  createDisconnectTrackingCommand,
   createOperationalOutcomeCorrectionCommand,
   createStopTrackingCommand,
   projectConversationAttention,
@@ -100,6 +101,32 @@ describe('G32 attention and Temporal runtime', () => {
     expect(stopped.resolutionReason).not.toBe('SATISFIED');
     expect(stopped.obligationLegs[0]).toMatchObject({status: 'CLOSED', closureReason: 'USER_CLOSED'});
     expect(projectResponsibility(stopped).bucket).toBe('NONE');
+  });
+
+  it('disconnects tracking without resolving the operational Responsibility and requires explicit delegation to reactivate it', () => {
+    const initial = state({attentionMode: 'DEFERRED'});
+    const disconnected = applyAttentionCommand(initial, createDisconnectTrackingCommand({
+      state: initial,
+      requestKey: 'disconnect-account-1',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 1
+    }), new Date('2026-09-09T00:00:00.000Z'));
+
+    expect(disconnected).toMatchObject({
+      resolutionStatus: 'OPEN',
+      liveTrackingState: 'HISTORICAL_INACTIVE',
+      attentionMode: 'PRESENT'
+    });
+    expect(disconnected.resolutionReason).toBeUndefined();
+    expect(projectResponsibility(disconnected).bucket).toBe('NONE');
+
+    const explicitlyDelegated = applyAttentionCommand(disconnected, createDelegateResponsibilityCommand({
+      state: disconnected,
+      requestKey: 'delegate-after-reconnect',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 2
+    }));
+    expect(explicitlyDelegated.liveTrackingState).toBe('TRACKING_ACTIVE');
   });
 
   it('requires explicit currentness for delegation and correction of an inactive accepted loop', () => {

@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 
 import {runTemporalReconciliation} from '@/server/gmail/worker';
+import {disconnectGmailAccount} from '@/server/integrity/disconnect';
 import {projectAccountMonitoringIntegrity, sourceReadinessAllowsHealthyMonitoring} from '@/server/integrity/projection';
 
 describe('G60 integrity and recovery boundaries', () => {
@@ -30,6 +31,38 @@ describe('G60 integrity and recovery boundaries', () => {
     expect(sourceReadinessAllowsHealthyMonitoring('ready')).toBe(true);
     expect(sourceReadinessAllowsHealthyMonitoring('partial')).toBe(false);
     expect(sourceReadinessAllowsHealthyMonitoring('unavailable')).toBe(false);
+  });
+
+  it('stops delegated monitoring before removing the Gmail credential', async () => {
+    const order: string[] = [];
+    const stopTrackingForDisconnectedAccount = vi.fn(async () => {
+      order.push('monitoring');
+      return 2;
+    });
+    const disconnect = vi.fn(async () => {
+      order.push('credential');
+    });
+
+    await expect(disconnectGmailAccount(
+      {userId: 'user-a', connectedAccountId: 'account-a', requestKey: 'disconnect-1'},
+      {stopTrackingForDisconnectedAccount} as never,
+      {disconnect} as never
+    )).resolves.toEqual({stoppedResponsibilities: 2});
+    expect(order).toEqual(['monitoring', 'credential']);
+    expect(stopTrackingForDisconnectedAccount).toHaveBeenCalledWith({
+      userId: 'user-a', connectedAccountId: 'account-a', requestKey: 'disconnect-1'
+    });
+    expect(disconnect).toHaveBeenCalledWith('user-a', 'account-a');
+  });
+
+  it('fails closed and preserves the credential when monitoring cannot be stopped', async () => {
+    const disconnect = vi.fn(async () => undefined);
+    await expect(disconnectGmailAccount(
+      {userId: 'user-a', connectedAccountId: 'account-a', requestKey: 'disconnect-2'},
+      {stopTrackingForDisconnectedAccount: vi.fn(async () => { throw new Error('STOP_FAILED'); })} as never,
+      {disconnect} as never
+    )).rejects.toThrow('STOP_FAILED');
+    expect(disconnect).not.toHaveBeenCalled();
   });
 
   it('sweeps overdue Temporal work per tenant and delegates evidence to the trusted repository', async () => {

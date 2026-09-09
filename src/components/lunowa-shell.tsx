@@ -977,7 +977,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState('');
   const delegatedItems = (accountId: string): AttentionItemReadModel[] => attention
-    ? [...attention.needsYou, ...attention.managed, ...attention.later, ...attention.review]
+    ? [...attention.needsYou, ...attention.managed, ...attention.later, ...attention.review, ...attention.done]
       .filter((item) => item.connectedAccountId === accountId && item.liveTrackingState === 'TRACKING_ACTIVE')
     : [];
   const delegatedCount = (accountId: string): number | null => attention ? delegatedItems(accountId).length : null;

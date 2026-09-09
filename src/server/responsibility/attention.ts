@@ -274,7 +274,6 @@ export function createStopTrackingCommand(input: AttentionCommandInput): Trusted
  * The operational Responsibility stays OPEN and may only become active again
  * through the explicit delegation action. */
 export function createDisconnectTrackingCommand(input: AttentionCommandInput): TrustedResponsibilityCommand {
-  if (input.state.resolutionStatus !== 'OPEN') throw new Error('account disconnect requires an open Responsibility');
   if (input.state.liveTrackingState !== 'TRACKING_ACTIVE') throw new Error('account disconnect requires active tracking');
   const provenance = userAssertion(input.requestKey);
   return {

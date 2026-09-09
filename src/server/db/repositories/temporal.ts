@@ -302,7 +302,6 @@ export class TemporalRepository {
         .where(and(
           eq(responsibilities.userId, input.userId),
           eq(responsibilities.connectedAccountId, input.connectedAccountId),
-          eq(responsibilities.resolutionStatus, 'OPEN'),
           eq(responsibilities.liveTrackingState, 'TRACKING_ACTIVE')
         ))
         .orderBy(asc(responsibilities.id));
@@ -313,7 +312,7 @@ export class TemporalRepository {
           connectedAccountId: input.connectedAccountId,
           responsibilityId: row.id
         });
-        if (!current || current.state.resolutionStatus !== 'OPEN' || current.state.liveTrackingState !== 'TRACKING_ACTIVE') continue;
+        if (!current || current.state.liveTrackingState !== 'TRACKING_ACTIVE') continue;
         const command = createDisconnectTrackingCommand({
           state: current.state,
           requestKey: `${input.requestKey}:${current.state.id}`,

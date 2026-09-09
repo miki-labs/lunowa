@@ -127,6 +127,24 @@ describe('G32 attention and Temporal runtime', () => {
       expectedAggregateVersion: 2
     }));
     expect(explicitlyDelegated.liveTrackingState).toBe('TRACKING_ACTIVE');
+
+    const resolvedActive = state({
+      resolutionStatus: 'RESOLVED',
+      resolutionReason: 'SATISFIED',
+      resolvedAt: '2026-09-08T00:00:00.000Z'
+    });
+    const disconnectedResolved = applyAttentionCommand(resolvedActive, createDisconnectTrackingCommand({
+      state: resolvedActive,
+      requestKey: 'disconnect-resolved-account-1',
+      evidenceRevision: 1,
+      expectedAggregateVersion: 1
+    }));
+    expect(disconnectedResolved).toMatchObject({
+      resolutionStatus: 'RESOLVED',
+      resolutionReason: 'SATISFIED',
+      liveTrackingState: 'HISTORICAL_INACTIVE'
+    });
+    expect(projectResponsibility(disconnectedResolved).bucket).toBe('NONE');
   });
 
   it('requires explicit currentness for delegation and correction of an inactive accepted loop', () => {

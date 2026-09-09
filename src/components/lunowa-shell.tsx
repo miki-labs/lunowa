@@ -353,7 +353,8 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     if (replyContextKey === key && replyContext) return;
     const controller = new AbortController();
     const query = new URLSearchParams({connectedAccountId: accountId, conversationId, mode: replyMode});
-    if (detail === 'conversation' && sourceConversation?.messages.at(-1)?.id) query.set('inReplyToMessageId', sourceConversation.messages.at(-1)!.id);
+    const latestInboundMessage = detail === 'conversation' ? [...(sourceConversation?.messages ?? [])].reverse().find((message) => message.direction === 'INBOUND') : undefined;
+    if (latestInboundMessage) query.set('inReplyToMessageId', latestInboundMessage.id);
     void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/drafts/context?${query.toString()}`, {credentials: 'same-origin', signal: controller.signal})
       .then(async (response) => {
         if (!response.ok) throw new Error((await response.json().catch(() => null) as {error?: string} | null)?.error ?? 'REPLY_CONTEXT_FAILED');

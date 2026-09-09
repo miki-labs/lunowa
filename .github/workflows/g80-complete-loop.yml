@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/g80-complete-loop.yml'
+      - 'docs/product/research/g80-*.md'
       - 'tests/g80-complete-loop-production-integration.ts'
       - 'e2e/**'
       - 'src/server/**'

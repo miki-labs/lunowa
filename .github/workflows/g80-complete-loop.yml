@@ -1,0 +1,79 @@
+name: G80 complete delegation loop
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/g80-complete-loop.yml'
+      - 'docs/product/research/g80-*.md'
+      - 'tests/g80-complete-loop-production-integration.ts'
+      - 'e2e/**'
+      - 'src/server/**'
+      - 'src/components/**'
+      - 'src/app/**'
+      - 'drizzle/**'
+      - 'drizzle.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  complete-loop:
+    name: PostgreSQL 18.6 complete-loop acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: lunowa_g80_clean
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55480:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lunowa_g80_clean"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Use Node 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.20.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify committed production migration is current
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- drizzle drizzle.config.ts src/server/db/schema package.json
+          test -z "$(git ls-files --others --exclude-standard -- drizzle)"
+
+      - name: Run complete PostgreSQL delegation loop
+        env:
+          G80_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55480/lunowa_g80_clean
+        run: pnpm test:g80-production
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser acceptance
+        run: pnpm test:e2e

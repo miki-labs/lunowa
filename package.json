@@ -32,6 +32,7 @@
     "test:source-production": "node --import tsx tests/source-integration.ts",
     "test:communication-production": "node --import tsx tests/communication-production-integration.ts",
     "test:g60-integrity": "vitest run tests/g60-integrity.test.ts tests/source.test.tsx tests/attention-read-model.test.ts tests/attention-temporal.test.ts",
+    "test:g80-production": "node --import tsx tests/g80-complete-loop-production-integration.ts",
     "test:gmail-real-provider": "node --import tsx tests/gmail-real-provider-evidence.ts",
     "proof:auth-uuid:schema": "auth generate --config proofs/better-auth-uuid/auth.ts --output proofs/better-auth-uuid/auth-schema.ts --yes && drizzle-kit generate --config proofs/better-auth-uuid/drizzle.config.ts",
     "test:auth-uuid": "node --import tsx tests/better-auth-uuid-proof.ts",

@@ -315,7 +315,7 @@ try {
     item.evidenceKind === 'PROVIDER_RECONCILED_SEND' && item.sourceLocator?.sendOperationId === operation.id
   ), 'closed USER reply leg is missing provider-reconciled Send provenance');
   assert(finalResponsibility.obligationLegs.some((leg) =>
-    leg.bearer === 'OTHER_PARTY' && leg.actionCode === 'SEND_APPROVAL' && leg.status === 'OPEN'
+    leg.bearer === 'PARTICIPANT' && leg.participantId === participantId && leg.actionCode === 'SEND_APPROVAL' && leg.status === 'OPEN'
   ), 'reconciled Send incorrectly erased the remaining counterparty requirement');
   assert(finalResponsibility.resolutionStatus === 'OPEN', 'provider Send was incorrectly promoted to operational closure');
   const finalAttention = projection(finalResponsibility, now.toISOString());

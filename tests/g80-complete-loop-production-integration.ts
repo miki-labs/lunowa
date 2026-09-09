@@ -308,9 +308,19 @@ try {
     connectedAccountId: accountId,
     responsibilityId: actionRequired.id
   }))?.state;
-  assert(finalResponsibility?.resolutionStatus === 'RESOLVED', 'reconciled sent Source did not close the justified communication outcome');
+  assert(finalResponsibility, 'Responsibility disappeared after Send reconciliation');
+  const closedReplyLeg = finalResponsibility.obligationLegs.find((leg) => leg.id === userLegId);
+  assert(closedReplyLeg?.status === 'CLOSED', 'reconciled Send did not close the exact USER reply leg');
+  assert(closedReplyLeg.provenance.some((item) =>
+    item.evidenceKind === 'PROVIDER_RECONCILED_SEND' && item.sourceLocator?.sendOperationId === operation.id
+  ), 'closed USER reply leg is missing provider-reconciled Send provenance');
+  assert(finalResponsibility.obligationLegs.some((leg) =>
+    leg.bearer === 'OTHER_PARTY' && leg.actionCode === 'SEND_APPROVAL' && leg.status === 'OPEN'
+  ), 'reconciled Send incorrectly erased the remaining counterparty requirement');
+  assert(finalResponsibility.resolutionStatus === 'OPEN', 'provider Send was incorrectly promoted to operational closure');
   const finalAttention = projection(finalResponsibility, now.toISOString());
-  assert(finalAttention.needsYou.length === 0 && finalAttention.review.length === 0, 'resolved loop left fabricated current work');
+  assert(finalAttention.needsYou.length === 0 && finalAttention.review.length === 0, 'reconciled Send left fabricated current user work');
+  assert(finalAttention.managedCount === 1, 'remaining counterparty work did not return to quiet Managed');
   const sourceRows = await db.select({
     providerMessageId: schema.messages.providerMessageId,
     direction: schema.messages.direction

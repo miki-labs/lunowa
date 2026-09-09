@@ -454,3 +454,28 @@ test('expires, re-authenticates, and signs out without changing mailbox monitori
   await expect(page.getByText(/この端末からログアウトしました。Lunowaの監視設定は変更されていません/)).toBeVisible();
   await expect(page.getByRole('heading', {name: 'Lunowaにサインイン'})).toBeVisible();
 });
+
+test('keeps mailbox disconnect failure and Product-account deletion boundaries truthful', async ({page}) => {
+  let deleteAttempts = 0;
+  await page.route('**/api/bff/users/**/gmail/accounts/source-account-1', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      deleteAttempts += 1;
+      await route.fulfill({status: 500, json: {error: 'SIMULATED_DISCONNECT_FAILURE'}});
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/ja');
+  await waitForAuthenticatedShell(page);
+  await nav(page, '設定').click();
+  await expect(page.getByRole('heading', {name: '接続と監視'})).toBeVisible();
+  await page.getByRole('button', {name: 'メール連携を解除する'}).click();
+  await expect(page.getByText(/この解除で1件の監視が停止します/)).toBeVisible();
+  await page.getByRole('button', {name: '解除を確定する'}).click();
+  await expect(page.getByText(/解除処理を完了できませんでした/)).toBeVisible();
+  expect(deleteAttempts).toBe(1);
+
+  await expect(page.getByRole('heading', {name: 'Lunowaアカウントの削除'})).toBeVisible();
+  await expect(page.getByText(/現在、この画面から削除処理は実行しません/)).toBeVisible();
+});

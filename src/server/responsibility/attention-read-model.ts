@@ -3,6 +3,7 @@ import type {SourceReadiness} from '@/lib/source-types';
 import {projectConversationAttention} from './attention';
 import type {AttentionProjectionItem} from './attention';
 import type {AttentionItemReadModel, AttentionReadModel, AttentionSurface} from '@/lib/attention-types';
+import {sourceReadinessAllowsHealthyMonitoring} from '@/server/integrity/projection';
 import {projectAdmissionReview} from './projection';
 import type {AdmissionReviewState, ResponsibilityState} from './types';
 
@@ -112,7 +113,7 @@ export function buildAttentionReadModel(input: {
   now?: Date;
 }): AttentionReadModel {
   const now = input.now ?? new Date();
-  const trustworthySource = input.sourceReadiness === 'ready';
+  const trustworthySource = sourceReadinessAllowsHealthyMonitoring(input.sourceReadiness);
   const projection = projectConversationAttention(input.responsibilities, {
     now,
     integrityTrusted: trustworthySource

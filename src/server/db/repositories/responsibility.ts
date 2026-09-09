@@ -35,6 +35,9 @@ import type {
   ResponsibilityInterpretationCandidate,
   ResponsibilityState,
   TemporalFact,
+  TemporalContract,
+  TemporalEvidence,
+  TemporalTrigger,
   ReductionResult,
   TrustedResponsibilityCommand
 } from '../../responsibility';
@@ -702,6 +705,56 @@ export class ResponsibilityRepository {
       projection: projectResponsibility(state),
       semanticEvidenceRevision: conversation.semanticEvidenceRevision
     };
+  }
+
+  /**
+   * Builds the minimum trusted evidence needed when a Temporal trigger is
+   * recovered after scheduler downtime. The scheduler supplies no semantic
+   * facts; this method only reads the owned conversation and accepted state.
+   */
+  public async loadTemporalEvidence(input: {
+    contract: TemporalContract;
+    trigger: TemporalTrigger;
+    responsibilityId: string;
+    now: Date;
+  }): Promise<TemporalEvidence> {
+    return this.db.transaction(async (tx) => {
+      const current = await loadResponsibilityState(tx, input.responsibilityId, false);
+      if (!current || current.userId !== input.contract.userId || current.connectedAccountId !== input.contract.connectedAccountId) {
+        return {evidenceRevision: 0, references: [], userAttentionNeeded: false};
+      }
+      const [conversation] = await tx.select({
+        semanticEvidenceRevision: conversations.semanticEvidenceRevision
+      }).from(conversations).where(and(
+        eq(conversations.id, current.conversationId),
+        eq(conversations.userId, input.contract.userId),
+        eq(conversations.connectedAccountId, input.contract.connectedAccountId)
+      )).limit(1);
+      const messageRows = await tx.select({id: messages.id, direction: messages.direction, occurredAt: messages.occurredAt})
+        .from(messages)
+        .where(and(
+          eq(messages.userId, input.contract.userId),
+          eq(messages.connectedAccountId, input.contract.connectedAccountId),
+          eq(messages.conversationId, current.conversationId)
+        ));
+      const activatedAt = Date.parse(input.contract.activatedAt);
+      const replyReceived = input.trigger.triggerType === 'REPLY_RECEIVED' && messageRows.some((row) =>
+        row.direction === 'INBOUND' && row.occurredAt.getTime() > activatedAt
+      );
+      const deadlineReached = input.trigger.triggerType === 'DEADLINE' &&
+        Boolean(input.trigger.triggerAt && Date.parse(input.trigger.triggerAt) <= input.now.getTime());
+      const userAttentionNeeded = (
+        current.obligationLegs.some((leg) => leg.bearer === 'USER' && leg.status === 'OPEN' && leg.actionability === 'ACTIONABLE' && leg.conditionSatisfied !== false) ||
+        current.details.uncertainties.some((uncertainty) => uncertainty.material && uncertainty.reviewRequired)
+      );
+      return {
+        evidenceRevision: Math.max(conversation?.semanticEvidenceRevision ?? 0, current?.acceptedEvidenceRevision ?? 0),
+        references: messageRows.map((row) => ({evidenceKind: 'PROVIDER_MESSAGE_OBSERVED', messageId: row.id})),
+        replyReceived,
+        deadlineReached,
+        userAttentionNeeded
+      };
+    });
   }
 
   public async listResponsibilities(input: {

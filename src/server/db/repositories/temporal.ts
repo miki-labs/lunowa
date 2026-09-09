@@ -8,6 +8,7 @@ import {responsibilities} from '../schema/responsibility';
 import {ResponsibilityRepository} from './responsibility';
 import {
   createDeferAttentionCommand,
+  createDisconnectTrackingCommand,
   createReturnAttentionCommand,
   createTemporalReconsiderationCommand,
   isTemporalTriggerEligible,
@@ -288,6 +289,51 @@ export class TemporalRepository {
     });
   }
 
+  public async stopTrackingForDisconnectedAccount(input: {
+    userId: string;
+    connectedAccountId: string;
+    requestKey: string;
+    now?: Date;
+  }): Promise<number> {
+    const now = input.now ?? new Date();
+    return this.db.transaction(async (tx) => {
+      const rows = await tx.select({id: responsibilities.id})
+        .from(responsibilities)
+        .where(and(
+          eq(responsibilities.userId, input.userId),
+          eq(responsibilities.connectedAccountId, input.connectedAccountId),
+          eq(responsibilities.liveTrackingState, 'TRACKING_ACTIVE')
+        ))
+        .orderBy(asc(responsibilities.id));
+      let stopped = 0;
+      for (const row of rows) {
+        const current = await this.responsibilityRepository.getResponsibilityInTransaction(tx, {
+          userId: input.userId,
+          connectedAccountId: input.connectedAccountId,
+          responsibilityId: row.id
+        });
+        if (!current || current.state.liveTrackingState !== 'TRACKING_ACTIVE') continue;
+        const command = createDisconnectTrackingCommand({
+          state: current.state,
+          requestKey: `${input.requestKey}:${current.state.id}`,
+          evidenceRevision: current.semanticEvidenceRevision,
+          expectedAggregateVersion: current.state.aggregateVersion
+        });
+        const result = await this.responsibilityRepository.applyTrustedCommandInTransaction(tx, command);
+        if (result.status !== 'APPLIED' || !result.responsibilities[0]) {
+          throw new Error(result.status === 'APPLIED' ? 'account disconnect did not stop tracking' : result.reason);
+        }
+        await this.retireActiveContractsInTransaction(tx, {
+          userId: input.userId,
+          connectedAccountId: input.connectedAccountId,
+          responsibilityId: current.state.id
+        }, now, 'CANCELLED', 'CANCELLED');
+        stopped += 1;
+      }
+      return stopped;
+    });
+  }
+
   private async retireActiveContractsInTransaction(
     tx: Transaction,
     input: {userId: string; connectedAccountId: string; responsibilityId: string},
@@ -490,6 +536,19 @@ export class TemporalRepository {
     const results: TemporalProcessResult[] = [];
     for (const row of rows) results.push(await this.processTemporalTrigger({...input, triggerId: row.id, now}));
     return results;
+  }
+
+  /** Returns bounded tenant work for a scheduler recovery sweep. */
+  public async listDueUserIds(now = new Date(), limit = 20): Promise<readonly string[]> {
+    const rows = await this.db.select({userId: temporalTriggers.userId})
+      .from(temporalTriggers)
+      .where(or(
+        and(or(eq(temporalTriggers.triggerStatus, 'SCHEDULED'), eq(temporalTriggers.triggerStatus, 'FAILED')), lte(temporalTriggers.availableAt, now)),
+        and(eq(temporalTriggers.triggerStatus, 'CLAIMED'), lte(temporalTriggers.claimedAt, new Date(now.getTime() - 5 * 60 * 1000)))
+      ))
+      .orderBy(asc(temporalTriggers.availableAt), asc(temporalTriggers.userId), asc(temporalTriggers.id))
+      .limit(Math.max(1, Math.min(limit, 100)));
+    return [...new Set(rows.map((row) => row.userId))];
   }
 
   private async claimTrigger(id: string, userId: string, now: Date): Promise<{trigger: TemporalTrigger; contract: TemporalContract; owned: boolean} | null> {

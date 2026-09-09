@@ -24,12 +24,14 @@ function readinessNotice(readiness: SourceReadiness, dataThroughAt: string | nul
     return <aside className="integrity-banner" aria-label="Sourceの確認範囲"><strong>Sourceの確認範囲に問題があります</strong><span>同期またはメールボックスの再認証が必要です。保存済みの原文は確認できますが、検索結果は全件を表さない可能性があります。{dataThroughAt ? `データ確認時点: ${new Date(dataThroughAt).toLocaleString('ja-JP')}。` : 'データ確認時点は不明です。'}</span></aside>;
   }
   if (readiness === 'unavailable') {
-    return <p className="empty-state">メールボックスが接続されていません。Sourceを表示するには、対応するメールボックスを接続してください。</p>;
+    return <p className="coverage-notice" role="status">現在接続中のメールボックスはありません。保存済みのSourceは引き続き確認できますが、新しい会話は同期されません。再開するには対応するメールボックスを接続してください。</p>;
   }
   return null;
 }
 
 function accountReadiness(account: SourcePageReadModel['accounts'][number]): SourceReadiness {
+  if (account.monitoring?.status === 'disconnected' || account.sync.errorCode === 'INTENTIONAL_DISCONNECT') return 'partial';
+  if (account.monitoring?.status === 'degraded') return 'degraded';
   if (
     account.connectionState === 'ERROR' ||
     account.connectionState === 'RECONNECT_REQUIRED' ||
@@ -48,6 +50,12 @@ function accountReadiness(account: SourcePageReadModel['accounts'][number]): Sou
 
 function accountCoverageNotice(account: SourcePageReadModel['accounts'][number]): React.ReactNode {
   const coverage = accountReadiness(account);
+  if (account.monitoring?.status === 'disconnected' || account.sync.errorCode === 'INTENTIONAL_DISCONNECT') {
+    return <>
+      <p className="coverage-notice" role="status">このメール連携は解除済みです。保存済みのSourceは確認できますが、新しい会話は同期されません。</p>
+      <p className="metadata">データ確認時点: {account.sync.dataThroughAt ? new Date(account.sync.dataThroughAt).toLocaleString('ja-JP') : '不明'}</p>
+    </>;
+  }
   return <>
     {readinessNotice(coverage, account.sync.dataThroughAt)}
     {coverage !== 'ready' && <p className="metadata">同期状態: {account.sync.status} · データ確認時点: {account.sync.dataThroughAt ? new Date(account.sync.dataThroughAt).toLocaleString('ja-JP') : '不明'}</p>}

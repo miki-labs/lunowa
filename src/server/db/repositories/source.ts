@@ -22,6 +22,7 @@ import {
   providerSyncStates
 } from '../schema';
 import {sanitizeSourceHtml, sourcePreview} from '../../source/sanitize';
+import {projectAccountMonitoringIntegrity} from '../../integrity/projection';
 
 type Database = ReturnType<typeof getDatabase>;
 
@@ -50,6 +51,7 @@ type AccountRow = {
   emailAddress: string;
   displayName: string | null;
   connectionState: string;
+  grantedCapabilities: readonly string[];
   syncStatus: string | null;
   lastSuccessAt: Date | null;
   lastFullReconcileAt: Date | null;
@@ -126,6 +128,14 @@ function accountModel(row: AccountRow): SourceAccountReadModel {
     emailAddress: row.emailAddress,
     displayName: row.displayName,
     connectionState: row.connectionState,
+    grantedCapabilities: row.grantedCapabilities,
+    monitoring: projectAccountMonitoringIntegrity({
+      connectionState: row.connectionState,
+      syncStatus: row.syncStatus,
+      syncErrorCode: row.errorCode,
+      lastSuccessAt: row.lastSuccessAt,
+      lastFullReconcileAt: row.lastFullReconcileAt
+    }),
     sync: {
       status: row.syncStatus ?? 'UNKNOWN',
       lastSuccessAt: iso(row.lastSuccessAt),
@@ -138,13 +148,16 @@ function accountModel(row: AccountRow): SourceAccountReadModel {
 
 function readiness(accounts: readonly AccountRow[]): SourceReadiness {
   if (accounts.length === 0) return 'unavailable';
-  if (accounts.some((account) =>
-    account.connectionState === 'ERROR' ||
-    account.connectionState === 'RECONNECT_REQUIRED' ||
-    account.syncStatus === 'ERROR' ||
-    account.syncStatus === 'RECONCILIATION_REQUIRED'
-  )) return 'degraded';
-  if (accounts.some((account) =>
+  const connected = accounts.filter((account) => account.connectionState === 'CONNECTED');
+  if (connected.length === 0) return 'unavailable';
+  if (connected.some((account) => projectAccountMonitoringIntegrity({
+    connectionState: account.connectionState,
+    syncStatus: account.syncStatus,
+    syncErrorCode: account.errorCode,
+    lastSuccessAt: account.lastSuccessAt,
+    lastFullReconcileAt: account.lastFullReconcileAt
+  }).status === 'degraded')) return 'degraded';
+  if (accounts.some((account) => account.connectionState !== 'CONNECTED') || connected.some((account) =>
     account.connectionState !== 'CONNECTED' ||
     !account.syncStatus ||
     account.syncStatus === 'PENDING' ||
@@ -156,9 +169,11 @@ function readiness(accounts: readonly AccountRow[]): SourceReadiness {
 
 function scopeDataThrough(accounts: readonly AccountRow[]): string | null {
   const dates = accounts
+    .filter((account) => account.connectionState === 'CONNECTED')
     .map((account) => account.lastSuccessAt ?? account.lastFullReconcileAt)
     .filter((value): value is Date => value instanceof Date);
-  if (dates.length !== accounts.length || dates.length === 0) return null;
+  const connectedCount = accounts.filter((account) => account.connectionState === 'CONNECTED').length;
+  if (dates.length !== connectedCount || dates.length === 0) return null;
   return new Date(Math.min(...dates.map((value) => value.getTime()))).toISOString();
 }
 
@@ -201,6 +216,7 @@ export class SourceRepository {
         emailAddress: connectedAccounts.emailAddress,
         displayName: connectedAccounts.displayName,
         connectionState: connectedAccounts.connectionState,
+        grantedCapabilities: connectedAccounts.grantedCapabilities,
         syncStatus: providerSyncStates.status,
         lastSuccessAt: providerSyncStates.lastSuccessAt,
         lastFullReconcileAt: providerSyncStates.lastFullReconcileAt,

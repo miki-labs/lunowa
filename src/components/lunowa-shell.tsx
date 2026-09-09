@@ -999,7 +999,8 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
       setDisconnectTarget(null);
       onRefreshData();
     } catch {
-      setDisconnectError('メール連携を解除できませんでした。現在の接続状態は変わっていません。');
+      setDisconnectError('メール連携の解除処理を完了できませんでした。監視状態または接続状態の一部が更新されている可能性があるため、最新状態を再確認しています。必要ならもう一度お試しください。');
+      onRefreshData();
     } finally {
       setDisconnecting(false);
     }
@@ -1047,6 +1048,12 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
       </form>}
       {appUser?.id && <p className="metadata">Googleの同意画面へ移動します。メールボックス接続はアプリのログインとは別です。</p>}
       {disconnectError && <p className="inline-status" role="alert">{disconnectError}</p>}
+    </section>
+    <section className="settings-card" aria-labelledby="product-account-deletion-heading">
+      <h2 id="product-account-deletion-heading">Lunowaアカウントの削除</h2>
+      <p>メール連携の解除とは別の、高い影響を持つProductアカウント操作です。</p>
+      <p className="metadata">削除機能を提供する際は、Lunowaの監視・委任を停止します。Gmail側のメールを削除する操作ではありません。</p>
+      <p className="inline-status" role="status">現在、この画面から削除処理は実行しません。データ保持・バックアップ・エクスポート・プロバイダー認可の具体的な扱いは、公開前のプライバシー / データ保持方針が確定してから確認内容とともに有効化します。</p>
     </section>
   </div>;
 }

@@ -182,4 +182,43 @@ describe('G21 Source safety boundaries', () => {
     await waitFor(() => expect(screen.getByText('Sourceの確認範囲に問題があります')).toBeInTheDocument());
     expect(screen.getByText(/検索結果は全件を表さない可能性があります/)).toBeInTheDocument();
   });
+
+  it('keeps saved Source inspectable after intentional disconnect without claiming active sync', async () => {
+    const disconnectedAccount = {
+      ...account,
+      connectionState: 'DISCONNECTED',
+      monitoring: {
+        status: 'disconnected' as const,
+        reasonCode: 'INTENTIONAL_DISCONNECT',
+        lastTrustworthyAt: account.sync.lastSuccessAt,
+        recoveryAction: null
+      },
+      sync: {...account.sync, status: 'ERROR', errorCode: 'INTENTIONAL_DISCONNECT'}
+    };
+    const disconnectedPage: SourcePageReadModel = {
+      ...page,
+      accounts: [disconnectedAccount],
+      conversations: [{...page.conversations[0], account: disconnectedAccount}],
+      readiness: 'unavailable',
+      dataThroughAt: null
+    };
+    const disconnectedDetail: SourceConversationReadModel = {...detail, account: disconnectedAccount};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) =>
+      String(input).includes('/source/conversations/conversation-1')
+        ? jsonResponse(disconnectedDetail)
+        : jsonResponse(disconnectedPage)
+    ));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(screen.getByRole('button', {name: '会話を表示'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: /Source Sender/})).toBeInTheDocument());
+    expect(screen.getByText(/保存済みのSourceは引き続き確認できます/)).toBeInTheDocument();
+    expect(screen.queryByText(/会話を同期しています/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: /Source Sender/}));
+    await waitFor(() => expect(screen.getByRole('heading', {name: 'Original provider subject'})).toBeInTheDocument());
+    expect(screen.getByText(/このメール連携は解除済みです/)).toBeInTheDocument();
+    expect(screen.getByText('Safe source')).toBeInTheDocument();
+  });
+
 });

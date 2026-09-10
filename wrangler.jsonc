@@ -4,6 +4,10 @@
   "compatibility_date": "2026-09-03",
   "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
   "main": "src/worker.ts",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   "triggers": {
     "crons": ["*/10 * * * *"]
   },

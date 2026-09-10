@@ -194,6 +194,26 @@ Prefer:
 
 Avoid critical conventions that exist only in one person's memory or hidden editor configuration.
 
+## Visual/UI work uses a different acceptance oracle
+
+Do not treat UI/UX work as an ordinary code patch with screenshots attached at the end. Route material user-facing work through `.agents/skills/visual-acceptance/SKILL.md` and distinguish three classes: accepted-reference conformance, UI engineering without one exact target, and UX/Product-direction work.
+
+For accepted-reference conformance, the rendering is part of the implementation loop. Establish the reference/revision, comparable Product state and canonical viewport; render the real application early; compare reference and candidate directly; correct material mismatches; then verify interaction, responsive behavior, accessibility and Product semantics as independent gates. Functional correctness and visual fidelity do not substitute for one another.
+
+Minimal-diff preference is subordinate here. A small patch that preserves an obsolete shell but misses the accepted target is worse than a larger focused presentation change that reaches conformance without violating Product/runtime boundaries. Conversely, pixel similarity never authorizes fake data, invented behavior, weakened accessibility or unsafe effects.
+
+Use stable screenshot baselines primarily for regression **after** a visual state has been accepted. Initial conformance to an external Figma/screenshot target needs direct comparison to that target; a candidate must not generate or update its own baseline and then use that baseline as sole evidence of correctness. When pixel diffs are used, keep the rendering environment stable and treat baseline changes as reviewable trust-root changes.
+
+External evidence basis, rechecked **2026-09-11**, supports this split:
+
+- Figma Make's 2026 local-code and visual-editing workflows operate on the running production codebase and use direct visual editing/annotations before normal Git/PR review: <https://help.figma.com/hc/en-us/articles/40775535020695-Make-in-your-local-codebase> and <https://www.figma.com/blog/properties-panel-and-annotations-now-in-figma-make/>.
+- Vercel records accepted Product-design decisions for coding agents because code shows what shipped but not why a UI/interaction became standard: <https://vercel.com/blog/teaching-agents-product-design-at-vercel>.
+- Playwright visual comparisons explicitly compare rendered screenshots and warn that rendering environment differences affect results: <https://playwright.dev/docs/test-snapshots>.
+- Storybook/Chromatic separate visual snapshots from interaction and accessibility tests rather than treating one axis as sufficient: <https://storybook.js.org/docs/writing-tests/visual-testing>, <https://storybook.js.org/docs/writing-tests/accessibility-testing>.
+- Recent UI-agent benchmarks likewise find visual fidelity and functional/interaction correctness partially decoupled: VISTA <https://arxiv.org/abs/2605.26144> and UI2App <https://arxiv.org/abs/2607.06306>. Iterative visual-feedback work such as 1D-Bench <https://arxiv.org/abs/2602.18548> and Coding with Eyes <https://arxiv.org/abs/2604.19750> supports rendering/interaction feedback during implementation. UXBench further treats UX judging as interaction-grounded and still validates against humans: <https://arxiv.org/abs/2606.16262>.
+
+These sources justify a rendered evidence loop, not a new orchestration service or mandatory third-party visual-testing subscription.
+
 ## Builder verification is evidence, not a completion claim
 
 The implementing agent SHOULD:

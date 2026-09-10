@@ -72,6 +72,12 @@ Classify the task before expensive implementation. Load or apply deeper guidance
 
 Do not turn every ordinary change into a full specialist review.
 
+### Visual/UI specialization
+
+When the task materially changes user-facing presentation or has an accepted Figma/screenshot/design-code target, read and apply `.agents/skills/visual-acceptance/SKILL.md` before substantial implementation. Classify reference conformance, UI engineering, and UX/Product-design work separately.
+
+For reference-conformance work, establish the reference identity, comparable target state and canonical viewport before editing. Render early and iterate against the actual application. Do not substitute source inspection, minimal diff, generic E2E success, or green CI for direct reference-to-candidate visual comparison. If only an unrelated auth/empty/error state can be rendered, the visual claim remains `NOT_VERIFIED`.
+
 ## 4. Reuse and design to actual risk
 
 Prefer, when relevant:

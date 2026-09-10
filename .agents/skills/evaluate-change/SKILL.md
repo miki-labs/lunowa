@@ -69,6 +69,12 @@ Escalate the relevant question, not the whole review, when the change materially
 
 Do not load every specialist discipline for a low-risk local patch.
 
+### Visual/UI specialization
+
+When the accepted task materially concerns user-facing presentation, responsive behavior, or an accepted Figma/screenshot/design-code reference, read and apply `.agents/skills/visual-acceptance/SKILL.md`.
+
+For reference-conformance work, visual conformance is a separate required decision axis. A materially wrong rendered result is `FAIL` even when functional checks are green; absent or stale direct rendered comparison is `NOT_VERIFIED`. Do not infer visual PASS from a small diff, clean architecture, source similarity, unit/E2E success, or builder confidence. If the candidate changes the visual baseline/oracle used to judge itself, require independent trust-root approval rather than treating the updated baseline as self-certifying evidence.
+
 ## 5. Challenge the evidence
 
 For each material claim, ask what evidence could falsify it and whether that evidence actually exists for the candidate state.

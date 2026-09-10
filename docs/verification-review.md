@@ -35,6 +35,20 @@ Verification SHOULD be selected from the actual failure modes of the change. Exa
 - dependency change → relevant regression suite + vulnerability/license review,
 - deployment change → staging/runtime smoke verification.
 
+## Visual/UI verification is a separate axis
+
+For material UI work, classify the claim before choosing evidence:
+
+- **accepted-reference conformance** needs fresh rendered candidate evidence and direct comparison with the accepted reference at the relevant state/viewport;
+- **UI engineering** without one exact visual target needs rendered-browser verification against the current design/interaction/responsive contracts;
+- **UX/Product-direction** needs scenario/task evidence plus accepted Product/owner judgment, not an automated similarity score.
+
+A green functional suite cannot prove visual conformance, and a matching screenshot cannot prove interaction, state, authorization, data truth, accessibility or provider effects. For reference-conformance work, a material visual mismatch is a failure of the requested behavior; missing direct visual evidence is `NOT_VERIFIED`.
+
+Use visual snapshot baselines to detect regression after a state is accepted. Keep their rendering environment stable, and do not let a candidate-created or candidate-updated baseline self-certify the same change. The independent reviewer should inspect the actual candidate/reference pair and, when affordable, reproduce the render directly.
+
+See `.agents/skills/visual-acceptance/SKILL.md` for the operational route.
+
 ## Test strategy
 
 Use the cheapest test that gives trustworthy coverage of the behavior while preserving a smaller number of end-to-end tests for critical cross-system journeys.

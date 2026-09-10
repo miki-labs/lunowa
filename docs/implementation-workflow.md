@@ -8,6 +8,8 @@ This workflow begins after a product/feature requirement is sufficiently real to
 
 Security, privacy, reliability, operability, commercial correctness, and AI-runtime constraints are cross-cutting only when the change makes them relevant.
 
+Material visual/UI work has a task-specific oracle rather than a separate delivery system. Route it through `.agents/skills/visual-acceptance/SKILL.md`: accepted-reference conformance requires a closed rendered-browser comparison loop; UI engineering requires rendered state/interaction evidence; UX/Product-direction changes require accepted Product/owner judgment.
+
 ## 1. Frame
 
 Clarify:
@@ -132,7 +134,7 @@ Evidence may include:
 - performance/economic measurements,
 - AI evals when model behavior is part of the product.
 
-Passing one generic command is not proof that every relevant behavior was verified.
+Passing one generic command is not proof that every relevant behavior was verified. For accepted visual-reference work, generic CI is never a substitute for fresh reference-to-candidate rendered comparison.
 
 ## 9. Review
 

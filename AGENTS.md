@@ -43,9 +43,10 @@ GitHub Issue task contract + blocked_by
 - Query mutable external facts live when they can change the solution or acceptance evidence.
 - Privileged or destructive external writes require separate explicit authority; they are not ambient coding-agent capability.
 - Put stable mechanical invariants in tests, CI, schemas, types, or scripts when practical. Use prose for judgment and rationale.
+- For material visual/UI tasks, classify reference conformance vs UI engineering vs UX/Product design before implementation. An accepted visual target makes rendered fidelity a task objective inside Product/safety guardrails; minimal diff is only a tie-breaker, and fresh browser comparison is required before claiming visual PASS.
 - Do not add a daemon, workflow database, custom orchestrator, automatic retry/replay, or broad tool enablement without a separately accepted, evidence-backed need.
 
-Execution guidance: `docs/coding-agent-harness.md`, `docs/implementation-workflow.md`, `.agents/skills/execute-task/SKILL.md`. Independent review: `.agents/skills/evaluate-change/SKILL.md`.
+Execution guidance: `docs/coding-agent-harness.md`, `docs/implementation-workflow.md`, `.agents/skills/execute-task/SKILL.md`. Material visual/UI work also routes through `.agents/skills/visual-acceptance/SKILL.md`; reference-conformance work cannot be accepted from code/tests alone. Independent review: `.agents/skills/evaluate-change/SKILL.md`.
 
 ## Source of truth by question
 

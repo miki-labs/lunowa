@@ -72,6 +72,12 @@ Include credible alternatives only when the choice is not obvious and the ration
 
 If these design notes become long, uncertain, cross-cutting, security-critical, data-critical, or difficult to reverse, stop using the task contract as the design document and create `design-doc.md` instead.
 
+### Visual / UI oracle — only when material
+
+Classify `reference conformance`, `UI engineering`, or `UX / Product design`. For accepted-reference work, record the reference identity/revision, comparable reachable state/data, material viewport/render conditions, and what direct rendered comparison will falsify conformance. Do not use illustrative reference data as production truth.
+
+For UX/Product-direction work, name the Product/owner decision still required. See `.agents/skills/visual-acceptance/SKILL.md`; omit this section for work with no material user-facing outcome.
+
 ## Acceptance criteria
 
 Write observable/testable conditions for completion.

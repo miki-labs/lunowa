@@ -244,81 +244,6 @@ export class SourceRepository {
     return participant(row?.email, row?.displayName);
   }
 
-  private async messageParticipants(
-    userId: string,
-    connectedAccountId: string,
-    messageId: string,
-    role?: 'TO' | 'CC' | 'BCC'
-  ): Promise<SourceParticipantReadModel[]> {
-    const filters = [
-      eq(messageParticipants.userId, userId),
-      eq(messageParticipants.connectedAccountId, connectedAccountId),
-      eq(messageParticipants.messageId, messageId)
-    ];
-    if (role) filters.push(eq(messageParticipants.role, role));
-    const rows = await this.db
-      .select({email: participantIdentities.canonicalEmail, displayName: participantIdentities.displayName})
-      .from(messageParticipants)
-      .innerJoin(
-        participantIdentities,
-        and(
-          eq(participantIdentities.id, messageParticipants.participantId),
-          eq(participantIdentities.userId, userId)
-        )
-      )
-      .where(and(...filters))
-      .orderBy(asc(messageParticipants.id));
-    return rows.map((row) => participant(row.email, row.displayName));
-  }
-
-  private async messageAttachments(
-    userId: string,
-    connectedAccountId: string,
-    messageId: string
-  ): Promise<SourceAttachmentReadModel[]> {
-    const rows = await this.db
-      .select({
-        id: attachments.id,
-        providerAttachmentId: attachments.providerAttachmentId,
-        filename: attachments.filename,
-        mimeType: attachments.mimeType,
-        sizeBytes: attachments.sizeBytes,
-        contentDisposition: attachments.contentDisposition,
-        contentReference: attachments.contentReference,
-        contentHash: attachments.contentHash,
-        previewState: attachments.previewState
-      })
-      .from(attachments)
-      .where(and(
-        eq(attachments.userId, userId),
-        eq(attachments.connectedAccountId, connectedAccountId),
-        eq(attachments.messageId, messageId)
-      ))
-      .orderBy(asc(attachments.id));
-    return rows;
-  }
-
-  private async messageModel(userId: string, connectedAccountId: string, row: typeof messages.$inferSelect): Promise<SourceMessageReadModel> {
-    return {
-      id: row.id,
-      providerMessageId: row.providerMessageId,
-      providerThreadId: row.providerThreadId,
-      direction: row.direction as SourceMessageReadModel['direction'],
-      sender: await this.participantById(userId, row.senderParticipantId),
-      recipients: await this.messageParticipants(userId, connectedAccountId, row.id, 'TO'),
-      cc: await this.messageParticipants(userId, connectedAccountId, row.id, 'CC'),
-      bcc: await this.messageParticipants(userId, connectedAccountId, row.id, 'BCC'),
-      subject: row.subject,
-      textBody: row.textBody,
-      sanitizedHtmlBody: sanitizeSourceHtml(row.sanitizedHtmlBody),
-      occurredAt: row.occurredAt.toISOString(),
-      providerReceivedAt: iso(row.providerReceivedAt),
-      readState: row.readState,
-      providerDeletedAt: iso(row.providerDeletedAt),
-      attachments: await this.messageAttachments(userId, connectedAccountId, row.id)
-    };
-  }
-
   private async matchingParticipantIds(userId: string, value: string): Promise<string[]> {
     if (!value) return [];
     const pattern = escapedLike(value);
@@ -447,39 +372,203 @@ export class SourceRepository {
     conversationId: string;
     connectedAccountId?: string;
   }): Promise<SourceConversationReadModel | null> {
-    const accounts = await this.ownedAccounts(input.userId, input.connectedAccountId);
-    const accountIds = accounts.map((account) => account.id);
-    if (accountIds.length === 0) return null;
-    const [row] = await this.db
-      .select()
-      .from(conversations)
-      .where(and(
-        eq(conversations.id, input.conversationId),
-        eq(conversations.userId, input.userId),
-        inArray(conversations.connectedAccountId, accountIds)
-      ))
-      .limit(1);
+    const accountFilters = [eq(connectedAccounts.userId, input.userId)];
+    const conversationFilters = [
+      eq(conversations.id, input.conversationId),
+      eq(conversations.userId, input.userId)
+    ];
+    const messageFilters = [
+      eq(messages.userId, input.userId),
+      eq(messages.conversationId, input.conversationId)
+    ];
+    const participantFilters = [
+      eq(messageParticipants.userId, input.userId),
+      eq(messages.userId, input.userId),
+      eq(messages.conversationId, input.conversationId)
+    ];
+    const attachmentFilters = [
+      eq(attachments.userId, input.userId),
+      eq(messages.userId, input.userId),
+      eq(messages.conversationId, input.conversationId)
+    ];
+    if (input.connectedAccountId) {
+      accountFilters.push(eq(connectedAccounts.id, input.connectedAccountId));
+      conversationFilters.push(eq(conversations.connectedAccountId, input.connectedAccountId));
+      messageFilters.push(eq(messages.connectedAccountId, input.connectedAccountId));
+      participantFilters.push(eq(messageParticipants.connectedAccountId, input.connectedAccountId));
+      attachmentFilters.push(eq(attachments.connectedAccountId, input.connectedAccountId));
+    }
+
+    // Cloudflare retires each pg checkout after one use. Keep that safety boundary,
+    // but avoid serial per-message round trips: all detail projections are scoped
+    // independently and can be fetched in one bounded parallel database stage.
+    const [accounts, conversationRows, messageRows, participantRows, attachmentRows] = await Promise.all([
+      this.db
+        .select({
+          id: connectedAccounts.id,
+          provider: connectedAccounts.provider,
+          providerAccountId: connectedAccounts.providerAccountId,
+          emailAddress: connectedAccounts.emailAddress,
+          displayName: connectedAccounts.displayName,
+          connectionState: connectedAccounts.connectionState,
+          grantedCapabilities: connectedAccounts.grantedCapabilities,
+          syncStatus: providerSyncStates.status,
+          lastSuccessAt: providerSyncStates.lastSuccessAt,
+          lastFullReconcileAt: providerSyncStates.lastFullReconcileAt,
+          errorCode: providerSyncStates.lastErrorCode
+        })
+        .from(connectedAccounts)
+        .leftJoin(providerSyncStates, eq(providerSyncStates.connectedAccountId, connectedAccounts.id))
+        .where(and(...accountFilters))
+        .orderBy(asc(connectedAccounts.provider), asc(connectedAccounts.emailAddress)),
+      this.db
+        .select()
+        .from(conversations)
+        .where(and(...conversationFilters))
+        .limit(1),
+      this.db
+        .select({
+          id: messages.id,
+          userId: messages.userId,
+          connectedAccountId: messages.connectedAccountId,
+          conversationId: messages.conversationId,
+          providerMessageId: messages.providerMessageId,
+          providerThreadId: messages.providerThreadId,
+          direction: messages.direction,
+          senderParticipantId: messages.senderParticipantId,
+          senderEmail: participantIdentities.canonicalEmail,
+          senderDisplayName: participantIdentities.displayName,
+          subject: messages.subject,
+          textBody: messages.textBody,
+          sanitizedHtmlBody: messages.sanitizedHtmlBody,
+          occurredAt: messages.occurredAt,
+          providerReceivedAt: messages.providerReceivedAt,
+          readState: messages.readState,
+          providerDeletedAt: messages.providerDeletedAt
+        })
+        .from(messages)
+        .leftJoin(
+          participantIdentities,
+          and(
+            eq(participantIdentities.id, messages.senderParticipantId),
+            eq(participantIdentities.userId, input.userId)
+          )
+        )
+        .where(and(...messageFilters))
+        .orderBy(asc(messages.occurredAt), asc(messages.id)),
+      this.db
+        .select({
+          id: messageParticipants.id,
+          messageId: messageParticipants.messageId,
+          role: messageParticipants.role,
+          email: participantIdentities.canonicalEmail,
+          displayName: participantIdentities.displayName
+        })
+        .from(messageParticipants)
+        .innerJoin(
+          messages,
+          and(
+            eq(messages.id, messageParticipants.messageId),
+            eq(messages.connectedAccountId, messageParticipants.connectedAccountId)
+          )
+        )
+        .innerJoin(
+          participantIdentities,
+          and(
+            eq(participantIdentities.id, messageParticipants.participantId),
+            eq(participantIdentities.userId, input.userId)
+          )
+        )
+        .where(and(...participantFilters))
+        .orderBy(asc(messageParticipants.id)),
+      this.db
+        .select({
+          id: attachments.id,
+          messageId: attachments.messageId,
+          providerAttachmentId: attachments.providerAttachmentId,
+          filename: attachments.filename,
+          mimeType: attachments.mimeType,
+          sizeBytes: attachments.sizeBytes,
+          contentDisposition: attachments.contentDisposition,
+          contentReference: attachments.contentReference,
+          contentHash: attachments.contentHash,
+          previewState: attachments.previewState
+        })
+        .from(attachments)
+        .innerJoin(
+          messages,
+          and(
+            eq(messages.id, attachments.messageId),
+            eq(messages.connectedAccountId, attachments.connectedAccountId)
+          )
+        )
+        .where(and(...attachmentFilters))
+        .orderBy(asc(attachments.id))
+    ]);
+
+    if (input.connectedAccountId && accounts.length === 0) throw new SourceAccessError('ACCOUNT_NOT_FOUND');
+    const row = conversationRows[0];
     if (!row) return null;
     const account = accounts.find((candidate) => candidate.id === row.connectedAccountId);
     if (!account) return null;
-    const messageRows = await this.db
-      .select()
-      .from(messages)
-      .where(and(
-        eq(messages.userId, input.userId),
-        eq(messages.connectedAccountId, row.connectedAccountId),
-        eq(messages.conversationId, row.id)
-      ))
-      .orderBy(asc(messages.occurredAt), asc(messages.id));
+
+    type RecipientGroups = Record<'TO' | 'CC' | 'BCC', SourceParticipantReadModel[]>;
+    const recipientsByMessage = new Map<string, RecipientGroups>();
+    for (const recipientRow of participantRows) {
+      if (recipientRow.role !== 'TO' && recipientRow.role !== 'CC' && recipientRow.role !== 'BCC') continue;
+      const groups = recipientsByMessage.get(recipientRow.messageId) ?? {TO: [], CC: [], BCC: []};
+      groups[recipientRow.role].push(participant(recipientRow.email, recipientRow.displayName));
+      recipientsByMessage.set(recipientRow.messageId, groups);
+    }
+
+    const attachmentsByMessage = new Map<string, SourceAttachmentReadModel[]>();
+    for (const attachment of attachmentRows) {
+      const group = attachmentsByMessage.get(attachment.messageId) ?? [];
+      group.push({
+        id: attachment.id,
+        providerAttachmentId: attachment.providerAttachmentId,
+        filename: attachment.filename,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        contentDisposition: attachment.contentDisposition,
+        contentReference: attachment.contentReference,
+        contentHash: attachment.contentHash,
+        previewState: attachment.previewState
+      });
+      attachmentsByMessage.set(attachment.messageId, group);
+    }
+
+    const messageModels: SourceMessageReadModel[] = messageRows
+      .filter((message) => message.connectedAccountId === row.connectedAccountId)
+      .map((message) => {
+        const recipients = recipientsByMessage.get(message.id) ?? {TO: [], CC: [], BCC: []};
+        return {
+          id: message.id,
+          providerMessageId: message.providerMessageId,
+          providerThreadId: message.providerThreadId,
+          direction: message.direction as SourceMessageReadModel['direction'],
+          sender: participant(message.senderEmail, message.senderDisplayName),
+          recipients: recipients.TO,
+          cc: recipients.CC,
+          bcc: recipients.BCC,
+          subject: message.subject,
+          textBody: message.textBody,
+          sanitizedHtmlBody: sanitizeSourceHtml(message.sanitizedHtmlBody),
+          occurredAt: message.occurredAt.toISOString(),
+          providerReceivedAt: iso(message.providerReceivedAt),
+          readState: message.readState,
+          providerDeletedAt: iso(message.providerDeletedAt),
+          attachments: attachmentsByMessage.get(message.id) ?? []
+        };
+      });
+
     return {
       id: row.id,
       providerThreadId: row.providerThreadId,
-      subject: row.normalizedSubject ?? messageRows[0]?.subject ?? '(no subject)',
+      subject: row.normalizedSubject ?? messageModels[0]?.subject ?? '(no subject)',
       account: accountModel(account),
       evidenceRevision: row.semanticEvidenceRevision,
-      messages: await Promise.all(messageRows.map((message) =>
-        this.messageModel(input.userId, row.connectedAccountId, message)
-      ))
+      messages: messageModels
     };
   }
 

@@ -57,7 +57,7 @@ describe('G40 live attention surfaces', () => {
     render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
     await waitFor(() => expect(screen.getByRole('button', {name: /返信する/})).toBeTruthy());
     expect(screen.queryByText('見積書を確認して返信する')).toBeNull();
-    fireEvent.change(screen.getByLabelText('表示状態'), {target: {value: 'degraded'}});
+    expect(screen.queryByLabelText('表示状態')).toBeNull();
     expect(screen.queryByText('一部の監視を確認できていません')).toBeNull();
     fireEvent.click(screen.getByRole('button', {name: /返信する/}));
     expect(screen.getByRole('heading', {name: '見積書の確認を終える'})).toBeTruthy();

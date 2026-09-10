@@ -157,6 +157,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     }
     setSelectedConversationId(conversationId);
     setSourceConversation(null);
+    setSourceConversationLoading(true);
     setSourceConversationError('');
     openDetail('conversation', origin);
   };
@@ -260,9 +261,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
 
   useEffect(() => {
     if (!appUser?.id) return;
-    if (!search.trim()) {
-      return;
-    }
+    if (!search.trim()) return;
     const controller = new AbortController();
     const userId = appUser.id;
     const timer = window.setTimeout(() => {
@@ -723,14 +722,16 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             setSearch(value);
             setSourceSearchModel(null);
             setSourceSearchError('');
+            setSourceSearchLoading(Boolean(value.trim()));
           }}
           onSearchAccount={(value) => {
             setSearchAccountId(value);
             setSourceSearchModel(null);
             setSourceSearchError('');
+            if (search.trim()) setSourceSearchLoading(true);
           }}
         />
-        <FixtureSwitch fixtureId={fixtureId} onChange={changeFixture} />
+        {!appUser?.id && <FixtureSwitch fixtureId={fixtureId} onChange={changeFixture} />}
       </section>
 
       <section className="detail-pane" aria-label="詳細" aria-live="off">
@@ -773,7 +774,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
               setDraftDirty(true);
             }}
             sourceConversation={sourceConversation}
-            sourceConversationLoading={sourceConversationLoading || Boolean(appUser?.id && detail === 'conversation' && selectedConversationId && !sourceConversation && !sourceConversationError)}
+            sourceConversationLoading={sourceConversationLoading}
             sourceConversationError={sourceConversationError}
             sourceUserId={appUser?.id}
             getAttentionMutation={getAttentionMutation}
@@ -855,7 +856,6 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
     <>
       <div className="surface-header">
         <div><p className="eyebrow">LUNOWA</p><h1 id="surface-heading">{title}</h1></div>
-        <button id={`surface-open-conversation-${surface}`} className="quiet-button" type="button" onClick={(event) => openConversation(event.currentTarget.id, sourceModel?.conversations[0]?.id ?? event.currentTarget.id)}>会話を見る</button>
       </div>
       {!attention && integrity && <IntegrityBanner />}
       {!attention && partial && <p className="coverage-notice" role="status">一部の会話のみを表示しています。最新の確認範囲: 10:15。</p>}

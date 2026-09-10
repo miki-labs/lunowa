@@ -145,7 +145,7 @@ export function RealSourceSearch({model, loading, error, text, accountId, onText
     {loading && <div className="loading-state" role="status">認可されたSourceを検索しています。</div>}
     {!loading && !error && !text.trim() && <p className="empty-state">検索語を入力すると、認可された会話の原文を検索します。</p>}
     {!loading && !error && text.trim() && model?.conversations.length === 0 && <p className="empty-state">「{text}」に一致する認可されたSourceはありません。検索語またはアカウント範囲を変更できます。</p>}
-    {!loading && !error && model?.conversations.map((item) => sourceRow(item, onOpenConversation))}
+    {!loading && !error && text.trim() && model?.conversations.map((item) => sourceRow(item, onOpenConversation))}
     {model && text.trim() && model.query.text === text.normalize('NFC').trim() && model.query.accountId === (accountId || null) && continuation(model, loading, onLoadMore)}
   </div>;
 }

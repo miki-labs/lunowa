@@ -1,4 +1,4 @@
-import {and, asc, desc, eq, inArray, sql} from 'drizzle-orm';
+import {and, asc, desc, eq, gte, inArray, sql} from 'drizzle-orm';
 
 import {getDatabase} from '../index';
 import {connectedAccounts, conversations, messageParticipants, messages, participantIdentities} from '../schema/evidence';
@@ -13,6 +13,10 @@ const ACTIVE_SEND_STATUSES = ['PENDING', 'DISPATCHING', 'AMBIGUOUS', 'PROVIDER_A
 const NON_RETRYABLE_SNAPSHOT_STATUSES = [...ACTIVE_SEND_STATUSES, 'RECONCILED'] as const;
 export const SEND_RECONCILIATION_STATUSES = ['DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED'] as const;
 export const SEND_OPERATION_STATUSES = ['PENDING', 'DISPATCHING', 'AMBIGUOUS', 'PROVIDER_ACCEPTED', 'RECONCILED', 'FAILED'] as const;
+export const SEND_ADMISSION_BURST_WINDOW_MS = 10 * 60 * 1000;
+export const SEND_ADMISSION_BURST_LIMIT = 20;
+export const SEND_ADMISSION_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const SEND_ADMISSION_DAILY_LIMIT = 100;
 export type SendOperationStatus = (typeof SEND_OPERATION_STATUSES)[number];
 
 export class DraftConflictError extends Error {
@@ -486,6 +490,8 @@ export class CommunicationRepository {
         inArray(sendOperations.status, [...ACTIVE_SEND_STATUSES])
       )).orderBy(desc(sendOperations.createdAt), desc(sendOperations.id)).limit(1);
       if (activeSend) return this.readSendOperation(activeSend);
+      // Serialize consequential Send admission per mailbox so concurrent requests
+      // cannot race past the public-beta abuse bounds.
       const [account] = await tx.select({
         id: connectedAccounts.id,
         emailAddress: connectedAccounts.emailAddress,
@@ -494,10 +500,27 @@ export class CommunicationRepository {
         grantedCapabilities: connectedAccounts.grantedCapabilities
       })
         .from(connectedAccounts)
-        .where(and(eq(connectedAccounts.id, draft.connectedAccountId), eq(connectedAccounts.userId, input.userId))).limit(1);
+        .where(and(eq(connectedAccounts.id, draft.connectedAccountId), eq(connectedAccounts.userId, input.userId)))
+        .for('update');
       if (!account) throw new CommunicationInputError('ACCOUNT_NOT_OWNED');
       if (account.connectionState !== 'CONNECTED') throw new CommunicationInputError('ACCOUNT_NOT_CONNECTED');
       if (!account.grantedCapabilities.includes('mail_send')) throw new CommunicationInputError('ACCOUNT_SEND_NOT_AUTHORIZED');
+
+      const now = new Date();
+      const usageCount = async (windowMs: number): Promise<number> => {
+        const [usage] = await tx.select({count: sql<number>`count(*)::int`})
+          .from(sendOperations)
+          .where(and(
+            eq(sendOperations.userId, input.userId),
+            eq(sendOperations.connectedAccountId, draft.connectedAccountId),
+            gte(sendOperations.createdAt, new Date(now.getTime() - windowMs))
+          ));
+        return Number(usage?.count ?? 0);
+      };
+      const burstCount = await usageCount(SEND_ADMISSION_BURST_WINDOW_MS);
+      if (burstCount >= SEND_ADMISSION_BURST_LIMIT) throw new CommunicationInputError('SEND_RATE_LIMITED');
+      const dailyCount = await usageCount(SEND_ADMISSION_DAILY_WINDOW_MS);
+      if (dailyCount >= SEND_ADMISSION_DAILY_LIMIT) throw new CommunicationInputError('SEND_RATE_LIMITED');
       if (input.responsibilityBinding) {
         const [binding] = await tx.select({
           id: responsibilities.id,
@@ -514,7 +537,6 @@ export class CommunicationRepository {
         if (!binding) throw new CommunicationInputError('RESPONSIBILITY_BINDING_STALE');
       }
       const idempotencyKey = crypto.randomUUID();
-      const now = new Date();
       const snapshot: Record<string, unknown> = {
         draftId: draft.id,
         draftVersion: draft.version,

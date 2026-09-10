@@ -26,6 +26,7 @@ vi.mock('@/server/gmail/runtime', () => ({createGmailRuntime: vi.fn(() => ({send
 import {GET as getContext} from '@/app/api/bff/users/[userId]/drafts/context/route';
 import {POST as saveDraft} from '@/app/api/bff/users/[userId]/drafts/route';
 import {POST as requestSend} from '@/app/api/bff/users/[userId]/send-operations/route';
+import {CommunicationInputError} from '@/server/db/repositories/communication';
 
 function request(url: string, body?: Record<string, unknown>) {
   return new Request(url, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : undefined);
@@ -81,6 +82,16 @@ describe('G50 contextual communication routes', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({accepted: false, error: 'INVALID_JSON_BODY'});
     expect(mocks.repository.requestImmediateSend).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 and performs no provider effect when Send admission is rate-limited', async () => {
+    mocks.repository.requestImmediateSend.mockRejectedValueOnce(new CommunicationInputError('SEND_RATE_LIMITED'));
+    const response = await requestSend(request('http://localhost/api/bff/users/user-1/send-operations', {draftId: 'draft-1'}), {
+      params: Promise.resolve({userId: 'user-1'})
+    });
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({accepted: false, error: 'SEND_RATE_LIMITED'});
+    expect(mocks.gmailSend.dispatch).not.toHaveBeenCalled();
   });
 
   it('binds the active Responsibility and performs the explicit provider dispatch in the live request', async () => {

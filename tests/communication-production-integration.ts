@@ -6,7 +6,13 @@ import {Pool} from 'pg';
 import {drizzle} from 'drizzle-orm/node-postgres';
 
 import * as schema from '../src/server/db/schema';
-import {CommunicationInputError, CommunicationRepository, DraftConflictError} from '../src/server/db/repositories/communication';
+import {
+  CommunicationInputError,
+  CommunicationRepository,
+  DraftConflictError,
+  SEND_ADMISSION_BURST_LIMIT,
+  SEND_ADMISSION_DAILY_LIMIT
+} from '../src/server/db/repositories/communication';
 import {EvidenceRepository} from '../src/server/db/repositories/evidence';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -94,6 +100,59 @@ try {
   assert(operation.providerMessageId === null && operation.providerResultId === null, 'G50 request claimed provider success.');
   const count = await pool.query<{count: string}>(`SELECT count(*)::text AS count FROM send_operations WHERE user_id = $1`, [userId]);
   assert(count.rows[0]?.count === '1', 'idempotency created duplicate SendOperation rows.');
+
+  const rateLimitedDraft = await repository.saveDraft({
+    userId, connectedAccountId: accountId, conversationId, inReplyToMessageId: normalized.messageId, mode: 'REPLY', body: 'burst bound check'
+  });
+  await pool.query(`
+    INSERT INTO send_operations (user_id, draft_id, connected_account_id, idempotency_key, status, draft_snapshot, created_at, updated_at)
+    SELECT $1, $2, $3, 'r90-burst-' || value::text, 'FAILED', '{}'::jsonb, now(), now()
+    FROM generate_series(1, $4) AS value
+  `, [userId, rateLimitedDraft.id, accountId, SEND_ADMISSION_BURST_LIMIT - 1]);
+  await repository.requestImmediateSend({userId, draftId: rateLimitedDraft.id}).then(
+    () => { throw new Error('burst Send admission bound was bypassed'); },
+    (error: unknown) => assert(error instanceof CommunicationInputError && error.code === 'SEND_RATE_LIMITED', 'burst Send admission did not fail closed.')
+  );
+  const replayAtLimit = await repository.requestImmediateSend({userId, draftId: updated.id});
+  assert(replayAtLimit.id === operation.id, 'rate limit blocked convergence on an already-admitted SendOperation.');
+
+  await pool.query(`UPDATE send_operations SET created_at = now() - interval '1 hour' WHERE user_id = $1`, [userId]);
+  const concurrentDraftA = await repository.saveDraft({
+    userId, connectedAccountId: accountId, conversationId, inReplyToMessageId: normalized.messageId, mode: 'REPLY', body: 'concurrent bound A'
+  });
+  const concurrentDraftB = await repository.saveDraft({
+    userId, connectedAccountId: accountId, conversationId, inReplyToMessageId: normalized.messageId, mode: 'REPLY', body: 'concurrent bound B'
+  });
+  await pool.query(`
+    INSERT INTO send_operations (user_id, draft_id, connected_account_id, idempotency_key, status, draft_snapshot, created_at, updated_at)
+    SELECT $1, $2, $3, 'r90-concurrent-' || value::text, 'FAILED', '{}'::jsonb, now(), now()
+    FROM generate_series(1, $4) AS value
+  `, [userId, concurrentDraftA.id, accountId, SEND_ADMISSION_BURST_LIMIT - 1]);
+  const concurrent = await Promise.allSettled([
+    repository.requestImmediateSend({userId, draftId: concurrentDraftA.id}),
+    repository.requestImmediateSend({userId, draftId: concurrentDraftB.id})
+  ]);
+  const admitted = concurrent.filter((result) => result.status === 'fulfilled');
+  const rejected = concurrent.filter((result) => result.status === 'rejected');
+  assert(admitted.length === 1, 'concurrent Send admission exceeded or underfilled the burst ceiling.');
+  assert(rejected.length === 1 && rejected[0]?.status === 'rejected' && rejected[0].reason instanceof CommunicationInputError && rejected[0].reason.code === 'SEND_RATE_LIMITED', 'concurrent Send admission did not serialize at the mailbox hard bound.');
+
+  await pool.query(`UPDATE send_operations SET created_at = now() - interval '1 hour' WHERE user_id = $1`, [userId]);
+  const dailyLimitedDraft = await repository.saveDraft({
+    userId, connectedAccountId: accountId, conversationId, inReplyToMessageId: normalized.messageId, mode: 'REPLY', body: 'daily bound check'
+  });
+  const dailyBefore = await pool.query<{count: string}>(`SELECT count(*)::text AS count FROM send_operations WHERE user_id = $1 AND connected_account_id = $2`, [userId, accountId]);
+  const dailyFill = SEND_ADMISSION_DAILY_LIMIT - Number(dailyBefore.rows[0]?.count ?? 0);
+  assert(dailyFill > 0, 'daily Send test setup already exceeded the hard bound.');
+  await pool.query(`
+    INSERT INTO send_operations (user_id, draft_id, connected_account_id, idempotency_key, status, draft_snapshot, created_at, updated_at)
+    SELECT $1, $2, $3, 'r90-daily-' || value::text, 'FAILED', '{}'::jsonb, now() - interval '1 hour', now()
+    FROM generate_series(1, $4) AS value
+  `, [userId, dailyLimitedDraft.id, accountId, dailyFill]);
+  await repository.requestImmediateSend({userId, draftId: dailyLimitedDraft.id}).then(
+    () => { throw new Error('daily Send admission bound was bypassed'); },
+    (error: unknown) => assert(error instanceof CommunicationInputError && error.code === 'SEND_RATE_LIMITED', 'daily Send admission did not fail closed.')
+  );
   await repository.saveDraft({
     userId, draftId: updated.id, expectedVersion: 2, connectedAccountId: accountId, conversationId,
     inReplyToMessageId: normalized.messageId, mode: 'REPLY_ALL', body: 'must not overwrite pending snapshot'

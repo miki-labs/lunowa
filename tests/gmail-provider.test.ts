@@ -304,8 +304,11 @@ describe('G20 deployed runtime bindings', () => {
     const worker = readFileSync(resolve(process.cwd(), 'src/worker.ts'), 'utf8');
     expect(wrangler).toContain('"main": "src/worker.ts"');
     expect(wrangler).toContain('"crons": ["*/10 * * * *"]');
+    expect(wrangler).toContain('"observability"');
+    expect(wrangler).toContain('"head_sampling_rate": 1');
     expect(worker).toContain('runGmailReconciliation()');
     expect(worker).toContain('runGmailSendReconciliation()');
+    expect(worker).toContain("event: 'scheduled_reconciliation'");
   });
 
   it('reconciles only already-attempted SendOperations through the scheduled repair path', async () => {

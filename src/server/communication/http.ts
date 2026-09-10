@@ -6,6 +6,9 @@ export function communicationErrorResponse(error: unknown): Response | null {
     return Response.json({accepted: false, error: error.message, currentVersion: error.currentVersion}, {status: 409, headers: {'Cache-Control': 'no-store'}});
   }
   if (error instanceof CommunicationInputError) {
+    if (error.code === 'SEND_RATE_LIMITED') {
+      return Response.json({accepted: false, error: error.code}, {status: 429, headers: {'Cache-Control': 'no-store'}});
+    }
     const status = error.code.includes('NOT_FOUND') ? 404 : error.code.includes('NOT_OWNED') || error.code.includes('NOT_CONNECTED') || error.code.includes('NOT_AUTHORIZED') ? 403 : 400;
     const conflict = error.code.includes('CONFLICT') || error.code.includes('IDEMPOTENCY_KEY_REUSED') || error.code === 'DRAFT_SEND_IN_PROGRESS';
     return Response.json({accepted: false, error: error.code}, {status: conflict ? 409 : status, headers: {'Cache-Control': 'no-store'}});

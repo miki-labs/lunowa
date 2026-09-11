@@ -69,11 +69,12 @@ Escalate the relevant question, not the whole review, when the change materially
 
 Do not load every specialist discipline for a low-risk local patch.
 
-### Visual/UI specialization
+### Product/UI specialization
 
-When the accepted task materially concerns user-facing presentation, responsive behavior, or an accepted Figma/screenshot/design-code reference, read and apply `.agents/skills/visual-acceptance/SKILL.md`.
+When the candidate changes shipped user-facing UI, read `.agents/skills/product-design/SKILL.md` and evaluate the applicable Product/interaction/responsive/accessibility authorities.
 
-For reference-conformance work, visual conformance is a separate required decision axis. A materially wrong rendered result is `FAIL` even when functional checks are green; absent or stale direct rendered comparison is `NOT_VERIFIED`. Do not infer visual PASS from a small diff, clean architecture, source similarity, unit/E2E success, or builder confidence. If the candidate changes the visual baseline/oracle used to judge itself, require independent trust-root approval rather than treating the updated baseline as self-certifying evidence.
+For accepted visual-reference work, also apply `.agents/skills/design-qa/SKILL.md`. Visual conformance is a separate required decision axis: an actionable P0/P1/P2 reference mismatch is `FAIL` even when functional checks are green; missing, stale, wrong-state, or uninspectable direct rendered comparison is `NOT_VERIFIED`. Do not infer visual PASS from a small diff, clean architecture, source similarity, unit/E2E success, deployment success, or builder confidence. Candidate-authored/updated visual baselines cannot self-certify the same candidate without independent trust-root approval.
+
 
 ## 5. Challenge the evidence
 

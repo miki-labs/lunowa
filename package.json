@@ -41,7 +41,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test e2e/deployed-preview-smoke.spec.ts",
-    "verify": "python -m unittest scripts/test_parallel_task_preflight.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare && pnpm check:cloudflare:deploy",
+    "verify": "python -m unittest scripts/test_parallel_task_preflight.py scripts/test_product_design_harness.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:cloudflare && pnpm build:cloudflare && pnpm check:cloudflare:deploy",
     "accept:gmail-real-send": "node --import tsx scripts/g51-real-gmail-send-acceptance.ts"
   },
   "dependencies": {

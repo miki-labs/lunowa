@@ -35,19 +35,19 @@ Verification SHOULD be selected from the actual failure modes of the change. Exa
 - dependency change → relevant regression suite + vulnerability/license review,
 - deployment change → staging/runtime smoke verification.
 
-## Visual/UI verification is a separate axis
+## Product/UI verification is multi-axis
 
-For material UI work, classify the claim before choosing evidence:
+For shipped user-facing work, load `.agents/skills/product-design/SKILL.md` and choose evidence from the actual claim:
 
-- **accepted-reference conformance** needs fresh rendered candidate evidence and direct comparison with the accepted reference at the relevant state/viewport;
-- **UI engineering** without one exact visual target needs rendered-browser verification against the current design/interaction/responsive contracts;
-- **UX/Product-direction** needs scenario/task evidence plus accepted Product/owner judgment, not an automated similarity score.
+- accepted-reference conformance -> fresh source + rendered candidate, same meaningful state/render conditions, direct comparison, and `.agents/skills/design-qa/SKILL.md`;
+- UI engineering without one exact visual target -> rendered-browser verification against current design/interaction/responsive authorities;
+- UX/Product-direction -> scenario/task evidence plus accepted Product/owner judgment;
+- interaction/state/data/effect claims -> functional/runtime evidence independent of visual similarity;
+- accessibility/responsive claims -> keyboard/focus/text-scale/reflow/target-size and representative viewport evidence proportional to the change.
 
-A green functional suite cannot prove visual conformance, and a matching screenshot cannot prove interaction, state, authorization, data truth, accessibility or provider effects. For reference-conformance work, a material visual mismatch is a failure of the requested behavior; missing direct visual evidence is `NOT_VERIFIED`.
+A green functional suite cannot prove visual conformance, and a matching screenshot cannot prove interaction, state, authorization, data truth, accessibility, or provider effects. For accepted-reference work, actionable P0/P1/P2 mismatch is a failure; unavailable or stale comparable rendered evidence is `NOT_VERIFIED`.
 
-Use visual snapshot baselines to detect regression after a state is accepted. Keep their rendering environment stable, and do not let a candidate-created or candidate-updated baseline self-certify the same change. The independent reviewer should inspect the actual candidate/reference pair and, when affordable, reproduce the render directly.
-
-See `.agents/skills/visual-acceptance/SKILL.md` for the operational route.
+Use screenshot baselines mainly for regression after a visual state is accepted. Stabilize material rendering inputs, and do not let a candidate-created/updated baseline self-certify the same change. The independent reviewer should inspect the actual candidate/reference pair and, when practical, independently render the exact head.
 
 ## Test strategy
 

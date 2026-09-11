@@ -194,25 +194,41 @@ Prefer:
 
 Avoid critical conventions that exist only in one person's memory or hidden editor configuration.
 
-## Visual/UI work uses a different acceptance oracle
+## Product/UI work uses a product-design harness
 
-Do not treat UI/UX work as an ordinary code patch with screenshots attached at the end. Route material user-facing work through `.agents/skills/visual-acceptance/SKILL.md` and distinguish three classes: accepted-reference conformance, UI engineering without one exact target, and UX/Product-direction work.
+User-facing work is not an ordinary code patch with screenshots attached at the end. Route it through `.agents/skills/product-design/SKILL.md`, which separates request mode and authority before implementation/review. Accepted visual-reference implementation then uses `.agents/skills/design-qa/SKILL.md` as a blocking rendered-comparison gate.
 
-For accepted-reference conformance, the rendering is part of the implementation loop. Establish the reference/revision, comparable Product state and canonical viewport; render the real application early; compare reference and candidate directly; correct material mismatches; then verify interaction, responsive behavior, accessibility and Product semantics as independent gates. Functional correctness and visual fidelity do not substitute for one another.
+The durable structure is deliberately small:
 
-Minimal-diff preference is subordinate here. A small patch that preserves an obsolete shell but misses the accepted target is worse than a larger focused presentation change that reaches conformance without violating Product/runtime boundaries. Conversely, pixel similarity never authorizes fake data, invented behavior, weakened accessibility or unsafe effects.
+```text
+AGENTS explicit trigger
+-> product-design router (shape / implement / review / copy / harden)
+-> canonical Lunowa Product/design/component authorities
+-> real production-code implementation
+-> rendered browser evidence
+-> design-qa for accepted-reference conformance
+-> functional / responsive / accessibility / Product gates
+-> exact-head independent review
+```
 
-Use stable screenshot baselines primarily for regression **after** a visual state has been accepted. Initial conformance to an external Figma/screenshot target needs direct comparison to that target; a candidate must not generate or update its own baseline and then use that baseline as sole evidence of correctness. When pixel diffs are used, keep the rendering environment stable and treat baseline changes as reviewable trust-root changes.
+For a Figma-driven task, fetch design context before code when that capability is available. Treat generated React/Tailwind as a representation, not final production code. Prefer mapped production context in this order when available: Code Connect/component mapping, component documentation, design annotations, design tokens, then raw values/screenshot inference. Reuse actual project components when they represent the same intent, but do not preserve obsolete presentation merely to keep the diff small.
 
-External evidence basis, rechecked **2026-09-11**, supports this split:
+Design QA must compare the accepted source and rendered candidate in the same meaningful state and render conditions. Full-view evidence checks composition/hierarchy/density; focused regions are required when details are not readable at full scale. Typography, layout/spacing, colors/tokens, assets/icons, and app-owned copy/content are mandatory fidelity surfaces. P0/P1/P2 remain blocking until fixed and re-captured; missing comparable evidence is `NOT_VERIFIED`.
 
-- Figma Make's 2026 local-code and visual-editing workflows operate on the running production codebase and use direct visual editing/annotations before normal Git/PR review: <https://help.figma.com/hc/en-us/articles/40775535020695-Make-in-your-local-codebase> and <https://www.figma.com/blog/properties-panel-and-annotations-now-in-figma-make/>.
-- Vercel records accepted Product-design decisions for coding agents because code shows what shipped but not why a UI/interaction became standard: <https://vercel.com/blog/teaching-agents-product-design-at-vercel>.
-- Playwright visual comparisons explicitly compare rendered screenshots and warn that rendering environment differences affect results: <https://playwright.dev/docs/test-snapshots>.
-- Storybook/Chromatic separate visual snapshots from interaction and accessibility tests rather than treating one axis as sufficient: <https://storybook.js.org/docs/writing-tests/visual-testing>, <https://storybook.js.org/docs/writing-tests/accessibility-testing>.
-- Recent UI-agent benchmarks likewise find visual fidelity and functional/interaction correctness partially decoupled: VISTA <https://arxiv.org/abs/2605.26144> and UI2App <https://arxiv.org/abs/2607.06306>. Iterative visual-feedback work such as 1D-Bench <https://arxiv.org/abs/2602.18548> and Coding with Eyes <https://arxiv.org/abs/2604.19750> supports rendering/interaction feedback during implementation. UXBench further treats UX judging as interaction-grounded and still validates against humans: <https://arxiv.org/abs/2606.16262>.
+Keep behavior and visual fidelity independent. A matching screenshot cannot prove interaction, state truth, authorization, accessibility, or provider effects. Green CI/build/E2E cannot prove visual conformance. Screenshot baselines are primarily regression oracles **after** acceptance; a candidate cannot mint its own golden and use the resulting zero diff as independent proof.
 
-These sources justify a rendered evidence loop, not a new orchestration service or mandatory third-party visual-testing subscription.
+### Evidence basis and deliberate non-adoptions (rechecked 2026-09-11)
+
+- OpenAI's public Product Design plugin separates routing (`index`) from blocking source-vs-rendered `design-qa`; its QA requires both artifacts, same-state normalization, full/focused comparisons, five fidelity surfaces, severity, and repeat-until-passed iteration: <https://github.com/openai/role-specific-plugins/tree/main/plugins/product-design>.
+- OpenAI's public Figma design-to-code skill requires design context before coding and prioritizes Code Connect, component docs, annotations, tokens, then raw values: <https://github.com/openai/plugins/blob/main/plugins/figma/skills/figma-design-to-code/SKILL.md>.
+- Figma's own `figma-implement-design` skill similarly requires design context + screenshot, production-convention translation, 1:1 validation, and exact assets; Figma Code Connect can inject real component imports/usage/instructions into MCP context: <https://github.com/figma/mcp-server-guide> and <https://developers.figma.com/docs/figma-mcp-server/code-connect-integration/>.
+- Vercel's 2026 `product-design` system uses an explicit `AGENTS.md` trigger, one router, canonical references, deterministic linters for mechanical rules, traceable decisions/exemplars, and evals that test both rule quality and **skill triggering**: <https://vercel.com/blog/teaching-agents-product-design-at-vercel>.
+- Coinbase/Figma measured Code Connect separately from agent skills: better component/design-system adherence plus lower token/time/cost in their bounded evaluation. Context and guidance are complementary: <https://www.figma.com/blog/how-coinbase-used-code-connect-to-shrink-token-costs/>.
+- Google Labs `DESIGN.md` is promising machine-readable visual-identity infrastructure but remains alpha. Lunowa already has accepted design/token authorities, so this Issue does **not** introduce a second design source of truth: <https://github.com/google-labs-code/design.md>.
+- Generic aesthetic skills (for example Anthropic's public `frontend-design`) are useful for greenfield visual creativity, but Lunowa does not elevate generic taste above its accepted Product/design authorities.
+- Visual-feedback research supports the browser loop: GUI agents that can observe/interact with rendered output outperform text-only debugging in evaluated settings; this is supporting evidence, not merge authority: <https://arxiv.org/abs/2604.19750>.
+
+These sources justify a repository-local Product Design router + rendered QA loop, not a new orchestration service, a mandatory SaaS visual-testing subscription, or a parallel design authority.
 
 ## Builder verification is evidence, not a completion claim
 

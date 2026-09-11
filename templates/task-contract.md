@@ -72,11 +72,13 @@ Include credible alternatives only when the choice is not obvious and the ration
 
 If these design notes become long, uncertain, cross-cutting, security-critical, data-critical, or difficult to reverse, stop using the task contract as the design document and create `design-doc.md` instead.
 
-### Visual / UI oracle — only when material
+### Product / UI oracle — only when material
 
-Classify `reference conformance`, `UI engineering`, or `UX / Product design`. For accepted-reference work, record the reference identity/revision, comparable reachable state/data, material viewport/render conditions, and what direct rendered comparison will falsify conformance. Do not use illustrative reference data as production truth.
+Name the request mode (`Shape`, `Implement`, `Review`, `Copy`, or `Harden`) and the user-facing surface. Read `.agents/skills/product-design/SKILL.md`.
 
-For UX/Product-direction work, name the Product/owner decision still required. See `.agents/skills/visual-acceptance/SKILL.md`; omit this section for work with no material user-facing outcome.
+For accepted-reference implementation, record the exact reference identity/revision, comparable reachable state/data, material viewport/render conditions, and the direct source-vs-rendered evidence that can falsify conformance. If Figma is the live source, say whether design context/Code Connect is actually available; never invent that evidence. Route final visual comparison through `.agents/skills/design-qa/SKILL.md`.
+
+For UX/Product-direction work, name the Product/owner decision still required. Omit this section for work with no material shipped user-facing outcome.
 
 ## Acceptance criteria
 

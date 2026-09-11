@@ -72,11 +72,12 @@ Classify the task before expensive implementation. Load or apply deeper guidance
 
 Do not turn every ordinary change into a full specialist review.
 
-### Visual/UI specialization
+### Product/UI specialization
 
-When the task materially changes user-facing presentation or has an accepted Figma/screenshot/design-code target, read and apply `.agents/skills/visual-acceptance/SKILL.md` before substantial implementation. Classify reference conformance, UI engineering, and UX/Product-design work separately.
+When the task changes what a user sees, understands, chooses, or does, read and apply `.agents/skills/product-design/SKILL.md` before substantial implementation. This includes material UI presentation, copy, interaction, responsive behavior, accessibility, reachable states, and accepted Figma/screenshot/design-code targets.
 
-For reference-conformance work, establish the reference identity, comparable target state and canonical viewport before editing. Render early and iterate against the actual application. Do not substitute source inspection, minimal diff, generic E2E success, or green CI for direct reference-to-candidate visual comparison. If only an unrelated auth/empty/error state can be rendered, the visual claim remains `NOT_VERIFIED`.
+For accepted visual-reference work, resolve the exact source target, comparable Product state, and render conditions before editing. If live Figma design context is available, fetch it before writing code; treat generated reference code as design representation and adapt it to Lunowa's real stack. Render early, iterate against the real application, then run `.agents/skills/design-qa/SKILL.md` before handoff. Static/source checks, minimal diff, generic E2E, HTTP health, deploy success, or green CI do not prove visual conformance.
+
 
 ## 4. Reuse and design to actual risk
 

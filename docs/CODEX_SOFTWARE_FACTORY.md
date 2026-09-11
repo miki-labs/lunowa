@@ -18,6 +18,12 @@ GitHub Issue (`symphony:ready`) + blocked_by
 
 同じ Issue/workspace に複数の実装 owner を置きません。並行作業は、互いに独立して unblocked な Issue を別々の workspace と runtime state に隔離できる場合だけ行います。Codex は current Issue、checked-in docs、code/tests を source of truth として、変更を小さく保ち、対象に応じた local checks を実行します。
 
+## Unattended worker isolation
+
+unattended Factory worker は専用の `CODEX_HOME` で実行します。interactive Codex の `CODEX_HOME`、MCP server 設定、plugin 設定を継承せず、gstack skill surface も Factory が curated した skill だけに限定します。
+
+この分離により、個人の interactive environment にある OAuth 状態、MCP の起動・接続失敗、不要な tool context が unattended run に入り込まなくなります。worker ごとの実行環境が予測可能になり、認証 prompt に応答できない background execution の安定性を高めます。
+
 gstack は一律の checklist ではなく、変更リスクに応じて選択します。
 
 - non-trivial code change: `gstack-review`
@@ -34,7 +40,7 @@ Codex は通常、Issue branch から `main` 向けの non-draft PR を作成ま
 - `Verify`
 - `E2E Smoke`
 
-必要な check が green でも自動的には merge しません。**auto-merge と production deployment は default では有効化されておらず**、merge / landing は human/operator gate です。production 操作には別途明示的な承認と、その変更に必要な検証が要ります。
+必要な check が green でも自動的には merge しません。**auto-merge と production deployment は default では有効化されておらず**、merge / landing は human/operator gate です。human/operator が明示的に `/land` を実行するまで、Factory worker は PR を merge しません。production 操作には別途明示的な承認と、その変更に必要な検証が要ります。
 
 ## Local operator commands
 

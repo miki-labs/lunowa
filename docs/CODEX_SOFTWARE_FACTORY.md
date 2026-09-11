@@ -22,6 +22,8 @@ GitHub Issue (`symphony:ready`) + blocked_by
 
 unattended Factory worker は専用の `CODEX_HOME` で実行します。interactive Codex の `CODEX_HOME`、MCP server 設定、plugin 設定を継承せず、gstack skill surface も Factory が curated した skill だけに限定します。
 
+unattended Issue worker は Issue ごとの Docker Sandboxes microVM 内で clone mode により実行します。agent から host workspace は read-only であり、変更は microVM 内の private clone にのみ加えられます。
+
 この分離により、個人の interactive environment にある OAuth 状態、MCP の起動・接続失敗、不要な tool context が unattended run に入り込まなくなります。worker ごとの実行環境が予測可能になり、認証 prompt に応答できない background execution の安定性を高めます。
 
 gstack は一律の checklist ではなく、変更リスクに応じて選択します。

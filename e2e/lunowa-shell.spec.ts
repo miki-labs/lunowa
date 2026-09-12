@@ -449,7 +449,7 @@ test('does not activate global search for editable input or Japanese IME composi
     dispatch(true, 229);
     dispatch(false, 229); // documented composition-end boundary compatibility event
   });
-  await expect(page.getByRole('heading', {name: 'ホーム'})).toBeVisible();
+  await expect(page.getByRole('heading', {name: /おはようございます/})).toBeVisible();
 
   await nav(page, '対応が必要').click();
   await page.getByRole('button', {name: /返信する/}).click();

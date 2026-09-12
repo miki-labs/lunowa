@@ -11,8 +11,8 @@ describe('LunowaShell', () => {
   it('renders typed Home attention and active Managed reassurance', () => {
     render(<LunowaShell />);
     expect(screen.getByRole('heading', {name: 'ホーム'})).toBeInTheDocument();
-    expect(screen.getByText('今、確認が必要なこと')).toBeInTheDocument();
-    expect(screen.getByText('Lunowaが見ています', {exact: false})).toBeInTheDocument();
+    expect(screen.getByText('今、あなたに必要なこと')).toBeInTheDocument();
+    expect(screen.getAllByText('Lunowaが見ています', {exact: false}).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', {name: '確認を表示'})).toBeInTheDocument();
   });
 

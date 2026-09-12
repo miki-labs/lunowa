@@ -34,6 +34,7 @@ gstack は一律の checklist ではなく、変更リスクに応じて選択�
 - substantial UI / UX change: `gstack-design-review`
 
 documentation-only の変更では、内容確認と relevant local checks で十分なら specialist pass は省略します。
+それでも docs-only smoke は通常の branch、PR、CI、no-merge gate を通過します。
 
 ## Pull request and gates
 

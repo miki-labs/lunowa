@@ -1,0 +1,6 @@
+# Execution-only first-turn visual inputs for Issue #155.
+docs/design/references/00-foundation-visual-system.png
+docs/design/references/01-component-system.png
+docs/design/references/02-desktop-core-workspace.png
+docs/design/references/03-moment-conversation-reply.png
+docs/design/references/04-mobile-core-flow.png

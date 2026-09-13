@@ -8,6 +8,8 @@ This workflow begins after a product/feature requirement is sufficiently real to
 
 Security, privacy, reliability, operability, commercial correctness, and AI-runtime constraints are cross-cutting only when the change makes them relevant.
 
+User-facing Product/UI work has a task-specific harness rather than a separate delivery system. Route it through `.agents/skills/product-design/SKILL.md`; accepted visual-reference implementation also uses `.agents/skills/design-qa/SKILL.md` as a blocking source-vs-rendered comparison gate.
+
 ## 1. Frame
 
 Clarify:
@@ -132,7 +134,7 @@ Evidence may include:
 - performance/economic measurements,
 - AI evals when model behavior is part of the product.
 
-Passing one generic command is not proof that every relevant behavior was verified.
+Passing one generic command is not proof that every relevant behavior was verified. For accepted visual-reference work, generic CI is never a substitute for fresh same-state source-to-rendered comparison and design QA.
 
 ## 9. Review
 

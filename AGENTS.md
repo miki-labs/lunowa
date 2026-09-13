@@ -43,9 +43,10 @@ GitHub Issue task contract + blocked_by
 - Query mutable external facts live when they can change the solution or acceptance evidence.
 - Privileged or destructive external writes require separate explicit authority; they are not ambient coding-agent capability.
 - Put stable mechanical invariants in tests, CI, schemas, types, or scripts when practical. Use prose for judgment and rationale.
+- When shaping, editing, or reviewing user-facing UI, load `.agents/skills/product-design/SKILL.md`. This applies to pages/components, copy, interaction, accessibility, responsive behavior, reachable UI states, and accepted visual-reference work; skip backend-only/telemetry/docs/marketing work with no shipped UI effect.
 - Do not add a daemon, workflow database, custom orchestrator, automatic retry/replay, or broad tool enablement without a separately accepted, evidence-backed need.
 
-Execution guidance: `docs/coding-agent-harness.md`, `docs/implementation-workflow.md`, `.agents/skills/execute-task/SKILL.md`. Independent review: `.agents/skills/evaluate-change/SKILL.md`.
+Execution guidance: `docs/coding-agent-harness.md`, `docs/implementation-workflow.md`, `.agents/skills/execute-task/SKILL.md`. User-facing work routes through `.agents/skills/product-design/SKILL.md`; accepted-reference implementation also uses `.agents/skills/design-qa/SKILL.md` as a blocking rendered-comparison gate. Independent review: `.agents/skills/evaluate-change/SKILL.md`.
 
 ## Source of truth by question
 

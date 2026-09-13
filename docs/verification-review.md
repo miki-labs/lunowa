@@ -35,6 +35,20 @@ Verification SHOULD be selected from the actual failure modes of the change. Exa
 - dependency change → relevant regression suite + vulnerability/license review,
 - deployment change → staging/runtime smoke verification.
 
+## Product/UI verification is multi-axis
+
+For shipped user-facing work, load `.agents/skills/product-design/SKILL.md` and choose evidence from the actual claim:
+
+- accepted-reference conformance -> fresh source + rendered candidate, same meaningful state/render conditions, direct comparison, and `.agents/skills/design-qa/SKILL.md`;
+- UI engineering without one exact visual target -> rendered-browser verification against current design/interaction/responsive authorities;
+- UX/Product-direction -> scenario/task evidence plus accepted Product/owner judgment;
+- interaction/state/data/effect claims -> functional/runtime evidence independent of visual similarity;
+- accessibility/responsive claims -> keyboard/focus/text-scale/reflow/target-size and representative viewport evidence proportional to the change.
+
+A green functional suite cannot prove visual conformance, and a matching screenshot cannot prove interaction, state, authorization, data truth, accessibility, or provider effects. For accepted-reference work, actionable P0/P1/P2 mismatch is a failure; unavailable or stale comparable rendered evidence is `NOT_VERIFIED`.
+
+Use screenshot baselines mainly for regression after a visual state is accepted. Stabilize material rendering inputs, and do not let a candidate-created/updated baseline self-certify the same change. The independent reviewer should inspect the actual candidate/reference pair and, when practical, independently render the exact head.
+
 ## Test strategy
 
 Use the cheapest test that gives trustworthy coverage of the behavior while preserving a smaller number of end-to-end tests for critical cross-system journeys.

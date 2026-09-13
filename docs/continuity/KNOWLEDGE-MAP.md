@@ -19,8 +19,8 @@
 | exact dependency / parallelization / writer / FK topology | `docs/product/IMPLEMENTATION-GRAPH.md` | live implementation Issues + GitHub `blocked_by` | current graph + task contract + evidenceで判断 |
 | 今のtask contract | live GitHub Issue | owning canonical artifacts | acting前にlive fetch |
 | candidate / review / CI | live GitHub PR / reviews / checks | current Issue | exact-head evidence。review-ready != PASS |
-| implementation / verification procedure | `docs/implementation-workflow.md`, `docs/coding-agent-harness.md`, `.agents/skills/execute-task/SKILL.md` | task-specific repository instructions | task riskに応じてprogressive disclosure |
-| independent acceptance procedure | `.agents/skills/evaluate-change/SKILL.md` + current task contract | PR/CI/builder evidence | full cumulative exact-head candidateをfresh contextで監査 |
+| implementation / verification procedure | `docs/implementation-workflow.md`, `docs/coding-agent-harness.md`, `.agents/skills/execute-task/SKILL.md` | user-facing UI: `.agents/skills/product-design/SKILL.md`; accepted visual reference: `.agents/skills/design-qa/SKILL.md` | task type/riskに応じてprogressive disclosure。reference conformanceはsame-state rendered comparison必須 |
+| independent acceptance procedure | `.agents/skills/evaluate-change/SKILL.md` + current task contract | UI taskは`product-design`; reference-conformanceは`design-qa`も適用 | full cumulative exact-head candidateをfresh contextで監査。visual PASSをgeneric CIから推測しない |
 | active implementation owner / branch / worktree / runtime | explicit task owner/launch authority + actual local Git/worktree/process evidence | PR status | action前にlive確認。同じIssue/worktreeのduplicate concurrent ownership禁止 |
 | task-relevant external/tool fact | authoritative CLI/API/MCP/plugin or primary source | dated local evidence | materialなmutable factだけlive query。local deterministic factを優先 |
 | 実際のruntime behavior | code / schema / migrations / tests / deployed evidence | intended canonical behavior | mismatchはreconcile。summaryで隠さない |

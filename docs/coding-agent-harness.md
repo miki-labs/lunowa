@@ -205,13 +205,15 @@ AGENTS explicit trigger
 -> product-design router (shape / implement / review / copy / harden)
 -> canonical Lunowa Product/design/component authorities
 -> real production-code implementation
--> rendered browser evidence
+-> early real-browser render + inspection during implementation
 -> design-qa for accepted-reference conformance
 -> functional / responsive / accessibility / Product gates
 -> exact-head independent review
 ```
 
 For a Figma-driven task, fetch design context before code when that capability is available. Treat generated React/Tailwind as a representation, not final production code. Prefer mapped production context in this order when available: Code Connect/component mapping, component documentation, design annotations, design tokens, then raw values/screenshot inference. Reuse actual project components when they represent the same intent, but do not preserve obsolete presentation merely to keep the diff small.
+
+For accepted-reference implementation, the implementation loop must open and inspect the actual production code path in a real browser **early**, capture a comparable state/viewport, and iterate from that evidence. A browser render first captured only at final handoff is too late to satisfy this route.
 
 Design QA must compare the accepted source and rendered candidate in the same meaningful state and render conditions. Full-view evidence checks composition/hierarchy/density; focused regions are required when details are not readable at full scale. Typography, layout/spacing, colors/tokens, assets/icons, and app-owned copy/content are mandatory fidelity surfaces. P0/P1/P2 remain blocking until fixed and re-captured; missing comparable evidence is `NOT_VERIFIED`.
 

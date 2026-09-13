@@ -67,8 +67,8 @@ Treat viewport overflow that hides persistent controls, wrong major-region propo
 For reference-conformance work:
 
 - any actionable `P0/P1/P2` => visual result `blocked` and evaluator conformance `FAIL`;
-- missing/stale/uninspectable source or rendered comparison => visual result `blocked` and evaluator status `NOT_VERIFIED`;
-- no actionable `P0/P1/P2` => visual result `passed`; remaining `P3` may be follow-up polish.
+- missing, stale, **wrong-state**, or otherwise uninspectable source/rendered comparison => visual result `blocked` and evaluator status `NOT_VERIFIED`;
+- no actionable `P0/P1/P2` and fresh comparable evidence => visual result `passed` and evaluator conformance `PASS`; remaining `P3` may be follow-up polish.
 
 Do not downgrade a material miss because the diff is small, architecture is clean, or generic CI is green.
 
@@ -99,6 +99,7 @@ full-view evidence:
 focused-region evidence (or why N/A):
 findings:
 comparison history:
+evaluator status: PASS | FAIL | NOT_VERIFIED
 final result: passed | blocked
 ```
 

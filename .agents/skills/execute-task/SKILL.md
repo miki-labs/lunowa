@@ -76,7 +76,7 @@ Do not turn every ordinary change into a full specialist review.
 
 When the task changes what a user sees, understands, chooses, or does, read and apply `.agents/skills/product-design/SKILL.md` before substantial implementation. This includes material UI presentation, copy, interaction, responsive behavior, accessibility, reachable states, and accepted Figma/screenshot/design-code targets.
 
-For accepted visual-reference work, resolve the exact source target, comparable Product state, and render conditions before editing. If live Figma design context is available, fetch it before writing code; treat generated reference code as design representation and adapt it to Lunowa's real stack. Render early, iterate against the real application, then run `.agents/skills/design-qa/SKILL.md` before handoff. Static/source checks, minimal diff, generic E2E, HTTP health, deploy success, or green CI do not prove visual conformance.
+For accepted visual-reference work, resolve the exact source target, comparable Product state, and render conditions before editing. If live Figma design context is available, fetch it before writing code; treat generated reference code as design representation and adapt it to Lunowa's real stack. Open and inspect the real application in a real browser early during implementation, iterate against that rendered evidence, then run `.agents/skills/design-qa/SKILL.md` before handoff. Static/source checks, minimal diff, generic E2E, HTTP health, deploy success, or green CI do not prove visual conformance.
 
 
 ## 4. Reuse and design to actual risk

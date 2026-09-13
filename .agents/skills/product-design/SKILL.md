@@ -76,8 +76,8 @@ When the task is to reproduce or integrate an accepted Figma frame, screenshot, 
 4. Prefer design-to-code hints in this order when available: Code Connect / mapped production component, component documentation, design annotations, design tokens, then raw values/screenshot inference.
 5. Reuse Lunowa components/tokens when they represent the same design intent. Do not preserve an old component/layout merely to minimize diff if it materially misses the accepted target.
 6. Use exact supplied/exported assets. Do not replace visible target assets/icons with improvised CSS/SVG/emoji/placeholders merely because they are easier to generate.
-7. Render the real production code path early. Do not wait until the patch is otherwise "done".
-8. Iterate against the rendered candidate, then run `.agents/skills/design-qa/SKILL.md` as the blocking visual handoff gate.
+7. **Open and inspect the real production code path in a real browser early during implementation.** Capture the first comparable render before the patch is otherwise "done"; do not postpone browser inspection to final handoff.
+8. Iterate against that real-browser rendered candidate, then run `.agents/skills/design-qa/SKILL.md` as the blocking visual handoff gate.
 
 If Figma MCP or Code Connect is unavailable, do not fabricate their evidence. Use the strongest actually available reference (for example accepted Make code + screenshot) and state the limitation.
 

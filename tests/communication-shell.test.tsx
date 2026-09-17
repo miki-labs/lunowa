@@ -84,6 +84,60 @@ describe('G50 live composer safety', () => {
     expect(screen.getByDisplayValue('確認しました。')).toBeTruthy();
   });
 
+  it('clears a prior draft identity and blocks Send while replacement Moment context is loading', async () => {
+    const secondItem = {
+      ...attention.needsYou[0],
+      id: 'responsibility-2',
+      responsibilityId: 'responsibility-2',
+      conversationId: 'conversation-2',
+      connectedAccountId: 'account-2',
+      operationalOutcome: '2件目の依頼に返信する',
+      primaryAction: '2件目に返信する'
+    };
+    const multiItemAttention = {...attention, needsYou: [...attention.needsYou, secondItem], delegatedCount: 2};
+    const firstContext = {...replyContext(true), draft: {...replyContext(true).draft!, body: '前の下書き'}};
+    const secondContext = {
+      ...replyContext(true),
+      connectedAccount: {...replyContext(true).connectedAccount, id: 'account-2'},
+      conversationId: 'conversation-2',
+      providerThreadId: 'thread-2',
+      inReplyToMessageId: 'message-2',
+      inReplyToProviderMessageId: 'provider-message-2',
+      recipients: [{email: 'second@example.com', displayName: 'Second'}],
+      draft: {id: 'draft-2', version: 1, body: '新しい下書き', recipients: [{email: 'second@example.com', displayName: 'Second'}], cc: []}
+    };
+    let releaseSecond: (response: Response) => void = () => undefined;
+    const delayedSecond = new Promise<Response>((resolve) => { releaseSecond = resolve; });
+    let sendPosts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json(multiItemAttention);
+      if (url.includes('/drafts/context?')) return url.includes('conversationId=conversation-2') ? delayedSecond : json(firstContext);
+      if (url.includes('/source/conversations')) return json(source);
+      if (url.endsWith('/send-operations') && init?.method === 'POST') {
+        sendPosts += 1;
+        return json({accepted: true, operation: {id: 'unexpected', status: 'PENDING'}});
+      }
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('前の下書き'));
+    expect(screen.getByLabelText('宛先')).toHaveValue('sender@example.com');
+    fireEvent.click(screen.getByRole('button', {name: /2件目に返信する/}));
+
+    expect(screen.getByText('返信の送信元と宛先を確認しています。')).toBeTruthy();
+    expect(screen.queryByLabelText('本文')).toBeNull();
+    expect(screen.queryByDisplayValue('sender@example.com')).toBeNull();
+    expect(screen.queryByRole('button', {name: '送信する'})).toBeNull();
+    expect(sendPosts).toBe(0);
+
+    releaseSecond(json(secondContext));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('新しい下書き'));
+    expect(screen.getByLabelText('宛先')).toHaveValue('second@example.com');
+  });
+
 
   it('binds the selected Responsibility and follows ambiguous Send reconciliation to a truthful reconciled state', async () => {
     let sendPosts = 0;

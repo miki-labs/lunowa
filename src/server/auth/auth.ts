@@ -11,6 +11,22 @@ export type AppAuthEnvironment = {
   baseURL: string;
 };
 
+export function trustedWorkersPreviewOrigins(baseURL: string, request?: Request): string[] {
+  const origin = request?.headers.get('origin');
+  if (!origin) return [];
+
+  try {
+    const base = new URL(baseURL);
+    const candidate = new URL(origin);
+    const workersPreviewSuffix = `-${base.hostname}`;
+    const isStableWorkersOrigin = base.protocol === 'https:' && base.hostname.endsWith('.workers.dev');
+    const isSiblingPreview = candidate.protocol === 'https:' && candidate.port === '' && candidate.hostname.endsWith(workersPreviewSuffix);
+    return isStableWorkersOrigin && isSiblingPreview ? [candidate.origin] : [];
+  } catch {
+    return [];
+  }
+}
+
 export function createAppAuth(database: DrizzleDatabase, environment: AppAuthEnvironment) {
   if (environment.secret.length < 32) {
     throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters.');
@@ -20,6 +36,7 @@ export function createAppAuth(database: DrizzleDatabase, environment: AppAuthEnv
     appName: 'Lunowa',
     secret: environment.secret,
     baseURL: environment.baseURL,
+    trustedOrigins: (request) => trustedWorkersPreviewOrigins(environment.baseURL, request),
     database: drizzleAdapter(database, {
       provider: 'pg',
       schema: authSchema,

@@ -92,6 +92,77 @@ describe('G40 live attention surfaces', () => {
     expect(screen.queryByText('最新の確認範囲: 10:15。')).toBeNull();
   });
 
+  it('orders typed Home attention by accepted delay relevance and selects the actual active item', async () => {
+    const needs = {
+      ...attention.needsYou[0],
+      nearestRelevantTime: '2030-01-03T09:00:00.000Z'
+    };
+    const urgentReview = {
+      ...attention.needsYou[0],
+      id: 'responsibility-review',
+      responsibilityId: 'responsibility-review',
+      conversationId: 'conversation-review',
+      surface: 'REVIEW',
+      projection: {bucket: 'REVIEW', subjectKind: 'RESPONSIBILITY', primaryReason: 'material-decision-critical-uncertainty'},
+      operationalOutcome: '契約条件を確定する',
+      reviewQuestion: '期限を過ぎた契約条件を確認してください',
+      primaryAction: null,
+      nearestRelevantTime: '2029-12-31T09:00:00.000Z',
+      overdue: true
+    };
+    const liveAttention = {...attention, needsYou: [needs], review: [urgentReview], delegatedCount: 2};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('/attention')
+        ? new Response(JSON.stringify(liveAttention))
+        : new Response(JSON.stringify({accounts: [], conversations: [], readiness: 'ready', dataThroughAt: null, query: {text: '', accountId: null, sender: null, from: null, to: null}, total: 0, nextCursor: null}))
+    ));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    const reviewRow = await screen.findByRole('button', {name: /期限を過ぎた契約条件を確認してください/});
+    const needsRow = screen.getByRole('button', {name: /返信する/});
+    const rows = Array.from(document.querySelectorAll('.home-work-row'));
+    expect(rows[0]).toBe(reviewRow);
+    expect(reviewRow).toHaveClass('selected');
+    expect(needsRow).not.toHaveClass('selected');
+    expect(screen.getByRole('heading', {name: '期限を過ぎた契約条件を確認してください'})).toBeTruthy();
+
+    fireEvent.click(needsRow);
+    expect(needsRow).toHaveClass('selected');
+    expect(reviewRow).not.toHaveClass('selected');
+    expect(screen.getByRole('heading', {name: '見積書の確認を終える'})).toBeTruthy();
+  });
+
+  it('labels a Later-only state without presenting it as zero Managed work', async () => {
+    const later = {
+      ...attention.needsYou[0],
+      id: 'responsibility-later',
+      responsibilityId: 'responsibility-later',
+      conversationId: 'conversation-later',
+      surface: 'LATER',
+      projection: {bucket: 'LATER', subjectKind: 'RESPONSIBILITY', primaryReason: 'user-intentionally-deferred-attention'},
+      operationalOutcome: '来週、契約条件を確認する',
+      primaryAction: null,
+      returnCondition: '9月20日',
+      nearestRelevantTime: '2030-01-20',
+      overdue: false
+    };
+    const laterOnly = {...attention, needsYou: [], managed: [], later: [later], strictZero: false, managedCount: 0, delegatedCount: 1};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('/attention')
+        ? new Response(JSON.stringify(laterOnly))
+        : new Response(JSON.stringify({accounts: [], conversations: [], readiness: 'ready', dataThroughAt: null, query: {text: '', accountId: null, sender: null, from: null, to: null}, total: 0, nextCursor: null}))
+    ));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    await screen.findByRole('button', {name: /来週、契約条件を確認する/});
+    expect(screen.getAllByText('あとで確認するもの').length).toBeGreaterThan(0);
+    expect(screen.getByText('あとで 1件')).toBeTruthy();
+    expect(document.querySelector('.home-summary-card.later strong')).toHaveTextContent('1');
+    expect(document.querySelector('.home-summary-card.managed')).toBeNull();
+    expect(screen.queryByText('0件')).toBeNull();
+    expect(screen.queryByText('現在、監視中の項目はありません。')).toBeNull();
+  });
+
   it('opens the first live Managed item from Home with its accepted context', async () => {
     const managed = {
       ...attention.needsYou[0],

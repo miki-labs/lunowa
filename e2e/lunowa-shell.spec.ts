@@ -307,6 +307,63 @@ test('uses trusted Moment reply context and binds explicit Send to the active Re
   await expect(page.getByLabel('宛先')).toBeDisabled();
 });
 
+test('cannot send a prior draft while a replacement Moment reply context is loading', async ({page}) => {
+  await page.unroute('**/api/bff/users/**/attention');
+  await page.unroute('**/api/bff/users/**/drafts/context**');
+  const secondItem: AttentionItemReadModel = {
+    ...(attentionReadModel.needsYou[0] as AttentionItemReadModel),
+    id: 'responsibility-2',
+    responsibilityId: 'responsibility-2',
+    conversationId: 'source-conversation-2',
+    connectedAccountId: 'source-account-2',
+    operationalOutcome: '2件目の依頼に返信する',
+    primaryAction: '2件目に返信する'
+  };
+  await page.route('**/api/bff/users/**/attention', (route) => route.fulfill({
+    json: {...attentionReadModel, needsYou: [...attentionReadModel.needsYou, secondItem], delegatedCount: 2}
+  }));
+  let releaseReplacement: () => void = () => undefined;
+  const replacementReady = new Promise<void>((resolve) => { releaseReplacement = resolve; });
+  await page.route('**/api/bff/users/**/drafts/context**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('conversationId') === 'source-conversation-2') {
+      await replacementReady;
+      await route.fulfill({json: {
+        ...replyContextFor('REPLY'),
+        connectedAccount: {...replyContextFor('REPLY').connectedAccount, id: 'source-account-2'},
+        conversationId: 'source-conversation-2',
+        providerThreadId: 'source-thread-2',
+        inReplyToMessageId: 'source-message-2',
+        inReplyToProviderMessageId: 'provider-message-2',
+        recipients: [{email: 'second@example.com', displayName: 'Second'}],
+        draft: {id: 'browser-draft-2', version: 1, body: '新しい下書き', recipients: [{email: 'second@example.com', displayName: 'Second'}], cc: []}
+      }});
+      return;
+    }
+    await route.fulfill({json: replyContextFor('REPLY')});
+  });
+  let sendRequests = 0;
+  await page.unroute('**/api/bff/users/**/send-operations');
+  await page.route('**/api/bff/users/**/send-operations', async (route) => {
+    sendRequests += 1;
+    await route.fulfill({json: {accepted: true, operation: {id: 'unexpected', status: 'PENDING'}}});
+  });
+
+  await page.goto('/ja');
+  await expect(page.getByLabel('本文')).toHaveValue('確認しました。');
+  await page.getByRole('button', {name: /2件目に返信する/}).click();
+
+  await expect(page.getByText('返信の送信元と宛先を確認しています。')).toBeVisible();
+  await expect(page.getByLabel('本文')).toHaveCount(0);
+  await expect(page.getByLabel('宛先')).toHaveCount(0);
+  await expect(page.getByRole('button', {name: '送信する'})).toHaveCount(0);
+  expect(sendRequests).toBe(0);
+
+  releaseReplacement();
+  await expect(page.getByLabel('本文')).toHaveValue('新しい下書き');
+  await expect(page.getByLabel('宛先')).toHaveValue('second@example.com');
+});
+
 test('blocks browser-offline Send without creating a SendOperation', async ({page, context}) => {
   let sendRequests = 0;
   await page.unroute('**/api/bff/users/**/send-operations');
@@ -383,6 +440,18 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
   await waitForAuthenticatedShell(page);
   await nav(page, '会話').focus();
   await expect(page.locator('.nav-tooltip', {hasText: '会話'})).toBeVisible();
+});
+
+test('shows list Back only after the desktop list and detail collapse to one pane', async ({page}) => {
+  await page.setViewportSize({width: 1448, height: 1086});
+  await page.goto('/ja');
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByRole('button', {name: /一覧に戻る/})).toBeHidden();
+
+  await page.setViewportSize({width: 430, height: 900});
+  await page.reload();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByRole('button', {name: /一覧に戻る/})).toBeVisible();
 });
 
 test('preserves core reading and focus visibility at 125, 150, and 200 percent browser-equivalent zoom and text scaling', async ({page}) => {

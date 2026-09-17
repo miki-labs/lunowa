@@ -25,6 +25,12 @@ type Surface = 'home' | 'needs' | 'managed' | 'review' | 'source' | 'search' | '
 type Detail = 'moment' | 'managed-detail' | 'review-detail' | 'delegation' | 'conversation' | null;
 type AttentionAction = 'STOP_TRACKING' | 'RETURN_ATTENTION' | 'DELEGATE' | 'RESOLVE_ADMISSION_REVIEW' | 'CORRECT_OPERATIONAL_OUTCOME';
 type AttentionMutation = {key: string; state: MutationState; error: string};
+type HomeAttentionEntry = {
+  item: AttentionItemReadModel;
+  kind: 'needs' | 'review';
+  detail: 'moment' | 'review-detail';
+  origin: string;
+};
 
 const navigation: readonly {id: Surface; label: string; icon: string}[] = [
   {id: 'home', label: 'ホーム', icon: 'home'}, {id: 'needs', label: '対応が必要', icon: 'alert'},
@@ -74,6 +80,35 @@ function attentionForOrigin(model: AttentionReadModel | null, origin: string): A
     .find((item) => origin === item.id || origin === `attention-${item.id}` || origin === `managed-${item.id}` || origin === `review-${item.id}` || origin === `delegation-${item.id}`) ?? null;
 }
 
+function compareAttentionRelevance(left: AttentionItemReadModel, right: AttentionItemReadModel) {
+  const overdue = Number(right.overdue) - Number(left.overdue);
+  if (overdue !== 0) return overdue;
+  const time = (left.nearestRelevantTime ?? '\uffff').localeCompare(right.nearestRelevantTime ?? '\uffff');
+  if (time !== 0) return time;
+  return `${left.subjectKind}:${left.id}`.localeCompare(`${right.subjectKind}:${right.id}`);
+}
+
+function homeAttentionEntries(model: AttentionReadModel | null): HomeAttentionEntry[] {
+  if (!model) return [];
+  return [...model.needsYou, ...model.review]
+    .sort(compareAttentionRelevance)
+    .map((item) => item.surface === 'REVIEW'
+      ? {item, kind: 'review', detail: 'review-detail', origin: `review-${item.id}`} as const
+      : {item, kind: 'needs', detail: 'moment', origin: `attention-${item.id}`} as const);
+}
+
+function replyTargetKey(input: {
+  detail: Detail;
+  origin: string;
+  conversationId: string;
+  connectedAccountId: string;
+  mode: ReplyMode;
+}) {
+  return input.detail === 'moment' || input.detail === 'conversation'
+    ? `${input.detail}:${input.origin}:${input.conversationId}:${input.connectedAccountId}:${input.mode}`
+    : '';
+}
+
 function userInitial(user?: AppUserSummary) {
   return user?.name?.trim().charAt(0) || user?.email?.trim().charAt(0).toUpperCase() || 'L';
 }
@@ -103,7 +138,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const [replyMode, setReplyMode] = useState<ReplyMode>('REPLY');
   const [replyContext, setReplyContext] = useState<ReplyContextReadModel | null>(null);
   const [draftRecipients, setDraftRecipients] = useState<{to: CommunicationParticipant[]; cc: CommunicationParticipant[]} | null>(null);
-  const [replyContextKey, setReplyContextKey] = useState('');
+  const [replyContextTargetKey, setReplyContextTargetKey] = useState('');
   const [replyContextError, setReplyContextError] = useState('');
   const [sendOperationStatus, setSendOperationStatus] = useState<SendLifecycle>('draft');
   const draftGeneration = useRef(0);
@@ -139,39 +174,62 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const fixture = shellFixtures.find(({id}) => id === fixtureId) ?? shellFixtures[0];
   const previewAttentionModel = appUser?.id && attentionOwnerId === appUser.id ? attentionModel : null;
-  const homePreviewAttention = surface === 'home' ? previewAttentionModel?.needsYou[0] ?? null : null;
-  const activeDataDetail: Detail = detail ?? (homePreviewAttention ? 'moment' : null);
-  const activeDataOrigin = detail ? detailOrigin : homePreviewAttention ? `attention-${homePreviewAttention.id}` : detailOrigin;
+  const homePreviewEntry = surface === 'home' ? homeAttentionEntries(previewAttentionModel)[0] ?? null : null;
+  const activeDataDetail: Detail = detail ?? homePreviewEntry?.detail ?? null;
+  const activeDataOrigin = detail ? detailOrigin : homePreviewEntry?.origin ?? detailOrigin;
   const activeDataAttention = attentionForOrigin(previewAttentionModel, activeDataOrigin);
   const activeConversationId = activeDataDetail === 'conversation'
     ? selectedConversationId
     : activeDataDetail === 'moment'
       ? activeDataAttention?.conversationId ?? ''
       : '';
+  const activeConnectedAccountId = activeDataDetail === 'moment'
+    ? activeDataAttention?.connectedAccountId ?? ''
+    : activeDataDetail === 'conversation' && sourceConversation?.id === selectedConversationId
+      ? sourceConversation.account.id
+      : '';
+  const activeReplyTargetKey = replyTargetKey({
+    detail: activeDataDetail,
+    origin: activeDataOrigin,
+    conversationId: activeConversationId,
+    connectedAccountId: activeConnectedAccountId,
+    mode: replyMode
+  });
+  const activeReplyContext = replyContext && activeReplyTargetKey && replyContextTargetKey === activeReplyTargetKey &&
+    replyContext.conversationId === activeConversationId &&
+    replyContext.connectedAccount.id === activeConnectedAccountId &&
+    replyContext.mode === replyMode
+    ? replyContext
+    : null;
 
   const commonMutations = {
     'stop-tracking': localCommonMutations['stop-tracking'] === 'idle' && fixture.mutationTarget === 'stop-tracking' ? fixture.mutation : localCommonMutations['stop-tracking'],
     'review-answer': localCommonMutations['review-answer'] === 'idle' && fixture.mutationTarget === 'review-answer' ? fixture.mutation : localCommonMutations['review-answer']
   };
   const sendState = sendOverride ?? fixture.send;
-  const changeFixture = (id: ShellFixture['id']) => {
+  const resetReplyState = (clearDraft = true) => {
     draftGeneration.current += 1;
     draftEditRevision.current += 1;
-    setLocalCommonMutations({'stop-tracking': 'idle', 'review-answer': 'idle'});
-    setSendOverride(null);
     setReplyContext(null);
-    setReplyContextKey('');
+    setReplyContextTargetKey('');
     setReplyContextError('');
+    if (clearDraft) setDraft('');
     setDraftRecipients(null);
     setDraftId(null);
     setDraftVersion(null);
     setDraftSaveState('idle');
     setDraftDirty(false);
     setSendOperationStatus('draft');
+  };
+  const changeFixture = (id: ShellFixture['id']) => {
+    resetReplyState(false);
+    setLocalCommonMutations({'stop-tracking': 'idle', 'review-answer': 'idle'});
+    setSendOverride(null);
     setFixtureId(id);
   };
 
-  const openDetail = (next: Detail, origin: string) => {
+  const openDetail = (next: Detail, origin: string, invalidateReply = true) => {
+    if (invalidateReply && (next !== activeDataDetail || origin !== activeDataOrigin)) resetReplyState();
     setDetail(next);
     setDetailOrigin(origin);
     window.setTimeout(() => {
@@ -180,28 +238,18 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   };
 
   const openConversation = (origin: string, conversationId = origin) => {
-    if (replyContext?.conversationId !== conversationId) {
-      draftGeneration.current += 1;
-      draftEditRevision.current += 1;
-      setReplyContext(null);
-      setReplyContextKey('');
-      setReplyContextError('');
-      setDraft('');
-      setDraftId(null);
-      setDraftVersion(null);
-      setDraftRecipients(null);
-      setDraftSaveState('idle');
-      setDraftDirty(false);
-      setSendOperationStatus('draft');
+    if (activeDataDetail !== 'conversation' || activeDataOrigin !== origin || activeConversationId !== conversationId) {
+      resetReplyState(activeConversationId !== conversationId);
     }
     setSelectedConversationId(conversationId);
     setSourceConversation(null);
     setSourceConversationLoading(true);
     setSourceConversationError('');
-    openDetail('conversation', origin);
+    openDetail('conversation', origin, false);
   };
 
   const selectSurface = (next: Surface) => {
+    if (activeReplyTargetKey || detail) resetReplyState();
     setSurface(next);
     setDetail(null);
     setDrawerOpen(false);
@@ -368,7 +416,11 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         if (!response.ok) throw new Error('SOURCE_CONVERSATION_FAILED');
         return response.json() as Promise<SourceConversationReadModel>;
       })
-      .then((result) => setSourceConversation(result))
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        if (result.id !== activeConversationId) throw new Error('SOURCE_CONVERSATION_MISMATCH');
+        setSourceConversation(result);
+      })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setSourceConversationError(error instanceof Error ? error.message : 'SOURCE_CONVERSATION_FAILED');
       })
@@ -379,14 +431,11 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   }, [activeConversationId, appUser?.id, detail]);
 
   useEffect(() => {
-    if (!appUser?.id || (activeDataDetail !== 'moment' && activeDataDetail !== 'conversation')) return;
-    const attentionItem = attentionForOrigin(previewAttentionModel, activeDataOrigin);
-    const conversationId = activeDataDetail === 'moment' ? attentionItem?.conversationId : sourceConversation?.id ?? replyContext?.conversationId;
-    const accountId = activeDataDetail === 'moment' ? attentionItem?.connectedAccountId : sourceConversation?.account.id ?? replyContext?.connectedAccount.id;
-    if (!conversationId || !accountId || (activeDataDetail === 'conversation' && !sourceConversation)) return;
+    if (!appUser?.id || !activeReplyTargetKey || !activeConversationId || !activeConnectedAccountId) return;
+    if (activeReplyContext) return;
+    const conversationId = activeConversationId;
+    const accountId = activeConnectedAccountId;
     const latestInboundMessage = sourceConversation?.id === conversationId ? [...sourceConversation.messages].reverse().find((message) => message.direction === 'INBOUND') : undefined;
-    const key = `${conversationId}:${accountId}:${replyMode}:${latestInboundMessage?.id ?? ''}`;
-    if (replyContextKey === key && replyContext) return;
     const controller = new AbortController();
     const query = new URLSearchParams({connectedAccountId: accountId, conversationId, mode: replyMode});
     if (latestInboundMessage) query.set('inReplyToMessageId', latestInboundMessage.id);
@@ -398,12 +447,15 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         return result as ReplyContextReadModel;
       })
       .then((result) => {
+        if (controller.signal.aborted) return;
+        if (result.conversationId !== conversationId || result.connectedAccount.id !== accountId || result.mode !== replyMode) {
+          throw new Error('REPLY_CONTEXT_MISMATCH');
+        }
         draftGeneration.current += 1;
-        const sameConversation = replyContext?.conversationId === result.conversationId;
         setReplyContext(result);
-        setReplyContextKey(key);
+        setReplyContextTargetKey(activeReplyTargetKey);
         setReplyContextError('');
-        setDraft(result.draft?.body ?? (sameConversation ? draft : ''));
+        setDraft(result.draft?.body ?? '');
         setDraftId(result.draft?.id ?? null);
         setDraftVersion(result.draft?.version ?? null);
         setDraftRecipients(result.draft ? {to: result.draft.recipients, cc: result.draft.cc} : null);
@@ -415,10 +467,10 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         if (!controller.signal.aborted) setReplyContextError(error instanceof Error ? error.message : 'REPLY_CONTEXT_FAILED');
       });
     return () => controller.abort();
-  }, [activeDataDetail, activeDataOrigin, appUser?.id, draft, previewAttentionModel, replyContext, replyContextKey, replyMode, sourceConversation]);
+  }, [activeConnectedAccountId, activeConversationId, activeReplyContext, activeReplyTargetKey, appUser?.id, replyMode, sourceConversation]);
 
   useEffect(() => {
-    if (!appUser?.id || !replyContext || !draftDirty) return;
+    if (!appUser?.id || !activeReplyContext || !draftDirty) return;
     const userId = appUser.id;
     const generation = draftGeneration.current;
     const editRevision = draftEditRevision.current;
@@ -433,10 +485,10 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         body: JSON.stringify({
           draftId,
           expectedVersion: draftVersion,
-          connectedAccountId: replyContext.connectedAccount.id,
-          conversationId: replyContext.conversationId,
-          inReplyToMessageId: replyContext.inReplyToMessageId,
-          mode: replyContext.mode,
+          connectedAccountId: activeReplyContext.connectedAccount.id,
+          conversationId: activeReplyContext.conversationId,
+          inReplyToMessageId: activeReplyContext.inReplyToMessageId,
+          mode: activeReplyContext.mode,
           body: draft,
           recipients: draftRecipients?.to,
           cc: draftRecipients?.cc
@@ -466,7 +518,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         });
     }, 240);
     return () => window.clearTimeout(timer);
-  }, [appUser?.id, draft, draftDirty, draftId, draftRecipients, draftVersion, replyContext]);
+  }, [activeReplyContext, appUser?.id, draft, draftDirty, draftId, draftRecipients, draftVersion]);
 
   useEffect(() => {
     if (!appUser?.id) return;
@@ -517,12 +569,14 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const hasReview = liveAttention ? liveAttention.review.length > 0 : fixture.hasReview;
   const reviewCount = liveAttention?.review.length ?? (fixture.hasReview ? 1 : 0);
   const selectedAttention = attentionForOrigin(liveAttention, detailOrigin);
-  const homeDisplayAttention = surface === 'home' ? liveAttention?.needsYou[0] ?? null : null;
-  const displayedDetail: Detail = detail ?? ((surface === 'home' && (homeDisplayAttention || !appUser?.id)) ? 'moment' : null);
+  const homeDisplayEntry = surface === 'home' ? homeAttentionEntries(liveAttention)[0] ?? null : null;
+  const homeDisplayAttention = homeDisplayEntry?.item ?? null;
+  const displayedDetail: Detail = detail ?? homeDisplayEntry?.detail ?? ((surface === 'home' && !appUser?.id) ? 'moment' : null);
   const displayedAttention = detail ? selectedAttention : homeDisplayAttention;
   const displayedSourceSummary = displayedAttention ? sourceModel?.conversations.find((item) => item.id === displayedAttention.conversationId) ?? null : null;
   const needsCount = liveAttention?.needsYou.length ?? (fixture.hasNeedsYou ? 1 : 0);
   const managedCount = liveAttention?.managedCount ?? (fixture.monitoringPosture === 'active' && fixture.integrity === 'healthy' ? 4 : 0);
+  const laterCount = liveAttention?.later.length ?? 0;
 
   const announceMutation = (target: Exclude<CommonMutationTarget, null>, message: string) => {
     setLocalCommonMutations((current) => ({...current, [target]: 'pending'}));
@@ -578,7 +632,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const getAttentionMutation = (action: AttentionAction) => selectedAttention && attentionMutation.key === attentionMutationKey(action, selectedAttention) ? attentionMutation.state : 'idle';
 
   const requestImmediateSend = async () => {
-    if (!appUser?.id || !draftId) {
+    if (!appUser?.id || !activeReplyContext || !activeReplyTargetKey || !draftId) {
       setStatus('下書きの保存を確認してから送信してください');
       return;
     }
@@ -587,13 +641,15 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
       setStatus('現在オフラインです。送信されていません。下書きは保持されています。オンラインに戻ってから明示的に送信してください');
       return;
     }
-    if (!replyContext?.connectedAccount.sendAuthorized) {
+    if (!activeReplyContext.connectedAccount.sendAuthorized) {
       setSendOperationStatus('draft');
       setStatus('Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください');
       return;
     }
     const responsibilityBinding = displayedAttention?.subjectKind === 'RESPONSIBILITY' &&
-      displayedAttention.responsibilityId && displayedAttention.conversationId === replyContext.conversationId &&
+      displayedDetail === 'moment' && displayedAttention.responsibilityId &&
+      displayedAttention.conversationId === activeReplyContext.conversationId &&
+      displayedAttention.connectedAccountId === activeReplyContext.connectedAccount.id &&
       displayedAttention.aggregateVersion !== undefined && displayedAttention.acceptedEvidenceRevision !== undefined
       ? {
           responsibilityId: displayedAttention.responsibilityId,
@@ -675,7 +731,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     }
   };
 
-  const effectiveSendState = replyContext ? sendOperationStatus : sendState;
+  const effectiveSendState = activeReplyContext ? sendOperationStatus : sendState;
 
   return (
     <main className={detail ? 'app-shell has-detail' : 'app-shell'} data-testid="lunowa-shell">
@@ -714,10 +770,10 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
           })}
         </nav>
         <div className="nav-spacer" />
-        {(managedCount > 0 || liveAttention?.integrity.status === 'healthy') && <button className="nav-monitor-card" type="button" onClick={() => selectSurface('managed')} aria-label="Lunowaが見ている項目を表示">
-          <span className="monitor-card-label"><LunowaIcon name="briefcase" size={15} /> Lunowaが見ています</span>
-          <strong>{managedCount}<small>件</small></strong>
-          <span>{managedCount > 0 ? '必要になるまで静かに見守ります。' : '現在、監視中の項目はありません。'}</span>
+        {(managedCount > 0 || laterCount > 0 || liveAttention?.integrity.status === 'healthy') && <button className="nav-monitor-card" type="button" onClick={() => selectSurface('managed')} aria-label="Lunowaが見ている項目を表示">
+          <span className="monitor-card-label"><LunowaIcon name="briefcase" size={15} /> {managedCount > 0 ? 'Lunowaが見ています' : laterCount > 0 ? 'あとで確認するもの' : 'Lunowaが見ています'}</span>
+          <strong>{managedCount > 0 ? managedCount : laterCount}<small>件</small></strong>
+          <span>{managedCount > 0 ? laterCount > 0 ? `必要になるまで見守ります。あとで ${laterCount}件` : '必要になるまで静かに見守ります。' : laterCount > 0 ? '戻す条件まで分けて保持しています。' : '現在、監視中の項目はありません。'}</span>
         </button>}
         <div className="nav-secondary">
           <button className={surface === 'settings' ? 'nav-item active' : 'nav-item'} type="button" aria-current={surface === 'settings' ? 'page' : undefined} aria-label="設定を表示" onClick={() => selectSurface('settings')}>
@@ -786,6 +842,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             setSourceSearchError('');
             if (search.trim()) setSourceSearchLoading(true);
           }}
+          activeHomeItemId={surface === 'home' ? displayedAttention?.id : undefined}
         />
         {!appUser?.id && <FixtureSwitch fixtureId={fixtureId} onChange={changeFixture} />}
       </section>
@@ -807,20 +864,12 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             sendState={effectiveSendState}
             fixture={fixture}
             attentionItem={displayedAttention}
-            replyContext={replyContext}
+            replyContext={activeReplyContext}
             replyContextError={replyContextError}
             replyMode={replyMode}
             onReplyMode={(mode) => {
               setReplyMode(mode);
-              draftGeneration.current += 1;
-              draftEditRevision.current += 1;
-              setReplyContextKey('');
-              setDraftId(null);
-              setDraftVersion(null);
-              setDraftRecipients(null);
-              setDraftSaveState('idle');
-              setDraftDirty(false);
-              setSendOperationStatus('draft');
+              resetReplyState();
             }}
             draftSaveState={draftSaveState}
             draftRecipients={draftRecipients}
@@ -838,12 +887,13 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
             getAttentionMutation={getAttentionMutation}
             onAttentionAction={(action, value) => displayedAttention && void performAttentionAction(action, displayedAttention, value)}
             onBack={() => {
+              resetReplyState();
               setDetail(null);
               setStatus('一覧に戻りました');
               window.setTimeout(() => document.getElementById(detailOrigin)?.focus(), 0);
             }}
             onCommonMutation={announceMutation}
-            onSend={replyContext ? () => void requestImmediateSend() : () => {
+            onSend={activeReplyContext ? () => void requestImmediateSend() : () => {
               setSendOverride('request_pending');
               setStatus('送信をリクエストしています');
             }}
@@ -872,7 +922,7 @@ function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; on
   );
 }
 
-function SurfaceContent({surface, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, onOpenSearch, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
+function SurfaceContent({surface, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, onOpenSearch, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch, activeHomeItemId}: {
   surface: Surface;
   fixture: ShellFixture;
   attention: AttentionReadModel | null;
@@ -902,6 +952,7 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   openReview: (origin?: string) => void;
   openDelegation: (origin?: string) => void;
   openConversation: (origin: string, conversationId?: string) => void;
+  activeHomeItemId?: string;
 }) {
   const title = navigation.find((item) => item.id === surface)?.label ?? 'ホーム';
   const integrity = attention ? attention.integrity.status === 'degraded' : fixture.integrity === 'degraded';
@@ -920,7 +971,7 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
       {!attention && partial && <p className="coverage-notice" role="status">一部の会話のみを表示しています。最新の確認範囲: 10:15。</p>}
       {attention && surface !== 'home' && attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{liveCoverageMessage}</p>}
       {loading && <LoadingState />}
-      {!loading && surface === 'home' && <Home fixture={fixture} attention={attention} appUser={appUser} sourceModel={sourceModel} onOpenSearch={onOpenSearch} openMoment={openMoment} openReview={openReview} openManaged={openManaged} openDelegation={openDelegation} />}
+      {!loading && surface === 'home' && <Home fixture={fixture} attention={attention} appUser={appUser} sourceModel={sourceModel} onOpenSearch={onOpenSearch} openMoment={openMoment} openReview={openReview} openManaged={openManaged} openDelegation={openDelegation} activeItemId={activeHomeItemId} />}
       {!loading && surface === 'needs' && <NeedsYou fixture={fixture} attention={attention} openMoment={openMoment} openConversation={(origin, conversationId) => openConversation(origin, conversationId ?? sourceModel?.conversations[0]?.id ?? origin)} />}
       {!loading && surface === 'managed' && <Managed fixture={fixture} attention={attention} openManaged={openManaged} />}
       {!loading && surface === 'review' && <Review fixture={fixture} attention={attention} openReview={openReview} />}
@@ -947,7 +998,7 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   );
 }
 
-function Home({fixture, attention, appUser, sourceModel, onOpenSearch, openMoment, openReview, openManaged, openDelegation}: {
+function Home({fixture, attention, appUser, sourceModel, onOpenSearch, openMoment, openReview, openManaged, openDelegation, activeItemId}: {
   fixture: ShellFixture;
   attention: AttentionReadModel | null;
   appUser?: AppUserSummary;
@@ -957,10 +1008,12 @@ function Home({fixture, attention, appUser, sourceModel, onOpenSearch, openMomen
   openReview: (origin?: string) => void;
   openManaged: (origin?: string) => void;
   openDelegation: (origin?: string) => void;
+  activeItemId?: string;
 }) {
   const needsCount = attention?.needsYou.length ?? (fixture.hasNeedsYou ? 1 : 0);
   const reviewCount = attention?.review.length ?? (fixture.hasReview ? 1 : 0);
   const managedCount = attention?.managedCount ?? (fixture.monitoringPosture === 'active' && fixture.integrity === 'healthy' ? 4 : 0);
+  const laterCount = attention?.later.length ?? 0;
   const doneCount = attention?.done.length ?? 0;
   const firstName = appUser?.name?.trim().split(/\s+/)[0];
   const dateLabel = new Intl.DateTimeFormat('ja-JP', {month: 'numeric', day: 'numeric', weekday: 'short'}).format(new Date());
@@ -970,25 +1023,26 @@ function Home({fixture, attention, appUser, sourceModel, onOpenSearch, openMomen
       <LunowaIcon name="search" size={18} /><span>メール・人・件名・キーワードで検索</span><span className="search-filter-glyph" aria-hidden="true">⌘</span>
     </button>
     <div className="home-greeting"><div><h2>{firstName ? `おはようございます、${firstName}さん` : 'おはようございます'}</h2><p>今日も大切なやり取りを、Lunowaが見守っています。</p></div><time>{dateLabel}</time></div>
-    <HomeSummary needsCount={needsCount} managedCount={managedCount} reviewCount={reviewCount} doneCount={doneCount} />
+    <HomeSummary needsCount={needsCount} managedCount={managedCount} reviewCount={reviewCount} laterCount={laterCount} doneCount={doneCount} />
   </>;
 
   if (attention) {
     const candidates = attention.delegationCandidates ?? [];
     if (attention.strictZero) return <div className="home-content">{header}<section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>{attention.managedCount > 0 ? `会話の確認範囲は信頼でき、Lunowaが${attention.managedCount}件を見守っています。` : '現在、Lunowaが監視している件はありません。'}</p>{attention.managedCount > 0 && <button className="quiet-button" type="button" onClick={() => openManaged(attention.managed[0] ? `managed-${attention.managed[0].id}` : undefined)}>管理中を見る</button>}</section>{candidates.length > 0 && <DelegationCandidates items={candidates} openDelegation={openDelegation} />}</div>;
 
+    const attentionItems = homeAttentionEntries(attention);
     const managedItems = [...attention.managed, ...attention.later];
+    const laterOnly = attention.managedCount === 0 && attention.later.length > 0;
     return <div className="home-content">{header}
       {attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{attention.integrity.message}</p>}
       <section className="home-section home-attention-section" aria-labelledby="attention-heading">
         <div className="home-section-heading"><div><span className="section-icon section-icon-alert"><LunowaIcon name="alert" size={18} /></span><div><h2 id="attention-heading">今、あなたに必要なこと</h2><p>期限が近いものや、あなたの判断・返信が必要な項目です。</p></div></div>{needsCount + reviewCount > 0 && <span>{needsCount + reviewCount}件</span>}</div>
         <div className="home-work-list">
-          {attention.needsYou.map((item, index) => <HomeWorkRow key={item.id} item={item} source={sourceByConversation.get(item.conversationId)} kind="needs" selected={index === 0} onClick={() => openMoment(`attention-${item.id}`)} />)}
-          {attention.review.map((item) => <HomeWorkRow key={item.id} item={item} source={sourceByConversation.get(item.conversationId)} kind="review" selected={false} onClick={() => openReview(`review-${item.id}`)} />)}
+          {attentionItems.map(({item, kind, origin}) => <HomeWorkRow key={`${item.subjectKind}:${item.id}`} item={item} source={sourceByConversation.get(item.conversationId)} kind={kind} selected={activeItemId === item.id} onClick={() => kind === 'review' ? openReview(origin) : openMoment(origin)} />)}
         </div>
       </section>
       <section className="home-section home-managed-section" aria-labelledby="home-managed-heading">
-        <div className="home-section-heading"><div><span className="section-icon"><LunowaIcon name="briefcase" size={18} /></span><div><h2 id="home-managed-heading">Lunowaが見ています</h2><p>対応のタイミングを見て、必要なときにお知らせします。</p></div></div>{managedItems.length > 0 && <span>{attention.managedCount}件</span>}</div>
+        <div className="home-section-heading"><div><span className="section-icon"><LunowaIcon name="briefcase" size={18} /></span><div><h2 id="home-managed-heading">{laterOnly ? 'あとで確認するもの' : 'Lunowaが見ています'}</h2><p>{laterOnly ? '戻す条件まで、意図した確認を分けて保持しています。' : '対応のタイミングを見て、必要なときにお知らせします。'}</p></div></div>{managedItems.length > 0 && <span>{attention.managedCount > 0 ? `${attention.managedCount}件${attention.later.length > 0 ? `・あとで ${attention.later.length}件` : ''}` : `あとで ${attention.later.length}件`}</span>}</div>
         {attention.integrity.status === 'healthy' && managedItems.length > 0
           ? <div className="home-managed-list">{managedItems.slice(0, 5).map((item) => <HomeManagedRow key={item.id} item={item} source={sourceByConversation.get(item.conversationId)} onClick={() => openManaged(`managed-${item.id}`)} />)}</div>
           : attention.integrity.status === 'healthy'
@@ -1004,10 +1058,13 @@ function Home({fixture, attention, appUser, sourceModel, onOpenSearch, openMomen
   return <div className="home-content">{header}<section className="home-section"><div className="home-section-heading"><div><span className="section-icon section-icon-alert"><LunowaIcon name="alert" size={18} /></span><div><h2>今、あなたに必要なこと</h2><p>期限が近いものや、あなたの判断・返信が必要な項目です。</p></div></div></div>{fixture.hasNeedsYou && <AttentionButton onClick={() => openMoment()} />}{fixture.hasReview && <button id="review-condition" className="list-row review-row" type="button" onClick={() => openReview()}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>佐藤ひろ子との会話に、異なる更新日があります。</span></button>}</section>{fixture.integrity === 'healthy' && fixture.monitoringPosture === 'active' ? <section className="home-section"><div className="home-section-heading"><div><span className="section-icon"><LunowaIcon name="briefcase" size={18} /></span><div><h2>Lunowaが見ています</h2><p>対応のタイミングを見て、必要なときにお知らせします。</p></div></div></div><button id="managed-estimate" className="home-managed-row" type="button" onClick={() => openManaged()}><span className="row-avatar"><LunowaIcon name="briefcase" size={16} /></span><span className="row-copy"><strong>来期の見積書</strong><span>佐藤ひろ子からの確認を待っています</span></span><span className="row-status waiting">待ち</span><LunowaIcon name="chevron" size={14} /></button></section> : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}</div>;
 }
 
-function HomeSummary({needsCount, managedCount, reviewCount, doneCount}: {needsCount: number; managedCount: number; reviewCount: number; doneCount: number}) {
+function HomeSummary({needsCount, managedCount, reviewCount, laterCount, doneCount}: {needsCount: number; managedCount: number; reviewCount: number; laterCount: number; doneCount: number}) {
+  const stewardshipCard = managedCount > 0 || laterCount === 0
+    ? {label: '管理中', count: managedCount, kind: 'managed', icon: 'briefcase'}
+    : {label: 'あとで', count: laterCount, kind: 'later', icon: 'check'};
   const cards = [
     {label: '対応が必要', count: needsCount, kind: 'needs', icon: 'alert'},
-    {label: '管理中', count: managedCount, kind: 'managed', icon: 'briefcase'},
+    stewardshipCard,
     {label: '確認', count: reviewCount, kind: 'review', icon: 'check'},
     {label: '完了', count: doneCount, kind: 'done', icon: 'check'}
   ];

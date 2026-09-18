@@ -11,9 +11,16 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const state = url.searchParams.get('state');
     const code = url.searchParams.get('code');
-    if (url.searchParams.has('error')) throw new GmailProviderError(400, 'OAUTH_DENIED');
-    if (!state || !code) throw new GmailProviderError(400, 'INVALID_OAUTH_CALLBACK');
+    if (!state) throw new GmailProviderError(400, 'INVALID_OAUTH_CALLBACK');
     assertOauthBrowserBinding(state, request.headers.get('cookie'));
+    if (url.searchParams.get('error') === 'access_denied') {
+      const cancelled = await createGmailRuntime().authorization.cancelAuthorization(state);
+      const destination = new URL(cancelled.returnPath, process.env.BETTER_AUTH_URL);
+      destination.searchParams.set('gmail', 'cancelled');
+      return Response.redirect(destination, 303);
+    }
+    if (url.searchParams.has('error')) throw new GmailProviderError(400, 'OAUTH_DENIED');
+    if (!code) throw new GmailProviderError(400, 'INVALID_OAUTH_CALLBACK');
     const result = await createGmailRuntime().authorization.completeAuthorization({
       state,
       code

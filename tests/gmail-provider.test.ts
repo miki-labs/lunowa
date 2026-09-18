@@ -228,6 +228,31 @@ describe('G20 Gmail credential and authorization boundary', () => {
     expect(() => assertOauthBrowserBinding(state, null)).toThrow(/INVALID_OAUTH_BROWSER_BINDING/);
   });
 
+  it('consumes a denied authorization state without exchanging credentials or changing a connection', async () => {
+    const providerClient = provider();
+    let savedState: Record<string, unknown> | undefined;
+    const gmailRepository = {
+      createOauthState: vi.fn(async (input: Record<string, unknown>) => { savedState = input; }),
+      consumeOauthState: vi.fn(async ({stateDigest}: {stateDigest: string}) => {
+        if (!savedState || savedState.stateDigest !== stateDigest || savedState.consumed) return null;
+        savedState.consumed = true;
+        return savedState as never;
+      }),
+      activateConnection: vi.fn()
+    };
+    const service = new GmailAuthorizationService(environment, new GmailCredentialCipher(environment.credentialKey), providerClient, gmailRepository as never);
+    const authorizationUrl = new URL(await service.createAuthorizationUrl('00000000-0000-4000-8000-000000000001', '/ja'));
+
+    await expect(service.cancelAuthorization(authorizationUrl.searchParams.get('state')!)).resolves.toMatchObject({
+      returnPath: '/ja',
+      userId: '00000000-0000-4000-8000-000000000001'
+    });
+    expect(providerClient.exchangeCode).not.toHaveBeenCalled();
+    expect(providerClient.revoke).not.toHaveBeenCalled();
+    expect(gmailRepository.activateConnection).not.toHaveBeenCalled();
+    await expect(service.cancelAuthorization(authorizationUrl.searchParams.get('state')!)).rejects.toMatchObject({code: 'INVALID_OAUTH_STATE'});
+  });
+
   it('checks user and account ownership before decrypting or refreshing', async () => {
     const cipher = new GmailCredentialCipher(environment.credentialKey);
     const providerClient = provider();

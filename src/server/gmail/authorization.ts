@@ -112,6 +112,15 @@ export class GmailAuthorizationService {
     });
     return {connectedAccountId: activated.connectedAccountId, returnPath: oauthState.returnPath, userId};
   }
+
+  async cancelAuthorization(state: string) {
+    const oauthState = await this.gmailRepository.consumeOauthState({
+      stateDigest: sha256(state),
+      now: new Date()
+    });
+    if (!oauthState) throw new GmailProviderError(400, 'INVALID_OAUTH_STATE');
+    return {returnPath: oauthState.returnPath, userId: oauthState.userId};
+  }
 }
 
 type CredentialRepository = Pick<

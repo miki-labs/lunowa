@@ -1,12 +1,13 @@
 'use client';
 
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import Image from 'next/image';
 import {NextIntlClientProvider, useLocale, useTranslations} from 'next-intl';
-import {House, Sparkles, ShieldCheck, CircleHelp, Mail, Search as SearchIcon, Settings as SettingsIcon, Menu, ArrowRight, UserRound} from 'lucide-react';
+import {Group, Panel, Separator, usePanelRef} from 'react-resizable-panels';
+import {House, Sparkles, ShieldCheck, CircleHelp, Mail, Search as SearchIcon, Settings as SettingsIcon, Menu, ArrowRight, UserRound, PanelLeftClose, PanelLeftOpen, Plus, AtSign, RotateCw} from 'lucide-react';
 import jaMessages from '../../messages/ja.json';
 import enMessages from '../../messages/en.json';
-import {WorkspaceHome} from './workspace-home';
+import {orderedTypedAttention, WorkspaceHome} from './workspace-home';
 import './workspace.css';
 
 import {
@@ -23,7 +24,7 @@ import {
   RealSourceSearch,
   SourceConversationDetail
 } from './source-ui';
-import type {SourceConversationReadModel, SourcePageReadModel} from './source-types';
+import type {SourceAccountReadModel, SourceConversationReadModel, SourcePageReadModel} from './source-types';
 import type {CommunicationParticipant, DraftSaveState, ReplyContextReadModel, ReplyMode} from '@/lib/communication-types';
 
 export * from './lunowa-shell-model';
@@ -32,6 +33,16 @@ type Surface = 'home' | 'needs' | 'managed' | 'review' | 'source' | 'search' | '
 type Detail = 'moment' | 'managed-detail' | 'review-detail' | 'delegation' | 'conversation' | null;
 type AttentionAction = 'STOP_TRACKING' | 'RETURN_ATTENTION' | 'DELEGATE' | 'RESOLVE_ADMISSION_REVIEW' | 'CORRECT_OPERATIONAL_OUTCOME';
 type AttentionMutation = {key: string; state: MutationState; error: string};
+
+const compactWorkspaceQuery = '(max-width: 1000px)';
+const subscribeToCompactWorkspace = (onChange: () => void) => {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const query = window.matchMedia(compactWorkspaceQuery);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+};
+const getCompactWorkspace = () => typeof window.matchMedia === 'function' && window.matchMedia(compactWorkspaceQuery).matches;
+const getServerCompactWorkspace = () => false;
 
 const navigation: readonly {id: Surface; label: string; icon: typeof House}[] = [
   {id: 'home', label: 'ホーム', icon: House}, {id: 'needs', label: '対応が必要', icon: Sparkles},
@@ -69,6 +80,7 @@ type ShellProps = {
   sessionActionError?: string;
   locale?: 'ja' | 'en';
   preview?: boolean;
+  mailboxCallback?: 'syncing' | 'cancelled';
 };
 
 export function LunowaShell(props: ShellProps = {}) {
@@ -77,7 +89,7 @@ export function LunowaShell(props: ShellProps = {}) {
   return <NextIntlClientProvider locale={locale} messages={{Workspace: (locale === 'en' ? enMessages : jaMessages).Workspace}} timeZone="Asia/Tokyo"><LunowaWorkspace {...props} onPreviewLocaleChange={setPreviewLocale} /></NextIntlClientProvider>;
 }
 
-function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionError = '', preview = false, onPreviewLocaleChange}: ShellProps & {onPreviewLocaleChange: (locale: 'ja' | 'en') => void}) {
+function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionError = '', preview = false, mailboxCallback, onPreviewLocaleChange}: ShellProps & {onPreviewLocaleChange: (locale: 'ja' | 'en') => void}) {
   const t = useTranslations('Workspace');
   const locale = useLocale();
   const [surface, setSurface] = useState<Surface>('home');
@@ -109,13 +121,18 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   const [search, setSearch] = useState('');
   const [searchAccountId, setSearchAccountId] = useState('');
   const [sourceModel, setSourceModel] = useState<SourcePageReadModel | null>(null);
+  const [sourceAccounts, setSourceAccounts] = useState<SourceAccountReadModel[]>([]);
+  const [sourceAccountsError, setSourceAccountsError] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [sourceLoading, setSourceLoading] = useState(() => Boolean(appUser?.id));
   const [sourceError, setSourceError] = useState('');
   const [sourceReload, setSourceReload] = useState(0);
+  const [sourceAccountsReload, setSourceAccountsReload] = useState(0);
   const [sourceSearchModel, setSourceSearchModel] = useState<SourcePageReadModel | null>(null);
   const [sourceSearchLoading, setSourceSearchLoading] = useState(false);
   const [sourceSearchError, setSourceSearchError] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [selectedConversationAccountId, setSelectedConversationAccountId] = useState('');
   const [sourceConversation, setSourceConversation] = useState<SourceConversationReadModel | null>(null);
   const [sourceConversationLoading, setSourceConversationLoading] = useState(false);
   const [sourceConversationError, setSourceConversationError] = useState('');
@@ -126,9 +143,17 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   const [attentionError, setAttentionError] = useState('');
   const [attentionReload, setAttentionReload] = useState(0);
   const [attentionMutation, setAttentionMutation] = useState<AttentionMutation>({key: '', state: 'idle', error: ''});
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mailboxNotice, setMailboxNotice] = useState(mailboxCallback ?? '');
+  const compactWorkspace = useSyncExternalStore(subscribeToCompactWorkspace, getCompactWorkspace, getServerCompactWorkspace);
+  const sidebarPanelRef = usePanelRef();
   const navTrigger = useRef<HTMLButtonElement>(null);
   const drawerPanel = useRef<HTMLElement>(null);
   const detailHeading = useRef<HTMLHeadingElement>(null);
+  const sourceListRequest = useRef(0);
+  const sourceAccountsRequest = useRef(0);
+  const sourceSearchRequest = useRef(0);
+  const initialAttentionSelection = useRef('');
   const fixture = shellFixtures.find(({id}) => id === fixtureId) ?? shellFixtures[0];
 
   const liveAttention = appUser?.id && attentionOwnerId === appUser.id ? attentionModel : null;
@@ -141,9 +166,22 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
       .find((item) => detailOrigin === item.id || detailOrigin === `attention-${item.id}` || detailOrigin === `managed-${item.id}` || detailOrigin === `review-${item.id}` || detailOrigin === `delegation-${item.id}`) ?? null
     : null;
   const historyConversationId = detail === 'moment' ? selectedAttention?.conversationId : detail === 'conversation' ? selectedConversationId : undefined;
-  const historyAccountId = detail === 'moment' ? selectedAttention?.connectedAccountId : undefined;
+  const historyAccountId = detail === 'moment' ? selectedAttention?.connectedAccountId : selectedConversationAccountId || undefined;
   const activeHistoryKey = appUser?.id && historyConversationId ? `${appUser.id}:${historyConversationId}:${historyAccountId ?? ''}` : '';
   const visibleHistory = historyKey === activeHistoryKey && sourceConversation && sourceConversation.id === historyConversationId && (!historyAccountId || sourceConversation.account.id === historyAccountId) ? sourceConversation : null;
+
+  useEffect(() => {
+    if (!appUser?.id || !liveAttention || compactWorkspace || surface !== 'home' || detail || initialAttentionSelection.current === appUser.id) return;
+    initialAttentionSelection.current = appUser.id;
+    const first = orderedTypedAttention(liveAttention)[0];
+    if (!first) return;
+    const origin = `${first.kind === 'review' ? 'review' : 'attention'}-${first.item.id}`;
+    const timer = window.setTimeout(() => {
+      setDetail(first.kind === 'review' ? 'review-detail' : 'moment');
+      setDetailOrigin(origin);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [appUser?.id, compactWorkspace, detail, liveAttention, surface]);
 
   const commonMutations = {
     'stop-tracking': localCommonMutations['stop-tracking'] === 'idle' && fixture.mutationTarget === 'stop-tracking' ? fixture.mutation : localCommonMutations['stop-tracking'],
@@ -184,20 +222,32 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
     setSendOperationStatus('draft');
   };
 
+  const focusDetailOnCompact = () => {
+    window.setTimeout(() => {
+      if (window.matchMedia?.(compactWorkspaceQuery).matches) detailHeading.current?.focus();
+    }, 0);
+  };
+
   const openDetail = (next: Detail, origin: string) => {
     if (next === 'moment' && (detail !== 'moment' || origin !== detailOrigin)) clearReplyContext();
     setDetail(next);
     setDetailOrigin(origin);
-    window.setTimeout(() => {
-      if (window.matchMedia?.('(max-width: 719px)').matches) detailHeading.current?.focus();
-    }, 0);
+    focusDetailOnCompact();
   };
 
-  const openConversation = (origin: string, conversationId = origin) => {
+  const openConversation = (origin: string, conversationId = origin, accountId?: string) => {
+    const accountFromList = sourceModel?.conversations.find((conversation) => conversation.id === conversationId)?.account.id
+      ?? sourceSearchModel?.conversations.find((conversation) => conversation.id === conversationId)?.account.id;
+    const nextAccountId = accountId ?? accountFromList ?? selectedAccountId;
+    if (detail === 'conversation' && sourceConversation?.id === conversationId && sourceConversation.account.id === nextAccountId) {
+      openDetail('conversation', origin);
+      return;
+    }
     if (replyContext?.conversationId !== conversationId) {
       clearReplyContext();
     }
     setSelectedConversationId(conversationId);
+    setSelectedConversationAccountId(nextAccountId);
     setSourceConversation(null);
     setSourceConversationLoading(true);
     setSourceConversationError('');
@@ -256,8 +306,11 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
 
   useEffect(() => {
     if (!appUser?.id) return;
+    const request = ++sourceListRequest.current;
     const controller = new AbortController();
-    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?limit=50`, {
+    const query = new URLSearchParams({limit: '50'});
+    if (selectedAccountId) query.set('accountId', selectedAccountId);
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?${query.toString()}`, {
       credentials: 'same-origin',
       signal: controller.signal
     })
@@ -265,20 +318,54 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
         if (!response.ok) throw new Error('SOURCE_LIST_FAILED');
         return response.json() as Promise<SourcePageReadModel>;
       })
-      .then((result) => setSourceModel(result))
+      .then((result) => {
+        if (request !== sourceListRequest.current) return;
+        setSourceModel(result);
+        setSourceAccounts((current) => {
+          if (!selectedAccountId) return result.accounts;
+          const refreshed = new Map(current.map((account) => [account.id, account]));
+          result.accounts.forEach((account) => refreshed.set(account.id, account));
+          return [...refreshed.values()];
+        });
+      })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setSourceError(error instanceof Error ? error.message : 'SOURCE_LIST_FAILED');
+        if (!controller.signal.aborted && request === sourceListRequest.current) setSourceError(error instanceof Error ? error.message : 'SOURCE_LIST_FAILED');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setSourceLoading(false);
+        if (!controller.signal.aborted && request === sourceListRequest.current) setSourceLoading(false);
       });
     return () => controller.abort();
-  }, [appUser?.id, sourceReload]);
+  }, [appUser?.id, selectedAccountId, sourceReload]);
+
+  useEffect(() => {
+    if (!appUser?.id || sourceAccountsReload === 0) return;
+    const request = ++sourceAccountsRequest.current;
+    const controller = new AbortController();
+    const query = new URLSearchParams({limit: '1'});
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?${query.toString()}`, {
+      credentials: 'same-origin',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('SOURCE_ACCOUNTS_FAILED');
+        return response.json() as Promise<SourcePageReadModel>;
+      })
+      .then((result) => {
+        if (!controller.signal.aborted && request === sourceAccountsRequest.current) setSourceAccounts(result.accounts);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted && request === sourceAccountsRequest.current) setSourceAccountsError('SOURCE_ACCOUNTS_FAILED');
+      });
+    return () => controller.abort();
+  }, [appUser?.id, sourceAccountsReload]);
 
   const loadMoreSource = () => {
     if (!appUser?.id || !sourceModel?.nextCursor || sourceLoading) return;
+    const request = ++sourceListRequest.current;
     const controller = new AbortController();
+    const activeAccountId = selectedAccountId;
     const query = new URLSearchParams({limit: '50', cursor: sourceModel.nextCursor});
+    if (activeAccountId) query.set('accountId', activeAccountId);
     setSourceLoading(true);
     setSourceError('');
     void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?${query.toString()}`, {
@@ -289,19 +376,23 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
         if (!response.ok) throw new Error('SOURCE_LIST_FAILED');
         return response.json() as Promise<SourcePageReadModel>;
       })
-      .then((result) => setSourceModel((current) => current ? {
+      .then((result) => {
+        if (request !== sourceListRequest.current) return;
+        setSourceModel((current) => current && current.query.accountId === (activeAccountId || null) && result.query.accountId === (activeAccountId || null) ? {
         ...result,
         conversations: [...current.conversations, ...result.conversations]
-      } : result))
+        } : current);
+      })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setSourceError(error instanceof Error ? error.message : 'SOURCE_LIST_FAILED');
+        if (!controller.signal.aborted && request === sourceListRequest.current) setSourceError(error instanceof Error ? error.message : 'SOURCE_LIST_FAILED');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setSourceLoading(false);
+        if (!controller.signal.aborted && request === sourceListRequest.current) setSourceLoading(false);
       });
   };
 
   useEffect(() => {
+    const request = ++sourceSearchRequest.current;
     if (!appUser?.id) return;
     if (!search.trim()) return;
     const controller = new AbortController();
@@ -319,12 +410,14 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
           if (!response.ok) throw new Error('SOURCE_SEARCH_FAILED');
           return response.json() as Promise<SourcePageReadModel>;
         })
-        .then((result) => setSourceSearchModel(result))
+        .then((result) => {
+          if (request === sourceSearchRequest.current) setSourceSearchModel(result);
+        })
         .catch((error: unknown) => {
-          if (!controller.signal.aborted) setSourceSearchError(error instanceof Error ? error.message : 'SOURCE_SEARCH_FAILED');
+          if (!controller.signal.aborted && request === sourceSearchRequest.current) setSourceSearchError(error instanceof Error ? error.message : 'SOURCE_SEARCH_FAILED');
         })
         .finally(() => {
-          if (!controller.signal.aborted) setSourceSearchLoading(false);
+          if (!controller.signal.aborted && request === sourceSearchRequest.current) setSourceSearchLoading(false);
         });
     }, 180);
     return () => {
@@ -335,9 +428,12 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
 
   const loadMoreSourceSearch = () => {
     if (!appUser?.id || !search.trim() || !sourceSearchModel?.nextCursor || sourceSearchLoading) return;
+    const request = ++sourceSearchRequest.current;
     const controller = new AbortController();
-    const query = new URLSearchParams({q: search, limit: '50', cursor: sourceSearchModel.nextCursor});
-    if (searchAccountId) query.set('accountId', searchAccountId);
+    const activeSearch = search.normalize('NFC').trim();
+    const activeAccountId = searchAccountId;
+    const query = new URLSearchParams({q: activeSearch, limit: '50', cursor: sourceSearchModel.nextCursor});
+    if (activeAccountId) query.set('accountId', activeAccountId);
     setSourceSearchLoading(true);
     setSourceSearchError('');
     void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/search?${query.toString()}`, {
@@ -348,16 +444,41 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
         if (!response.ok) throw new Error('SOURCE_SEARCH_FAILED');
         return response.json() as Promise<SourcePageReadModel>;
       })
-      .then((result) => setSourceSearchModel((current) => current && current.query.text === search.normalize('NFC').trim() && current.query.accountId === (searchAccountId || null) ? {
+      .then((result) => {
+        if (request !== sourceSearchRequest.current) return;
+        setSourceSearchModel((current) => current && current.query.text === activeSearch && current.query.accountId === (activeAccountId || null) && result.query.text === activeSearch && result.query.accountId === (activeAccountId || null) ? {
         ...result,
         conversations: [...current.conversations, ...result.conversations]
-      } : current))
+        } : current);
+      })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setSourceSearchError(error instanceof Error ? error.message : 'SOURCE_SEARCH_FAILED');
+        if (!controller.signal.aborted && request === sourceSearchRequest.current) setSourceSearchError(error instanceof Error ? error.message : 'SOURCE_SEARCH_FAILED');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setSourceSearchLoading(false);
+        if (!controller.signal.aborted && request === sourceSearchRequest.current) setSourceSearchLoading(false);
       });
+  };
+
+  const selectAccount = (accountId: string) => {
+    if (accountId === selectedAccountId) {
+      setDetail(null);
+      setSurface('source');
+      return;
+    }
+    sourceListRequest.current += 1;
+    sourceSearchRequest.current += 1;
+    setSelectedAccountId(accountId);
+    setSearchAccountId(accountId);
+    setSourceModel(null);
+    setSourceSearchModel(null);
+    setSourceError('');
+    setSourceLoading(true);
+    setSourceSearchError('');
+    setDetail(null);
+    setSurface('source');
+    setStatus(accountId
+      ? locale === 'en' ? 'Showing conversations from the selected mailbox' : '選択したメールボックスの会話を表示します'
+      : locale === 'en' ? 'Showing conversations from all mailboxes' : 'すべてのメールボックスの会話を表示します');
   };
 
   useEffect(() => {
@@ -690,8 +811,15 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
 
   const effectiveSendState = replyContext ? sendOperationStatus : sendState;
 
+  const toggleSidebar = () => {
+    if (compactWorkspace) setSidebarCollapsed((value) => !value);
+    else if (sidebarPanelRef.current?.isCollapsed()) sidebarPanelRef.current.expand();
+    else sidebarPanelRef.current?.collapse();
+  };
+
   return (
-    <main className={`app-shell workspace-shell${detail ? ' has-detail' : ''}${surface === 'home' ? ' is-home' : ''}`} data-testid="lunowa-shell" lang={locale}>
+    <main className="workspace-frame" data-testid="lunowa-shell" lang={locale}>
+    <Group orientation="horizontal" disabled={compactWorkspace} resizeTargetMinimumSize={{fine: 10, coarse: 28}} className={`app-shell workspace-shell${detail ? ' has-detail' : ''}${surface === 'home' ? ' is-home' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#surface-heading">{t('skip')}</a>
       <header className="mobile-header">
         <button
@@ -706,8 +834,9 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
         </button>
         <Image className="workspace-logo" src="/brand/lunowa-logo.png" alt="Lunowa" width={210} height={70} />
       </header>
+      <Panel id="production-sidebar-panel" className="workspace-panel workspace-panel-sidebar" panelRef={sidebarPanelRef} defaultSize="19.05%" minSize={compactWorkspace ? 0 : 220} maxSize={compactWorkspace ? '100%' : 360} collapsible={!compactWorkspace} collapsedSize={76} onResize={(size) => { if (!compactWorkspace) setSidebarCollapsed(size.inPixels < 100); }}>
       <aside ref={drawerPanel} className={drawerOpen ? 'primary-nav open' : 'primary-nav'} aria-label={t('navLabel')} role={drawerOpen ? 'dialog' : undefined} aria-modal={drawerOpen || undefined}>
-        <div className="brand workspace-brand"><span className="brand-monogram" aria-hidden="true">L</span><Image className="workspace-logo" src="/brand/lunowa-logo.png" alt="Lunowa" width={210} height={70} /></div><p className="nav-section-label">{t('workspaceLabel')}</p>
+        <div className="brand workspace-brand"><span className="brand-monogram" aria-hidden="true">L</span><Image className="workspace-logo" src="/brand/lunowa-logo.png" alt="Lunowa" width={210} height={70} /><button className="sidebar-collapse icon-button" type="button" aria-label={sidebarCollapsed ? (locale === 'en' ? 'Expand sidebar' : '左パネルを展開') : (locale === 'en' ? 'Collapse sidebar' : '左パネルを折り畳む')} aria-expanded={!sidebarCollapsed} onClick={toggleSidebar}>{sidebarCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}</button></div><p className="nav-section-label">{t('workspaceLabel')}</p>
         <nav>
           {navigation.filter((item) => item.id !== 'review' || hasReview || surface === 'review').map((item) => (
             <button
@@ -725,11 +854,23 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
             </button>
           ))}
         </nav>
+        {appUser?.id && <MailboxSwitcher accounts={sourceAccounts} selectedAccountId={selectedAccountId} total={sourceModel?.total ?? 0} locale={locale === 'en' ? 'en' : 'ja'} userId={appUser.id} accountsError={sourceAccountsError} onRetryAccounts={() => {
+          setSourceAccountsError('');
+          setSourceAccountsReload((current) => current + 1);
+        }} onSelect={selectAccount} onSettings={() => selectSurface('settings')} />}
         <div className="nav-bottom"><p>{t('navFooter')}</p><button className="workspace-profile" onClick={() => selectSurface('settings')} aria-label={t('viewSettings')}><span className="profile-avatar"><UserRound size={18} /></span><span><strong>{appUser?.name || t('previewUser')}</strong><span>{appUser?.email || t('previewTitle')}</span></span><ArrowRight size={15} /></button></div>
-      </aside>
+      </aside></Panel>
+      <Separator className="workspace-resize-handle" aria-label={locale === 'en' ? 'Resize sidebar' : '左メニューの幅を調整'} />
       {drawerOpen && <button aria-label={t('closeNav')} className="scrim" onClick={closeDrawer} />}
 
+      <Panel id="production-list-panel" className="workspace-panel workspace-panel-list" defaultSize="33.02%" minSize={compactWorkspace ? 0 : 320} maxSize={compactWorkspace ? '100%' : 640}>
       <section className="surface-pane" aria-label={t('currentSurface')}>
+        {mailboxNotice && <aside className="mailbox-callback-notice" role="status">
+          <span>{mailboxNotice === 'syncing'
+            ? locale === 'en' ? 'Gmail access was authorized. Initial sync is in progress; coverage stays partial until it completes.' : 'Gmail のアクセスを許可しました。初回同期中は確認範囲を一部として表示します。'
+            : locale === 'en' ? 'Gmail connection was cancelled. Your app session and existing mailboxes are unchanged.' : 'Gmail の接続をキャンセルしました。アプリのログインと既存のメール連携は変わりません。'}</span>
+          <button type="button" aria-label={locale === 'en' ? 'Dismiss Gmail notice' : 'Gmailのお知らせを閉じる'} onClick={() => setMailboxNotice('')}>×</button>
+        </aside>}
         {preview && <div className="workspace-preview" role="note"><strong>{t('previewTitle')}</strong><span>{t('previewNotice')}</span><select aria-label={t('language')} value={locale} onChange={(event) => onPreviewLocaleChange(event.target.value === 'en' ? 'en' : 'ja')}><option value="ja">日本語</option><option value="en">English</option></select></div>}
         <SurfaceContent
           selectedOrigin={detail ? detailOrigin : undefined}
@@ -745,17 +886,26 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
           sessionActionError={sessionActionError}
           onRefreshData={() => {
             setSourceError('');
+            setSourceAccountsError('');
             setSourceLoading(true);
             setSourceReload((current) => current + 1);
+            setSourceAccountsReload((current) => current + 1);
             setAttentionModel(null);
             setAttentionOwnerId(null);
             setAttentionLoading(true);
             setAttentionError('');
             setAttentionReload((current) => current + 1);
           }}
+          onAccountDisconnected={(accountId) => setSourceAccounts((current) => current.map((account) => account.id === accountId ? {
+            ...account,
+            connectionState: 'DISCONNECTED',
+            monitoring: {status: 'disconnected', reasonCode: 'INTENTIONAL_DISCONNECT', lastTrustworthyAt: account.sync.lastSuccessAt, recoveryAction: null},
+            sync: {...account.sync, status: 'ERROR', errorCode: 'INTENTIONAL_DISCONNECT'}
+          } : account))}
           search={search}
           searchAccountId={searchAccountId}
           sourceModel={sourceModel}
+          sourceAccounts={sourceAccounts}
           sourceLoading={sourceLoading}
           sourceError={sourceError}
           onRetrySource={() => {
@@ -766,6 +916,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
           sourceSearchModel={sourceSearchModel}
           sourceSearchLoading={sourceSearchLoading}
           sourceSearchError={sourceSearchError}
+          selectedConversationId={selectedConversationId}
           openMoment={(origin = attentionItemStatic.id) => openDetail('moment', origin)}
           openManaged={(origin = 'managed-estimate') => openDetail('managed-detail', origin)}
           openReview={(origin = 'review-condition') => openDetail('review-detail', origin)}
@@ -787,9 +938,11 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
           }}
         />
         {!appUser?.id && <FixtureSwitch fixtureId={fixtureId} onChange={changeFixture} />}
-      </section>
+      </section></Panel>
+      <Separator className="workspace-resize-handle" aria-label={locale === 'en' ? 'Resize list and detail' : '一覧と詳細の幅を調整'} />
 
-      <section className="detail-pane" aria-label="詳細" aria-live="off">
+      <Panel id="production-detail-panel" className="workspace-panel workspace-panel-detail" minSize={compactWorkspace ? 0 : 420}>
+      <section className="detail-pane" aria-label={locale === 'en' ? 'Details' : '詳細'} aria-live="off">
         {preview && detail && <p className="workspace-detail-preview">{t('previewNotice')}</p>}
         {detail ? (
           <DetailContent
@@ -839,16 +992,61 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
             }}
             onOpenSource={(conversationId) => {
               setSurface('source');
-              openConversation(sourceItem.id, conversationId ?? sourceModel?.conversations[0]?.id ?? sourceItem.id);
+              const nextConversationId = conversationId ?? sourceModel?.conversations[0]?.id ?? sourceItem.id;
+              openConversation(sourceItem.id, nextConversationId, selectedAttention?.connectedAccountId ?? sourceModel?.conversations.find((item) => item.id === nextConversationId)?.account.id);
             }}
           />
         ) : (
           <EmptyDetail />
         )}
-      </section>
+      </section></Panel>
       <div className="status-region" role="status" aria-live="polite" aria-atomic="true">{status}</div>
-    </main>
+    </Group></main>
   );
+}
+
+function mailboxState(account: SourceAccountReadModel, locale: 'ja' | 'en') {
+  const disconnected = account.connectionState === 'DISCONNECTED' || account.monitoring?.status === 'disconnected';
+  const degraded = account.connectionState === 'RECONNECT_REQUIRED' || account.connectionState === 'ERROR' || account.monitoring?.status === 'degraded' || account.sync.status === 'ERROR' || account.sync.status === 'RECONCILIATION_REQUIRED';
+  const syncing = !account.sync.lastSuccessAt || account.sync.status === 'PENDING' || account.sync.status === 'SYNCING' || account.sync.status === 'UNKNOWN';
+  if (disconnected) return {tone: 'disconnected', label: locale === 'en' ? 'Disconnected' : '解除済み'};
+  if (degraded) return {tone: 'degraded', label: locale === 'en' ? 'Reconnect needed' : '再接続が必要'};
+  if (syncing) return {tone: 'syncing', label: locale === 'en' ? 'Syncing' : '同期中'};
+  return {tone: 'connected', label: locale === 'en' ? 'Connected' : '接続済み'};
+}
+
+function MailboxSwitcher({accounts, selectedAccountId, total, locale, userId, accountsError, onRetryAccounts, onSelect, onSettings}: {
+  accounts: SourceAccountReadModel[];
+  selectedAccountId: string;
+  total: number;
+  locale: 'ja' | 'en';
+  userId: string;
+  accountsError: string;
+  onRetryAccounts: () => void;
+  onSelect: (accountId: string) => void;
+  onSettings: () => void;
+}) {
+  const t = (ja: string, en: string) => locale === 'en' ? en : ja;
+  return <section className="mailbox-switcher" aria-labelledby="mailbox-switcher-heading">
+    <h2 id="mailbox-switcher-heading">{t('アカウント', 'Accounts')}</h2>
+    <button className={`mailbox-account${selectedAccountId === '' ? ' active' : ''}`} type="button" aria-label={selectedAccountId === '' ? t(`すべてのGmail · ${total}件`, `All Gmail · ${total} conversations`) : t('すべてのGmail', 'All Gmail')} aria-pressed={selectedAccountId === ''} onClick={() => onSelect('')}>
+      <span className="mailbox-service all"><Mail size={16} /></span><span className="mailbox-copy"><strong>{t('すべて', 'All')}</strong><small>{t('接続したGmail', 'Connected Gmail')}</small></span>{selectedAccountId === '' && <span className="mailbox-count">{total}</span>}
+    </button>
+    {accounts.map((account, index) => {
+      const state = mailboxState(account, locale);
+      const name = account.displayName || account.emailAddress;
+      return <button key={account.id} className={`mailbox-account${selectedAccountId === account.id ? ' active' : ''}`} type="button" aria-label={`Gmail · ${name} · ${account.emailAddress} · ${state.label}`} aria-pressed={selectedAccountId === account.id} onClick={() => onSelect(account.id)}>
+        <span className="mailbox-service gmail" aria-hidden="true">G<span className="mailbox-compact-index">{index + 1}</span></span><span className="mailbox-copy"><strong>{name}</strong><small>{account.emailAddress}</small><span className={`mailbox-state ${state.tone}`}><i />{state.label}</span></span><span className="mailbox-touch-label" aria-hidden="true">{name}</span><span className="mailbox-tooltip" aria-hidden="true">{name} · {account.emailAddress} · {state.label}</span>{selectedAccountId === account.id && <span className="mailbox-count">{total}</span>}
+      </button>;
+    })}
+    <form action={`/api/bff/users/${encodeURIComponent(userId)}/gmail/authorize`} method="get">
+      <input name="returnTo" type="hidden" value={`/${locale}`} />
+      <button className="mailbox-add" type="submit" aria-label={t('Gmailを追加', 'Add Gmail')}><Plus size={17} /><span>{t('Gmailを追加', 'Add Gmail')}</span></button>
+    </form>
+    {accountsError && <button className="mailbox-registry-error" type="button" aria-label={t('メールボックス状態を再取得', 'Retry mailbox status')} onClick={onRetryAccounts}><RotateCw size={15} aria-hidden="true" /><span>{t('接続状態を確認できません。再試行', 'Mailbox status may be stale. Retry')}</span></button>}
+    <button className="mailbox-outlook" type="button" disabled title={t('Outlook対応後に利用できます', 'Available after Outlook support ships')}><AtSign size={16} /><span>Outlook</span><small>{t('未対応', 'Unavailable')}</small></button>
+    {accounts.some((account) => mailboxState(account, locale).tone === 'degraded') && <button className="mailbox-recovery" type="button" onClick={onSettings}>{t('再接続を確認', 'Review reconnect')}</button>}
+  </section>;
 }
 
 function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; onChange: (id: ShellFixture['id']) => void}) {
@@ -863,7 +1061,7 @@ function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; on
   );
 }
 
-function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
+function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, onAccountDisconnected, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceAccounts, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, selectedConversationId, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
   selectedOrigin?: string;
   surface: Surface;
   onNavigate: (surface: Surface) => void;
@@ -876,24 +1074,27 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
   signingOut: boolean;
   sessionActionError: string;
   onRefreshData: () => void;
+  onAccountDisconnected: (accountId: string) => void;
   search: string;
   onSearch: (value: string) => void;
   searchAccountId: string;
   onSearchAccount: (value: string) => void;
   sourceModel: SourcePageReadModel | null;
+  sourceAccounts: SourceAccountReadModel[];
   sourceLoading: boolean;
   sourceError: string;
   onRetrySource: () => void;
   sourceSearchModel: SourcePageReadModel | null;
   sourceSearchLoading: boolean;
   sourceSearchError: string;
+  selectedConversationId: string;
   onLoadMoreSource: () => void;
   onLoadMoreSourceSearch: () => void;
   openMoment: (origin?: string) => void;
   openManaged: (origin?: string) => void;
   openReview: (origin?: string) => void;
   openDelegation: (origin?: string) => void;
-  openConversation: (origin: string, conversationId?: string) => void;
+  openConversation: (origin: string, conversationId?: string, accountId?: string) => void;
 }) {
   const t = useTranslations('Workspace');
   const title = t(surface);
@@ -914,14 +1115,14 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
       {attention && surface !== 'home' && attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{liveCoverageMessage}</p>}
       {loading && <LoadingState />}
       {!loading && surface === 'home' && <WorkspaceHome selectedOrigin={selectedOrigin} fixture={fixture} attention={attention} sourceModel={sourceModel} live={Boolean(appUser?.id)} sourceLoading={sourceLoading} sourceError={sourceError} openMoment={openMoment} openReview={openReview} openManaged={openManaged} openDelegation={openDelegation} openConversation={openConversation} onNavigate={onNavigate} />}
-      {!loading && surface === 'needs' && <NeedsYou fixture={fixture} attention={attention} openMoment={openMoment} openConversation={(origin, conversationId) => openConversation(origin, conversationId ?? sourceModel?.conversations[0]?.id ?? origin)} />}
+      {!loading && surface === 'needs' && <NeedsYou fixture={fixture} attention={attention} openMoment={openMoment} openConversation={(origin, conversationId, accountId) => openConversation(origin, conversationId ?? sourceModel?.conversations[0]?.id ?? origin, accountId)} />}
       {!loading && surface === 'managed' && <Managed fixture={fixture} attention={attention} openManaged={openManaged} />}
       {!loading && surface === 'review' && <Review fixture={fixture} attention={attention} openReview={openReview} />}
       {!loading && surface === 'source' && (appUser?.id
-        ? <RealSourceList model={sourceModel} loading={sourceLoading} error={sourceError} onRetry={onRetrySource} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} onLoadMore={onLoadMoreSource} />
+        ? <RealSourceList model={sourceModel} loading={sourceLoading} error={sourceError} selectedId={selectedConversationId} onRetry={onRetrySource} onOpenConversation={(conversationId, accountId) => openConversation(conversationId, conversationId, accountId)} onLoadMore={onLoadMoreSource} />
         : <FixtureSourceList openConversation={openConversation} openMoment={openMoment} />)}
       {!loading && surface === 'search' && (appUser?.id
-        ? <RealSourceSearch model={sourceSearchModel ?? sourceModel} loading={sourceSearchLoading} error={sourceSearchError} text={search} accountId={searchAccountId} onText={onSearch} onAccount={onSearchAccount} onOpenConversation={(conversationId) => openConversation(conversationId, conversationId)} onLoadMore={onLoadMoreSourceSearch} />
+        ? <RealSourceSearch model={sourceSearchModel ?? sourceModel} accounts={sourceAccounts} loading={sourceSearchLoading} error={sourceSearchError} text={search} accountId={searchAccountId} selectedId={selectedConversationId} onText={onSearch} onAccount={onSearchAccount} onOpenConversation={(conversationId, accountId) => openConversation(conversationId, conversationId, accountId)} onLoadMore={onLoadMoreSourceSearch} />
         : <Search search={search} onSearch={onSearch} openConversation={openConversation} />)}
       {!loading && surface === 'settings' && (
         <Settings
@@ -930,9 +1131,10 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
           onSignOut={onSignOut}
           signingOut={signingOut}
           sessionActionError={sessionActionError}
-          sourceModel={sourceModel}
+          sourceAccounts={sourceAccounts}
           attention={attention}
           onRefreshData={onRefreshData}
+          onAccountDisconnected={onAccountDisconnected}
           onOpenManaged={openManaged}
         />
       )}
@@ -940,8 +1142,8 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
   );
 }
 
-function NeedsYou({fixture, attention, openMoment, openConversation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openConversation: (origin: string, conversationId?: string) => void}) {
-  if (attention) return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{attention.needsYou.length > 0 ? attention.needsYou.map((item) => <div key={item.id}><LiveAttentionButton item={item} onClick={openMoment} /><button id={`source-${item.id}`} className="source-link" type="button" onClick={() => openConversation(`source-${item.id}`, item.conversationId)}>元の会話を開く</button></div>) : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
+function NeedsYou({fixture, attention, openMoment, openConversation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openConversation: (origin: string, conversationId?: string, accountId?: string) => void}) {
+  if (attention) return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{attention.needsYou.length > 0 ? attention.needsYou.map((item) => <div key={item.id}><LiveAttentionButton item={item} onClick={openMoment} /><button id={`source-${item.id}`} className="source-link" type="button" onClick={() => openConversation(`source-${item.id}`, item.conversationId, item.connectedAccountId)}>元の会話を開く</button></div>) : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
   return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{fixture.hasNeedsYou ? <><AttentionButton onClick={openMoment} /><button id="needs-open-source" className="source-link" type="button" onClick={(event) => openConversation(event.currentTarget.id)}>元の会話を開く</button></> : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
 }
 
@@ -977,15 +1179,16 @@ function Search({search, onSearch, openConversation}: {search: string; onSearch:
   return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button id="search-result-estimate" className="list-row" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
 }
 
-function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, sourceModel, attention, onRefreshData, onOpenManaged}: {
+function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, sourceAccounts, attention, onRefreshData, onAccountDisconnected, onOpenManaged}: {
   fixture: ShellFixture;
   appUser?: AppUserSummary;
   onSignOut?: () => Promise<void>;
   signingOut: boolean;
   sessionActionError: string;
-  sourceModel: SourcePageReadModel | null;
+  sourceAccounts: SourceAccountReadModel[];
   attention: AttentionReadModel | null;
   onRefreshData: () => void;
+  onAccountDisconnected: (accountId: string) => void;
   onOpenManaged: (origin?: string) => void;
 }) {
   const [disconnectTarget, setDisconnectTarget] = useState<string | null>(null);
@@ -1012,6 +1215,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
       });
       if (!response.ok) throw new Error('DISCONNECT_FAILED');
       setDisconnectTarget(null);
+      onAccountDisconnected(accountId);
       onRefreshData();
     } catch {
       setDisconnectError('メール連携の解除処理を完了できませんでした。監視状態または接続状態の一部が更新されている可能性があるため、最新状態を再確認しています。必要ならもう一度お試しください。');
@@ -1032,7 +1236,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
     <section className="settings-card" aria-labelledby="mailbox-heading">
       <h2 id="mailbox-heading">接続と監視</h2>
       <p>メールボックスの接続は、アプリへのサインインとは別の状態です。</p>
-      {sourceModel?.accounts.length ? sourceModel.accounts.map((account) => {
+      {sourceAccounts.length ? sourceAccounts.map((account) => {
         const monitored = delegatedCount(account.id);
         const capabilities = account.grantedCapabilities ?? [];
         const disconnected = account.connectionState === 'DISCONNECTED';
@@ -1105,7 +1309,7 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
   const title = detail === 'conversation'
     ? sourceUserId ? sourceConversation?.subject ?? 'Sourceの会話' : sourceItem.subject
     : detail === 'review-detail' ? attentionItem?.reviewQuestion ?? '契約更新の条件を確認してください' : detail === 'delegation' ? attentionItem?.operationalOutcome ?? '任せる候補を確認してください' : detail === 'managed-detail' ? attentionItem?.operationalOutcome ?? '来期の見積書を見守っています' : attentionItem?.operationalOutcome ?? (sourceUserId ? t('selectedWork') : attentionItemStatic.action);
-  return <div className="detail-content"><button className="back-button" type="button" onClick={onBack}>‹ {t('backToList')}</button>{detail !== 'moment' && <h2 ref={headingRef} tabIndex={-1}>{title}</h2>}
+  return <div className={`detail-content${detail === 'conversation' ? ' detail-conversation' : ''}`}><button className="back-button" type="button" onClick={onBack}>‹ {t('backToList')}</button>{detail !== 'moment' && <h2 ref={headingRef} tabIndex={-1}>{title}</h2>}
     {detail === 'moment' && <MomentBody title={sourceUserId ? title : t('sampleAction')} headingRef={headingRef} item={attentionItem} onSource={onOpenSource} history={sourceUserId ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError} /> : <SampleThread />} person={sourceConversation?.messages.find((message) => message.direction === 'INBOUND')?.sender.displayName ?? sourceConversation?.messages.find((message) => message.direction === 'INBOUND')?.sender.email} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} replyContext={matchingMomentContext ? replyContext : null} replyContextError={replyContextError} replyMode={replyMode} onReplyMode={onReplyMode} draftSaveState={draftSaveState} draftRecipients={matchingMomentContext ? draftRecipients : null} onRecipients={onRecipients} liveContextRequired={Boolean(sourceUserId)} />}
     {detail === 'managed-detail' && <ManagedDetail item={attentionItem} live={Boolean(sourceUserId)} mutation={attentionItem ? getAttentionMutation('STOP_TRACKING') : commonMutations['stop-tracking']} returnMutation={attentionItem ? getAttentionMutation('RETURN_ATTENTION') : 'idle'} onMutation={onCommonMutation} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
     {detail === 'review-detail' && <ReviewDetail item={attentionItem} live={Boolean(sourceUserId)} mutation={attentionItem ? attentionItem.subjectKind === 'ADMISSION_REVIEW' ? getAttentionMutation('RESOLVE_ADMISSION_REVIEW') : getAttentionMutation('CORRECT_OPERATIONAL_OUTCOME') : commonMutations['review-answer']} onMutation={onCommonMutation} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
@@ -1183,7 +1387,18 @@ function Composer({draft, onDraft, sendState, fixture, onSend, replyContext, rep
           : null;
   const sendPermissionMissing = Boolean(replyContext && !replyContext.connectedAccount.sendAuthorized);
   const sendDisabled = !draft || awaitingResult || unavailable || sendPermissionMissing || Boolean(replyContextError) || Boolean(replyContext && draftSaveState !== 'saved');
-  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">{t('reply')}</h3>{replyContext && <label htmlFor="reply-mode">{t('replyType')}<select id="reply-mode" value={replyMode} disabled={awaitingResult} onChange={(event) => onReplyMode(event.target.value as ReplyMode)}><option value="REPLY">{t('reply')}</option><option value="REPLY_ALL">{t('replyAll')}</option></select></label>}{replyContext ? <><label htmlFor="reply-to">{t('to')}<input id="reply-to" value={toValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: parseRecipients(event.target.value), cc: ccRecipients})} /></label><label htmlFor="reply-cc">Cc<input id="reply-cc" value={ccValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: toRecipients, cc: parseRecipients(event.target.value)})} /></label><p className="metadata">宛先の表示名: {toLabel} · From: {fromLabel}</p></> : <p className="metadata">{t('to')}: {toLabel} · From: {fromLabel}</p>}{replyContextError && <p className="inline-status" role="alert">{t('contextError')}</p>}{sendPermissionMissing && <p className="inline-status" role="status">Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください。読み取りと監視は継続できます。</p>}<label htmlFor="reply-body">{t('body')}<textarea id="reply-body" value={draft} disabled={awaitingResult} onChange={(event) => onDraft(event.target.value)} placeholder={t('replyPlaceholder')} rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{replyContext && draftSaveState === 'saving' && <p className="inline-status" role="status">{t('savingDraft')}</p>}{replyContext && draftSaveState === 'conflict' && <p className="inline-status" role="alert">別の編集が保存されたため、下書きを上書きしていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={sendDisabled} type="button" onClick={onSend}>{sendState === 'request_pending' ? t('sendRequest') : sendState === 'provider_ambiguous' ? t('sendUnknown') : sendState === 'provider_confirmed_reconciling' ? t('sendUpdating') : sendState === 'provider_reconciled' ? t('sent') : sendState === 'provider_failed' ? t('retrySend') : t('send')}</button><p className="metadata">{t('noEnterSend')}</p></section>;
+  return <section className="composer compact-composer" aria-labelledby="composer-heading">
+    <div className="composer-recipient-line"><div><h3 id="composer-heading">{t('reply')}</h3><span>{t('to')}: {toLabel}</span></div>{replyContext && <details><summary>{t('replyType')}・Cc</summary><div className="composer-details"><label htmlFor="reply-mode">{t('replyType')}<select id="reply-mode" value={replyMode} disabled={awaitingResult} onChange={(event) => onReplyMode(event.target.value as ReplyMode)}><option value="REPLY">{t('reply')}</option><option value="REPLY_ALL">{t('replyAll')}</option></select></label><label htmlFor="reply-to">{t('to')}<input id="reply-to" value={toValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: parseRecipients(event.target.value), cc: ccRecipients})} /></label><label htmlFor="reply-cc">Cc<input id="reply-cc" value={ccValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: toRecipients, cc: parseRecipients(event.target.value)})} /></label><p className="metadata">From: {fromLabel}</p></div></details>}</div>
+    {!replyContext && <p className="metadata">{t('to')}: {toLabel} · From: {fromLabel}</p>}
+    {replyContextError && <p className="inline-status" role="alert">{t('contextError')}</p>}
+    {sendPermissionMissing && <p className="inline-status" role="status">Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください。読み取りと監視は継続できます。</p>}
+    <label className="composer-body" htmlFor="reply-body"><span className="status-region">{t('body')}</span><textarea id="reply-body" value={draft} disabled={awaitingResult} onChange={(event) => onDraft(event.target.value)} placeholder={t('replyPlaceholder')} rows={3} /></label>
+    {unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}
+    {replyContext && draftSaveState === 'saving' && <p className="inline-status" role="status">{t('savingDraft')}</p>}
+    {replyContext && draftSaveState === 'conflict' && <p className="inline-status" role="alert">別の編集が保存されたため、下書きを上書きしていません。</p>}
+    {feedback && <p className="inline-status" role="status">{feedback}</p>}
+    <div className="composer-actions"><p className="metadata">{t('noEnterSend')}</p><button className="primary-button" disabled={sendDisabled} type="button" onClick={onSend}>{sendState === 'request_pending' ? t('sendRequest') : sendState === 'provider_ambiguous' ? t('sendUnknown') : sendState === 'provider_confirmed_reconciling' ? t('sendUpdating') : sendState === 'provider_reconciled' ? t('sent') : sendState === 'provider_failed' ? t('retrySend') : t('send')}</button></div>
+  </section>;
 }
 
 function IntegrityBanner({onInspect}: {onInspect: () => void}) {
@@ -1199,4 +1414,7 @@ function AttentionUnavailable({onRetry}: {onRetry: () => void}) {
   const t = useTranslations('Workspace');
   return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">{t('monitoringStatus')}</p><h2>{t('unavailableTitle')}</h2><p>{t('unavailableBody')}</p><button className="quiet-button" type="button" onClick={onRetry}>{t('retry')}</button></section></div>;
 }
-function EmptyDetail() { return <div className="empty-detail"><p className="eyebrow">詳細</p><h2>項目を選択してください</h2><p>対応、管理中、確認、または会話を選ぶと、ここに必要な文脈を表示します。</p></div>; }
+function EmptyDetail() {
+  const en = useLocale() === 'en';
+  return <div className="empty-detail"><p className="eyebrow">{en ? 'Details' : '詳細'}</p><h2>{en ? 'Select an item' : '項目を選択してください'}</h2><p>{en ? 'Select work, managed items, review, or a conversation to see the context you need.' : '対応、管理中、確認、または会話を選ぶと、ここに必要な文脈を表示します。'}</p></div>;
+}

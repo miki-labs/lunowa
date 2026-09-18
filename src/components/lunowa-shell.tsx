@@ -99,7 +99,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   const draftGeneration = useRef(0);
   const draftEditRevision = useRef(0);
   const draftSaveInFlightGeneration = useRef<number | null>(null);
-  const localDraftCarry = useRef(new Map<string, {body: string; dirty: boolean}>());
+  const localDraftCarry = useRef(new Map<string, {body: string; dirty: boolean; mode: ReplyMode; draftId: string | null; draftVersion: number | null}>());
   const [localCommonMutations, setLocalCommonMutations] = useState<Record<Exclude<CommonMutationTarget, null>, MutationState>>({
     'stop-tracking': 'idle',
     'review-answer': 'idle'
@@ -169,7 +169,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   };
 
   const clearReplyContext = () => {
-    if (replyContext) localDraftCarry.current.set(`${replyContext.connectedAccount.id}:${replyContext.conversationId}`, {body: draft, dirty: draftDirty});
+    if (replyContext) localDraftCarry.current.set(`${replyContext.connectedAccount.id}:${replyContext.conversationId}:${replyContext.mode}`, {body: draft, dirty: draftDirty, mode: replyContext.mode, draftId, draftVersion});
     draftGeneration.current += 1;
     draftEditRevision.current += 1;
     setReplyContext(null);
@@ -415,18 +415,24 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
       .then((result) => {
         if (controller.signal.aborted) return;
         draftGeneration.current += 1;
-        const carryKey = `${result.connectedAccount.id}:${result.conversationId}`;
-        const carriedDraft = localDraftCarry.current.get(carryKey);
-        localDraftCarry.current.delete(carryKey);
-        const carriedDraftNeedsSave = Boolean(carriedDraft && (carriedDraft.dirty || carriedDraft.body !== (result.draft?.body ?? '')));
+        const carryPrefix = `${result.connectedAccount.id}:${result.conversationId}:`;
+        const exactCarryKey = `${carryPrefix}${result.mode}`;
+        const fallbackCarryKey = [...localDraftCarry.current.keys()].find((candidate) => candidate.startsWith(carryPrefix));
+        const selectedCarryKey = localDraftCarry.current.has(exactCarryKey) ? exactCarryKey : fallbackCarryKey;
+        const carriedDraft = selectedCarryKey ? localDraftCarry.current.get(selectedCarryKey) : undefined;
+        if (selectedCarryKey) localDraftCarry.current.delete(selectedCarryKey);
+        const crossModeCarry = Boolean(carriedDraft && carriedDraft.mode !== result.mode);
+        const sameModeConflict = Boolean(carriedDraft?.dirty && !crossModeCarry && (carriedDraft.draftId !== (result.draft?.id ?? null) || carriedDraft.draftVersion !== (result.draft?.version ?? null)));
+        const useCarriedDraft = Boolean(carriedDraft && (crossModeCarry || carriedDraft.dirty));
+        const carriedDraftNeedsSave = Boolean(useCarriedDraft && !sameModeConflict && (carriedDraft!.dirty || carriedDraft!.body !== (result.draft?.body ?? '')));
         setReplyContext(result);
         setReplyContextKey(key);
         setReplyContextError('');
-        setDraft(carriedDraft?.body ?? result.draft?.body ?? '');
+        setDraft(useCarriedDraft ? carriedDraft!.body : result.draft?.body ?? '');
         setDraftId(result.draft?.id ?? null);
         setDraftVersion(result.draft?.version ?? null);
         setDraftRecipients(result.draft ? {to: result.draft.recipients, cc: result.draft.cc} : null);
-        setDraftSaveState(carriedDraftNeedsSave ? 'idle' : result.draft ? 'saved' : 'idle');
+        setDraftSaveState(sameModeConflict ? 'conflict' : carriedDraftNeedsSave ? 'idle' : result.draft ? 'saved' : 'idle');
         setDraftDirty(carriedDraftNeedsSave);
         setSendOperationStatus('draft');
       })

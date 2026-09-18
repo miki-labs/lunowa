@@ -129,12 +129,12 @@
   .rf-workspace > #rf-sidebar-panel {flex:0 0 210px!important;}
   .rf-collapsed > #rf-sidebar-panel {flex-basis:76px!important;}
   .rf-workspace > #rf-list-panel,.rf-workspace > #rf-detail-panel {flex:1 1 0!important;}
-  .rf-workspace > #rf-detail-panel,.rf-mobile-detail > #rf-list-panel {display:none;}
-  .rf-mobile-detail > #rf-detail-panel {display:block;}
+  .rf-workspace > #rf-detail-panel,.rf-mobile-detail > #rf-list-panel {display:none!important;flex:0 0 0!important;width:0!important;}
+  .rf-mobile-detail > #rf-detail-panel {display:block!important;flex:1 1 0!important;width:auto!important;}
   .rf-resize-handle {display:none;}
 }
 @media(max-width:600px) {
-  .rf-workspace > #rf-sidebar-panel {flex-basis:64px!important;}
+  .rf-workspace > #rf-sidebar-panel {flex:0 0 64px!important;width:64px!important;}
   .rf-detail,.rf-moment .rf-detail {padding:14px 10px;}
   .rf-action-buttons,.rf-moment .rf-action-buttons {flex-wrap:wrap;}
   .rf-action-buttons>.rf-primary,.rf-moment .rf-action-buttons>.rf-primary {width:100%;}

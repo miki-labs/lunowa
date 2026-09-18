@@ -59,12 +59,23 @@ for (const variant of ['desktop', 'moment']) {
 }
 
 test('English and compact view retain readable content without horizontal overflow', async ({page}) => {
-  for (const width of [1448,900,430,320]) {
-    await page.setViewportSize({width,height:1086});
-    await page.goto('/en/preview?view=moment');
-    if (width <= 1000) await page.locator('.rf-mail-row').first().click();
-    await expect(page.getByRole('textbox', {name:'Reply message'})).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  for (const locale of ['ja','en']) {
+    for (const width of [900,430,320]) {
+      await page.setViewportSize({width,height:1086});
+      await page.goto(`/${locale}/preview?view=moment`);
+      await page.locator('.rf-mail-row').first().click();
+      const reply = page.getByRole('textbox', {name:locale === 'ja' ? '返信本文' : 'Reply message'});
+      const send = page.getByRole('button', {name:locale === 'ja' ? '送信' : 'Send',exact:true});
+      await expect(reply).toBeVisible();
+      const detailBox = (await page.locator('#rf-detail-panel').boundingBox())!;
+      expect(detailBox.x).toBeLessThanOrEqual(width > 600 ? 211 : 65);
+      expect(detailBox.x + detailBox.width).toBeLessThanOrEqual(width + 1);
+      await send.scrollIntoViewIfNeeded();
+      const sendBox = (await send.boundingBox())!;
+      expect(sendBox.x).toBeGreaterThanOrEqual(detailBox.x);
+      expect(sendBox.x + sendBox.width).toBeLessThanOrEqual(width + 1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
   }
 });
 

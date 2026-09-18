@@ -144,6 +144,48 @@ describe('G50 live composer safety', () => {
     await waitFor(() => expect(screen.getByRole('button', {name: '送信する'})).not.toBeDisabled());
   });
 
+  it('uses fresh server truth for a clean same-mode revisit and conflicts instead of overwriting a dirty changed version', async () => {
+    const second = {...attention.needsYou[0], id: 'responsibility-2', responsibilityId: 'responsibility-2', conversationId: 'conversation-2', operationalOutcome: '納品日を確認する', primaryAction: '納品日を返信する'};
+    let conversationOneLoads = 0;
+    const draftPosts: Array<Record<string, unknown>> = [];
+    const contextB = {...replyContext(true), conversationId: 'conversation-2', draft: {id: 'draft-2', version: 1, body: 'B本文', recipients: [{email: 'sender@example.com', displayName: 'Sender'}], cc: []}};
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json({...attention, needsYou: [attention.needsYou[0], second]});
+      if (url.includes('/drafts/context?')) {
+        if (url.includes('conversationId=conversation-2')) return json(contextB);
+        conversationOneLoads += 1;
+        return json({...replyContext(true), draft: {...replyContext(true).draft!, version: conversationOneLoads === 1 ? 1 : conversationOneLoads === 2 ? 2 : 3, body: conversationOneLoads === 1 ? 'A v1' : conversationOneLoads === 2 ? 'A v2 from server' : 'A v3 from server'}});
+      }
+      if (url.endsWith('/drafts') && init?.method === 'POST') {
+        draftPosts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({id: 'unexpected', version: 99});
+      }
+      if (url.includes('/source/conversations')) return json(source);
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+
+    fireEvent.click(await screen.findByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('A v1'));
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('B本文'));
+    fireEvent.click(screen.getByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('A v2 from server'));
+    expect(draftPosts).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: '競合時に守るローカル編集'}});
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('B本文'));
+    fireEvent.click(screen.getByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('競合時に守るローカル編集'));
+    expect(screen.getByText('別の編集が保存されたため、下書きを上書きしていません。')).toBeTruthy();
+    await new Promise((resolve) => window.setTimeout(resolve, 320));
+    expect(draftPosts).toEqual([]);
+    expect(screen.getByRole('button', {name: '送信する'})).toBeDisabled();
+  });
+
   it('keeps late Moment history and reply context from a previous selection out of the active work', async () => {
     let finishHistory: (value: Response) => void = () => undefined;
     let finishContext: (value: Response) => void = () => undefined;

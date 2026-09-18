@@ -169,7 +169,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   };
 
   const clearReplyContext = () => {
-    if (replyContext) localDraftCarry.current.set(`${replyContext.connectedAccount.id}:${replyContext.conversationId}:${replyContext.mode}`, {body: draft, dirty: draftDirty, mode: replyContext.mode, draftId, draftVersion});
+    if (replyContext) localDraftCarry.current.set(`${replyContext.connectedAccount.id}:${replyContext.conversationId}:${replyContext.mode}`, {body: draft, dirty: draftDirty || draftSaveState === 'conflict', mode: replyContext.mode, draftId, draftVersion});
     draftGeneration.current += 1;
     draftEditRevision.current += 1;
     setReplyContext(null);
@@ -429,8 +429,8 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
         setReplyContextKey(key);
         setReplyContextError('');
         setDraft(useCarriedDraft ? carriedDraft!.body : result.draft?.body ?? '');
-        setDraftId(result.draft?.id ?? null);
-        setDraftVersion(result.draft?.version ?? null);
+        setDraftId(sameModeConflict ? carriedDraft!.draftId : result.draft?.id ?? null);
+        setDraftVersion(sameModeConflict ? carriedDraft!.draftVersion : result.draft?.version ?? null);
         setDraftRecipients(result.draft ? {to: result.draft.recipients, cc: result.draft.cc} : null);
         setDraftSaveState(sameModeConflict ? 'conflict' : carriedDraftNeedsSave ? 'idle' : result.draft ? 'saved' : 'idle');
         setDraftDirty(carriedDraftNeedsSave);

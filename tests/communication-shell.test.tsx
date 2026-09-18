@@ -158,8 +158,9 @@ describe('G50 live composer safety', () => {
         return json({...replyContext(true), draft: {...replyContext(true).draft!, version: conversationOneLoads === 1 ? 1 : conversationOneLoads === 2 ? 2 : 3, body: conversationOneLoads === 1 ? 'A v1' : conversationOneLoads === 2 ? 'A v2 from server' : 'A v3 from server'}});
       }
       if (url.endsWith('/drafts') && init?.method === 'POST') {
-        draftPosts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
-        return json({id: 'unexpected', version: 99});
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        draftPosts.push(body);
+        return body.expectedVersion === 2 ? json({error: 'DRAFT_VERSION_CONFLICT'}, {status: 409}) : json({id: 'unexpected', version: 99});
       }
       if (url.includes('/source/conversations')) return json(source);
       return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
@@ -183,6 +184,18 @@ describe('G50 live composer safety', () => {
     expect(screen.getByText('別の編集が保存されたため、下書きを上書きしていません。')).toBeTruthy();
     await new Promise((resolve) => window.setTimeout(resolve, 320));
     expect(draftPosts).toEqual([]);
+    expect(screen.getByRole('button', {name: '送信する'})).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('B本文'));
+    fireEvent.click(screen.getByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('競合時に守るローカル編集'));
+    expect(screen.getByText('別の編集が保存されたため、下書きを上書きしていません。')).toBeTruthy();
+    expect(draftPosts).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: '競合後の追記'}});
+    await waitFor(() => expect(draftPosts).toHaveLength(1), {timeout: 1500});
+    expect(draftPosts[0]).toMatchObject({draftId: 'draft-1', expectedVersion: 2, body: '競合後の追記'});
     expect(screen.getByRole('button', {name: '送信する'})).toBeDisabled();
   });
 

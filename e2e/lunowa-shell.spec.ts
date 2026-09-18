@@ -173,6 +173,7 @@ test.beforeEach(async ({page}) => {
 });
 
 test('renders the shell and navigates a Needs You item to its Moment', async ({page}) => {
+  await page.setViewportSize({width: 1448, height: 1086});
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -185,6 +186,8 @@ test('renders the shell and navigates a Needs You item to its Moment', async ({p
   await page.getByRole('button', {name: /返信する/}).click();
   await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
   await expect(page.getByRole('button', {name: '返信を書く'})).toBeVisible();
+  await expect(page.getByLabel('本文')).toBeVisible();
+  if (process.env.M1_ARTIFACT_DIR) await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-moment-ja-1448.png')});
   expect(consoleErrors).toEqual([]);
 });
 
@@ -328,7 +331,22 @@ test('keeps the newest account scope and renders a multi-message two-account can
   expect(composerBox!.y + composerBox!.height).toBeLessThanOrEqual(1086);
   expect(listRequests).toContain('source-account-1');
   expect(listRequests.at(-1)).toBe('source-account-2');
-  if (process.env.M1_ARTIFACT_DIR) await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-source-detail-2account-1448.png'), fullPage: true});
+  if (process.env.M1_ARTIFACT_DIR) {
+    await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-source-detail-2account-1448.png')});
+    for (const locale of ['ja', 'en'] as const) {
+      for (const width of [900, 430, 320]) {
+        await page.setViewportSize({width, height: 900});
+        await page.goto(`/${locale}`);
+        await (locale === 'ja' ? nav(page, '会話') : navEn(page, 'Conversations')).click();
+        await page.locator('.mailbox-account', {hasText: 'Project mailbox'}).click();
+        await expect(page.getByRole('button', {name: /Q2 プロジェクト進捗共有/})).toBeVisible();
+        await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, `production-source-list-${locale}-${width}.png`)});
+        await page.getByRole('button', {name: /Q2 プロジェクト進捗共有/}).click();
+        await expect(page.getByLabel(locale === 'ja' ? '本文' : 'Message')).toBeVisible();
+        await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, `production-source-detail-${locale}-${width}.png`)});
+      }
+    }
+  }
 });
 
 test('shows truthful Source detail loading until the production-shaped conversation is ready', async ({page}) => {
@@ -347,9 +365,10 @@ test('shows truthful Source detail loading until the production-shaped conversat
 
   await page.goto('/ja');
   await nav(page, '会話').click();
+  const requestsBeforeOpen = detailRequests;
   await page.getByRole('button', {name: /佐藤ひろ子/}).click();
   await expect(page.getByText('Sourceの会話を読み込んでいます。')).toBeVisible();
-  expect(detailRequests).toBe(1);
+  expect(detailRequests).toBe(requestsBeforeOpen + 1);
   await expect(page.getByLabel('詳細').getByText('添付の見積書をご確認いただけますか。')).toBeVisible();
   await expect(page.getByRole('button', {name: '送信する'})).toBeEnabled();
   await expect(page.getByText('Sourceの会話を読み込んでいます。')).toHaveCount(0);
@@ -385,6 +404,7 @@ test('uses trusted Moment reply context and binds explicit Send to the active Re
   await nav(page, '対応が必要').click();
   await page.getByRole('button', {name: /返信する/}).click();
   await expect(page.getByLabel('宛先')).toHaveValue('sender@example.com');
+  await page.getByText('種類・Cc').click();
   await expect(page.getByText(/From: Browser mailbox <browser@example.invalid>/)).toBeVisible();
   await page.getByLabel('本文').press('Enter');
   expect(sendBodies).toHaveLength(0);
@@ -464,6 +484,12 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
     expect(geometry.display).toBe('flex');
     if (width <= 1000) expect(geometry.nav.width).toBeLessThanOrEqual(width <= 600 ? 64 : 210);
     if (width <= 1000) expect(geometry.detail.width).toBe(0);
+    if (width === 320) {
+      await expect(page.getByRole('button', {name: /すべてのGmail/})).toBeVisible();
+      await expect(page.getByRole('button', {name: /Gmail · Browser mailbox · browser@example.invalid · 接続済み/})).toBeVisible();
+      await expect(page.getByRole('button', {name: 'Gmailを追加'})).toBeVisible();
+      await expect(page.locator('.mailbox-compact-index')).toHaveText('1');
+    }
   }
 
   await page.setViewportSize({width: 900, height: 844});
@@ -497,7 +523,6 @@ test('preserves core reading and focus visibility at 125, 150, and 200 percent b
     await page.evaluate((textScale) => {
       document.documentElement.style.fontSize = `${textScale * 100}%`;
     }, scale);
-    if (width < 900) await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
     await nav(page, '対応が必要').click();
     await page.getByRole('button', {name: /返信する/}).click();
     const draft = page.getByLabel('本文');
@@ -520,16 +545,28 @@ test('preserves core reading and focus visibility at 125, 150, and 200 percent b
 });
 
 test('returns focus to compact conversation-entry controls', async ({page}) => {
+  await page.setViewportSize({width: 900, height: 844});
+  await page.goto('/ja');
+  await nav(page, '会話').click();
+  await page.getByRole('button', {name: /来期の見積書について/}).click();
+  await expect(page.getByRole('heading', {name: '来期の見積書について'})).toBeFocused();
+  await page.getByRole('button', {name: /一覧に戻る/}).click();
+  await expect(page.locator('#source-conversation-1')).toBeFocused();
+
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeFocused();
+  await page.getByRole('button', {name: /一覧に戻る/}).click();
+  await expect(page.locator('#attention-responsibility-1')).toBeFocused();
+
   await page.setViewportSize({width: 390, height: 844});
   await page.goto('/ja');
 
-  await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '対応が必要').click();
   await page.getByRole('button', {name: '元の会話を開く'}).click();
   await page.getByRole('button', {name: /一覧に戻る/}).click();
   await expect(page.locator('#source-responsibility-1')).toBeFocused();
 
-  await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '検索').click();
   await page.getByLabel('メールを検索').fill('見積書');
   await page.locator('#source-conversation-1').click();

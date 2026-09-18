@@ -115,6 +115,13 @@ describe('G21 Source safety boundaries', () => {
     fireEvent.click(screen.getByRole('button', {name: '会話を表示'}));
     await waitFor(() => expect(screen.getByRole('button', {name: /Source Sender/})).toBeInTheDocument());
     expect(screen.getAllByText(/gmail · owner@example.com/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', {name: 'すべてのGmail · 1件'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Gmail · Work · owner@example.com · 接続済み'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Gmailを追加'})).toBeInTheDocument();
+    const callsBeforeReselect = fetchMock.mock.calls.filter(([input]) => String(input).includes('/source/conversations?')).length;
+    fireEvent.click(screen.getByRole('button', {name: /すべて/}));
+    expect(screen.getByRole('button', {name: /Source Sender/})).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes('/source/conversations?'))).toHaveLength(callsBeforeReselect);
 
     fireEvent.click(screen.getByRole('button', {name: /Source Sender/}));
     await waitFor(() => expect(screen.getByRole('heading', {name: 'Original provider subject'})).toBeInTheDocument());
@@ -164,8 +171,9 @@ describe('G21 Source safety boundaries', () => {
     const scoped = (selectedAccount: typeof account, item: ReturnType<typeof conversation>, nextCursor: string | null = null): SourcePageReadModel => ({
       ...page, accounts: [selectedAccount], conversations: [item], query: {...page.query, accountId: selectedAccount.id}, total: nextCursor ? 2 : 1, nextCursor
     });
+    let oldPageSettled = false;
     let releaseOldPage: (response: Response) => void = () => undefined;
-    const oldPage = new Promise<Response>((resolve) => { releaseOldPage = resolve; });
+    const oldPage = new Promise<Response>((resolve) => { releaseOldPage = resolve; }).then((response) => { oldPageSettled = true; return response; });
     let account1Loads = 0;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), 'https://example.test');
@@ -191,13 +199,15 @@ describe('G21 Source safety boundaries', () => {
     await screen.findByRole('button', {name: /Fresh account page/});
 
     releaseOldPage(jsonResponse(scoped(account, conversation('stale-page-2', 'Stale old page'))));
-    await waitFor(() => expect(screen.queryByRole('button', {name: /Stale old page/})).not.toBeInTheDocument());
-    expect(screen.getByRole('button', {name: /Fresh account page/})).toBeInTheDocument();
+    await waitFor(() => expect(oldPageSettled).toBe(true));
+    await waitFor(() => expect(screen.getByRole('button', {name: /Fresh account page/})).toBeInTheDocument());
+    expect(screen.queryByRole('button', {name: /Stale old page/})).not.toBeInTheDocument();
   });
 
   it('invalidates a delayed search response when the query is cleared even if fetch ignores abort', async () => {
+    let searchSettled = false;
     let releaseSearch: (response: Response) => void = () => undefined;
-    const delayedSearch = new Promise<Response>((resolve) => { releaseSearch = resolve; });
+    const delayedSearch = new Promise<Response>((resolve) => { releaseSearch = resolve; }).then((response) => { searchSettled = true; return response; });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/source/search')) return delayedSearch;
@@ -213,8 +223,30 @@ describe('G21 Source safety boundaries', () => {
     await screen.findByText('検索語を入力すると、認可された会話の原文を検索します。');
 
     releaseSearch(jsonResponse({...page, conversations: [{...page.conversations[0], id: 'stale-search', subject: 'Stale search result'}], query: {...page.query, text: 'delayed'}}));
-    await waitFor(() => expect(screen.queryByRole('button', {name: /Stale search result/})).not.toBeInTheDocument());
+    await waitFor(() => expect(searchSettled).toBe(true));
+    await waitFor(() => expect(screen.getByText('検索語を入力すると、認可された会話の原文を検索します。')).toBeInTheDocument());
+    expect(screen.queryByRole('button', {name: /Stale search result/})).not.toBeInTheDocument();
     expect(screen.getByLabelText('メールを検索')).toHaveValue('');
+  });
+
+  it('merges refreshed scoped account truth into the full mailbox registry used by Settings', async () => {
+    const secondAccount = {...account, id: 'account-2', providerAccountId: 'provider-account-2', emailAddress: 'second@example.com', displayName: 'Second'};
+    const reconnectAccount = {...account, connectionState: 'RECONNECT_REQUIRED', sync: {...account.sync, status: 'RECONCILIATION_REQUIRED', errorCode: 'RECONNECT_REQUIRED'}};
+    const allPage: SourcePageReadModel = {...page, accounts: [account, secondAccount], total: 2};
+    const scopedPage: SourcePageReadModel = {...page, accounts: [reconnectAccount], conversations: [{...page.conversations[0], account: reconnectAccount}], query: {...page.query, accountId: account.id}};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'https://example.test');
+      if (url.pathname.includes('/source/conversations') && url.searchParams.get('accountId') === account.id) return jsonResponse(scopedPage);
+      return jsonResponse(allPage);
+    }));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    const workAccount = await screen.findByRole('button', {name: 'Gmail · Work · owner@example.com · 接続済み'});
+    fireEvent.click(workAccount);
+    await screen.findByRole('button', {name: 'Gmail · Work · owner@example.com · 再接続が必要'});
+    fireEvent.click(screen.getByRole('button', {name: '設定を表示'}));
+    expect(screen.getByRole('heading', {name: 'owner@example.com'})).toBeInTheDocument();
+    expect(screen.getByRole('heading', {name: 'second@example.com'})).toBeInTheDocument();
   });
 
   it('surfaces degraded sync on Source detail even when the account remains connected', async () => {

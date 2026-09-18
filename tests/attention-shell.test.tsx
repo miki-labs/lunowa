@@ -63,6 +63,34 @@ describe('G40 live attention surfaces', () => {
     expect(screen.getByRole('heading', {name: '見積書の確認を終える'})).toBeTruthy();
   });
 
+  it('keeps a direct Attention Source open bound to its accepted account after another mailbox was selected', async () => {
+    const sourceAccount = (id: string, emailAddress: string, displayName: string) => ({
+      id, provider: 'gmail', providerAccountId: emailAddress, emailAddress, displayName, connectionState: 'CONNECTED',
+      sync: {status: 'HEALTHY', lastSuccessAt: '2030-01-01T00:00:00.000Z', lastFullReconcileAt: '2030-01-01T00:00:00.000Z', dataThroughAt: '2030-01-01T00:00:00.000Z', errorCode: null}
+    });
+    const accountA = sourceAccount('account-a', 'a@example.com', 'Account A');
+    const accountB = sourceAccount('account-b', 'b@example.com', 'Account B');
+    const liveAttention = {...attention, needsYou: [{...attention.needsYou[0], conversationId: 'conversation-b', connectedAccountId: accountB.id}]};
+    const conversation = {id: 'conversation-b', providerThreadId: 'thread-b', subject: 'B account evidence', preview: 'Exact B account Source', lastMessageAt: '2030-01-01T00:00:00.000Z', messageCount: 1, hasAttachments: false, account: accountB, latestSender: {email: 'sender@example.com', displayName: 'Sender'}};
+    const source = {accounts: [accountA, accountB], conversations: [conversation], readiness: 'ready', dataThroughAt: '2030-01-01T00:00:00.000Z', query: {text: '', accountId: null, sender: null, from: null, to: null}, total: 1, nextCursor: null};
+    const detail = {id: conversation.id, providerThreadId: conversation.providerThreadId, subject: conversation.subject, account: accountB, evidenceRevision: 1, messages: []};
+    const requested: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requested.push(url);
+      if (url.endsWith('/attention')) return new Response(JSON.stringify(liveAttention));
+      if (url.includes('/source/conversations/conversation-b')) return new Response(JSON.stringify(detail));
+      if (url.includes('accountId=account-a')) return new Response(JSON.stringify({...source, accounts: [accountA], conversations: [], query: {...source.query, accountId: accountA.id}, total: 0}));
+      return new Response(JSON.stringify(source));
+    }));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(await screen.findByRole('button', {name: /Gmail · Account A · a@example.com/}));
+    fireEvent.click(screen.getByRole('button', {name: '対応が必要を表示'}));
+    fireEvent.click(await screen.findByRole('button', {name: '元の会話を開く'}));
+    await waitFor(() => expect(requested.some((url) => url.includes('/source/conversations/conversation-b?accountId=account-b'))).toBe(true));
+  });
+
   it('orders typed Attention by urgency and opens the first accepted detail on desktop', async () => {
     const needs = {...attention.needsYou[0], id: 'needs-later', responsibilityId: 'needs-later', primaryAction: '通常の返信をする', operationalOutcome: '通常の返信を終える', nearestRelevantTime: '2030-01-03T00:00:00.000Z'};
     const urgentReview = {...attention.needsYou[0], id: 'review-overdue', responsibilityId: 'review-overdue', surface: 'REVIEW', projection: {bucket: 'REVIEW', subjectKind: 'RESPONSIBILITY', primaryReason: 'accepted-review'}, primaryAction: null, reviewQuestion: '期限切れの依頼を確認する', operationalOutcome: '期限切れの条件を判断する', nearestRelevantTime: '2030-01-04T00:00:00.000Z', overdue: true};

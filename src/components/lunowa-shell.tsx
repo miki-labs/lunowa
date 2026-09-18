@@ -173,8 +173,11 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
     const first = orderedTypedAttention(liveAttention)[0];
     if (!first) return;
     const origin = `${first.kind === 'review' ? 'review' : 'attention'}-${first.item.id}`;
-    setDetail(first.kind === 'review' ? 'review-detail' : 'moment');
-    setDetailOrigin(origin);
+    const timer = window.setTimeout(() => {
+      setDetail(first.kind === 'review' ? 'review-detail' : 'moment');
+      setDetailOrigin(origin);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [appUser?.id, compactWorkspace, detail, liveAttention, surface]);
 
   const commonMutations = {
@@ -216,13 +219,17 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
     setSendOperationStatus('draft');
   };
 
+  const focusDetailOnCompact = () => {
+    window.setTimeout(() => {
+      if (window.matchMedia?.(compactWorkspaceQuery).matches) detailHeading.current?.focus();
+    }, 0);
+  };
+
   const openDetail = (next: Detail, origin: string) => {
     if (next === 'moment' && (detail !== 'moment' || origin !== detailOrigin)) clearReplyContext();
     setDetail(next);
     setDetailOrigin(origin);
-    window.setTimeout(() => {
-      if (window.matchMedia?.('(max-width: 719px)').matches) detailHeading.current?.focus();
-    }, 0);
+    focusDetailOnCompact();
   };
 
   const openConversation = (origin: string, conversationId = origin, accountId?: string) => {
@@ -295,8 +302,6 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
     const controller = new AbortController();
     const query = new URLSearchParams({limit: '50'});
     if (selectedAccountId) query.set('accountId', selectedAccountId);
-    setSourceLoading(true);
-    setSourceError('');
     void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?${query.toString()}`, {
       credentials: 'same-origin',
       signal: controller.signal
@@ -308,7 +313,12 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
       .then((result) => {
         if (request !== sourceListRequest.current) return;
         setSourceModel(result);
-        if (!selectedAccountId) setSourceAccounts(result.accounts);
+        setSourceAccounts((current) => {
+          if (!selectedAccountId) return result.accounts;
+          const refreshed = new Map(current.map((account) => [account.id, account]));
+          result.accounts.forEach((account) => refreshed.set(account.id, account));
+          return [...refreshed.values()];
+        });
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted && request === sourceListRequest.current) setSourceError(error instanceof Error ? error.message : 'SOURCE_LIST_FAILED');
@@ -354,12 +364,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   useEffect(() => {
     const request = ++sourceSearchRequest.current;
     if (!appUser?.id) return;
-    if (!search.trim()) {
-      setSourceSearchModel(null);
-      setSourceSearchError('');
-      setSourceSearchLoading(false);
-      return;
-    }
+    if (!search.trim()) return;
     const controller = new AbortController();
     const userId = appUser.id;
     const timer = window.setTimeout(() => {
@@ -425,6 +430,11 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   };
 
   const selectAccount = (accountId: string) => {
+    if (accountId === selectedAccountId) {
+      setDetail(null);
+      setSurface('source');
+      return;
+    }
     sourceListRequest.current += 1;
     sourceSearchRequest.current += 1;
     setSelectedAccountId(accountId);
@@ -432,6 +442,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
     setSourceModel(null);
     setSourceSearchModel(null);
     setSourceError('');
+    setSourceLoading(true);
     setSourceSearchError('');
     setDetail(null);
     setSurface('source');
@@ -973,18 +984,19 @@ function MailboxSwitcher({accounts, selectedAccountId, total, locale, userId, on
   const t = (ja: string, en: string) => locale === 'en' ? en : ja;
   return <section className="mailbox-switcher" aria-labelledby="mailbox-switcher-heading">
     <h2 id="mailbox-switcher-heading">{t('アカウント', 'Accounts')}</h2>
-    <button className={`mailbox-account${selectedAccountId === '' ? ' active' : ''}`} type="button" aria-pressed={selectedAccountId === ''} onClick={() => onSelect('')}>
+    <button className={`mailbox-account${selectedAccountId === '' ? ' active' : ''}`} type="button" aria-label={t(`すべてのGmail · ${total}件`, `All Gmail · ${total} conversations`)} aria-pressed={selectedAccountId === ''} onClick={() => onSelect('')}>
       <span className="mailbox-service all"><Mail size={16} /></span><span className="mailbox-copy"><strong>{t('すべて', 'All')}</strong><small>{t('接続したGmail', 'Connected Gmail')}</small></span>{selectedAccountId === '' && <span className="mailbox-count">{total}</span>}
     </button>
-    {accounts.map((account) => {
+    {accounts.map((account, index) => {
       const state = mailboxState(account, locale);
-      return <button key={account.id} className={`mailbox-account${selectedAccountId === account.id ? ' active' : ''}`} type="button" aria-pressed={selectedAccountId === account.id} onClick={() => onSelect(account.id)} title={`${account.emailAddress} · ${state.label}`}>
-        <span className="mailbox-service gmail" aria-label="Gmail">G</span><span className="mailbox-copy"><strong>{account.displayName || account.emailAddress}</strong><small>{account.emailAddress}</small><span className={`mailbox-state ${state.tone}`}><i />{state.label}</span></span>{selectedAccountId === account.id && <span className="mailbox-count">{total}</span>}
+      const name = account.displayName || account.emailAddress;
+      return <button key={account.id} className={`mailbox-account${selectedAccountId === account.id ? ' active' : ''}`} type="button" aria-label={`Gmail · ${name} · ${account.emailAddress} · ${state.label}`} aria-pressed={selectedAccountId === account.id} onClick={() => onSelect(account.id)}>
+        <span className="mailbox-service gmail" aria-hidden="true">G<span className="mailbox-compact-index">{index + 1}</span></span><span className="mailbox-copy"><strong>{name}</strong><small>{account.emailAddress}</small><span className={`mailbox-state ${state.tone}`}><i />{state.label}</span></span><span className="mailbox-tooltip" aria-hidden="true">{name} · {state.label}</span>{selectedAccountId === account.id && <span className="mailbox-count">{total}</span>}
       </button>;
     })}
     <form action={`/api/bff/users/${encodeURIComponent(userId)}/gmail/authorize`} method="get">
       <input name="returnTo" type="hidden" value={`/${locale}`} />
-      <button className="mailbox-add" type="submit"><Plus size={17} /><span>{t('Gmailを追加', 'Add Gmail')}</span></button>
+      <button className="mailbox-add" type="submit" aria-label={t('Gmailを追加', 'Add Gmail')}><Plus size={17} /><span>{t('Gmailを追加', 'Add Gmail')}</span></button>
     </form>
     <button className="mailbox-outlook" type="button" disabled title={t('Outlook対応後に利用できます', 'Available after Outlook support ships')}><AtSign size={16} /><span>Outlook</span><small>{t('未対応', 'Unavailable')}</small></button>
     {accounts.some((account) => mailboxState(account, locale).tone === 'degraded') && <button className="mailbox-recovery" type="button" onClick={onSettings}>{t('再接続を確認', 'Review reconnect')}</button>}
@@ -1056,7 +1068,7 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
       {attention && surface !== 'home' && attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{liveCoverageMessage}</p>}
       {loading && <LoadingState />}
       {!loading && surface === 'home' && <WorkspaceHome selectedOrigin={selectedOrigin} fixture={fixture} attention={attention} sourceModel={sourceModel} live={Boolean(appUser?.id)} sourceLoading={sourceLoading} sourceError={sourceError} openMoment={openMoment} openReview={openReview} openManaged={openManaged} openDelegation={openDelegation} openConversation={openConversation} onNavigate={onNavigate} />}
-      {!loading && surface === 'needs' && <NeedsYou fixture={fixture} attention={attention} openMoment={openMoment} openConversation={(origin, conversationId) => openConversation(origin, conversationId ?? sourceModel?.conversations[0]?.id ?? origin)} />}
+      {!loading && surface === 'needs' && <NeedsYou fixture={fixture} attention={attention} openMoment={openMoment} openConversation={(origin, conversationId, accountId) => openConversation(origin, conversationId ?? sourceModel?.conversations[0]?.id ?? origin, accountId)} />}
       {!loading && surface === 'managed' && <Managed fixture={fixture} attention={attention} openManaged={openManaged} />}
       {!loading && surface === 'review' && <Review fixture={fixture} attention={attention} openReview={openReview} />}
       {!loading && surface === 'source' && (appUser?.id
@@ -1072,7 +1084,7 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
           onSignOut={onSignOut}
           signingOut={signingOut}
           sessionActionError={sessionActionError}
-          sourceModel={sourceModel}
+          sourceAccounts={sourceAccounts}
           attention={attention}
           onRefreshData={onRefreshData}
           onOpenManaged={openManaged}
@@ -1082,8 +1094,8 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
   );
 }
 
-function NeedsYou({fixture, attention, openMoment, openConversation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openConversation: (origin: string, conversationId?: string) => void}) {
-  if (attention) return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{attention.needsYou.length > 0 ? attention.needsYou.map((item) => <div key={item.id}><LiveAttentionButton item={item} onClick={openMoment} /><button id={`source-${item.id}`} className="source-link" type="button" onClick={() => openConversation(`source-${item.id}`, item.conversationId)}>元の会話を開く</button></div>) : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
+function NeedsYou({fixture, attention, openMoment, openConversation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openConversation: (origin: string, conversationId?: string, accountId?: string) => void}) {
+  if (attention) return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{attention.needsYou.length > 0 ? attention.needsYou.map((item) => <div key={item.id}><LiveAttentionButton item={item} onClick={openMoment} /><button id={`source-${item.id}`} className="source-link" type="button" onClick={() => openConversation(`source-${item.id}`, item.conversationId, item.connectedAccountId)}>元の会話を開く</button></div>) : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
   return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{fixture.hasNeedsYou ? <><AttentionButton onClick={openMoment} /><button id="needs-open-source" className="source-link" type="button" onClick={(event) => openConversation(event.currentTarget.id)}>元の会話を開く</button></> : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
 }
 
@@ -1119,13 +1131,13 @@ function Search({search, onSearch, openConversation}: {search: string; onSearch:
   return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button id="search-result-estimate" className="list-row" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
 }
 
-function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, sourceModel, attention, onRefreshData, onOpenManaged}: {
+function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, sourceAccounts, attention, onRefreshData, onOpenManaged}: {
   fixture: ShellFixture;
   appUser?: AppUserSummary;
   onSignOut?: () => Promise<void>;
   signingOut: boolean;
   sessionActionError: string;
-  sourceModel: SourcePageReadModel | null;
+  sourceAccounts: SourceAccountReadModel[];
   attention: AttentionReadModel | null;
   onRefreshData: () => void;
   onOpenManaged: (origin?: string) => void;
@@ -1174,7 +1186,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
     <section className="settings-card" aria-labelledby="mailbox-heading">
       <h2 id="mailbox-heading">接続と監視</h2>
       <p>メールボックスの接続は、アプリへのサインインとは別の状態です。</p>
-      {sourceModel?.accounts.length ? sourceModel.accounts.map((account) => {
+      {sourceAccounts.length ? sourceAccounts.map((account) => {
         const monitored = delegatedCount(account.id);
         const capabilities = account.grantedCapabilities ?? [];
         const disconnected = account.connectionState === 'DISCONNECTED';

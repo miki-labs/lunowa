@@ -418,6 +418,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
         const carryKey = `${result.connectedAccount.id}:${result.conversationId}`;
         const carriedDraft = localDraftCarry.current.get(carryKey);
         localDraftCarry.current.delete(carryKey);
+        const carriedDraftNeedsSave = Boolean(carriedDraft && (carriedDraft.dirty || carriedDraft.body !== (result.draft?.body ?? '')));
         setReplyContext(result);
         setReplyContextKey(key);
         setReplyContextError('');
@@ -425,8 +426,8 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
         setDraftId(result.draft?.id ?? null);
         setDraftVersion(result.draft?.version ?? null);
         setDraftRecipients(result.draft ? {to: result.draft.recipients, cc: result.draft.cc} : null);
-        setDraftSaveState(carriedDraft?.dirty ? 'idle' : result.draft ? 'saved' : 'idle');
-        setDraftDirty(carriedDraft?.dirty ?? false);
+        setDraftSaveState(carriedDraftNeedsSave ? 'idle' : result.draft ? 'saved' : 'idle');
+        setDraftDirty(carriedDraftNeedsSave);
         setSendOperationStatus('draft');
       })
       .catch((error: unknown) => {

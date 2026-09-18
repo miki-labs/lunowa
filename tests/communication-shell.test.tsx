@@ -116,6 +116,34 @@ describe('G50 live composer safety', () => {
     expect(draftPosts[0]).toMatchObject({connectedAccountId: 'account-2', conversationId: 'conversation-2', mode: 'REPLY_ALL', body: 'Reply Allにも保持する未保存本文'});
   });
 
+  it.each([
+    ['a different mode-specific draft', {id: 'draft-all', version: 4, body: '別モードの保存済み本文', recipients: [{email: 'sender@example.com', displayName: 'Sender'}], cc: []}, {draftId: 'draft-all', expectedVersion: 4}],
+    ['no mode-specific draft', undefined, {draftId: null, expectedVersion: null}]
+  ])('saves a clean carried body against %s before enabling Send', async (_case, modeDraft, expectedIdentity) => {
+    const draftPosts: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json(attention);
+      if (url.includes('/drafts/context?')) return json(url.includes('mode=REPLY_ALL') ? {...replyContext(true), mode: 'REPLY_ALL', ...(modeDraft ? {draft: modeDraft} : {draft: undefined})} : replyContext(true));
+      if (url.endsWith('/drafts') && init?.method === 'POST') {
+        draftPosts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({id: modeDraft?.id ?? 'draft-all-new', version: (modeDraft?.version ?? 0) + 1});
+      }
+      if (url.includes('/source/conversations')) return json(source);
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+
+    await openComposer();
+    expect(screen.getByLabelText('本文')).toHaveValue('確認しました。');
+    fireEvent.change(screen.getByLabelText('種類'), {target: {value: 'REPLY_ALL'}});
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('確認しました。'));
+    await waitFor(() => expect(draftPosts).toHaveLength(1), {timeout: 1500});
+    expect(draftPosts[0]).toMatchObject({...expectedIdentity, connectedAccountId: 'account-1', conversationId: 'conversation-1', mode: 'REPLY_ALL', body: '確認しました。'});
+    await waitFor(() => expect(screen.getByRole('button', {name: '送信する'})).not.toBeDisabled());
+  });
+
   it('keeps late Moment history and reply context from a previous selection out of the active work', async () => {
     let finishHistory: (value: Response) => void = () => undefined;
     let finishContext: (value: Response) => void = () => undefined;

@@ -157,6 +157,66 @@ describe('G21 Source safety boundaries', () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('cursor=page-2'), expect.anything());
   });
 
+  it('rejects an old page response after switching away and back to the same account scope', async () => {
+    const account2 = {...account, id: 'account-2', providerAccountId: 'provider-account-2', emailAddress: 'second@example.com', displayName: 'Second'};
+    const conversation = (id: string, subject: string, selectedAccount = account) => ({...page.conversations[0], id, subject, account: selectedAccount, latestSender: {email: `${id}@example.com`, displayName: subject}});
+    const allPage = {...page, accounts: [account, account2], conversations: [conversation('all-1', 'All mailbox item')], total: 2};
+    const scoped = (selectedAccount: typeof account, item: ReturnType<typeof conversation>, nextCursor: string | null = null): SourcePageReadModel => ({
+      ...page, accounts: [selectedAccount], conversations: [item], query: {...page.query, accountId: selectedAccount.id}, total: nextCursor ? 2 : 1, nextCursor
+    });
+    let releaseOldPage: (response: Response) => void = () => undefined;
+    const oldPage = new Promise<Response>((resolve) => { releaseOldPage = resolve; });
+    let account1Loads = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'https://example.test');
+      if (!url.pathname.includes('/source/conversations')) return jsonResponse(page);
+      const accountId = url.searchParams.get('accountId');
+      if (!accountId) return jsonResponse(allPage);
+      if (accountId === account.id && url.searchParams.has('cursor')) return oldPage;
+      if (accountId === account.id) {
+        account1Loads += 1;
+        return jsonResponse(scoped(account, conversation(`account-1-${account1Loads}`, account1Loads === 1 ? 'First account page' : 'Fresh account page'), account1Loads === 1 ? 'old-page-2' : null));
+      }
+      return jsonResponse(scoped(account2, conversation('account-2-1', 'Second account page', account2)));
+    }));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    await screen.findByRole('button', {name: /Work/});
+    fireEvent.click(screen.getByRole('button', {name: /Work/}));
+    await screen.findByRole('button', {name: /First account page/});
+    fireEvent.click(screen.getByRole('button', {name: '次の会話を読み込む'}));
+    fireEvent.click(screen.getByRole('button', {name: /Second/}));
+    await screen.findByRole('button', {name: /Second account page/});
+    fireEvent.click(screen.getByRole('button', {name: /Work/}));
+    await screen.findByRole('button', {name: /Fresh account page/});
+
+    releaseOldPage(jsonResponse(scoped(account, conversation('stale-page-2', 'Stale old page'))));
+    await waitFor(() => expect(screen.queryByRole('button', {name: /Stale old page/})).not.toBeInTheDocument());
+    expect(screen.getByRole('button', {name: /Fresh account page/})).toBeInTheDocument();
+  });
+
+  it('invalidates a delayed search response when the query is cleared even if fetch ignores abort', async () => {
+    let releaseSearch: (response: Response) => void = () => undefined;
+    const delayedSearch = new Promise<Response>((resolve) => { releaseSearch = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/source/search')) return delayedSearch;
+      return jsonResponse(page);
+    }));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(screen.getByRole('button', {name: '検索を表示'}));
+    const search = screen.getByLabelText('メールを検索');
+    fireEvent.change(search, {target: {value: 'delayed'}});
+    await screen.findByText('認可されたSourceを検索しています。');
+    fireEvent.change(search, {target: {value: ''}});
+    await screen.findByText('検索語を入力すると、認可された会話の原文を検索します。');
+
+    releaseSearch(jsonResponse({...page, conversations: [{...page.conversations[0], id: 'stale-search', subject: 'Stale search result'}], query: {...page.query, text: 'delayed'}}));
+    await waitFor(() => expect(screen.queryByRole('button', {name: /Stale search result/})).not.toBeInTheDocument());
+    expect(screen.getByLabelText('メールを検索')).toHaveValue('');
+  });
+
   it('surfaces degraded sync on Source detail even when the account remains connected', async () => {
     const degradedAccount = {
       ...account,

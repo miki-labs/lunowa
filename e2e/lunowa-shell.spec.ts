@@ -1,7 +1,10 @@
 import {expect, test} from '@playwright/test';
+import path from 'node:path';
 import type {AttentionItemReadModel, AttentionReadModel} from '../src/lib/attention-types';
+import type {SourceAccountReadModel} from '../src/lib/source-types';
 
 const nav = (page: import('@playwright/test').Page, label: string) => page.getByRole('button', {name: `${label}を表示`});
+const navEn = (page: import('@playwright/test').Page, label: string) => page.getByRole('button', {name: `Show ${label}`});
 const waitForAuthenticatedShell = async (page: import('@playwright/test').Page) => {
   await expect(page.getByTestId('lunowa-shell')).toBeVisible();
 };
@@ -23,7 +26,7 @@ const appSession = {
     updatedAt: '2030-01-01T00:00:00.000Z'
   }
 };
-const sourceAccount = {
+const sourceAccount: SourceAccountReadModel = {
   id: 'source-account-1',
   provider: 'gmail',
   providerAccountId: 'browser@example.invalid',
@@ -37,6 +40,16 @@ const sourceAccount = {
     dataThroughAt: '2030-01-01T00:00:00.000Z',
     errorCode: null
   }
+};
+const secondSourceAccount: SourceAccountReadModel = {
+  ...sourceAccount,
+  id: 'source-account-2',
+  providerAccountId: 'project@example.invalid',
+  emailAddress: 'project@example.invalid',
+  displayName: 'Project mailbox',
+  connectionState: 'RECONNECT_REQUIRED',
+  monitoring: {status: 'degraded', reasonCode: 'RECONNECT_REQUIRED', lastTrustworthyAt: '2029-12-31T22:00:00.000Z', recoveryAction: 'RECONNECT'},
+  sync: {...sourceAccount.sync, status: 'RECONCILIATION_REQUIRED', errorCode: 'RECONNECT_REQUIRED'}
 };
 const sourcePage = {
   accounts: [sourceAccount],
@@ -224,15 +237,98 @@ test('keeps trusted delegation and LATER actions on the authenticated Product pa
 test('keeps Source truth readable and adds the trusted contextual reply entry on the real Source Conversation', async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
   await page.goto('/ja');
-  await page.getByRole('button', {name: 'ナビゲーションを開く'}).click();
   await nav(page, '会話').click();
   await page.getByRole('button', {name: /佐藤ひろ子/}).click();
   await expect(page.getByLabel('詳細').getByText('添付の見積書をご確認いただけますか。')).toBeVisible();
   await expect(page.getByLabel('宛先')).toHaveValue('sender@example.com');
+  await page.getByText('種類・Cc').click();
   await expect(page.getByText(/From: Browser mailbox <browser@example.invalid>/)).toBeVisible();
   await expect(page.getByRole('button', {name: '送信する'})).toBeEnabled();
   await page.getByRole('button', {name: /一覧に戻る/}).click();
   await expect(page.getByRole('button', {name: /佐藤ひろ子/})).toBeVisible();
+});
+
+test('renders the production Source list and selected conversation in the accepted workspace', async ({page}) => {
+  await page.setViewportSize({width: 1448, height: 1086});
+  await page.goto('/ja');
+  await nav(page, '会話').click();
+  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+  await expect(page.locator('.source-row.is-selected')).toHaveCount(1);
+  await expect(page.getByText('browser@example.invalid', {exact: true}).first()).toBeVisible();
+  await expect(page.getByRole('button', {name: /安全にダウンロード/})).toBeVisible();
+  if (process.env.M1_ARTIFACT_DIR) await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-source-detail-1448.png'), fullPage: true});
+});
+
+test('keeps the newest account scope and renders a multi-message two-account candidate', async ({page}) => {
+  const conversation = (id: string, account: typeof sourceAccount, sender: string, subject: string) => ({
+    ...sourcePage.conversations[0], id, providerThreadId: `thread-${id}`, subject,
+    preview: `${sender}からの確認事項と前回までのやり取りです。`, messageCount: id === 'project-conversation' ? 4 : 2,
+    account, latestSender: {email: `${sender.toLowerCase()}@example.com`, displayName: sender}
+  });
+  const allPage = {...sourcePage, accounts: [sourceAccount, secondSourceAccount], conversations: [
+    conversation('source-conversation-1', sourceAccount, '佐藤ひろ子', '来期の見積書について'),
+    conversation('browser-follow-up', sourceAccount, '田中太郎', '契約更新の確認'),
+    conversation('project-conversation', secondSourceAccount, '鈴木花子', 'Q2 プロジェクト進捗共有')
+  ], readiness: 'degraded', total: 3};
+  const scopedPage = (account: typeof sourceAccount) => ({...allPage, accounts: [account], conversations: allPage.conversations.filter((item) => item.account.id === account.id), query: {...allPage.query, accountId: account.id}, total: account.id === sourceAccount.id ? 2 : 1});
+  const projectDetail = {...sourceDetail, id: 'project-conversation', providerThreadId: 'thread-project-conversation', subject: 'Q2 プロジェクト進捗共有', account: secondSourceAccount, messages: [
+    {...sourceDetail.messages[0], id: 'project-message-1', providerMessageId: 'provider-project-1', sender: {email: 'suzuki@example.com', displayName: '鈴木花子'}, subject: 'Q2 プロジェクト進捗共有', textBody: '候補日時をお送りします。ご都合の良い日を教えてください。', attachments: []},
+    {...sourceDetail.messages[0], id: 'project-message-2', providerMessageId: 'provider-project-2', direction: 'OUTBOUND', sender: {email: 'project@example.invalid', displayName: 'Project mailbox'}, textBody: 'ありがとうございます。候補を確認して改めてご連絡します。', attachments: []},
+    {...sourceDetail.messages[0], id: 'project-message-3', providerMessageId: 'provider-project-3', sender: {email: 'suzuki@example.com', displayName: '鈴木花子'}, textBody: '5月23日、26日、27日の3候補です。', attachments: []},
+    {...sourceDetail.messages[0], id: 'project-message-4', providerMessageId: 'provider-project-4', sender: {email: 'suzuki@example.com', displayName: '鈴木花子'}, textBody: '候補日時の資料を添付しました。', attachments: sourceDetail.messages[0].attachments}
+  ]};
+  const listRequests: string[] = [];
+  await page.unroute('**/api/bff/users/**/source/conversations**');
+  await page.unroute('**/api/bff/users/**/source/search**');
+  await page.unroute('**/api/bff/users/**/drafts/context**');
+  await page.route('**/api/bff/users/**/drafts/context**', async (route) => {
+    const context = replyContextFor('REPLY', false);
+    await route.fulfill({json: {
+      ...context,
+      connectedAccount: {id: secondSourceAccount.id, emailAddress: secondSourceAccount.emailAddress, displayName: secondSourceAccount.displayName, connectionState: secondSourceAccount.connectionState, sendAuthorized: false},
+      conversationId: 'project-conversation',
+      providerThreadId: 'thread-project-conversation',
+      inReplyToMessageId: 'project-message-4',
+      inReplyToProviderMessageId: 'provider-project-4',
+      sender: {email: secondSourceAccount.emailAddress, displayName: secondSourceAccount.displayName},
+      recipients: [{email: 'suzuki@example.com', displayName: '鈴木花子'}],
+      subject: 'Re: Q2 プロジェクト進捗共有',
+      draft: {...context.draft, id: 'project-draft', body: '', recipients: [{email: 'suzuki@example.com', displayName: '鈴木花子'}], cc: []}
+    }});
+  });
+  await page.route('**/api/bff/users/**/source/search**', async (route) => {
+    const accountId = new URL(route.request().url()).searchParams.get('accountId');
+    await route.fulfill({json: accountId === secondSourceAccount.id ? scopedPage(secondSourceAccount) : allPage});
+  });
+  await page.route('**/api/bff/users/**/source/conversations**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/project-conversation')) return route.fulfill({json: projectDetail});
+    if (url.pathname.includes('/source/conversations/')) return route.fulfill({json: sourceDetail});
+    const accountId = url.searchParams.get('accountId');
+    listRequests.push(accountId ?? 'all');
+    if (accountId === sourceAccount.id) await new Promise((resolve) => setTimeout(resolve, 450));
+    if (accountId === secondSourceAccount.id) await new Promise((resolve) => setTimeout(resolve, 40));
+    await route.fulfill({json: accountId === sourceAccount.id ? scopedPage(sourceAccount) : accountId === secondSourceAccount.id ? scopedPage(secondSourceAccount) : allPage}).catch(() => undefined);
+  });
+
+  await page.setViewportSize({width: 1448, height: 1086});
+  await page.goto('/ja');
+  await nav(page, '会話').click();
+  await page.locator('.mailbox-account', {hasText: 'Browser mailbox'}).click();
+  await page.locator('.mailbox-account', {hasText: 'Project mailbox'}).click();
+  await expect(page.getByRole('button', {name: /Q2 プロジェクト進捗共有/})).toBeVisible();
+  await expect(page.getByRole('button', {name: /来期の見積書について/})).toHaveCount(0);
+  await page.getByRole('button', {name: /Q2 プロジェクト進捗共有/}).click();
+  await expect(page.getByText('候補日時の資料を添付しました。')).toBeVisible();
+  await expect(page.getByTestId('production-detail-panel').getByText('Sourceの確認範囲に問題があります')).toBeVisible();
+  await expect(page.getByLabel('本文')).toBeVisible();
+  await expect(page.getByRole('button', {name: '送信する'})).toBeVisible();
+  const composerBox = await page.locator('.compact-composer').boundingBox();
+  expect(composerBox).not.toBeNull();
+  expect(composerBox!.y + composerBox!.height).toBeLessThanOrEqual(1086);
+  expect(listRequests).toContain('source-account-1');
+  expect(listRequests.at(-1)).toBe('source-account-2');
+  if (process.env.M1_ARTIFACT_DIR) await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-source-detail-2account-1448.png'), fullPage: true});
 });
 
 test('shows truthful Source detail loading until the production-shaped conversation is ready', async ({page}) => {
@@ -341,14 +437,12 @@ test('keeps manual composer available but disables Send when mail_send permissio
 });
 
 test('keeps each responsive stage in content-fit order and rail labels discoverable', async ({page}) => {
-  for (const width of [1600, 1440, 1180, 900, 768, 720, 430, 390]) {
+  for (const width of [1600, 1448, 1180, 900, 768, 720, 430, 390, 320]) {
     await page.setViewportSize({width, height: 900});
     await page.goto('/ja');
     await waitForAuthenticatedShell(page);
-    // Desktop keeps list and detail side by side, even before selection.
-    if (width >= 720) await expect(page.locator('.detail-pane')).toBeVisible();
+    if (width > 1000) await expect(page.locator('.detail-pane')).toBeVisible();
     else await expect(page.locator('.detail-pane')).toBeHidden();
-    if (width >= 720) await page.getByRole('button', {name: /返信する/}).click();
     const geometry = await page.evaluate(() => {
       const shell = document.querySelector<HTMLElement>('.app-shell')!;
       const header = document.querySelector<HTMLElement>('.mobile-header')!;
@@ -367,26 +461,33 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
       };
     });
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.viewport);
-    if (width >= 1440) expect(geometry.display).toBe('grid');
-    if (width >= 900 && width < 1180) expect(geometry.nav.width).toBeLessThanOrEqual(72);
-    if (width >= 720 && width < 900) {
-      expect(geometry.display).toBe('grid');
-      expect(geometry.header.width).toBeCloseTo(width, 0);
-      expect(geometry.surface.y).toBeGreaterThanOrEqual(geometry.header.y + geometry.header.height);
-      expect(geometry.detail.y).toBeGreaterThanOrEqual(geometry.header.y + geometry.header.height);
-    }
-    if (width < 720) {
-      expect(geometry.display).toBe('block');
-      expect(geometry.surface.width).toBeCloseTo(width, 0);
-      expect(geometry.detail.width).toBe(0);
-    }
+    expect(geometry.display).toBe('flex');
+    if (width <= 1000) expect(geometry.nav.width).toBeLessThanOrEqual(width <= 600 ? 64 : 210);
+    if (width <= 1000) expect(geometry.detail.width).toBe(0);
   }
 
   await page.setViewportSize({width: 900, height: 844});
   await page.goto('/ja');
   await waitForAuthenticatedShell(page);
   await nav(page, '会話').focus();
-  await expect(page.locator('.nav-tooltip', {hasText: '会話'})).toBeVisible();
+  await expect(nav(page, '会話')).toBeFocused();
+});
+
+test('keeps the English Source reading path complete at desktop and compact widths', async ({page}) => {
+  for (const width of [1448, 900, 430, 320]) {
+    await page.setViewportSize({width, height: 900});
+    await page.goto('/en');
+    await navEn(page, 'Conversations').click();
+    await page.getByRole('button', {name: /来期の見積書について/}).click();
+    await expect(page.getByText('1 message · Original source')).toBeVisible();
+    await expect(page.getByLabel('Message')).toHaveValue('確認しました。');
+    await expect(page.getByRole('button', {name: 'Send reply'})).toBeEnabled();
+    const geometry = await page.evaluate(() => ({
+      scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+      viewport: window.innerWidth
+    }));
+    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.viewport);
+  }
 });
 
 test('preserves core reading and focus visibility at 125, 150, and 200 percent browser-equivalent zoom and text scaling', async ({page}) => {

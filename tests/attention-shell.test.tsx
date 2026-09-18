@@ -63,6 +63,40 @@ describe('G40 live attention surfaces', () => {
     expect(screen.getByRole('heading', {name: '見積書の確認を終える'})).toBeTruthy();
   });
 
+  it('orders typed Attention by urgency and opens the first accepted detail on desktop', async () => {
+    const needs = {...attention.needsYou[0], id: 'needs-later', responsibilityId: 'needs-later', primaryAction: '通常の返信をする', operationalOutcome: '通常の返信を終える', nearestRelevantTime: '2030-01-03T00:00:00.000Z'};
+    const urgentReview = {...attention.needsYou[0], id: 'review-overdue', responsibilityId: 'review-overdue', surface: 'REVIEW', projection: {bucket: 'REVIEW', subjectKind: 'RESPONSIBILITY', primaryReason: 'accepted-review'}, primaryAction: null, reviewQuestion: '期限切れの依頼を確認する', operationalOutcome: '期限切れの条件を判断する', nearestRelevantTime: '2030-01-04T00:00:00.000Z', overdue: true};
+    const liveAttention = {...attention, needsYou: [needs], review: [urgentReview]};
+    const source = {accounts: [], conversations: [], readiness: 'ready', dataThroughAt: '2030-01-01T00:00:00.000Z', query: {text: '', accountId: null, sender: null, from: null, to: null}, total: 0, nextCursor: null};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input).endsWith('/attention')
+      ? new Response(JSON.stringify(liveAttention))
+      : new Response(JSON.stringify(source))));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    const urgentButton = await screen.findByRole('button', {name: /期限切れの依頼を確認する/});
+    await waitFor(() => expect(urgentButton).toHaveAttribute('aria-current', 'true'));
+    expect(screen.getByRole('heading', {name: '期限切れの依頼を確認する'})).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', {name: /通常の返信をする/}));
+    expect(screen.getByRole('heading', {name: '通常の返信を終える'})).toBeTruthy();
+  });
+
+  it('shows Later as its own counted summary without inventing a zero Managed metric', async () => {
+    const later = {...attention.needsYou[0], id: 'later-1', responsibilityId: 'later-1', surface: 'LATER', primaryAction: null, operationalOutcome: '来週もう一度確認する', awaitedEvent: '先方からの回答', returnCondition: '来週月曜'};
+    const liveAttention = {...attention, needsYou: [], later: [later], managed: [], managedCount: 0, delegatedCount: 1, strictZero: true};
+    const source = {accounts: [], conversations: [], readiness: 'ready', dataThroughAt: '2030-01-01T00:00:00.000Z', query: {text: '', accountId: null, sender: null, from: null, to: null}, total: 0, nextCursor: null};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input).endsWith('/attention')
+      ? new Response(JSON.stringify(liveAttention))
+      : new Response(JSON.stringify(source))));
+
+    const {container} = render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    const laterMetric = await screen.findByRole('button', {name: /あとで確認するもの.*1/});
+    expect(container.querySelector('.metric-managed')).toBeNull();
+    fireEvent.click(laterMetric);
+    expect(screen.getByRole('heading', {name: /委ねた確認/})).toHaveTextContent('1');
+    expect(screen.getByRole('button', {name: /来週もう一度確認する/})).toBeTruthy();
+  });
+
   it('uses live coverage truth on attention surfaces instead of fixture coverage', async () => {
     const liveCoverage = {
       ...attention,

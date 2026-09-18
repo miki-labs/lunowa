@@ -7,6 +7,15 @@ import type {ShellFixture} from './lunowa-shell-model';
 import type {SourcePageReadModel} from './source-types';
 
 type Open = (origin?: string) => void;
+export type TypedAttention = {item: AttentionItemReadModel; kind: 'needs' | 'review'};
+
+export function orderedTypedAttention(attention: AttentionReadModel): TypedAttention[] {
+  const time = (item: AttentionItemReadModel) => item.nearestRelevantTime && !Number.isNaN(Date.parse(item.nearestRelevantTime)) ? Date.parse(item.nearestRelevantTime) : Number.POSITIVE_INFINITY;
+  return [
+    ...attention.needsYou.map((item) => ({item, kind: 'needs' as const})),
+    ...attention.review.map((item) => ({item, kind: 'review' as const}))
+  ].sort((left, right) => Number(Boolean(right.item.overdue)) - Number(Boolean(left.item.overdue)) || time(left.item) - time(right.item) || left.item.id.localeCompare(right.item.id));
+}
 type Props = {
   selectedOrigin?: string;
   fixture: ShellFixture;
@@ -32,6 +41,8 @@ export function WorkspaceHome({selectedOrigin, fixture, attention, sourceModel, 
   const active = attention ? attention.managedCount > 0 : fixture.monitoringPosture === 'active';
   const managedCount = attention?.managedCount ?? (active ? 4 : 0);
   const hasLater = (attention?.later.length ?? 0) > 0;
+  const laterCount = attention?.later.length ?? 0;
+  const typedAttention = attention ? orderedTypedAttention(attention) : [];
   const hasDelegatedAttention = (attention?.delegatedCount ?? 0) > 0 && needs + reviews > 0;
   const managedItem = attention?.managed[0] ?? attention?.later[0];
   const managedOrigin = managedItem ? `managed-${managedItem.id}` : !attention && active ? 'managed-estimate' : null;
@@ -56,15 +67,16 @@ export function WorkspaceHome({selectedOrigin, fixture, attention, sourceModel, 
     <div className="home-metrics" aria-label={t('overview')}>
       <button className="home-metric metric-action" onClick={() => onNavigate('needs')}><span><Sparkles size={16} />{t('needs')}</span><strong>{needs}</strong><span className="metric-caption">{t('needsHint')}<ArrowRight size={15} /></span></button>
       <button className="home-metric metric-review" onClick={() => onNavigate('review')}><span><CircleHelp size={16} />{t('review')}</span><strong>{reviews}</strong><span className="metric-caption">{t('reviewHint')}<ArrowRight size={15} /></span></button>
-      <button className="home-metric metric-managed" onClick={() => onNavigate('managed')}><span><ShieldCheck size={16} />{t('managed')}</span><strong>{healthy ? managedCount : '—'}</strong><span className="metric-caption">{t(healthy ? 'managedHint' : 'coveragePending')}<ArrowRight size={15} /></span></button>
+      {(active || !attention || !healthy) && <button className="home-metric metric-managed" onClick={() => onNavigate('managed')}><span><ShieldCheck size={16} />{t('managed')}</span><strong>{healthy ? managedCount : '—'}</strong><span className="metric-caption">{t(healthy ? 'managedHint' : 'coveragePending')}<ArrowRight size={15} /></span></button>}
+      {hasLater && <button className="home-metric metric-later" onClick={() => onNavigate('managed')}><span><Clock3 size={16} />{t('laterTitle')}</span><strong>{laterCount}</strong><span className="metric-caption">{t('laterBody')}<ArrowRight size={15} /></span></button>}
     </div>
 
     <div className="home-columns">
       <section className="home-attention" aria-labelledby="attention-heading">
         <div className="section-heading"><h2 id="attention-heading">{t('attentionTitle')}</h2><span>{t('itemCount', {count: needs + reviews})}</span></div>
         {strictZero ? <div className="home-zero"><span className="zero-symbol"><Check size={24} /></span><h2>{t('allClear')}</h2><p>{t(active || hasLater ? 'allClearBody' : 'noMonitoring')}</p></div> : <>
-          {attention ? attention.needsYou.map((item) => itemRow(item, false)) : fixture.hasNeedsYou && <button id="estimate-hiroko" aria-current={selectedOrigin === "estimate-hiroko" || undefined} className="work-row work-action" onClick={() => openMoment('estimate-hiroko')}><span className="work-row-top"><span className="state-chip action">{t('actionType')}</span><span className="work-person">{t('samplePerson')}</span></span><strong>{t('sampleAction')}</strong><span className="work-row-description">{t('sampleWhy')}</span><span className="work-time"><Clock3 size={14} />{t('sampleDeadline')}</span><ArrowRight className="work-row-arrow" size={18} /></button>}
-          {attention ? attention.review.map((item) => itemRow(item, true)) : fixture.hasReview && <button id="review-condition" aria-current={selectedOrigin === "review-condition" || undefined} className="work-row work-review" onClick={() => openReview('review-condition')}><span className="work-row-top"><span className="state-chip review">{t('reviewType')}</span><span className="work-person">{t('samplePerson')}</span></span><strong>{t('sampleReview')}</strong><span className="work-row-description">{t('sampleReviewWhy')}</span><ArrowRight className="work-row-arrow" size={18} /></button>}
+          {attention ? typedAttention.map(({item, kind}) => itemRow(item, kind === 'review')) : fixture.hasNeedsYou && <button id="estimate-hiroko" aria-current={selectedOrigin === "estimate-hiroko" || undefined} className="work-row work-action" onClick={() => openMoment('estimate-hiroko')}><span className="work-row-top"><span className="state-chip action">{t('actionType')}</span><span className="work-person">{t('samplePerson')}</span></span><strong>{t('sampleAction')}</strong><span className="work-row-description">{t('sampleWhy')}</span><span className="work-time"><Clock3 size={14} />{t('sampleDeadline')}</span><ArrowRight className="work-row-arrow" size={18} /></button>}
+          {!attention && fixture.hasReview && <button id="review-condition" aria-current={selectedOrigin === "review-condition" || undefined} className="work-row work-review" onClick={() => openReview('review-condition')}><span className="work-row-top"><span className="state-chip review">{t('reviewType')}</span><span className="work-person">{t('samplePerson')}</span></span><strong>{t('sampleReview')}</strong><span className="work-row-description">{t('sampleReviewWhy')}</span><ArrowRight className="work-row-arrow" size={18} /></button>}
           {needs + reviews === 0 && <p className="home-quiet-message">{t(healthy ? 'noAttention' : 'coverageUnknown')}</p>}
         </>}
         {(attention?.delegationCandidates?.length ?? 0) > 0 && <section className="home-candidates"><h3>{t('candidates')}</h3>{attention!.delegationCandidates!.map((item) => <button id={`delegation-${item.id}`} key={item.id} className="list-row" onClick={() => openDelegation(`delegation-${item.id}`)}><strong>{item.operationalOutcome}</strong><span>{t('inspectCandidate')}</span></button>)}</section>}

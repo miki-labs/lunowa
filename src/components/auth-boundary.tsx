@@ -16,7 +16,7 @@ type SessionState = {
   signedOutConfirmed?: boolean;
 };
 
-export function AuthBoundary({oauthCallback}: {oauthCallback?: 'returned' | 'failed'}) {
+export function AuthBoundary({oauthCallback, mailboxCallback}: {oauthCallback?: 'returned' | 'failed'; mailboxCallback?: 'syncing' | 'cancelled'}) {
   const locale = useLocale();
   const t = useTranslations('Auth');
   const [sessionState, setSessionState] = useState<SessionState>({status: 'checking'});
@@ -126,6 +126,7 @@ export function AuthBoundary({oauthCallback}: {oauthCallback?: 'returned' | 'fai
             onSignOut={signOut}
             signingOut={signingOut}
             sessionActionError={sessionActionError}
+            mailboxCallback={mailboxCallback}
           />
         </div>
       )}

@@ -210,8 +210,7 @@ function SourceAttachment({attachment, accountId, userId, en}: {attachment: Sour
 
   return <li className="attachment-item">
     <FileText size={23} aria-hidden="true" />
-    <div><strong>{attachment.filename}</strong><span className="metadata">{attachment.mimeType} · {attachmentSize(attachment.sizeBytes, en)}</span></div>
-    {localPreviewFailed && <span className="metadata">{en ? 'Preview failed on this device. The protected download path remains available.' : 'この画面でのプレビューに失敗しました。安全な取得経路を利用できます。'}</span>}
+    <div className="attachment-copy"><strong>{attachment.filename}</strong><span className="metadata">{attachment.mimeType} · {attachmentSize(attachment.sizeBytes, en)}</span>{localPreviewFailed && <span className="metadata">{en ? 'Preview failed on this device. The protected download path remains available.' : 'この画面でのプレビューに失敗しました。安全な取得経路を利用できます。'}</span>}</div>
     {providerBlocked || state === 'provider-blocked'
       ? <span className="inline-status" role="status">{en ? 'Provider security restrictions block this file. Lunowa will not bypass them.' : 'プロバイダーの安全制限により、このファイルは取得できません。制限を回避しません。'}</span>
       : canFetch

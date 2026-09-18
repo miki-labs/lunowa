@@ -335,8 +335,21 @@ test('keeps the newest account scope and renders a multi-message two-account can
   expect(composerBox!.y + composerBox!.height).toBeLessThanOrEqual(1086);
   expect(listRequests).toContain('source-account-1');
   expect(listRequests.at(-1)).toBe('source-account-2');
+  if (process.env.M1_ARTIFACT_DIR) await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-source-detail-2account-1448.png')});
+  await page.setViewportSize({width: 900, height: 900});
+  await page.goto('/ja');
+  await waitForAuthenticatedShell(page);
+  await expect(page.getByRole('button', {name: /Project mailbox/})).toBeVisible();
+  const sidebarGeometry = await page.locator('.primary-nav').evaluate((sidebar) => {
+    sidebar.scrollTop = sidebar.scrollHeight;
+    const profile = sidebar.querySelector<HTMLElement>('.workspace-profile')!.getBoundingClientRect();
+    return {maxScroll: sidebar.scrollHeight - sidebar.clientHeight, scrollTop: sidebar.scrollTop, profileTop: profile.top, profileBottom: profile.bottom, viewport: window.innerHeight};
+  });
+  expect(sidebarGeometry.maxScroll).toBeGreaterThan(0);
+  expect(sidebarGeometry.scrollTop).toBeGreaterThan(0);
+  expect(sidebarGeometry.profileTop).toBeGreaterThanOrEqual(0);
+  expect(sidebarGeometry.profileBottom).toBeLessThanOrEqual(sidebarGeometry.viewport);
   if (process.env.M1_ARTIFACT_DIR) {
-    await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-source-detail-2account-1448.png')});
     for (const locale of ['ja', 'en'] as const) {
       for (const width of [900, 430, 320]) {
         await page.setViewportSize({width, height: 900});
@@ -411,6 +424,11 @@ test('uses trusted Moment reply context and binds explicit Send to the active Re
   await expect(page.getByLabel('宛先')).toHaveValue('sender@example.com');
   await page.getByText('種類・Cc').click();
   await expect(page.getByText(/From: Browser mailbox <browser@example.invalid>/)).toBeVisible();
+  const sendIsUnobstructed = await page.getByRole('button', {name: '送信する'}).evaluate((send) => {
+    const rect = send.getBoundingClientRect();
+    return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.closest('button') === send;
+  });
+  expect(sendIsUnobstructed).toBe(true);
   await page.getByLabel('本文').press('Enter');
   expect(sendBodies).toHaveLength(0);
   await page.getByRole('button', {name: '送信する'}).click();
@@ -509,6 +527,14 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
     await page.setViewportSize({width, height: 900});
     await page.goto('/ja');
     await nav(page, '会話').click();
+    if (width <= 600) {
+      const rowGeometry = await page.locator('.source-row').first().evaluate((row) => {
+        const avatar = row.querySelector<HTMLElement>('.source-avatar')!.getBoundingClientRect();
+        const content = row.querySelector<HTMLElement>('.source-main')!.getBoundingClientRect();
+        return {avatarRight: avatar.right, contentLeft: content.left};
+      });
+      expect(rowGeometry.avatarRight).toBeLessThanOrEqual(rowGeometry.contentLeft);
+    }
     await page.getByRole('button', {name: /来期の見積書について/}).click();
     const geometry = await page.evaluate(() => ({
       nav: document.querySelector<HTMLElement>('.primary-nav')!.getBoundingClientRect().toJSON(),
@@ -533,6 +559,24 @@ test('keeps the English Source reading path complete at desktop and compact widt
     await expect(page.getByText('1 message · Original source')).toBeVisible();
     await expect(page.getByLabel('Message')).toHaveValue('確認しました。');
     await expect(page.getByRole('button', {name: 'Send reply'})).toBeEnabled();
+    await page.getByText('Reply type·Cc').click();
+    await expect(page.getByText(/From: Browser mailbox <browser@example.invalid>/)).toBeVisible();
+    const sendIsUnobstructed = await page.getByRole('button', {name: 'Send reply'}).evaluate((send) => {
+      const rect = send.getBoundingClientRect();
+      return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.closest('button') === send;
+    });
+    expect(sendIsUnobstructed).toBe(true);
+    if (width === 320) {
+      const attachmentGeometry = await page.locator('.attachment-item').evaluate((item) => {
+        const copy = item.querySelector<HTMLElement>('.attachment-copy')!.getBoundingClientRect();
+        const download = item.querySelector<HTMLElement>('.attachment-download')!.getBoundingClientRect();
+        const overlaps = !(copy.right <= download.left || download.right <= copy.left || copy.bottom <= download.top || download.bottom <= copy.top);
+        return {overlaps, scrollWidth: item.scrollWidth, clientWidth: item.clientWidth};
+      });
+      expect(attachmentGeometry.overlaps).toBe(false);
+      expect(attachmentGeometry.scrollWidth).toBeLessThanOrEqual(attachmentGeometry.clientWidth);
+    }
+    await page.getByText('Reply type·Cc').click();
     const geometry = await page.evaluate(() => ({
       scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
       viewport: window.innerWidth

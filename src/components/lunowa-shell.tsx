@@ -126,6 +126,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   const [sourceLoading, setSourceLoading] = useState(() => Boolean(appUser?.id));
   const [sourceError, setSourceError] = useState('');
   const [sourceReload, setSourceReload] = useState(0);
+  const [sourceAccountsReload, setSourceAccountsReload] = useState(0);
   const [sourceSearchModel, setSourceSearchModel] = useState<SourcePageReadModel | null>(null);
   const [sourceSearchLoading, setSourceSearchLoading] = useState(false);
   const [sourceSearchError, setSourceSearchError] = useState('');
@@ -149,6 +150,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   const drawerPanel = useRef<HTMLElement>(null);
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const sourceListRequest = useRef(0);
+  const sourceAccountsRequest = useRef(0);
   const sourceSearchRequest = useRef(0);
   const initialAttentionSelection = useRef('');
   const fixture = shellFixtures.find(({id}) => id === fixtureId) ?? shellFixtures[0];
@@ -328,6 +330,26 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
       });
     return () => controller.abort();
   }, [appUser?.id, selectedAccountId, sourceReload]);
+
+  useEffect(() => {
+    if (!appUser?.id || sourceAccountsReload === 0) return;
+    const request = ++sourceAccountsRequest.current;
+    const controller = new AbortController();
+    const query = new URLSearchParams({limit: '1'});
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations?${query.toString()}`, {
+      credentials: 'same-origin',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('SOURCE_ACCOUNTS_FAILED');
+        return response.json() as Promise<SourcePageReadModel>;
+      })
+      .then((result) => {
+        if (!controller.signal.aborted && request === sourceAccountsRequest.current) setSourceAccounts(result.accounts);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [appUser?.id, sourceAccountsReload]);
 
   const loadMoreSource = () => {
     if (!appUser?.id || !sourceModel?.nextCursor || sourceLoading) return;
@@ -853,6 +875,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
             setSourceError('');
             setSourceLoading(true);
             setSourceReload((current) => current + 1);
+            setSourceAccountsReload((current) => current + 1);
             setAttentionModel(null);
             setAttentionOwnerId(null);
             setAttentionLoading(true);
@@ -984,14 +1007,14 @@ function MailboxSwitcher({accounts, selectedAccountId, total, locale, userId, on
   const t = (ja: string, en: string) => locale === 'en' ? en : ja;
   return <section className="mailbox-switcher" aria-labelledby="mailbox-switcher-heading">
     <h2 id="mailbox-switcher-heading">{t('アカウント', 'Accounts')}</h2>
-    <button className={`mailbox-account${selectedAccountId === '' ? ' active' : ''}`} type="button" aria-label={t(`すべてのGmail · ${total}件`, `All Gmail · ${total} conversations`)} aria-pressed={selectedAccountId === ''} onClick={() => onSelect('')}>
+    <button className={`mailbox-account${selectedAccountId === '' ? ' active' : ''}`} type="button" aria-label={selectedAccountId === '' ? t(`すべてのGmail · ${total}件`, `All Gmail · ${total} conversations`) : t('すべてのGmail', 'All Gmail')} aria-pressed={selectedAccountId === ''} onClick={() => onSelect('')}>
       <span className="mailbox-service all"><Mail size={16} /></span><span className="mailbox-copy"><strong>{t('すべて', 'All')}</strong><small>{t('接続したGmail', 'Connected Gmail')}</small></span>{selectedAccountId === '' && <span className="mailbox-count">{total}</span>}
     </button>
     {accounts.map((account, index) => {
       const state = mailboxState(account, locale);
       const name = account.displayName || account.emailAddress;
       return <button key={account.id} className={`mailbox-account${selectedAccountId === account.id ? ' active' : ''}`} type="button" aria-label={`Gmail · ${name} · ${account.emailAddress} · ${state.label}`} aria-pressed={selectedAccountId === account.id} onClick={() => onSelect(account.id)}>
-        <span className="mailbox-service gmail" aria-hidden="true">G<span className="mailbox-compact-index">{index + 1}</span></span><span className="mailbox-copy"><strong>{name}</strong><small>{account.emailAddress}</small><span className={`mailbox-state ${state.tone}`}><i />{state.label}</span></span><span className="mailbox-tooltip" aria-hidden="true">{name} · {state.label}</span>{selectedAccountId === account.id && <span className="mailbox-count">{total}</span>}
+        <span className="mailbox-service gmail" aria-hidden="true">G<span className="mailbox-compact-index">{index + 1}</span></span><span className="mailbox-copy"><strong>{name}</strong><small>{account.emailAddress}</small><span className={`mailbox-state ${state.tone}`}><i />{state.label}</span></span><span className="mailbox-touch-label" aria-hidden="true">{name}</span><span className="mailbox-tooltip" aria-hidden="true">{name} · {account.emailAddress} · {state.label}</span>{selectedAccountId === account.id && <span className="mailbox-count">{total}</span>}
       </button>;
     })}
     <form action={`/api/bff/users/${encodeURIComponent(userId)}/gmail/authorize`} method="get">

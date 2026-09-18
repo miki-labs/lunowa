@@ -1,4 +1,4 @@
-import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {LunowaShell} from '@/components/lunowa-shell';
@@ -244,9 +244,44 @@ describe('G21 Source safety boundaries', () => {
     const workAccount = await screen.findByRole('button', {name: 'Gmail · Work · owner@example.com · 接続済み'});
     fireEvent.click(workAccount);
     await screen.findByRole('button', {name: 'Gmail · Work · owner@example.com · 再接続が必要'});
+    expect(screen.getByRole('button', {name: 'すべてのGmail'})).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: '設定を表示'}));
     expect(screen.getByRole('heading', {name: 'owner@example.com'})).toBeInTheDocument();
     expect(screen.getByRole('heading', {name: 'second@example.com'})).toBeInTheDocument();
+  });
+
+  it('refreshes global mailbox truth after changing a non-selected account in Settings', async () => {
+    const secondAccount = {...account, id: 'account-2', providerAccountId: 'provider-account-2', emailAddress: 'second@example.com', displayName: 'Second'};
+    const disconnectedSecond = {
+      ...secondAccount,
+      connectionState: 'DISCONNECTED',
+      monitoring: {status: 'disconnected' as const, reasonCode: 'INTENTIONAL_DISCONNECT', lastTrustworthyAt: secondAccount.sync.lastSuccessAt, recoveryAction: null},
+      sync: {...secondAccount.sync, status: 'ERROR', errorCode: 'INTENTIONAL_DISCONNECT'}
+    };
+    let secondDisconnected = false;
+    const allPage = (): SourcePageReadModel => ({...page, accounts: [account, secondDisconnected ? disconnectedSecond : secondAccount], total: 2});
+    const scopedPage: SourcePageReadModel = {...page, accounts: [account], query: {...page.query, accountId: account.id}};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'https://example.test');
+      if (init?.method === 'DELETE' && url.pathname.endsWith('/gmail/accounts/account-2')) {
+        secondDisconnected = true;
+        return new Response(null, {status: 204});
+      }
+      if (url.pathname.includes('/source/conversations') && url.searchParams.get('accountId') === account.id) return jsonResponse(scopedPage);
+      return jsonResponse(allPage());
+    }));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Gmail · Work · owner@example.com · 接続済み'}));
+    await screen.findByRole('button', {name: 'すべてのGmail'});
+    fireEvent.click(screen.getByRole('button', {name: '設定を表示'}));
+    const secondSettings = screen.getByRole('heading', {name: 'second@example.com'}).closest('article');
+    expect(secondSettings).not.toBeNull();
+    fireEvent.click(within(secondSettings!).getByRole('button', {name: 'メール連携を解除する'}));
+    fireEvent.click(within(secondSettings!).getByRole('button', {name: '解除を確定する'}));
+
+    await screen.findByRole('button', {name: 'Gmail · Second · second@example.com · 解除済み'});
+    expect(within(secondSettings!).getByText('意図的に解除済み')).toBeInTheDocument();
   });
 
   it('surfaces degraded sync on Source detail even when the account remains connected', async () => {

@@ -59,6 +59,63 @@ afterEach(() => {
 });
 
 describe('G50 live composer safety', () => {
+  it('removes the prior editable identity while a replacement Moment or reply mode is loading', async () => {
+    const second = {...attention.needsYou[0], id: 'responsibility-2', responsibilityId: 'responsibility-2', conversationId: 'conversation-2', connectedAccountId: 'account-2', operationalOutcome: '納品日を確認する', primaryAction: '納品日を返信する'};
+    const contextA = replyContext(true);
+    const contextB = {...replyContext(true), connectedAccount: {...replyContext(true).connectedAccount, id: 'account-2'}, conversationId: 'conversation-2', recipients: [{email: 'second@example.com', displayName: 'Second'}], draft: {id: 'draft-2', version: 1, body: 'Second draft', recipients: [{email: 'second@example.com', displayName: 'Second'}], cc: []}};
+    let releaseB: (value: typeof contextB) => void = () => undefined;
+    let releaseReplyAll: (value: typeof contextB) => void = () => undefined;
+    const pendingB = new Promise<typeof contextB>((resolve) => {releaseB = resolve;});
+    const pendingReplyAll = new Promise<typeof contextB>((resolve) => {releaseReplyAll = resolve;});
+    const draftPosts: Array<Record<string, unknown>> = [];
+    const history = (id: string, accountId: string) => ({id, evidenceRevision: 1, account: {id: accountId, provider: 'gmail', emailAddress: 'owner@example.com', connectionState: 'CONNECTED', sync: {status: 'HEALTHY'}}, messages: [{id: `message-${id}`, direction: 'INBOUND', sender: {displayName: 'Sender', email: 'sender@example.com'}, recipients: [], cc: [], participants: [], occurredAt: '2030-01-01', textBody: 'Original message', sanitizedHtmlBody: null, attachments: []}]});
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json({...attention, needsYou: [attention.needsYou[0], second]});
+      if (url.includes('/drafts/context?')) {
+        if (url.includes('mode=REPLY_ALL')) return pendingReplyAll.then(json);
+        if (url.includes('conversationId=conversation-2')) return pendingB.then(json);
+        return json(contextA);
+      }
+      if (url.endsWith('/drafts') && init?.method === 'POST') {
+        draftPosts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({id: 'unexpected', version: 2});
+      }
+      if (url.includes('/source/conversations/conversation-1')) return json(history('conversation-1', 'account-1'));
+      if (url.includes('/source/conversations/conversation-2')) return json(history('conversation-2', 'account-2'));
+      if (url.includes('/source/conversations')) return json(source);
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+
+    fireEvent.click(await screen.findByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('確認しました。'));
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: '保存してはいけない旧下書き'}});
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    expect(screen.getByText('返信の送信元と宛先を確認しています。')).toBeTruthy();
+    expect(screen.queryByLabelText('本文')).toBeNull();
+    await new Promise((resolve) => window.setTimeout(resolve, 320));
+    expect(draftPosts).toEqual([]);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('conversationId=conversation-2'))).toBe(true));
+
+    await act(async () => {releaseB(contextB);});
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('Second draft'));
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: 'Reply Allにも保持する未保存本文'}});
+    fireEvent.change(screen.getByLabelText('種類'), {target: {value: 'REPLY_ALL'}});
+    expect(screen.getByText('返信の送信元と宛先を確認しています。')).toBeTruthy();
+    expect(screen.queryByLabelText('本文')).toBeNull();
+    await new Promise((resolve) => window.setTimeout(resolve, 320));
+    expect(draftPosts).toEqual([]);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('mode=REPLY_ALL'))).toBe(true));
+    const contextWithoutDraft = {...contextB};
+    delete (contextWithoutDraft as {draft?: unknown}).draft;
+    await act(async () => {releaseReplyAll({...contextWithoutDraft, mode: 'REPLY_ALL'} as typeof contextB);});
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('Reply Allにも保持する未保存本文'));
+    await waitFor(() => expect(draftPosts).toHaveLength(1), {timeout: 1500});
+    expect(draftPosts[0]).toMatchObject({connectedAccountId: 'account-2', conversationId: 'conversation-2', mode: 'REPLY_ALL', body: 'Reply Allにも保持する未保存本文'});
+  });
+
   it('keeps late Moment history and reply context from a previous selection out of the active work', async () => {
     let finishHistory: (value: Response) => void = () => undefined;
     let finishContext: (value: Response) => void = () => undefined;

@@ -99,6 +99,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   const draftGeneration = useRef(0);
   const draftEditRevision = useRef(0);
   const draftSaveInFlightGeneration = useRef<number | null>(null);
+  const localDraftCarry = useRef(new Map<string, {body: string; dirty: boolean}>());
   const [localCommonMutations, setLocalCommonMutations] = useState<Record<Exclude<CommonMutationTarget, null>, MutationState>>({
     'stop-tracking': 'idle',
     'review-answer': 'idle'
@@ -163,10 +164,28 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
     setDraftSaveState('idle');
     setDraftDirty(false);
     setSendOperationStatus('draft');
+    localDraftCarry.current.clear();
     setFixtureId(id);
   };
 
+  const clearReplyContext = () => {
+    if (replyContext) localDraftCarry.current.set(`${replyContext.connectedAccount.id}:${replyContext.conversationId}`, {body: draft, dirty: draftDirty});
+    draftGeneration.current += 1;
+    draftEditRevision.current += 1;
+    setReplyContext(null);
+    setReplyContextKey('');
+    setReplyContextError('');
+    setDraft('');
+    setDraftId(null);
+    setDraftVersion(null);
+    setDraftRecipients(null);
+    setDraftSaveState('idle');
+    setDraftDirty(false);
+    setSendOperationStatus('draft');
+  };
+
   const openDetail = (next: Detail, origin: string) => {
+    if (next === 'moment' && (detail !== 'moment' || origin !== detailOrigin)) clearReplyContext();
     setDetail(next);
     setDetailOrigin(origin);
     window.setTimeout(() => {
@@ -176,18 +195,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
 
   const openConversation = (origin: string, conversationId = origin) => {
     if (replyContext?.conversationId !== conversationId) {
-      draftGeneration.current += 1;
-      draftEditRevision.current += 1;
-      setReplyContext(null);
-      setReplyContextKey('');
-      setReplyContextError('');
-      setDraft('');
-      setDraftId(null);
-      setDraftVersion(null);
-      setDraftRecipients(null);
-      setDraftSaveState('idle');
-      setDraftDirty(false);
-      setSendOperationStatus('draft');
+      clearReplyContext();
     }
     setSelectedConversationId(conversationId);
     setSourceConversation(null);
@@ -407,16 +415,18 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
       .then((result) => {
         if (controller.signal.aborted) return;
         draftGeneration.current += 1;
-        const sameConversation = replyContext?.conversationId === result.conversationId;
+        const carryKey = `${result.connectedAccount.id}:${result.conversationId}`;
+        const carriedDraft = localDraftCarry.current.get(carryKey);
+        localDraftCarry.current.delete(carryKey);
         setReplyContext(result);
         setReplyContextKey(key);
         setReplyContextError('');
-        setDraft(result.draft?.body ?? (sameConversation ? draft : ''));
+        setDraft(carriedDraft?.body ?? result.draft?.body ?? '');
         setDraftId(result.draft?.id ?? null);
         setDraftVersion(result.draft?.version ?? null);
         setDraftRecipients(result.draft ? {to: result.draft.recipients, cc: result.draft.cc} : null);
-        setDraftSaveState(result.draft ? 'saved' : 'idle');
-        setDraftDirty(false);
+        setDraftSaveState(carriedDraft?.dirty ? 'idle' : result.draft ? 'saved' : 'idle');
+        setDraftDirty(carriedDraft?.dirty ?? false);
         setSendOperationStatus('draft');
       })
       .catch((error: unknown) => {
@@ -794,15 +804,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
             replyMode={replyMode}
             onReplyMode={(mode) => {
               setReplyMode(mode);
-              draftGeneration.current += 1;
-              draftEditRevision.current += 1;
-              setReplyContextKey('');
-              setDraftId(null);
-              setDraftVersion(null);
-              setDraftRecipients(null);
-              setDraftSaveState('idle');
-              setDraftDirty(false);
-              setSendOperationStatus('draft');
+              clearReplyContext();
             }}
             draftSaveState={draftSaveState}
             draftRecipients={draftRecipients}

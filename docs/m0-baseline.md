@@ -10,7 +10,7 @@ This baseline does not prove a live Google or Microsoft consent flow, mailbox sy
 
 ### Human summary（日本語）
 
-M0の基準は、承認済み02/03の見た目と幅調整をsample previewとして保持し、実際の認証・Source・Responsibility・下書き・送信は既存`AuthBoundary` / `LunowaShell` / BFF / server境界を再利用する方針です。プレビューの固定データや操作を本番へ接続しません。旧PR #171は一括マージせず、不足している3つの安全な挙動だけをM1/M2で現候補へ実装・検証します。Gmailを先に接続し、Outlookと複数アカウント表示を完成範囲に含めますが、M0自体は実provider動作の完成を意味しません。
+M0の基準は、承認済み02/03の見た目と幅調整をsample previewとして保持し、実際の認証・Source・Responsibility・下書き・送信は既存`AuthBoundary` / `LunowaShell` / BFF / server境界を再利用する方針です。プレビューの固定データや操作を本番へ接続しません。旧PR #171は一括マージせず、現候補へ既に採用済みの挙動を記録し、下書きidentityの安全修正はM0で完了し、残る表示・並び順の差だけをM1で扱います。Gmailを先に接続し、Outlookと複数アカウント表示を完成範囲に含めますが、M0自体は実provider動作の完成を意味しません。
 
 ## Accepted visual and interaction baseline
 
@@ -47,13 +47,13 @@ The source visual target is reference 02 for the desktop workspace and reference
 
 ### PR #171 behavioral comparison
 
-The three independently useful corrections below were searched in the current candidate and are not present in equivalent implementation/tests. They are accepted missing behavior, not reasons to merge the PR wholesale.
+The three independently useful corrections below were compared directly. One remains for M1, one is partly adopted with a narrower M1 summary gap, and one is fixed in M0. None is a reason to merge the PR wholesale.
 
 | PR #171 behavior | Current candidate | Owner and action |
 | --- | --- | --- |
 | Sort typed Needs You and Review entries by accepted delay relevance and select the item whose detail is actually active | **Missing.** Current `WorkspaceHome` renders Needs You then Review and compares the selected origin, without the PR's combined ordering helper/test. | **M1 accepted-shell controller/Home integration.** Port the smallest behavior and deterministic test while adapting presentation to reference 02/03. |
-| Represent a Later-only state truthfully instead of showing zero Managed/false reassurance | **Partially represented elsewhere but missing in current Home summary.** The existing Managed surface distinguishes Later; `WorkspaceHome` still reports only `managedCount` in its Home metric/section. | **M1 accepted-shell Home projection.** Show Later separately or with explicit wording; do not count it as healthy Managed or strict zero. Add the focused projection test. |
-| Clear the previous conversation's sender/recipient/draft identity and block Send while a newly selected Moment reply context loads | **Missing.** The current candidate does not contain PR #171's loading transition or regression test. | **M2 communication connection.** Clear/fence prior context on identity change, render local loading truth, and expose no Send until the new account-bound context resolves. Port the deterministic delayed-response test. |
+| Represent a Later-only state truthfully instead of showing zero Managed/false reassurance | **Section behavior already adopted; summary metric remains a gap.** `WorkspaceHome` uses `hasLater`, `laterTitle`, `laterBody`, and `laterCount`, with focused test coverage. Its top metric still reports only healthy `managedCount`. | **M1 accepted-shell Home projection.** Preserve the adopted section behavior and decide how the accepted reference summary represents Later without counting it as healthy Managed or strict zero. |
+| Clear the previous conversation's sender/recipient/draft identity and block Send while a newly selected Moment reply context loads | **Fixed in M0.** Moment identity and reply-mode changes synchronously clear/fence the prior context, draft, recipients, and save generation; the composer remains loading until the replacement context resolves. | **M0 production controller.** Deterministic delayed-response coverage proves no old-identity draft POST occurs during either transition. M2 reuses this boundary. |
 
 ### Integration order
 
@@ -61,7 +61,7 @@ The three independently useful corrections below were searched in the current ca
 2. Keep #174 and #112 open until their own external/rendered acceptance is satisfied. M0 records their code ownership and unverified gates; it does not substitute for them.
 3. Do not merge or cherry-pick PR #171 wholesale. Keep it as read-only evidence while the accepted visual candidate becomes the shared base.
 4. Start M1 from the accepted M0 revision. Bring over only the verified missing Home behaviors in the table, implemented against the accepted workspace structure and current controller.
-5. Start M2 after the M1 base is accepted, then bring over the verified stale-reply-context correction and its test. Any later PR #171 disposition is an explicit GitHub action after equivalent behavior is accepted, never an automatic side effect of M0.
+5. Start M2 after the M1 base is accepted and preserve M0's fail-closed reply-context transition and regression test. Any later PR #171 disposition is an explicit GitHub action after equivalent behavior is accepted, never an automatic side effect of M0.
 
 ## Production control contract
 
@@ -100,7 +100,7 @@ The accepted image contains controls whose sample behavior is not a production c
 | Old docs describing Gmail as the final provider limit | **Reconciled** | `COMPLETION-SCOPE.md` and narrow pointers in Product/implementation/continuity docs state Gmail-first implementation with Gmail + Outlook/multiple-account completion scope. Historical milestone text remains historical evidence. |
 | `react-resizable-panels`, Lucide, next-intl | **Keep** | Current imports cover accepted splitters, icons, and Japanese/English UI. Package/lockfile cleanup requires production integration plus build verification. |
 
-No runtime code is deleted in M0. Removing a currently imported production Home or a fixture oracle before its replacement is connected would create a gap, not cleanup.
+No runtime code is deleted in M0. The only runtime correction clears and fences stale reply identity during Moment or reply-mode transitions. Removing a currently imported production Home or a fixture oracle before its replacement is connected would create a gap, not cleanup.
 
 ## External readiness inventory
 

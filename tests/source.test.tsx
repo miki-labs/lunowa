@@ -126,6 +126,12 @@ describe('G21 Source safety boundaries', () => {
     fireEvent.click(screen.getByRole('button', {name: /Source Sender/}));
     await waitFor(() => expect(screen.getByRole('heading', {name: 'Original provider subject'})).toBeInTheDocument());
     expect(screen.getByText('Safe source')).toBeInTheDocument();
+    const detailCalls = fetchMock.mock.calls.filter(([input]) => String(input).includes('/source/conversations/conversation-1')).length;
+    fireEvent.click(screen.getByRole('button', {name: /Source Sender/}));
+    fireEvent.click(screen.getByRole('button', {name: /Source Sender/}));
+    expect(screen.getByText('Safe source')).toBeInTheDocument();
+    expect(screen.queryByText('Sourceの会話を読み込んでいます。')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes('/source/conversations/conversation-1'))).toHaveLength(detailCalls);
     expect(screen.queryByText('window.authority = true')).not.toBeInTheDocument();
     expect(screen.getByText(/この画面でのプレビューに失敗しました/)).toBeInTheDocument();
     expect(screen.queryByRole('button', {name: '送信する'})).not.toBeInTheDocument();
@@ -282,6 +288,40 @@ describe('G21 Source safety boundaries', () => {
 
     await screen.findByRole('button', {name: 'Gmail · Second · second@example.com · 解除済み'});
     expect(within(secondSettings!).getByText('意図的に解除済み')).toBeInTheDocument();
+  });
+
+  it('keeps a successful disconnect truthful when the global mailbox refresh fails', async () => {
+    const secondAccount = {...account, id: 'account-2', providerAccountId: 'provider-account-2', emailAddress: 'second@example.com', displayName: 'Second'};
+    const allPage: SourcePageReadModel = {...page, accounts: [account, secondAccount], total: 2};
+    const scopedPage: SourcePageReadModel = {...page, accounts: [account], query: {...page.query, accountId: account.id}};
+    let initialAllLoaded = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'https://example.test');
+      if (init?.method === 'DELETE' && url.pathname.endsWith('/gmail/accounts/account-2')) return new Response(null, {status: 204});
+      if (url.pathname.includes('/source/conversations') && url.searchParams.get('accountId') === account.id) return jsonResponse(scopedPage);
+      if (url.pathname.includes('/source/conversations') && !initialAllLoaded) {
+        initialAllLoaded = true;
+        return jsonResponse(allPage);
+      }
+      if (url.pathname.includes('/source/conversations')) return jsonResponse({error: 'unavailable'}, 503);
+      return jsonResponse(page);
+    }));
+
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Gmail · Work · owner@example.com · 接続済み'}));
+    await screen.findByRole('button', {name: 'すべてのGmail'});
+    fireEvent.click(screen.getByRole('button', {name: '設定を表示'}));
+    const secondSettings = screen.getByRole('heading', {name: 'second@example.com'}).closest('article');
+    expect(secondSettings).not.toBeNull();
+    fireEvent.click(within(secondSettings!).getByRole('button', {name: 'メール連携を解除する'}));
+    fireEvent.click(within(secondSettings!).getByRole('button', {name: '解除を確定する'}));
+
+    await screen.findByRole('button', {name: 'Gmail · Second · second@example.com · 解除済み'});
+    const retry = await screen.findByRole('button', {name: 'メールボックス状態を再取得'});
+    expect(retry).toBeInTheDocument();
+    fireEvent.click(retry);
+    await screen.findByRole('button', {name: 'メールボックス状態を再取得'});
+    expect(screen.getByRole('button', {name: 'Gmail · Second · second@example.com · 解除済み'})).toBeInTheDocument();
   });
 
   it('surfaces degraded sync on Source detail even when the account remains connected', async () => {

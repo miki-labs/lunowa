@@ -4,7 +4,7 @@ import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import Image from 'next/image';
 import {NextIntlClientProvider, useLocale, useTranslations} from 'next-intl';
 import {Group, Panel, Separator, usePanelRef} from 'react-resizable-panels';
-import {House, Sparkles, ShieldCheck, CircleHelp, Mail, Search as SearchIcon, Settings as SettingsIcon, Menu, ArrowRight, UserRound, PanelLeftClose, PanelLeftOpen, Plus, AtSign} from 'lucide-react';
+import {House, Sparkles, ShieldCheck, CircleHelp, Mail, Search as SearchIcon, Settings as SettingsIcon, Menu, ArrowRight, UserRound, PanelLeftClose, PanelLeftOpen, Plus, AtSign, RotateCw} from 'lucide-react';
 import jaMessages from '../../messages/ja.json';
 import enMessages from '../../messages/en.json';
 import {orderedTypedAttention, WorkspaceHome} from './workspace-home';
@@ -122,6 +122,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   const [searchAccountId, setSearchAccountId] = useState('');
   const [sourceModel, setSourceModel] = useState<SourcePageReadModel | null>(null);
   const [sourceAccounts, setSourceAccounts] = useState<SourceAccountReadModel[]>([]);
+  const [sourceAccountsError, setSourceAccountsError] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [sourceLoading, setSourceLoading] = useState(() => Boolean(appUser?.id));
   const [sourceError, setSourceError] = useState('');
@@ -235,13 +236,18 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
   };
 
   const openConversation = (origin: string, conversationId = origin, accountId?: string) => {
+    const accountFromList = sourceModel?.conversations.find((conversation) => conversation.id === conversationId)?.account.id
+      ?? sourceSearchModel?.conversations.find((conversation) => conversation.id === conversationId)?.account.id;
+    const nextAccountId = accountId ?? accountFromList ?? selectedAccountId;
+    if (detail === 'conversation' && sourceConversation?.id === conversationId && sourceConversation.account.id === nextAccountId) {
+      openDetail('conversation', origin);
+      return;
+    }
     if (replyContext?.conversationId !== conversationId) {
       clearReplyContext();
     }
     setSelectedConversationId(conversationId);
-    const accountFromList = sourceModel?.conversations.find((conversation) => conversation.id === conversationId)?.account.id
-      ?? sourceSearchModel?.conversations.find((conversation) => conversation.id === conversationId)?.account.id;
-    setSelectedConversationAccountId(accountId ?? accountFromList ?? selectedAccountId);
+    setSelectedConversationAccountId(nextAccountId);
     setSourceConversation(null);
     setSourceConversationLoading(true);
     setSourceConversationError('');
@@ -347,7 +353,9 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
       .then((result) => {
         if (!controller.signal.aborted && request === sourceAccountsRequest.current) setSourceAccounts(result.accounts);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!controller.signal.aborted && request === sourceAccountsRequest.current) setSourceAccountsError('SOURCE_ACCOUNTS_FAILED');
+      });
     return () => controller.abort();
   }, [appUser?.id, sourceAccountsReload]);
 
@@ -468,7 +476,9 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
     setSourceSearchError('');
     setDetail(null);
     setSurface('source');
-    setStatus(accountId ? '選択したメールボックスの会話を表示します' : 'すべてのメールボックスの会話を表示します');
+    setStatus(accountId
+      ? locale === 'en' ? 'Showing conversations from the selected mailbox' : '選択したメールボックスの会話を表示します'
+      : locale === 'en' ? 'Showing conversations from all mailboxes' : 'すべてのメールボックスの会話を表示します');
   };
 
   useEffect(() => {
@@ -844,7 +854,10 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
             </button>
           ))}
         </nav>
-        {appUser?.id && <MailboxSwitcher accounts={sourceAccounts} selectedAccountId={selectedAccountId} total={sourceModel?.total ?? 0} locale={locale === 'en' ? 'en' : 'ja'} userId={appUser.id} onSelect={selectAccount} onSettings={() => selectSurface('settings')} />}
+        {appUser?.id && <MailboxSwitcher accounts={sourceAccounts} selectedAccountId={selectedAccountId} total={sourceModel?.total ?? 0} locale={locale === 'en' ? 'en' : 'ja'} userId={appUser.id} accountsError={sourceAccountsError} onRetryAccounts={() => {
+          setSourceAccountsError('');
+          setSourceAccountsReload((current) => current + 1);
+        }} onSelect={selectAccount} onSettings={() => selectSurface('settings')} />}
         <div className="nav-bottom"><p>{t('navFooter')}</p><button className="workspace-profile" onClick={() => selectSurface('settings')} aria-label={t('viewSettings')}><span className="profile-avatar"><UserRound size={18} /></span><span><strong>{appUser?.name || t('previewUser')}</strong><span>{appUser?.email || t('previewTitle')}</span></span><ArrowRight size={15} /></button></div>
       </aside></Panel>
       <Separator className="workspace-resize-handle" aria-label={locale === 'en' ? 'Resize sidebar' : '左メニューの幅を調整'} />
@@ -873,6 +886,7 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
           sessionActionError={sessionActionError}
           onRefreshData={() => {
             setSourceError('');
+            setSourceAccountsError('');
             setSourceLoading(true);
             setSourceReload((current) => current + 1);
             setSourceAccountsReload((current) => current + 1);
@@ -882,6 +896,12 @@ function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionE
             setAttentionError('');
             setAttentionReload((current) => current + 1);
           }}
+          onAccountDisconnected={(accountId) => setSourceAccounts((current) => current.map((account) => account.id === accountId ? {
+            ...account,
+            connectionState: 'DISCONNECTED',
+            monitoring: {status: 'disconnected', reasonCode: 'INTENTIONAL_DISCONNECT', lastTrustworthyAt: account.sync.lastSuccessAt, recoveryAction: null},
+            sync: {...account.sync, status: 'ERROR', errorCode: 'INTENTIONAL_DISCONNECT'}
+          } : account))}
           search={search}
           searchAccountId={searchAccountId}
           sourceModel={sourceModel}
@@ -995,12 +1015,14 @@ function mailboxState(account: SourceAccountReadModel, locale: 'ja' | 'en') {
   return {tone: 'connected', label: locale === 'en' ? 'Connected' : '接続済み'};
 }
 
-function MailboxSwitcher({accounts, selectedAccountId, total, locale, userId, onSelect, onSettings}: {
+function MailboxSwitcher({accounts, selectedAccountId, total, locale, userId, accountsError, onRetryAccounts, onSelect, onSettings}: {
   accounts: SourceAccountReadModel[];
   selectedAccountId: string;
   total: number;
   locale: 'ja' | 'en';
   userId: string;
+  accountsError: string;
+  onRetryAccounts: () => void;
   onSelect: (accountId: string) => void;
   onSettings: () => void;
 }) {
@@ -1021,6 +1043,7 @@ function MailboxSwitcher({accounts, selectedAccountId, total, locale, userId, on
       <input name="returnTo" type="hidden" value={`/${locale}`} />
       <button className="mailbox-add" type="submit" aria-label={t('Gmailを追加', 'Add Gmail')}><Plus size={17} /><span>{t('Gmailを追加', 'Add Gmail')}</span></button>
     </form>
+    {accountsError && <button className="mailbox-registry-error" type="button" aria-label={t('メールボックス状態を再取得', 'Retry mailbox status')} onClick={onRetryAccounts}><RotateCw size={15} aria-hidden="true" /><span>{t('接続状態を確認できません。再試行', 'Mailbox status may be stale. Retry')}</span></button>}
     <button className="mailbox-outlook" type="button" disabled title={t('Outlook対応後に利用できます', 'Available after Outlook support ships')}><AtSign size={16} /><span>Outlook</span><small>{t('未対応', 'Unavailable')}</small></button>
     {accounts.some((account) => mailboxState(account, locale).tone === 'degraded') && <button className="mailbox-recovery" type="button" onClick={onSettings}>{t('再接続を確認', 'Review reconnect')}</button>}
   </section>;
@@ -1038,7 +1061,7 @@ function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; on
   );
 }
 
-function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceAccounts, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, selectedConversationId, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
+function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, onAccountDisconnected, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceAccounts, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, selectedConversationId, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
   selectedOrigin?: string;
   surface: Surface;
   onNavigate: (surface: Surface) => void;
@@ -1051,6 +1074,7 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
   signingOut: boolean;
   sessionActionError: string;
   onRefreshData: () => void;
+  onAccountDisconnected: (accountId: string) => void;
   search: string;
   onSearch: (value: string) => void;
   searchAccountId: string;
@@ -1110,6 +1134,7 @@ function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention
           sourceAccounts={sourceAccounts}
           attention={attention}
           onRefreshData={onRefreshData}
+          onAccountDisconnected={onAccountDisconnected}
           onOpenManaged={openManaged}
         />
       )}
@@ -1154,7 +1179,7 @@ function Search({search, onSearch, openConversation}: {search: string; onSearch:
   return <div className="surface-content"><label className="search-box" htmlFor="source-search">メールを検索<input id="source-search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="送信者、件名、語句を入力" /></label>{search ? <><p className="metadata">「{search}」の認可された完全一致を検索しています。</p><button id="search-result-estimate" className="list-row" type="button" onClick={(event) => openConversation(event.currentTarget.id)}><strong>{sourceItem.subject}</strong><span>{sourceItem.preview}</span></button></> : <p className="empty-state">検索語を入力すると、会話の原文を検索します。</p>}</div>;
 }
 
-function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, sourceAccounts, attention, onRefreshData, onOpenManaged}: {
+function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, sourceAccounts, attention, onRefreshData, onAccountDisconnected, onOpenManaged}: {
   fixture: ShellFixture;
   appUser?: AppUserSummary;
   onSignOut?: () => Promise<void>;
@@ -1163,6 +1188,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
   sourceAccounts: SourceAccountReadModel[];
   attention: AttentionReadModel | null;
   onRefreshData: () => void;
+  onAccountDisconnected: (accountId: string) => void;
   onOpenManaged: (origin?: string) => void;
 }) {
   const [disconnectTarget, setDisconnectTarget] = useState<string | null>(null);
@@ -1189,6 +1215,7 @@ function Settings({fixture, appUser, onSignOut, signingOut, sessionActionError, 
       });
       if (!response.ok) throw new Error('DISCONNECT_FAILED');
       setDisconnectTarget(null);
+      onAccountDisconnected(accountId);
       onRefreshData();
     } catch {
       setDisconnectError('メール連携の解除処理を完了できませんでした。監視状態または接続状態の一部が更新されている可能性があるため、最新状態を再確認しています。必要ならもう一度お試しください。');

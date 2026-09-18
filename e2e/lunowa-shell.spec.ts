@@ -259,6 +259,10 @@ test('renders the production Source list and selected conversation in the accept
   await expect(page.locator('.source-row.is-selected')).toHaveCount(1);
   await expect(page.getByText('browser@example.invalid', {exact: true}).first()).toBeVisible();
   await expect(page.getByRole('button', {name: /安全にダウンロード/})).toBeVisible();
+  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+  await page.getByRole('button', {name: /佐藤ひろ子/}).click();
+  await expect(page.getByRole('button', {name: /安全にダウンロード/})).toBeVisible();
+  await expect(page.getByText('Sourceの会話を読み込んでいます。')).toHaveCount(0);
   if (process.env.M1_ARTIFACT_DIR) await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, 'production-source-detail-1448.png'), fullPage: true});
 });
 
@@ -340,6 +344,7 @@ test('keeps the newest account scope and renders a multi-message two-account can
         await (locale === 'ja' ? nav(page, '会話') : navEn(page, 'Conversations')).click();
         await page.locator('.mailbox-account', {hasText: 'Project mailbox'}).click();
         await expect(page.getByRole('button', {name: /Q2 プロジェクト進捗共有/})).toBeVisible();
+        await page.locator('.surface-header h1').click();
         await page.screenshot({caret: 'initial', path: path.join(process.env.M1_ARTIFACT_DIR, `production-source-list-${locale}-${width}.png`)});
         await page.getByRole('button', {name: /Q2 プロジェクト進捗共有/}).click();
         await expect(page.getByLabel(locale === 'ja' ? '本文' : 'Message')).toBeVisible();
@@ -476,6 +481,7 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
         surface: surface.getBoundingClientRect().toJSON(),
         detail: detail.getBoundingClientRect().toJSON(),
         nav: nav.getBoundingClientRect().toJSON(),
+        listPanel: document.getElementById('production-list-panel')!.getBoundingClientRect().toJSON(),
         scrollWidth,
         viewport: window.innerWidth
       };
@@ -484,6 +490,7 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
     expect(geometry.display).toBe('flex');
     if (width <= 1000) expect(geometry.nav.width).toBeLessThanOrEqual(width <= 600 ? 64 : 210);
     if (width <= 1000) expect(geometry.detail.width).toBe(0);
+    if (width <= 1000) expect(geometry.listPanel.width).toBeGreaterThanOrEqual(width - geometry.nav.width - 1);
     if (width === 320) {
       await expect(page.getByRole('button', {name: /すべてのGmail/})).toBeVisible();
       await expect(page.getByRole('button', {name: /Gmail · Browser mailbox · browser@example.invalid · 接続済み/})).toBeVisible();
@@ -497,6 +504,22 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
   await waitForAuthenticatedShell(page);
   await nav(page, '会話').focus();
   await expect(nav(page, '会話')).toBeFocused();
+
+  for (const width of [900, 430, 320]) {
+    await page.setViewportSize({width, height: 900});
+    await page.goto('/ja');
+    await nav(page, '会話').click();
+    await page.getByRole('button', {name: /来期の見積書について/}).click();
+    const geometry = await page.evaluate(() => ({
+      nav: document.querySelector<HTMLElement>('.primary-nav')!.getBoundingClientRect().toJSON(),
+      detailPanel: document.getElementById('production-detail-panel')!.getBoundingClientRect().toJSON(),
+      detailScrollWidth: document.querySelector<HTMLElement>('.detail-pane')!.scrollWidth,
+      detailClientWidth: document.querySelector<HTMLElement>('.detail-pane')!.clientWidth,
+      viewport: window.innerWidth
+    }));
+    expect(geometry.detailPanel.width).toBeGreaterThanOrEqual(geometry.viewport - geometry.nav.width - 1);
+    expect(geometry.detailScrollWidth).toBeLessThanOrEqual(geometry.detailClientWidth);
+  }
 });
 
 test('keeps the English Source reading path complete at desktop and compact widths', async ({page}) => {
@@ -504,6 +527,8 @@ test('keeps the English Source reading path complete at desktop and compact widt
     await page.setViewportSize({width, height: 900});
     await page.goto('/en');
     await navEn(page, 'Conversations').click();
+    await page.locator('.mailbox-account', {hasText: 'Browser mailbox'}).click();
+    await expect(page.locator('.status-region')).toHaveText('Showing conversations from the selected mailbox');
     await page.getByRole('button', {name: /来期の見積書について/}).click();
     await expect(page.getByText('1 message · Original source')).toBeVisible();
     await expect(page.getByLabel('Message')).toHaveValue('確認しました。');

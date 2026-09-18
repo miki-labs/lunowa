@@ -559,7 +559,7 @@ test('keeps the English Source reading path complete at desktop and compact widt
     await expect(page.getByText('1 message · Original source')).toBeVisible();
     await expect(page.getByLabel('Message')).toHaveValue('確認しました。');
     await expect(page.getByRole('button', {name: 'Send reply'})).toBeEnabled();
-    await page.getByText('Reply type·Cc').click();
+    await page.locator('.composer-recipient-line summary').click();
     await expect(page.getByText(/From: Browser mailbox <browser@example.invalid>/)).toBeVisible();
     const sendIsUnobstructed = await page.getByRole('button', {name: 'Send reply'}).evaluate((send) => {
       const rect = send.getBoundingClientRect();
@@ -576,7 +576,7 @@ test('keeps the English Source reading path complete at desktop and compact widt
       expect(attachmentGeometry.overlaps).toBe(false);
       expect(attachmentGeometry.scrollWidth).toBeLessThanOrEqual(attachmentGeometry.clientWidth);
     }
-    await page.getByText('Reply type·Cc').click();
+    await page.locator('.composer-recipient-line summary').click();
     const geometry = await page.evaluate(() => ({
       scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
       viewport: window.innerWidth

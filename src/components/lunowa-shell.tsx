@@ -1,6 +1,13 @@
 'use client';
 
 import {useEffect, useRef, useState} from 'react';
+import Image from 'next/image';
+import {NextIntlClientProvider, useLocale, useTranslations} from 'next-intl';
+import {House, Sparkles, ShieldCheck, CircleHelp, Mail, Search as SearchIcon, Settings as SettingsIcon, Menu, ArrowRight, UserRound} from 'lucide-react';
+import jaMessages from '../../messages/ja.json';
+import enMessages from '../../messages/en.json';
+import {WorkspaceHome} from './workspace-home';
+import './workspace.css';
 
 import {
   shellFixtures,
@@ -26,11 +33,11 @@ type Detail = 'moment' | 'managed-detail' | 'review-detail' | 'delegation' | 'co
 type AttentionAction = 'STOP_TRACKING' | 'RETURN_ATTENTION' | 'DELEGATE' | 'RESOLVE_ADMISSION_REVIEW' | 'CORRECT_OPERATIONAL_OUTCOME';
 type AttentionMutation = {key: string; state: MutationState; error: string};
 
-const navigation: readonly {id: Surface; label: string; icon: string}[] = [
-  {id: 'home', label: 'ホーム', icon: '⌂'}, {id: 'needs', label: '対応が必要', icon: '!'},
-  {id: 'managed', label: '管理中', icon: '◌'}, {id: 'review', label: '確認', icon: '?'},
-  {id: 'source', label: '会話', icon: '✉'}, {id: 'search', label: '検索', icon: '⌕'},
-  {id: 'settings', label: '設定', icon: '⚙'}
+const navigation: readonly {id: Surface; label: string; icon: typeof House}[] = [
+  {id: 'home', label: 'ホーム', icon: House}, {id: 'needs', label: '対応が必要', icon: Sparkles},
+  {id: 'managed', label: '管理中', icon: ShieldCheck}, {id: 'review', label: '確認', icon: CircleHelp},
+  {id: 'source', label: '会話', icon: Mail}, {id: 'search', label: '検索', icon: SearchIcon},
+  {id: 'settings', label: '設定', icon: SettingsIcon}
 ];
 
 const attentionItemStatic = {
@@ -55,12 +62,24 @@ export function isImeKeyboardEvent(event: Pick<KeyboardEvent, 'isComposing' | 'k
 
 export type AppUserSummary = {id?: string; name: string; email: string};
 
-export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActionError = ''}: {
+type ShellProps = {
   appUser?: AppUserSummary;
   onSignOut?: () => Promise<void>;
   signingOut?: boolean;
   sessionActionError?: string;
-} = {}) {
+  locale?: 'ja' | 'en';
+  preview?: boolean;
+};
+
+export function LunowaShell(props: ShellProps = {}) {
+  const [previewLocale, setPreviewLocale] = useState<'ja' | 'en'>(props.locale ?? 'ja');
+  const locale = props.preview ? previewLocale : props.locale ?? 'ja';
+  return <NextIntlClientProvider locale={locale} messages={{Workspace: (locale === 'en' ? enMessages : jaMessages).Workspace}} timeZone="Asia/Tokyo"><LunowaWorkspace {...props} onPreviewLocaleChange={setPreviewLocale} /></NextIntlClientProvider>;
+}
+
+function LunowaWorkspace({appUser, onSignOut, signingOut = false, sessionActionError = '', preview = false, onPreviewLocaleChange}: ShellProps & {onPreviewLocaleChange: (locale: 'ja' | 'en') => void}) {
+  const t = useTranslations('Workspace');
+  const locale = useLocale();
   const [surface, setSurface] = useState<Surface>('home');
   const [detail, setDetail] = useState<Detail>(null);
   const [detailOrigin, setDetailOrigin] = useState(attentionItemStatic.id);
@@ -99,6 +118,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const [sourceConversation, setSourceConversation] = useState<SourceConversationReadModel | null>(null);
   const [sourceConversationLoading, setSourceConversationLoading] = useState(false);
   const [sourceConversationError, setSourceConversationError] = useState('');
+  const [historyKey, setHistoryKey] = useState('');
   const [attentionModel, setAttentionModel] = useState<AttentionReadModel | null>(null);
   const [attentionOwnerId, setAttentionOwnerId] = useState<string | null>(null);
   const [attentionLoading, setAttentionLoading] = useState(() => Boolean(appUser?.id));
@@ -109,6 +129,20 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const drawerPanel = useRef<HTMLElement>(null);
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const fixture = shellFixtures.find(({id}) => id === fixtureId) ?? shellFixtures[0];
+
+  const liveAttention = appUser?.id && attentionOwnerId === appUser.id ? attentionModel : null;
+  const liveAttentionLoading = Boolean(appUser?.id) && (attentionOwnerId !== appUser?.id || attentionLoading);
+  const liveAttentionError = attentionOwnerId === appUser?.id ? attentionError : '';
+  const reviewCount = appUser?.id ? liveAttention?.review.length ?? 0 : Number(fixture.hasReview);
+  const hasReview = reviewCount > 0;
+  const selectedAttention = liveAttention
+    ? [...liveAttention.needsYou, ...liveAttention.managed, ...liveAttention.later, ...liveAttention.review, ...liveAttention.done, ...(liveAttention.delegationCandidates ?? [])]
+      .find((item) => detailOrigin === item.id || detailOrigin === `attention-${item.id}` || detailOrigin === `managed-${item.id}` || detailOrigin === `review-${item.id}` || detailOrigin === `delegation-${item.id}`) ?? null
+    : null;
+  const historyConversationId = detail === 'moment' ? selectedAttention?.conversationId : detail === 'conversation' ? selectedConversationId : undefined;
+  const historyAccountId = detail === 'moment' ? selectedAttention?.connectedAccountId : undefined;
+  const activeHistoryKey = appUser?.id && historyConversationId ? `${appUser.id}:${historyConversationId}:${historyAccountId ?? ''}` : '';
+  const visibleHistory = historyKey === activeHistoryKey && sourceConversation && sourceConversation.id === historyConversationId && (!historyAccountId || sourceConversation.account.id === historyAccountId) ? sourceConversation : null;
 
   const commonMutations = {
     'stop-tracking': localCommonMutations['stop-tracking'] === 'idle' && fixture.mutationTarget === 'stop-tracking' ? fixture.mutation : localCommonMutations['stop-tracking'],
@@ -166,7 +200,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     setSurface(next);
     setDetail(null);
     setDrawerOpen(false);
-    setStatus(`${navigation.find((item) => item.id === next)?.label}を表示しました`);
+    setStatus(t('navigateStatus', {name: t(next)}));
   };
 
   const closeDrawer = () => {
@@ -319,9 +353,10 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   };
 
   useEffect(() => {
-    if (!appUser?.id || detail !== 'conversation' || !selectedConversationId) return;
+    if (!appUser?.id || !historyConversationId) return;
     const controller = new AbortController();
-    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations/${encodeURIComponent(selectedConversationId)}`, {
+    const accountQuery = historyAccountId ? `?accountId=${encodeURIComponent(historyAccountId)}` : '';
+    void fetch(`/api/bff/users/${encodeURIComponent(appUser.id)}/source/conversations/${encodeURIComponent(historyConversationId)}${accountQuery}`, {
       credentials: 'same-origin',
       signal: controller.signal
     })
@@ -329,15 +364,23 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         if (!response.ok) throw new Error('SOURCE_CONVERSATION_FAILED');
         return response.json() as Promise<SourceConversationReadModel>;
       })
-      .then((result) => setSourceConversation(result))
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setHistoryKey(activeHistoryKey);
+        setSourceConversationError('');
+        setSourceConversation(result);
+      })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setSourceConversationError(error instanceof Error ? error.message : 'SOURCE_CONVERSATION_FAILED');
+        if (!controller.signal.aborted) {
+          setHistoryKey(activeHistoryKey);
+          setSourceConversationError(error instanceof Error ? error.message : 'SOURCE_CONVERSATION_FAILED');
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setSourceConversationLoading(false);
       });
     return () => controller.abort();
-  }, [appUser?.id, detail, selectedConversationId]);
+  }, [appUser?.id, historyConversationId, historyAccountId, activeHistoryKey]);
 
   useEffect(() => {
     if (!appUser?.id || (detail !== 'moment' && detail !== 'conversation')) return;
@@ -362,6 +405,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
         return result as ReplyContextReadModel;
       })
       .then((result) => {
+        if (controller.signal.aborted) return;
         draftGeneration.current += 1;
         const sameConversation = replyContext?.conversationId === result.conversationId;
         setReplyContext(result);
@@ -475,16 +519,6 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
     );
   }
 
-  const liveAttention = appUser?.id && attentionOwnerId === appUser.id ? attentionModel : null;
-  const liveAttentionLoading = Boolean(appUser?.id) && (attentionOwnerId !== appUser?.id || attentionLoading);
-  const liveAttentionError = attentionOwnerId === appUser?.id ? attentionError : '';
-  const hasReview = liveAttention ? liveAttention.review.length > 0 : fixture.hasReview;
-  const reviewCount = liveAttention?.review.length ?? (fixture.hasReview ? 1 : 0);
-  const selectedAttention = liveAttention
-    ? [...liveAttention.needsYou, ...liveAttention.managed, ...liveAttention.later, ...liveAttention.review, ...liveAttention.done, ...(liveAttention.delegationCandidates ?? [])]
-      .find((item) => detailOrigin === item.id || detailOrigin === `attention-${item.id}` || detailOrigin === `managed-${item.id}` || detailOrigin === `review-${item.id}` || detailOrigin === `delegation-${item.id}`) ?? null
-    : null;
-
   const announceMutation = (target: Exclude<CommonMutationTarget, null>, message: string) => {
     setLocalCommonMutations((current) => ({...current, [target]: 'pending'}));
     setStatus(message);
@@ -539,6 +573,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const getAttentionMutation = (action: AttentionAction) => selectedAttention && attentionMutation.key === attentionMutationKey(action, selectedAttention) ? attentionMutation.state : 'idle';
 
   const requestImmediateSend = async () => {
+    if (detail === 'moment' && (!selectedAttention || !replyContext || selectedAttention.conversationId !== replyContext.conversationId || selectedAttention.connectedAccountId !== replyContext.connectedAccount.id || replyContext.mode !== replyMode)) return;
     if (!appUser?.id || !draftId) {
       setStatus('下書きの保存を確認してから送信してください');
       return;
@@ -639,23 +674,23 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
   const effectiveSendState = replyContext ? sendOperationStatus : sendState;
 
   return (
-    <main className={detail ? 'app-shell has-detail' : 'app-shell'} data-testid="lunowa-shell">
-      <a className="skip-link" href="#surface-heading">本文へ移動</a>
+    <main className={`app-shell workspace-shell${detail ? ' has-detail' : ''}${surface === 'home' ? ' is-home' : ''}`} data-testid="lunowa-shell" lang={locale}>
+      <a className="skip-link" href="#surface-heading">{t('skip')}</a>
       <header className="mobile-header">
         <button
           ref={navTrigger}
           className="icon-button"
           type="button"
-          aria-label="ナビゲーションを開く"
+          aria-label={t('openNav')}
           aria-expanded={drawerOpen}
           onClick={() => setDrawerOpen(true)}
         >
-          ☰
+          <Menu size={22} />
         </button>
-        <span className="wordmark">LUNOWA</span>
+        <Image className="workspace-logo" src="/brand/lunowa-logo.png" alt="Lunowa" width={210} height={70} />
       </header>
-      <aside ref={drawerPanel} className={drawerOpen ? 'primary-nav open' : 'primary-nav'} aria-label="主なナビゲーション" role={drawerOpen ? 'dialog' : undefined} aria-modal={drawerOpen || undefined}>
-        <div className="brand"><span aria-hidden="true">◐</span> LUNOWA</div>
+      <aside ref={drawerPanel} className={drawerOpen ? 'primary-nav open' : 'primary-nav'} aria-label={t('navLabel')} role={drawerOpen ? 'dialog' : undefined} aria-modal={drawerOpen || undefined}>
+        <div className="brand workspace-brand"><span className="brand-monogram" aria-hidden="true">L</span><Image className="workspace-logo" src="/brand/lunowa-logo.png" alt="Lunowa" width={210} height={70} /></div><p className="nav-section-label">{t('workspaceLabel')}</p>
         <nav>
           {navigation.filter((item) => item.id !== 'review' || hasReview || surface === 'review').map((item) => (
             <button
@@ -663,23 +698,26 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
               key={item.id}
               type="button"
               aria-current={surface === item.id ? 'page' : undefined}
-              aria-label={`${item.label}を表示`}
+              aria-label={t('show', {name: t(item.id)})}
               onClick={() => selectSurface(item.id)}
             >
-              <span className="nav-icon" aria-hidden="true">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
-              <span className="nav-tooltip" aria-hidden="true">{item.label}</span>
-              {item.id === 'review' && <span className="nav-count" aria-label={`確認が${reviewCount}件`}>{reviewCount}</span>}
+              <item.icon className="nav-icon" size={19} strokeWidth={1.7} aria-hidden="true" />
+              <span className="nav-label">{t(item.id)}</span>
+              <span className="nav-tooltip" aria-hidden="true">{t(item.id)}</span>
+              {item.id === 'review' && <span className="nav-count" aria-label={t('itemCount', {count: reviewCount})}>{reviewCount}</span>}
             </button>
           ))}
         </nav>
-        <div className="nav-bottom"><span>監視はアプリのサインアウトとは別です</span></div>
+        <div className="nav-bottom"><p>{t('navFooter')}</p><button className="workspace-profile" onClick={() => selectSurface('settings')} aria-label={t('viewSettings')}><span className="profile-avatar"><UserRound size={18} /></span><span><strong>{appUser?.name || t('previewUser')}</strong><span>{appUser?.email || t('previewTitle')}</span></span><ArrowRight size={15} /></button></div>
       </aside>
-      {drawerOpen && <button aria-label="ナビゲーションを閉じる" className="scrim" onClick={closeDrawer} />}
+      {drawerOpen && <button aria-label={t('closeNav')} className="scrim" onClick={closeDrawer} />}
 
-      <section className="surface-pane" aria-label="現在の画面">
+      <section className="surface-pane" aria-label={t('currentSurface')}>
+        {preview && <div className="workspace-preview" role="note"><strong>{t('previewTitle')}</strong><span>{t('previewNotice')}</span><select aria-label={t('language')} value={locale} onChange={(event) => onPreviewLocaleChange(event.target.value === 'en' ? 'en' : 'ja')}><option value="ja">日本語</option><option value="en">English</option></select></div>}
         <SurfaceContent
+          selectedOrigin={detail ? detailOrigin : undefined}
           surface={surface}
+          onNavigate={selectSurface}
           fixture={fixture}
           attention={liveAttention}
           attentionLoading={liveAttentionLoading}
@@ -735,6 +773,7 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
       </section>
 
       <section className="detail-pane" aria-label="詳細" aria-live="off">
+        {preview && detail && <p className="workspace-detail-preview">{t('previewNotice')}</p>}
         {detail ? (
           <DetailContent
             detail={detail}
@@ -773,9 +812,9 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
               setDraftSaveState('idle');
               setDraftDirty(true);
             }}
-            sourceConversation={sourceConversation}
-            sourceConversationLoading={sourceConversationLoading}
-            sourceConversationError={sourceConversationError}
+            sourceConversation={visibleHistory}
+            sourceConversationLoading={sourceConversationLoading || Boolean(activeHistoryKey && historyKey !== activeHistoryKey)}
+            sourceConversationError={historyKey === activeHistoryKey ? sourceConversationError : ''}
             sourceUserId={appUser?.id}
             getAttentionMutation={getAttentionMutation}
             onAttentionAction={(action, value) => selectedAttention && void performAttentionAction(action, selectedAttention, value)}
@@ -804,18 +843,21 @@ export function LunowaShell({appUser, onSignOut, signingOut = false, sessionActi
 }
 
 function FixtureSwitch({fixtureId, onChange}: {fixtureId: ShellFixture['id']; onChange: (id: ShellFixture['id']) => void}) {
+  const t = useTranslations('Workspace');
   return (
     <label className="fixture-switch">
-      <span>表示状態</span>
+      <span>{t('fixtureLabel')}</span>
       <select value={fixtureId} onChange={(event) => onChange(event.target.value as ShellFixture['id'])}>
-        {shellFixtures.map((fixture) => <option key={fixture.id} value={fixture.id}>{fixture.label}</option>)}
+        {shellFixtures.map((fixture) => <option key={fixture.id} value={fixture.id}>{t(`fixtures.${fixture.id}`)}</option>)}
       </select>
     </label>
   );
 }
 
-function SurfaceContent({surface, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
+function SurfaceContent({selectedOrigin, surface, onNavigate, fixture, attention, attentionLoading, attentionError, appUser, onSignOut, signingOut, sessionActionError, onRefreshData, search, onSearch, searchAccountId, onSearchAccount, sourceModel, sourceLoading, sourceError, onRetrySource, sourceSearchModel, sourceSearchLoading, sourceSearchError, openMoment, openManaged, openReview, openDelegation, openConversation, onLoadMoreSource, onLoadMoreSourceSearch}: {
+  selectedOrigin?: string;
   surface: Surface;
+  onNavigate: (surface: Surface) => void;
   fixture: ShellFixture;
   attention: AttentionReadModel | null;
   attentionLoading: boolean;
@@ -844,24 +886,25 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   openDelegation: (origin?: string) => void;
   openConversation: (origin: string, conversationId?: string) => void;
 }) {
-  const title = navigation.find((item) => item.id === surface)?.label ?? 'ホーム';
+  const t = useTranslations('Workspace');
+  const title = t(surface);
   const integrity = attention ? attention.integrity.status === 'degraded' : fixture.integrity === 'degraded';
   const partial = attention ? attention.source.readiness === 'partial' : fixture.sourceReadiness === 'partial';
   const loading = attention ? attention.source.readiness === 'loading' : fixture.sourceReadiness === 'loading';
-  const liveCoverageMessage = attention?.integrity.message ?? '会話の確認範囲がまだ十分ではありません。対応なしとは表示しません。';
+  const liveCoverageMessage = attention?.integrity.message ?? t('coverageUnknown');
   const attentionSurface = surface === 'home' || surface === 'needs' || surface === 'managed' || surface === 'review';
-  if (appUser?.id && attentionSurface && !attention && attentionLoading) return <LoadingState />;
-  if (appUser?.id && attentionSurface && !attention && attentionError) return <AttentionUnavailable />;
+  if (appUser?.id && attentionSurface && !attention && attentionLoading) return <><div className="surface-header"><h1 id="surface-heading">{title}</h1></div><LoadingState /></>;
+  if (appUser?.id && attentionSurface && !attention && attentionError) return <><div className="surface-header"><h1 id="surface-heading">{title}</h1></div><AttentionUnavailable onRetry={onRefreshData} /></>;
   return (
     <>
       <div className="surface-header">
-        <div><p className="eyebrow">LUNOWA</p><h1 id="surface-heading">{title}</h1></div>
+        <div><h1 id="surface-heading">{title}</h1>{surface === 'home' && <p className="workspace-subtitle">{t('subtitle')}</p>}</div><button className="workspace-search" aria-label={t('openSearch')} onClick={() => onNavigate('search')}><SearchIcon size={17} /><span>{t('searchPlaceholder')}</span><kbd>/</kbd></button>
       </div>
-      {!attention && integrity && <IntegrityBanner />}
-      {!attention && partial && <p className="coverage-notice" role="status">一部の会話のみを表示しています。最新の確認範囲: 10:15。</p>}
+      {!attention && integrity && <IntegrityBanner onInspect={() => onNavigate('settings')} />}
+      {!attention && partial && <p className="coverage-notice" role="status">{t('partialNotice')}</p>}
       {attention && surface !== 'home' && attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{liveCoverageMessage}</p>}
       {loading && <LoadingState />}
-      {!loading && surface === 'home' && <Home fixture={fixture} attention={attention} openMoment={openMoment} openReview={openReview} openManaged={openManaged} openDelegation={openDelegation} />}
+      {!loading && surface === 'home' && <WorkspaceHome selectedOrigin={selectedOrigin} fixture={fixture} attention={attention} sourceModel={sourceModel} live={Boolean(appUser?.id)} sourceLoading={sourceLoading} sourceError={sourceError} openMoment={openMoment} openReview={openReview} openManaged={openManaged} openDelegation={openDelegation} openConversation={openConversation} onNavigate={onNavigate} />}
       {!loading && surface === 'needs' && <NeedsYou fixture={fixture} attention={attention} openMoment={openMoment} openConversation={(origin, conversationId) => openConversation(origin, conversationId ?? sourceModel?.conversations[0]?.id ?? origin)} />}
       {!loading && surface === 'managed' && <Managed fixture={fixture} attention={attention} openManaged={openManaged} />}
       {!loading && surface === 'review' && <Review fixture={fixture} attention={attention} openReview={openReview} />}
@@ -888,39 +931,6 @@ function SurfaceContent({surface, fixture, attention, attentionLoading, attentio
   );
 }
 
-function Home({fixture, attention, openMoment, openReview, openManaged, openDelegation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openReview: (origin?: string) => void; openManaged: (origin?: string) => void; openDelegation: (origin?: string) => void}) {
-  if (attention) {
-    const managedOrigin = attention.managed[0] ? `managed-${attention.managed[0].id}` : undefined;
-    const laterOrigin = attention.later[0] ? `managed-${attention.later[0].id}` : undefined;
-    const candidates = attention.delegationCandidates ?? [];
-    if (attention.strictZero) return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>{attention.managedCount > 0 ? `会話の確認範囲は信頼でき、Lunowaが${attention.managedCount}件を見守っています。` : '現在、Lunowaが監視している件はありません。'}</p>{attention.managedCount > 0 && <button className="quiet-button" type="button" onClick={() => openManaged(managedOrigin)}>管理中を見る</button>}</section>{candidates.length > 0 && <DelegationCandidates items={candidates} openDelegation={openDelegation} />}</div>;
-    return <div className="surface-content">
-      {attention.integrity.status !== 'healthy' && <p className="coverage-notice" role="status">{attention.integrity.message}</p>}
-      <section aria-labelledby="attention-heading"><div className="section-heading"><h2 id="attention-heading">今、確認が必要なこと</h2><span>{attention.needsYou.length + attention.review.length}件</span></div>
-        {attention.needsYou.map((item) => <LiveAttentionButton key={item.id} item={item} onClick={openMoment} />)}
-        {attention.review.map((item) => <LiveReviewButton key={item.id} item={item} onClick={openReview} />)}
-      </section>
-      {attention.integrity.status === 'healthy' && attention.managedCount > 0
-        ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>{attention.managedCount}</strong></h2><p>今、追加対応が必要なものはありません。</p><button id="managed-estimate" className="quiet-button" type="button" onClick={() => openManaged(managedOrigin)}>管理中を見る</button></section>
-        : attention.integrity.status === 'healthy' && attention.later.length > 0
-          ? <section className="managed-summary" aria-labelledby="later-heading"><p className="eyebrow">あとで確認するもの</p><h2 id="later-heading">委ねた確認があります <strong>{attention.later.length}</strong></h2><p>これは「監視なし」ではありません。戻す条件を確認できます。</p><button className="quiet-button" type="button" onClick={() => openManaged(laterOrigin)}>あとで確認するものを見る</button></section>
-        : attention.integrity.status === 'healthy'
-          ? <p className="empty-state">現在、Lunowaが監視している件はありません。</p>
-          : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}
-      {candidates.length > 0 && <DelegationCandidates items={candidates} openDelegation={openDelegation} />}
-    </div>;
-  }
-  if (!fixture.hasNeedsYou && !fixture.hasReview && fixture.integrity === 'healthy' && fixture.sourceReadiness === 'ready' && fixture.monitoringPosture === 'active') return <div className="surface-content"><section className="true-zero"><p className="eyebrow">現在の状態</p><h2>今、あなたが対応する必要はありません。</h2><p>会話の確認範囲は信頼でき、Lunowaが4件を見守っています。</p><button className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button></section></div>;
-  if (fixture.monitoringPosture !== 'active') return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視の設定</p><h2>{fixture.monitoringPosture === 'stopped_by_user' ? '監視はあなたが停止しました' : '現在、任せている監視はありません'}</h2><p>{fixture.monitoringPosture === 'stopped_by_user' ? '停止は、会話が完了したことや対応不要を意味しません。' : '会話を確認しても、監視の約束はまだ作成されません。'}</p><button className="quiet-button" type="button" onClick={() => openManaged()}>監視の状態を見る</button></section></div>;
-  return <div className="surface-content">
-    <section aria-labelledby="attention-heading"><div className="section-heading"><h2 id="attention-heading">今、確認が必要なこと</h2><span>2件</span></div>
-      {fixture.hasNeedsYou && <AttentionButton onClick={() => openMoment()} />}
-      {fixture.hasReview && <button id="review-condition" className="list-row review-row" type="button" onClick={() => openReview()}><span className="state-chip review">確認</span><strong>契約更新の条件を確認してください</strong><span>佐藤ひろ子との会話に、異なる更新日があります。</span></button>}
-    </section>
-    {fixture.integrity === 'healthy' && fixture.monitoringPosture === 'active' ? <section className="managed-summary" aria-labelledby="managed-heading"><p className="eyebrow">安心して任せていること</p><h2 id="managed-heading">Lunowaが見ています <strong>4</strong></h2><p>今、追加対応が必要なものはありません。</p><p className="metadata">最終確認 2分前</p><button id="managed-estimate" className="quiet-button" type="button" onClick={() => openManaged()}>管理中を見る</button></section> : <p className="coverage-notice">監視の状態を確認するまで、管理中の安心表示は保留しています。</p>}
-  </div>;
-}
-
 function NeedsYou({fixture, attention, openMoment, openConversation}: {fixture: ShellFixture; attention: AttentionReadModel | null; openMoment: (origin?: string) => void; openConversation: (origin: string, conversationId?: string) => void}) {
   if (attention) return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{attention.needsYou.length > 0 ? attention.needsYou.map((item) => <div key={item.id}><LiveAttentionButton item={item} onClick={openMoment} /><button id={`source-${item.id}`} className="source-link" type="button" onClick={() => openConversation(`source-${item.id}`, item.conversationId)}>元の会話を開く</button></div>) : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
   return <div className="surface-content"><p className="surface-intro">現在のあなたの対応が必要なものだけを表示しています。</p>{fixture.hasNeedsYou ? <><AttentionButton onClick={openMoment} /><button id="needs-open-source" className="source-link" type="button" onClick={(event) => openConversation(event.currentTarget.id)}>元の会話を開く</button></> : <p className="empty-state">現在、対応が必要な件はありません。</p>}</div>;
@@ -936,10 +946,6 @@ function LiveReviewButton({item, onClick}: {item: AttentionItemReadModel; onClic
 
 function AttentionButton({onClick}: {onClick: () => void}) {
   return <button id={attentionItemStatic.id} className="list-row attention-row" type="button" onClick={onClick}><span className="state-chip action">対応</span><strong>{attentionItemStatic.action}</strong><span>{attentionItemStatic.person} · {attentionItemStatic.topic}</span><span className="metadata">{attentionItemStatic.whyNow}</span></button>;
-}
-
-function DelegationCandidates({items, openDelegation}: {items: AttentionItemReadModel[]; openDelegation: (origin?: string) => void}) {
-  return <section className="managed-summary" aria-labelledby="delegation-candidates-heading"><p className="eyebrow">任せる候補</p><h2 id="delegation-candidates-heading">現在のループを選んで任せる</h2><p>過去の会話を自動で監視対象にはしません。確認したい1件を選んでください。</p>{items.map((item) => <button id={`delegation-${item.id}`} key={item.id} className="list-row" type="button" onClick={() => openDelegation(`delegation-${item.id}`)}><span className="state-chip waiting">候補</span><strong>{item.operationalOutcome}</strong><span>{item.awaitedEvent ?? '相手の応答または次の条件'}</span><span className="metadata">戻す条件: {item.returnCondition ?? '条件を確認して決めます'}</span></button>)}</section>;
 }
 
 function Managed({fixture, attention, openManaged}: {fixture: ShellFixture; attention: AttentionReadModel | null; openManaged: (origin?: string) => void}) {
@@ -1085,11 +1091,13 @@ function DetailContent({detail, headingRef, draft, onDraft, commonMutations, sen
   onSend: () => void;
   onOpenSource: (conversationId?: string) => void;
 }) {
+  const t = useTranslations('Workspace');
+  const matchingMomentContext = !sourceUserId || (attentionItem?.conversationId === replyContext?.conversationId && attentionItem?.connectedAccountId === replyContext?.connectedAccount.id && replyContext?.mode === replyMode);
   const title = detail === 'conversation'
     ? sourceUserId ? sourceConversation?.subject ?? 'Sourceの会話' : sourceItem.subject
-    : detail === 'review-detail' ? attentionItem?.reviewQuestion ?? '契約更新の条件を確認してください' : detail === 'delegation' ? attentionItem?.operationalOutcome ?? '任せる候補を確認してください' : detail === 'managed-detail' ? attentionItem?.operationalOutcome ?? '来期の見積書を見守っています' : attentionItem?.operationalOutcome ?? attentionItemStatic.action;
-  return <div className="detail-content"><button className="back-button" type="button" onClick={onBack}>‹ 一覧に戻る</button><h2 ref={headingRef} tabIndex={-1}>{title}</h2>
-    {detail === 'moment' && <MomentBody item={attentionItem} onSource={onOpenSource} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} replyContext={replyContext} replyContextError={replyContextError} replyMode={replyMode} onReplyMode={onReplyMode} draftSaveState={draftSaveState} draftRecipients={draftRecipients} onRecipients={onRecipients} liveContextRequired={Boolean(sourceUserId)} />}
+    : detail === 'review-detail' ? attentionItem?.reviewQuestion ?? '契約更新の条件を確認してください' : detail === 'delegation' ? attentionItem?.operationalOutcome ?? '任せる候補を確認してください' : detail === 'managed-detail' ? attentionItem?.operationalOutcome ?? '来期の見積書を見守っています' : attentionItem?.operationalOutcome ?? (sourceUserId ? t('selectedWork') : attentionItemStatic.action);
+  return <div className="detail-content"><button className="back-button" type="button" onClick={onBack}>‹ {t('backToList')}</button>{detail !== 'moment' && <h2 ref={headingRef} tabIndex={-1}>{title}</h2>}
+    {detail === 'moment' && <MomentBody title={sourceUserId ? title : t('sampleAction')} headingRef={headingRef} item={attentionItem} onSource={onOpenSource} history={sourceUserId ? <SourceConversationDetail conversation={sourceConversation} userId={sourceUserId} loading={sourceConversationLoading} error={sourceConversationError} /> : <SampleThread />} person={sourceConversation?.messages.find((message) => message.direction === 'INBOUND')?.sender.displayName ?? sourceConversation?.messages.find((message) => message.direction === 'INBOUND')?.sender.email} draft={draft} onDraft={onDraft} sendState={sendState} fixture={fixture} onSend={onSend} replyContext={matchingMomentContext ? replyContext : null} replyContextError={replyContextError} replyMode={replyMode} onReplyMode={onReplyMode} draftSaveState={draftSaveState} draftRecipients={matchingMomentContext ? draftRecipients : null} onRecipients={onRecipients} liveContextRequired={Boolean(sourceUserId)} />}
     {detail === 'managed-detail' && <ManagedDetail item={attentionItem} live={Boolean(sourceUserId)} mutation={attentionItem ? getAttentionMutation('STOP_TRACKING') : commonMutations['stop-tracking']} returnMutation={attentionItem ? getAttentionMutation('RETURN_ATTENTION') : 'idle'} onMutation={onCommonMutation} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
     {detail === 'review-detail' && <ReviewDetail item={attentionItem} live={Boolean(sourceUserId)} mutation={attentionItem ? attentionItem.subjectKind === 'ADMISSION_REVIEW' ? getAttentionMutation('RESOLVE_ADMISSION_REVIEW') : getAttentionMutation('CORRECT_OPERATIONAL_OUTCOME') : commonMutations['review-answer']} onMutation={onCommonMutation} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
     {detail === 'delegation' && <DelegationDetail item={attentionItem} mutation={getAttentionMutation('DELEGATE')} onAttentionAction={onAttentionAction} onSource={onOpenSource} />}
@@ -1115,10 +1123,14 @@ type ComposerProps = {
   liveContextRequired: boolean;
 };
 
-function MomentBody({item, onSource, ...composer}: {item: AttentionItemReadModel | null; onSource: (conversationId?: string) => void} & ComposerProps) {
-  const action = item?.primaryAction ?? '内容を確認してください';
-  const outcome = item?.operationalOutcome ?? '見積書の条件について、確認を終える';
-  return <><p className="detail-lead">{item ? `現在の対応: ${action}` : attentionItemStatic.whyNow}</p><section className="trust-block"><h3>いま行うこと</h3><p>{item ? `${outcome}。` : '見積書を確認して、必要な点を返信してください。'}</p><button className="primary-button" type="button" onClick={() => document.getElementById('reply-body')?.focus()}>返信を書く</button></section><section><h3>変わったこと</h3><p>{item ? `このResponsibilityは「${item.projection.primaryReason}」として現在の状態に投影されています。` : '佐藤さんから、打ち合わせ前の確認依頼が届きました。'}</p></section><section><h3>残っていること</h3><p>{item ? outcome : '見積書の条件について、あなたからの確認を待っています。'}</p></section><button className="source-link" type="button" onClick={() => onSource(item?.conversationId)}>元の会話を確認する</button><Composer {...composer} /></>;
+function SampleThread() {
+  const t = useTranslations('Workspace');
+  return <div className="workspace-thread"><p className="thread-heading">{t('conversationHistory')}</p><article className="sample-message"><header><strong>{t('samplePerson')}</strong><time>10:15</time></header><p>{t('sampleMessageOne')}</p></article><article className="sample-message outbound"><header><strong>{t('you')}</strong><time>10:20</time></header><p>{t('sampleMessageTwo')}</p></article><article className="sample-message"><header><strong>{t('samplePerson')}</strong><time>10:24</time></header><p>{t('sampleMessageThree')}</p></article></div>;
+}
+
+function MomentBody({item, onSource, history, person, title, headingRef, ...composer}: {title: string; headingRef: React.RefObject<HTMLHeadingElement | null>; item: AttentionItemReadModel | null; onSource: (conversationId?: string) => void; history: React.ReactNode; person?: string | null} & ComposerProps) {
+  const t = useTranslations('Workspace');
+  return <><div className="moment-person"><span className="conversation-avatar" aria-hidden="true"><UserRound size={23} /></span><div><strong>{person ?? (composer.liveContextRequired ? t('selectedWork') : t('samplePerson'))}</strong><p>{item?.operationalOutcome ?? t(composer.liveContextRequired ? 'loading' : 'sampleSubject')}</p></div></div><section className="moment-action"><p className="moment-action-label"><Sparkles size={15} />{t('nextAction')}</p><div className="moment-action-main"><h2 ref={headingRef} tabIndex={-1} className="moment-action-title">{title}</h2><button className="primary-button" type="button" disabled={composer.liveContextRequired && !composer.replyContext} onClick={() => document.getElementById('reply-body')?.focus()}>{t('writeReply')}</button></div><p className="moment-action-context">{item?.operationalOutcome ?? t(composer.liveContextRequired ? 'loading' : 'sampleWhy')}</p><button className="source-link" type="button" onClick={() => onSource(item?.conversationId)}>{t('viewOriginal')}</button></section><div className="moment-history">{history}</div><Composer {...composer} /></>;
 }
 
 function ManagedDetail({item, live, mutation, returnMutation, onMutation, onAttentionAction, onSource}: {item: AttentionItemReadModel | null; live: boolean; mutation: MutationState; returnMutation: MutationState; onMutation: (target: Exclude<CommonMutationTarget, null>, message: string) => void; onAttentionAction: (action: AttentionAction, value?: string) => void; onSource: (conversationId?: string) => void}) {
@@ -1141,14 +1153,15 @@ function Conversation(composer: ComposerProps) {
 }
 
 function Composer({draft, onDraft, sendState, fixture, onSend, replyContext, replyContextError, replyMode, onReplyMode, draftSaveState, draftRecipients, onRecipients, liveContextRequired}: ComposerProps) {
+  const t = useTranslations('Workspace');
   if (liveContextRequired && !replyContext) {
-    return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3>{replyContextError ? <p className="inline-status" role="alert">返信の宛先を確認できないため、送信できません。</p> : <p className="inline-status" role="status">返信の送信元と宛先を確認しています。</p>}</section>;
+    return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">{t('reply')}</h3>{replyContextError ? <p className="inline-status" role="alert">{t('contextError')}</p> : <p className="inline-status" role="status">{t('contextLoading')}</p>}</section>;
   }
   const unavailable = !liveContextRequired && fixture.sourceRead === 'temporarily_unavailable';
   const awaitingResult = sendState === 'request_pending' || sendState === 'provider_ambiguous' || sendState === 'provider_confirmed_reconciling' || sendState === 'provider_reconciled';
   const toRecipients = draftRecipients?.to ?? replyContext?.recipients ?? [];
   const ccRecipients = draftRecipients?.cc ?? replyContext?.cc ?? [];
-  const toLabel = toRecipients.map(({displayName, email}) => displayName ? `${displayName} <${email}>` : email).join(', ') || '佐藤ひろ子';
+  const toLabel = toRecipients.map(({displayName, email}) => displayName ? `${displayName} <${email}>` : email).join(', ') || t('samplePerson');
   const toValue = toRecipients.map(({email}) => email).join(', ');
   const ccValue = ccRecipients.map(({email}) => email).join(', ');
   const fromLabel = replyContext ? `${replyContext.sender.displayName ?? ''} <${replyContext.sender.email}>`.trim() : 'work@example.jp';
@@ -1161,13 +1174,20 @@ function Composer({draft, onDraft, sendState, fixture, onSend, replyContext, rep
           : null;
   const sendPermissionMissing = Boolean(replyContext && !replyContext.connectedAccount.sendAuthorized);
   const sendDisabled = !draft || awaitingResult || unavailable || sendPermissionMissing || Boolean(replyContextError) || Boolean(replyContext && draftSaveState !== 'saved');
-  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">返信</h3>{replyContext && <label htmlFor="reply-mode">種類<select id="reply-mode" value={replyMode} disabled={awaitingResult} onChange={(event) => onReplyMode(event.target.value as ReplyMode)}><option value="REPLY">返信</option><option value="REPLY_ALL">全員に返信</option></select></label>}{replyContext ? <><label htmlFor="reply-to">宛先<input id="reply-to" value={toValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: parseRecipients(event.target.value), cc: ccRecipients})} /></label><label htmlFor="reply-cc">Cc<input id="reply-cc" value={ccValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: toRecipients, cc: parseRecipients(event.target.value)})} /></label><p className="metadata">宛先の表示名: {toLabel} · From: {fromLabel}</p></> : <p className="metadata">宛先: {toLabel} · From: {fromLabel}</p>}{replyContextError && <p className="inline-status" role="alert">返信の宛先を確認できないため、送信できません。</p>}{sendPermissionMissing && <p className="inline-status" role="status">Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください。読み取りと監視は継続できます。</p>}<label htmlFor="reply-body">本文<textarea id="reply-body" value={draft} disabled={awaitingResult} onChange={(event) => onDraft(event.target.value)} placeholder="返信を入力" rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{replyContext && draftSaveState === 'saving' && <p className="inline-status" role="status">下書きを保存しています。</p>}{replyContext && draftSaveState === 'conflict' && <p className="inline-status" role="alert">別の編集が保存されたため、下書きを上書きしていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={sendDisabled} type="button" onClick={onSend}>{sendState === 'request_pending' ? '送信をリクエストしています' : sendState === 'provider_ambiguous' ? '送信結果を確認しています' : sendState === 'provider_confirmed_reconciling' ? '状態を更新しています' : sendState === 'provider_reconciled' ? '送信済み' : sendState === 'provider_failed' ? '再試行する' : '送信する'}</button><p className="metadata">Enterだけでは送信されません。</p></section>;
+  return <section className="composer" aria-labelledby="composer-heading"><h3 id="composer-heading">{t('reply')}</h3>{replyContext && <label htmlFor="reply-mode">{t('replyType')}<select id="reply-mode" value={replyMode} disabled={awaitingResult} onChange={(event) => onReplyMode(event.target.value as ReplyMode)}><option value="REPLY">{t('reply')}</option><option value="REPLY_ALL">{t('replyAll')}</option></select></label>}{replyContext ? <><label htmlFor="reply-to">{t('to')}<input id="reply-to" value={toValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: parseRecipients(event.target.value), cc: ccRecipients})} /></label><label htmlFor="reply-cc">Cc<input id="reply-cc" value={ccValue} disabled={awaitingResult} onChange={(event) => onRecipients({to: toRecipients, cc: parseRecipients(event.target.value)})} /></label><p className="metadata">宛先の表示名: {toLabel} · From: {fromLabel}</p></> : <p className="metadata">{t('to')}: {toLabel} · From: {fromLabel}</p>}{replyContextError && <p className="inline-status" role="alert">{t('contextError')}</p>}{sendPermissionMissing && <p className="inline-status" role="status">Gmailの送信権限がありません。設定でメールボックスを再接続して送信権限を許可してください。読み取りと監視は継続できます。</p>}<label htmlFor="reply-body">{t('body')}<textarea id="reply-body" value={draft} disabled={awaitingResult} onChange={(event) => onDraft(event.target.value)} placeholder={t('replyPlaceholder')} rows={4} /></label>{unavailable && <p className="inline-status" role="status">現在オフラインです。下書きは保存されていますが、送信されていません。</p>}{replyContext && draftSaveState === 'saving' && <p className="inline-status" role="status">{t('savingDraft')}</p>}{replyContext && draftSaveState === 'conflict' && <p className="inline-status" role="alert">別の編集が保存されたため、下書きを上書きしていません。</p>}{feedback && <p className="inline-status" role="status">{feedback}</p>}<button className="primary-button" disabled={sendDisabled} type="button" onClick={onSend}>{sendState === 'request_pending' ? t('sendRequest') : sendState === 'provider_ambiguous' ? t('sendUnknown') : sendState === 'provider_confirmed_reconciling' ? t('sendUpdating') : sendState === 'provider_reconciled' ? t('sent') : sendState === 'provider_failed' ? t('retrySend') : t('send')}</button><p className="metadata">{t('noEnterSend')}</p></section>;
 }
 
-function IntegrityBanner() {
-  return <aside className="integrity-banner" aria-labelledby="integrity-title"><strong id="integrity-title">一部の監視を確認できていません</strong><span>会話の更新を再確認するまで、管理中の安心表示には含めません。</span><button type="button">再接続を確認</button></aside>;
+function IntegrityBanner({onInspect}: {onInspect: () => void}) {
+  const t = useTranslations('Workspace');
+  return <aside className="integrity-banner" aria-labelledby="integrity-title"><strong id="integrity-title">{t('integrityTitle')}</strong><span>{t('integrityBody')}</span><button type="button" onClick={onInspect}>{t('reconnect')}</button></aside>;
 }
 
-function LoadingState() { return <div className="loading-state" role="status"><span aria-hidden="true" />会話の状態を確認しています。完了するまで、対応なしとは表示しません。</div>; }
-function AttentionUnavailable() { return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">監視の状態</p><h2>監視の状態を確認できません</h2><p>最新の対応・確認・管理中の状態を取得できないため、対応なしとは表示していません。Sourceは引き続き確認できます。</p><button className="quiet-button" type="button" onClick={() => window.location.reload()}>再確認する</button></section></div>; }
+function LoadingState() {
+  const t = useTranslations('Workspace');
+  return <div className="loading-state" role="status"><span aria-hidden="true" />{t('loading')}</div>;
+}
+function AttentionUnavailable({onRetry}: {onRetry: () => void}) {
+  const t = useTranslations('Workspace');
+  return <div className="surface-content"><section className="managed-summary"><p className="eyebrow">{t('monitoringStatus')}</p><h2>{t('unavailableTitle')}</h2><p>{t('unavailableBody')}</p><button className="quiet-button" type="button" onClick={onRetry}>{t('retry')}</button></section></div>;
+}
 function EmptyDetail() { return <div className="empty-detail"><p className="eyebrow">詳細</p><h2>項目を選択してください</h2><p>対応、管理中、確認、または会話を選ぶと、ここに必要な文脈を表示します。</p></div>; }

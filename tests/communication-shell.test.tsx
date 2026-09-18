@@ -1,4 +1,4 @@
-import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {LunowaShell} from '@/components/lunowa-shell';
@@ -59,6 +59,36 @@ afterEach(() => {
 });
 
 describe('G50 live composer safety', () => {
+  it('keeps late Moment history and reply context from a previous selection out of the active work', async () => {
+    let finishHistory: (value: Response) => void = () => undefined;
+    let finishContext: (value: Response) => void = () => undefined;
+    const historyA = new Promise<Response>((resolve) => {finishHistory = resolve;});
+    const contextA = new Promise<Response>((resolve) => {finishContext = resolve;});
+    const second = {...attention.needsYou[0], id: 'responsibility-2', responsibilityId: 'responsibility-2', conversationId: 'conversation-2', operationalOutcome: '納品日を確認する', primaryAction: '納品日を返信する'};
+    const contextB = {...replyContext(true), conversationId: 'conversation-2', recipients: [{email: 'second@example.com', displayName: 'Second'}], draft: {id: 'draft-2', version: 1, body: 'Second draft', recipients: [{email: 'second@example.com', displayName: 'Second'}], cc: []}};
+    const history = (id: string, body: string) => ({id, evidenceRevision: 1, account: {id: 'account-1', provider: 'gmail', emailAddress: 'owner@example.com', connectionState: 'CONNECTED', sync: {status: 'HEALTHY'}}, messages: [{id: `message-${id}`, direction: 'INBOUND', sender: {displayName: 'Sender', email: 'sender@example.com'}, recipients: [], cc: [], participants: [], occurredAt: '2030-01-01', textBody: body, sanitizedHtmlBody: null, attachments: []}]});
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json({...attention, needsYou: [attention.needsYou[0], second]});
+      if (url.includes('/drafts/context?')) return url.includes('conversation-1') ? contextA : json(contextB);
+      if (url.includes('/source/conversations/conversation-1')) return historyA;
+      if (url.includes('/source/conversations/conversation-2')) return json(history('conversation-2', 'Second original message'));
+      return json(source);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(await screen.findByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('conversation-1?accountId=account-1'))).toBe(true));
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    expect(await screen.findByText('Second original message')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('Second draft'));
+    await act(async () => {finishHistory(json(history('conversation-1', 'First original message'))); finishContext(json(replyContext(true)));});
+    expect(screen.queryByText('First original message')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('本文')).toHaveValue('Second draft');
+    expect(screen.getByLabelText('宛先')).toHaveValue('second@example.com');
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/send-operations'))).toBe(false);
+  });
+
   it('keeps manual reply usable but disables Send when live mail_send capability is missing', async () => {
     const fetchMock = baseFetch(replyContext(false));
     vi.stubGlobal('fetch', fetchMock);

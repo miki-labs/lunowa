@@ -218,7 +218,7 @@ export function SourceConversationDetail({conversation, userId, loading, error}:
   return <div className="source-conversation-body">
     <p className="metadata">原文 · {conversation.account.provider} · {conversation.account.emailAddress} · evidence revision {conversation.evidenceRevision}</p>
     {accountCoverageNotice(conversation.account)}
-    {conversation.messages.map((message) => <article className="source-message" key={message.id}>
+    {conversation.messages.map((message) => <article className={`source-message ${message.direction === 'OUTBOUND' ? 'outbound' : 'inbound'}`} key={message.id}>
       <header><strong>{message.sender.displayName || message.sender.email}</strong><span>{message.sender.email}</span><time dateTime={message.occurredAt}>{new Date(message.occurredAt).toLocaleString('ja-JP')}</time></header>
       <p className="metadata">{message.direction === 'INBOUND' ? '受信' : '送信'} · 宛先: {formatRecipients(message)} · provider message: {message.providerMessageId}</p>
       {message.providerDeletedAt && <p className="inline-status" role="status">プロバイダーでは現在確認できませんが、観測済みの原文は保持しています。</p>}

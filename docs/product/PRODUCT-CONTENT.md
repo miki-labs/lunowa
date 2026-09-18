@@ -4,6 +4,8 @@
 
 **Canonical detailed Product authority when this file is present on `main`. On an unmerged branch, it is a canonical-promotion candidate.**
 
+The 2026-09-18 user-approved completion scope is recorded in [COMPLETION-SCOPE.md](COMPLETION-SCOPE.md). Gmail remains the first implementation path; Outlook and mixed multiple accounts are now part of the requested finished application. Earlier one-provider sequencing statements describe the original milestone, not an exclusion of this accepted extension. Existing domain and effect boundaries remain unchanged.
+
 This document closes the Product-behavior domains required by GitHub Issue #45: User Control / Correction / Escalation, degraded/failure behavior, account lifecycle, Settings, communication edge cases, complete Managed/Review behavior, zero/unknown/unavailable states, and final feature scope.
 
 Authority order remains:

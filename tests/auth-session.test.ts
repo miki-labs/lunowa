@@ -45,7 +45,7 @@ describe('production auth contract', () => {
     expect(evidenceSql).toContain('CREATE TABLE "connected_accounts"');
   });
 
-  it('configures only local application credentials and the proven UUID generator', () => {
+  it('does not fall back to passwords when Google is unconfigured and preserves UUID ownership', () => {
     const auth = createAppAuth({} as never, {
       secret: 'test-secret-that-is-longer-than-thirty-two-characters',
       baseURL: 'http://auth.test.invalid'
@@ -57,7 +57,7 @@ describe('production auth contract', () => {
     };
 
     expect(options.advanced?.database?.generateId).toBe('uuid');
-    expect(options.emailAndPassword?.enabled).toBe(true);
+    expect(options.emailAndPassword?.enabled).toBe(false);
     expect(options.account?.accountLinking?.enabled).toBe(false);
     expect(Object.keys(options.socialProviders ?? {})).toEqual([]);
   });

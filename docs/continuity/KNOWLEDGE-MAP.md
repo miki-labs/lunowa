@@ -6,6 +6,7 @@
 
 | 知りたいこと | Primary authority | Secondary / context | Freshness rule |
 | --- | --- | --- | --- |
+| Gmail + Outlook・複数アカウント・承認済み画面を含む完成範囲 | `docs/product/COMPLETION-SCOPE.md` + `PRODUCT.md` | linked live completion Issue | scopeと実装/公開の検証済み状態を区別する |
 | Lunowaは何を解決するProductか / v1 direction / hypothesis | `docs/product/PRODUCT.md` | `docs/product/PRODUCT-CONTENT.md`, current Product Issue | hypothesisとempirical validationを混同しない |
 | v1の詳細behavior / scope / failure / Feature Matrix | `docs/product/PRODUCT-CONTENT.md` | `docs/product/PRODUCT.md`, design, Responsibility | Product behavior変更時に再読 |
 | end-to-endで何が成立すればよいか | `docs/product/GOLDEN-SCENARIO-BANK.md` | Responsibility oracles | semantic truth conflictではResponsibility authorityを確認 |

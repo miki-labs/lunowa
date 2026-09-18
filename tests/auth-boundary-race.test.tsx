@@ -18,6 +18,7 @@ vi.mock('@/lib/auth-client', () => ({
 }));
 
 import {AuthBoundary} from '@/components/auth-boundary';
+import {AuthTestProvider} from './auth-test-provider';
 
 afterEach(() => {
   cleanup();
@@ -54,7 +55,7 @@ describe('application session currentness', () => {
       }));
     authMocks.signOut.mockResolvedValue({data: {success: true}, error: null});
 
-    render(<AuthBoundary />);
+    render(<AuthBoundary />, {wrapper: AuthTestProvider});
     await screen.findByTestId('lunowa-shell');
     fireEvent.click(screen.getByRole('button', {name: '設定を表示'}));
 
@@ -64,7 +65,7 @@ describe('application session currentness', () => {
     await screen.findByText(/この端末からログアウトしました。Lunowaの監視設定は変更されていません/);
 
     resolveStaleCheck?.({data: appSession, error: null});
-    await waitFor(() => expect(screen.getByRole('heading', {name: 'Lunowaにサインイン'})).toBeVisible());
+    await waitFor(() => expect(screen.getByRole('heading', {name: 'Lunowaへようこそ'})).toBeVisible());
     expect(screen.queryByTestId('lunowa-shell')).not.toBeInTheDocument();
   });
 });

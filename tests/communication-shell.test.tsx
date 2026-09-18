@@ -1,4 +1,4 @@
-import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {LunowaShell} from '@/components/lunowa-shell';
@@ -59,6 +59,176 @@ afterEach(() => {
 });
 
 describe('G50 live composer safety', () => {
+  it('removes the prior editable identity while a replacement Moment or reply mode is loading', async () => {
+    const second = {...attention.needsYou[0], id: 'responsibility-2', responsibilityId: 'responsibility-2', conversationId: 'conversation-2', connectedAccountId: 'account-2', operationalOutcome: '納品日を確認する', primaryAction: '納品日を返信する'};
+    const contextA = replyContext(true);
+    const contextB = {...replyContext(true), connectedAccount: {...replyContext(true).connectedAccount, id: 'account-2'}, conversationId: 'conversation-2', recipients: [{email: 'second@example.com', displayName: 'Second'}], draft: {id: 'draft-2', version: 1, body: 'Second draft', recipients: [{email: 'second@example.com', displayName: 'Second'}], cc: []}};
+    let releaseB: (value: typeof contextB) => void = () => undefined;
+    let releaseReplyAll: (value: typeof contextB) => void = () => undefined;
+    const pendingB = new Promise<typeof contextB>((resolve) => {releaseB = resolve;});
+    const pendingReplyAll = new Promise<typeof contextB>((resolve) => {releaseReplyAll = resolve;});
+    const draftPosts: Array<Record<string, unknown>> = [];
+    const history = (id: string, accountId: string) => ({id, evidenceRevision: 1, account: {id: accountId, provider: 'gmail', emailAddress: 'owner@example.com', connectionState: 'CONNECTED', sync: {status: 'HEALTHY'}}, messages: [{id: `message-${id}`, direction: 'INBOUND', sender: {displayName: 'Sender', email: 'sender@example.com'}, recipients: [], cc: [], participants: [], occurredAt: '2030-01-01', textBody: 'Original message', sanitizedHtmlBody: null, attachments: []}]});
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json({...attention, needsYou: [attention.needsYou[0], second]});
+      if (url.includes('/drafts/context?')) {
+        if (url.includes('mode=REPLY_ALL')) return pendingReplyAll.then(json);
+        if (url.includes('conversationId=conversation-2')) return pendingB.then(json);
+        return json(contextA);
+      }
+      if (url.endsWith('/drafts') && init?.method === 'POST') {
+        draftPosts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({id: 'unexpected', version: 2});
+      }
+      if (url.includes('/source/conversations/conversation-1')) return json(history('conversation-1', 'account-1'));
+      if (url.includes('/source/conversations/conversation-2')) return json(history('conversation-2', 'account-2'));
+      if (url.includes('/source/conversations')) return json(source);
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+
+    fireEvent.click(await screen.findByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('確認しました。'));
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: '保存してはいけない旧下書き'}});
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    expect(screen.getByText('返信の送信元と宛先を確認しています。')).toBeTruthy();
+    expect(screen.queryByLabelText('本文')).toBeNull();
+    await new Promise((resolve) => window.setTimeout(resolve, 320));
+    expect(draftPosts).toEqual([]);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('conversationId=conversation-2'))).toBe(true));
+
+    await act(async () => {releaseB(contextB);});
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('Second draft'));
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: 'Reply Allにも保持する未保存本文'}});
+    fireEvent.change(screen.getByLabelText('種類'), {target: {value: 'REPLY_ALL'}});
+    expect(screen.getByText('返信の送信元と宛先を確認しています。')).toBeTruthy();
+    expect(screen.queryByLabelText('本文')).toBeNull();
+    await new Promise((resolve) => window.setTimeout(resolve, 320));
+    expect(draftPosts).toEqual([]);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('mode=REPLY_ALL'))).toBe(true));
+    const contextWithoutDraft = {...contextB};
+    delete (contextWithoutDraft as {draft?: unknown}).draft;
+    await act(async () => {releaseReplyAll({...contextWithoutDraft, mode: 'REPLY_ALL'} as typeof contextB);});
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('Reply Allにも保持する未保存本文'));
+    await waitFor(() => expect(draftPosts).toHaveLength(1), {timeout: 1500});
+    expect(draftPosts[0]).toMatchObject({connectedAccountId: 'account-2', conversationId: 'conversation-2', mode: 'REPLY_ALL', body: 'Reply Allにも保持する未保存本文'});
+  });
+
+  it.each([
+    ['a different mode-specific draft', {id: 'draft-all', version: 4, body: '別モードの保存済み本文', recipients: [{email: 'sender@example.com', displayName: 'Sender'}], cc: []}, {draftId: 'draft-all', expectedVersion: 4}],
+    ['no mode-specific draft', undefined, {draftId: null, expectedVersion: null}]
+  ])('saves a clean carried body against %s before enabling Send', async (_case, modeDraft, expectedIdentity) => {
+    const draftPosts: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json(attention);
+      if (url.includes('/drafts/context?')) return json(url.includes('mode=REPLY_ALL') ? {...replyContext(true), mode: 'REPLY_ALL', ...(modeDraft ? {draft: modeDraft} : {draft: undefined})} : replyContext(true));
+      if (url.endsWith('/drafts') && init?.method === 'POST') {
+        draftPosts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({id: modeDraft?.id ?? 'draft-all-new', version: (modeDraft?.version ?? 0) + 1});
+      }
+      if (url.includes('/source/conversations')) return json(source);
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+
+    await openComposer();
+    expect(screen.getByLabelText('本文')).toHaveValue('確認しました。');
+    fireEvent.change(screen.getByLabelText('種類'), {target: {value: 'REPLY_ALL'}});
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('確認しました。'));
+    await waitFor(() => expect(draftPosts).toHaveLength(1), {timeout: 1500});
+    expect(draftPosts[0]).toMatchObject({...expectedIdentity, connectedAccountId: 'account-1', conversationId: 'conversation-1', mode: 'REPLY_ALL', body: '確認しました。'});
+    await waitFor(() => expect(screen.getByRole('button', {name: '送信する'})).not.toBeDisabled());
+  });
+
+  it('uses fresh server truth for a clean same-mode revisit and conflicts instead of overwriting a dirty changed version', async () => {
+    const second = {...attention.needsYou[0], id: 'responsibility-2', responsibilityId: 'responsibility-2', conversationId: 'conversation-2', operationalOutcome: '納品日を確認する', primaryAction: '納品日を返信する'};
+    let conversationOneLoads = 0;
+    const draftPosts: Array<Record<string, unknown>> = [];
+    const contextB = {...replyContext(true), conversationId: 'conversation-2', draft: {id: 'draft-2', version: 1, body: 'B本文', recipients: [{email: 'sender@example.com', displayName: 'Sender'}], cc: []}};
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json({...attention, needsYou: [attention.needsYou[0], second]});
+      if (url.includes('/drafts/context?')) {
+        if (url.includes('conversationId=conversation-2')) return json(contextB);
+        conversationOneLoads += 1;
+        return json({...replyContext(true), draft: {...replyContext(true).draft!, version: conversationOneLoads === 1 ? 1 : conversationOneLoads === 2 ? 2 : 3, body: conversationOneLoads === 1 ? 'A v1' : conversationOneLoads === 2 ? 'A v2 from server' : 'A v3 from server'}});
+      }
+      if (url.endsWith('/drafts') && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        draftPosts.push(body);
+        return body.expectedVersion === 2 ? json({error: 'DRAFT_VERSION_CONFLICT'}, {status: 409}) : json({id: 'unexpected', version: 99});
+      }
+      if (url.includes('/source/conversations')) return json(source);
+      return json({error: 'UNEXPECTED_REQUEST'}, {status: 500});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+
+    fireEvent.click(await screen.findByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('A v1'));
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('B本文'));
+    fireEvent.click(screen.getByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('A v2 from server'));
+    expect(draftPosts).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: '競合時に守るローカル編集'}});
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('B本文'));
+    fireEvent.click(screen.getByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('競合時に守るローカル編集'));
+    expect(screen.getByText('別の編集が保存されたため、下書きを上書きしていません。')).toBeTruthy();
+    await new Promise((resolve) => window.setTimeout(resolve, 320));
+    expect(draftPosts).toEqual([]);
+    expect(screen.getByRole('button', {name: '送信する'})).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('B本文'));
+    fireEvent.click(screen.getByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('競合時に守るローカル編集'));
+    expect(screen.getByText('別の編集が保存されたため、下書きを上書きしていません。')).toBeTruthy();
+    expect(draftPosts).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText('本文'), {target: {value: '競合後の追記'}});
+    await waitFor(() => expect(draftPosts).toHaveLength(1), {timeout: 1500});
+    expect(draftPosts[0]).toMatchObject({draftId: 'draft-1', expectedVersion: 2, body: '競合後の追記'});
+    expect(screen.getByRole('button', {name: '送信する'})).toBeDisabled();
+  });
+
+  it('keeps late Moment history and reply context from a previous selection out of the active work', async () => {
+    let finishHistory: (value: Response) => void = () => undefined;
+    let finishContext: (value: Response) => void = () => undefined;
+    const historyA = new Promise<Response>((resolve) => {finishHistory = resolve;});
+    const contextA = new Promise<Response>((resolve) => {finishContext = resolve;});
+    const second = {...attention.needsYou[0], id: 'responsibility-2', responsibilityId: 'responsibility-2', conversationId: 'conversation-2', operationalOutcome: '納品日を確認する', primaryAction: '納品日を返信する'};
+    const contextB = {...replyContext(true), conversationId: 'conversation-2', recipients: [{email: 'second@example.com', displayName: 'Second'}], draft: {id: 'draft-2', version: 1, body: 'Second draft', recipients: [{email: 'second@example.com', displayName: 'Second'}], cc: []}};
+    const history = (id: string, body: string) => ({id, evidenceRevision: 1, account: {id: 'account-1', provider: 'gmail', emailAddress: 'owner@example.com', connectionState: 'CONNECTED', sync: {status: 'HEALTHY'}}, messages: [{id: `message-${id}`, direction: 'INBOUND', sender: {displayName: 'Sender', email: 'sender@example.com'}, recipients: [], cc: [], participants: [], occurredAt: '2030-01-01', textBody: body, sanitizedHtmlBody: null, attachments: []}]});
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/attention')) return json({...attention, needsYou: [attention.needsYou[0], second]});
+      if (url.includes('/drafts/context?')) return url.includes('conversation-1') ? contextA : json(contextB);
+      if (url.includes('/source/conversations/conversation-1')) return historyA;
+      if (url.includes('/source/conversations/conversation-2')) return json(history('conversation-2', 'Second original message'));
+      return json(source);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LunowaShell appUser={{id: 'user-1', name: 'Owner', email: 'owner@example.com'}} />);
+    fireEvent.click(await screen.findByRole('button', {name: /見積書に返信する/}));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('conversation-1?accountId=account-1'))).toBe(true));
+    fireEvent.click(screen.getByRole('button', {name: /納品日を返信する/}));
+    expect(await screen.findByText('Second original message')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('本文')).toHaveValue('Second draft'));
+    await act(async () => {finishHistory(json(history('conversation-1', 'First original message'))); finishContext(json(replyContext(true)));});
+    expect(screen.queryByText('First original message')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('本文')).toHaveValue('Second draft');
+    expect(screen.getByLabelText('宛先')).toHaveValue('second@example.com');
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/send-operations'))).toBe(false);
+  });
+
   it('keeps manual reply usable but disables Send when live mail_send capability is missing', async () => {
     const fetchMock = baseFetch(replyContext(false));
     vi.stubGlobal('fetch', fetchMock);

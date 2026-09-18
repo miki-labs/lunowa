@@ -8,8 +8,9 @@ test('serves the protected Lunowa sign-in boundary at desktop and compact viewpo
       const response = await page.goto('/ja');
 
       expect(response?.ok(), 'the preview must respond successfully').toBe(true);
-      await expect(page.getByRole('heading', {name: 'Lunowaにサインイン'})).toBeVisible();
-      await expect(page.getByText(/メールボックスの接続は、サインイン後に別の操作/)).toBeVisible();
+      await expect(page.getByRole('heading', {name: 'Lunowaへようこそ'})).toBeVisible();
+      await expect(page.getByRole('button', {name: 'Google で続行'})).toBeVisible();
+      await expect(page.getByText(/サインインだけでは、Gmailの読み取りや送信は許可されません/)).toBeVisible();
     });
   }
 });

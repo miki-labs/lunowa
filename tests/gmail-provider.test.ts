@@ -303,7 +303,7 @@ describe('G20 deployed runtime bindings', () => {
     const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8');
     const worker = readFileSync(resolve(process.cwd(), 'src/worker.ts'), 'utf8');
     expect(wrangler).toContain('"main": "src/worker.ts"');
-    expect(wrangler).toContain('"crons": ["*/10 * * * *"]');
+    expect(wrangler).not.toContain('"crons"');
     expect(wrangler).toContain('"observability"');
     expect(wrangler).toContain('"head_sampling_rate": 1');
     expect(worker).toContain('runGmailReconciliation()');

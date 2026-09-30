@@ -293,7 +293,7 @@ describe('G20 Gmail credential and authorization boundary', () => {
 });
 
 describe('G20 deployed runtime bindings', () => {
-  it('binds the durable worker owner to the deployed ten-minute cron', async () => {
+  it('keeps scheduled reconciliation code available while the deployed cron is paused', async () => {
     const enqueueDueWork = vi.fn(async () => 2);
     const runPending = vi.fn(async () => ({processed: 3, failed: 1}));
     await expect(runGmailReconciliation({sync: {enqueueDueWork, runPending} as never}))
@@ -303,7 +303,7 @@ describe('G20 deployed runtime bindings', () => {
     const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8');
     const worker = readFileSync(resolve(process.cwd(), 'src/worker.ts'), 'utf8');
     expect(wrangler).toContain('"main": "src/worker.ts"');
-    expect(wrangler).toContain('"crons": ["*/10 * * * *"]');
+    expect(wrangler).not.toContain('"crons"');
     expect(wrangler).toContain('"observability"');
     expect(wrangler).toContain('"head_sampling_rate": 1');
     expect(worker).toContain('runGmailReconciliation()');

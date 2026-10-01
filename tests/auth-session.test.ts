@@ -2,7 +2,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {describe, expect, it} from 'vitest';
 
-import {createAppAuth} from '@/server/auth/auth';
+import {createAppAuth, trustedWorkersPreviewOrigins} from '@/server/auth/auth';
 import {AppSessionAccessError, authorizeAppSession, sessionAccessResponse, type AuthenticatedAppSession} from '@/server/auth/session';
 
 const userId = 'c8b653d9-dceb-48d1-a4fc-e4df475f3493';
@@ -60,6 +60,19 @@ describe('production auth contract', () => {
     expect(options.emailAndPassword?.enabled).toBe(true);
     expect(options.account?.accountLinking?.enabled).toBe(false);
     expect(Object.keys(options.socialProviders ?? {})).toEqual([]);
+  });
+
+  it('trusts only HTTPS sibling Cloudflare preview origins derived from the configured stable Worker URL', () => {
+    const baseURL = 'https://lunowa-preview.kanato-erika773.workers.dev';
+    const requestFrom = (origin: string) => new Request(`${baseURL}/api/auth/sign-up/email`, {headers: {origin}});
+
+    expect(trustedWorkersPreviewOrigins(baseURL, requestFrom('https://symphony-155-lunowa-preview.kanato-erika773.workers.dev')))
+      .toEqual(['https://symphony-155-lunowa-preview.kanato-erika773.workers.dev']);
+    expect(trustedWorkersPreviewOrigins(baseURL, requestFrom('https://8b48ac60-lunowa-preview.kanato-erika773.workers.dev')))
+      .toEqual(['https://8b48ac60-lunowa-preview.kanato-erika773.workers.dev']);
+    expect(trustedWorkersPreviewOrigins(baseURL, requestFrom('https://unrelated.workers.dev'))).toEqual([]);
+    expect(trustedWorkersPreviewOrigins(baseURL, requestFrom('http://symphony-155-lunowa-preview.kanato-erika773.workers.dev'))).toEqual([]);
+    expect(trustedWorkersPreviewOrigins('https://app.example.com', requestFrom('https://preview-app.example.com'))).toEqual([]);
   });
 
   it('requires a production-strength session secret', () => {

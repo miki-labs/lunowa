@@ -2,6 +2,8 @@
 
 ## Status
 
+2026-09-18 completion follow-up: the historical stages below are not the current backlog. Reuse their implemented capabilities after checking code and live evidence. The user's expanded Gmail + Outlook / accepted-reference / bounded-cleanup direction is recorded in [COMPLETION-SCOPE.md](COMPLETION-SCOPE.md); current sequencing and task contracts live in [completion Issue #175](https://github.com/miki-labs/lunowa/issues/175).
+
 **Active execution plan, reconciled 2026-08-29 after Issue #58 / PR #59 implementation-graph freeze and Issue #61 / PR #76 visual-reference freeze.**
 
 This is sequencing authority, not Product truth. Product truth lives in `PRODUCT.md` / `PRODUCT-CONTENT.md`; Product regressions in `GOLDEN-SCENARIO-BANK.md`; Responsibility semantics/oracles in `responsibility/`; UI behavior in `../design/`; exact dependency/parallelization/writer detail in `IMPLEMENTATION-GRAPH.md` + live GitHub Issues.

@@ -47,7 +47,7 @@ const participantIdByEmail = new Map([
 
 function oracleBlock(caseId: string): string {
   for (const file of ORACLE_FILES) {
-    const text = readFileSync(resolve(process.cwd(), file), 'utf8');
+    const text = readFileSync(resolve(process.cwd(), file), 'utf8').replace(/\r\n/g, '\n');
     for (const match of text.matchAll(/```yaml\n([\s\S]*?)```/g)) {
       const block = match[1] ?? '';
       if (new RegExp(`^case_id:\\s*${caseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm').test(block)) return block;

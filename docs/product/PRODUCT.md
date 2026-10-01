@@ -4,6 +4,8 @@
 
 **Canonical Product authority for Lunowa, reconciled through 2026-08-28.**
 
+2026-09-18 user scope extension: [COMPLETION-SCOPE.md](COMPLETION-SCOPE.md) records the accepted Gmail + Outlook, multi-account, reference-led completion direction and bounded code cleanup. It extends the earlier one-provider completion target without changing the Responsibility, authorization, or Send invariants. The local amendment remains unmerged; live execution is tracked in [#175](https://github.com/miki-labs/lunowa/issues/175).
+
 This document owns the highest-level Product contract:
 
 - what Lunowa exists to do;

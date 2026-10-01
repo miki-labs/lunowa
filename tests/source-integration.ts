@@ -64,6 +64,7 @@ try {
   assert(version.rows[0]?.server_version_num === '180006', 'G21 integration requires PostgreSQL 18.6.');
 
   const auth = createAppAuth(db, {
+    credentialFixture: true,
     secret: process.env.BETTER_AUTH_SECRET,
     baseURL: process.env.BETTER_AUTH_URL
   });

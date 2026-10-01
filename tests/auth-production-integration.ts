@@ -63,6 +63,7 @@ try {
   assert(catalog.rows[0]?.data_type === 'uuid' && catalog.rows[0]?.is_primary_key, 'Production user.id is not a PostgreSQL UUID primary key.');
 
   const auth = createAppAuth(db, {
+    credentialFixture: true,
     secret: integrationSecret,
     baseURL: 'http://g10-auth.invalid'
   });

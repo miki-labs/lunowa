@@ -6,6 +6,8 @@
 
 ## Checkpoint metadata
 
+2026-09-18 planning update: [COMPLETION-SCOPE.md](../product/COMPLETION-SCOPE.md) records the user's Gmail + Outlook / multiple-account / accepted-visual / bounded-cleanup extension. Find the live completion plan through that source before dispatch. The September 6 capability/frontier snapshot below is historical: later implementation Issues have closed, while the new visual candidate is still local and uncommitted. Neither fact establishes current deployed/provider acceptance. Do not restart the old frontier from this snapshot.
+
 - Last reconciled: **2026-09-06**
 - Current `main` SHA: **live GitHubで確認**。このmutable document自身の更新で即staleになるため固定しない
 - Accepted Product/application base at this reconcile includes **G00 / G11 / G10 / G19 / G20 / G30 / G31**

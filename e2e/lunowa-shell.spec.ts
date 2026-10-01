@@ -345,6 +345,10 @@ test('keeps each responsive stage in content-fit order and rail labels discovera
     await page.setViewportSize({width, height: 900});
     await page.goto('/ja');
     await waitForAuthenticatedShell(page);
+    // Desktop keeps list and detail side by side, even before selection.
+    if (width >= 720) await expect(page.locator('.detail-pane')).toBeVisible();
+    else await expect(page.locator('.detail-pane')).toBeHidden();
+    if (width >= 720) await page.getByRole('button', {name: /返信する/}).click();
     const geometry = await page.evaluate(() => {
       const shell = document.querySelector<HTMLElement>('.app-shell')!;
       const header = document.querySelector<HTMLElement>('.mobile-header')!;
@@ -457,7 +461,7 @@ test('does not activate global search for editable input or Japanese IME composi
   await expect(page.getByRole('heading', {name: '見積書の確認を終える'})).toBeVisible();
 });
 
-test('expires, re-authenticates, and signs out without changing mailbox monitoring semantics', async ({page}) => {
+test('expires, re-authenticates, and signs out without changing mailbox monitoring semantics', async ({page, context}) => {
   await page.unroute('**/api/auth/get-session**');
   let authenticated = true;
   await page.route('**/api/auth/**', async (route) => {
@@ -466,9 +470,8 @@ test('expires, re-authenticates, and signs out without changing mailbox monitori
       await route.fulfill({json: authenticated ? appSession : null});
       return;
     }
-    if (path.endsWith('/sign-in/email')) {
-      authenticated = true;
-      await route.fulfill({json: {redirect: false, token: appSession.session.token, user: appSession.user}});
+    if (path.endsWith('/sign-in/social')) {
+      await route.fulfill({json: {redirect: false, url: 'https://accounts.google.com/o/oauth2/v2/auth?state=fixture'}});
       return;
     }
     if (path.endsWith('/sign-out')) {
@@ -478,24 +481,32 @@ test('expires, re-authenticates, and signs out without changing mailbox monitori
     }
     await route.abort();
   });
+  await context.route('https://accounts.google.com/**', async (route) => {
+    authenticated = true;
+    await route.fulfill({status: 302, headers: {location: new URL('/ja?auth=returned', page.url()).href}, body: ''});
+  });
 
   await page.goto('/ja');
   await expect(page.getByTestId('lunowa-shell')).toBeVisible();
 
+  await nav(page, '対応が必要').click();
+  await page.getByRole('button', {name: /返信する/}).click();
+  await page.getByLabel('本文').fill('再ログイン後も残す未送信の下書き');
+
   authenticated = false;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await expect(page.getByRole('heading', {name: 'セッションの期限が切れました'})).toBeVisible();
-  await expect(page.getByText(/サーバー側の監視が停止したことは意味しません/)).toBeVisible();
+  await expect(page.getByRole('heading', {name: 'もう一度、サインイン'})).toBeVisible();
+  await expect(page.getByText(/サーバー側の監視が停止することはありません/)).toBeVisible();
+  await expect(page.getByRole('link', {name: 'English'})).toHaveCount(0);
 
-  await page.getByLabel('メールアドレス').fill('browser@example.invalid');
-  await page.getByLabel('パスワード').fill('password-123');
-  await page.getByRole('button', {name: 'サインインする'}).click();
+  await page.getByRole('button', {name: 'Google で続行'}).click();
   await expect(page.getByTestId('lunowa-shell')).toBeVisible();
+  await expect(page.getByLabel('本文')).toHaveValue('再ログイン後も残す未送信の下書き');
 
   await nav(page, '設定').click();
   await page.getByRole('button', {name: 'この端末からログアウト'}).click();
   await expect(page.getByText(/この端末からログアウトしました。Lunowaの監視設定は変更されていません/)).toBeVisible();
-  await expect(page.getByRole('heading', {name: 'Lunowaにサインイン'})).toBeVisible();
+  await expect(page.getByRole('heading', {name: 'Lunowaへようこそ'})).toBeVisible();
 });
 
 test('keeps mailbox disconnect failure and Product-account deletion boundaries truthful', async ({page}) => {

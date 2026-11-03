@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@vinext/cloudflare": "1.0.0-beta.7",
-    "better-auth": "1.7.2",
+    "better-auth": "1.7.7",
     "drizzle-orm": "0.45.2",
     "email-addresses": "5.0.0",
     "iconv-lite": "0.7.0",
